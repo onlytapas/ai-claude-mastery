@@ -1,0 +1,156 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What Claude Code is, in one sentence you can say to anyone</li>
+<li>How it differs from chatting with Claude in the web or desktop app</li>
+<li>Where Claude Code runs: terminal, VS Code, JetBrains, the desktop app and the cloud</li>
+<li>What it can and can't do, and how its safety model protects your computer</li>
+<li>Who uses it and why it matters for testers, not only developers</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 41 (how the Claude pieces fit together) helps. If you've never opened a terminal, skim Chapters 52–54 first, or follow this chapter's tour inside VS Code instead.</div>
+
+<div class="bigidea"><p><a class="gl" href="#g-claude-code">Claude Code</a> is Anthropic's AI assistant that <strong>works inside your project</strong> rather than inside a chat window. You describe a task in plain English. Claude Code reads your files, runs commands, edits code and checks the result, asking your permission along the way. It's the difference between asking a colleague for advice and asking a colleague to sit at your computer and do the work while you watch.</p></div>
+
+<h3 id="ch63-1"><span class="num">63.1</span>One sentence, then the details</h3>
+<p>Anthropic describes Claude Code as an <strong>agentic coding tool</strong>. Each word matters:</p>
+<div class="tbl"><table>
+<tr><th>Word</th><th>Plain meaning</th></tr>
+<tr><td>Agentic</td><td>It doesn't just answer; it takes steps on its own (reading, searching, running, editing) towards a goal you set. See <a class="gl" href="#g-agent">agent</a>.</td></tr>
+<tr><td>Coding</td><td>It was built for software work, but anything that lives in files and can be done with commands works too: test plans, data files, scripts, reports.</td></tr>
+<tr><td>Tool</td><td>It's a program you install and run, not a website. It uses Claude models (the same family you chat with) as its "brain".</td></tr>
+</table></div>
+<p>If you remember one thing: <strong>the Claude app talks; Claude Code acts.</strong></p>
+
+<div class="box analogy"><span class="tag">In everyday life</span><p>Imagine you need a leaking tap fixed. You can phone a plumber friend, describe the leak and follow their advice yourself. That's the Claude app: excellent advice, but your hands do the work and you copy everything across. Or the plumber can come round, look under the sink, try a fix, turn the water back on and check for drips, asking "OK if I turn the water off?" first. That's Claude Code.</p></div>
+
+<h3 id="ch63-2"><span class="num">63.2</span>Chat app versus Claude Code</h3>
+<div class="tbl"><table>
+<tr><th></th><th>Claude app (web, desktop, mobile chat)</th><th>Claude Code</th></tr>
+<tr><td>Where your work lives</td><td>In the conversation, plus files you upload</td><td>In your project folder on your computer (or a cloud copy of it)</td></tr>
+<tr><td>What it can see</td><td>What you paste or attach</td><td>Any file in the project it chooses to read, plus command output</td></tr>
+<tr><td>What it can do</td><td>Write answers, documents and <a class="gl" href="#g-artifact">artifacts</a></td><td>Read, search, create and edit files; run commands such as tests, git and build tools</td></tr>
+<tr><td>How it checks its work</td><td>It can't run your code</td><td>It runs the tests itself and reads the results</td></tr>
+<tr><td>Who copies results around</td><td>You</td><td>Nobody: changes land directly in your files, which you review</td></tr>
+<tr><td>Safety</td><td>Mostly about content</td><td>Also about actions: a permission system decides what it may do without asking</td></tr>
+<tr><td>Best for</td><td>Thinking, writing, learning, analysing documents</td><td>Multi-step work inside a code or test repository</td></tr>
+</table></div>
+<p>Both use the same Claude models and the same account. Many people use both every day: the app to think through a test strategy, Claude Code to turn it into automated tests.</p>
+
+<h3 id="ch63-3"><span class="num">63.3</span>Where Claude Code runs</h3>
+<p>Claude Code is one program with several "front doors". Your settings, <a class="gl" href="#g-claude-md">CLAUDE.md</a> files and commands work the same through all of them.</p>
+<div class="tbl"><table>
+<tr><th>Surface</th><th>What it looks like</th><th>Good for</th></tr>
+<tr><td><b>Terminal</b> (the CLI)</td><td>You type <code>claude</code> in a <a class="gl" href="#g-terminal">terminal</a> window and chat in text</td><td>Full control, every feature, scripts and automation</td></tr>
+<tr><td><b>VS Code</b> extension</td><td>A Claude panel inside the editor, with changes shown as side-by-side diffs</td><td>People who live in VS Code; easiest place to start. Probably how your machine was set up.</td></tr>
+<tr><td><b>JetBrains</b> plugin</td><td>The same idea inside IntelliJ IDEA, PyCharm, WebStorm and others</td><td>Java and Python teams using JetBrains tools</td></tr>
+<tr><td><b>Desktop app</b></td><td>The <em>Code</em> tab in the Claude Desktop app</td><td>A friendlier window without a terminal</td></tr>
+<tr><td><b>Web / cloud</b></td><td>Sessions at claude.ai/code that run on Anthropic's machines against a GitHub repository</td><td>Long tasks that keep going while your laptop is closed; working from your phone</td></tr>
+</table></div>
+<p>Chapter 70 covers each surface in depth. For now, know that they're doors into the same house.</p>
+
+<h3 id="ch63-4"><span class="num">63.4</span>What Claude Code can do</h3>
+<p>Under the hood Claude Code gives the model a set of <a class="gl" href="#g-tool-use">tools</a>. The model decides which to use; Claude Code runs them on your computer.</p>
+<div class="tbl"><table>
+<tr><th>Tool family</th><th>Examples of what Claude does with it</th><th>QA example</th></tr>
+<tr><td>Read and search</td><td>Open files, find files by name, search inside files</td><td>"Find every test that touches the checkout page"</td></tr>
+<tr><td>Edit and write</td><td>Change lines in a file, create new files</td><td>Add three boundary-value tests to <code>login.spec.ts</code></td></tr>
+<tr><td>Run commands</td><td>Run tests, git, package managers, scripts</td><td>Run the failing test, read the error, try a fix, run it again</td></tr>
+<tr><td>Web</td><td>Search the web, fetch a page</td><td>Look up the current Playwright API for screenshots</td></tr>
+<tr><td>Helpers</td><td>Hand a side task to a <a class="gl" href="#g-subagent">subagent</a>; keep a to-do list</td><td>Review 40 test files in parallel without filling the main conversation</td></tr>
+<tr><td>Connected tools</td><td>Anything you plug in through <a class="gl" href="#g-mcp">MCP</a></td><td>Read a Jira story (Chapter 101), drive a browser (Chapter 102)</td></tr>
+</table></div>
+
+<div class="box example"><span class="tag">Real-world example: a tester's afternoon</span><p>Priya, a QA engineer, types: <em>"The nightly run shows three failures in the payments suite. Find out why and tell me whether it's the app or the tests."</em> Claude Code reads the test report, opens the three test files, runs one failing test, notices a renamed button ID in a recent commit, shows Priya the evidence, and proposes a one-line locator fix. It asks before editing. Priya approves, Claude reruns the suite, and all three pass. Priya still made the important call (the change was intentional, so the test was wrong, not the app), but she skipped forty minutes of digging.</p></div>
+
+<h3 id="ch63-5"><span class="num">63.5</span>What it can't do (or shouldn't)</h3>
+<ul>
+<li><strong>It doesn't know your business.</strong> It doesn't know which behaviour is a bug and which is intended unless you tell it, or unless the requirements are written down somewhere it can read.</li>
+<li><strong>It isn't always right.</strong> Like every AI model it can be confidently wrong (Chapter 22). The difference is that it can run tests to check itself, if you ask it to.</li>
+<li><strong>It can't see what it hasn't read.</strong> Claude starts each session fresh. It only knows the files it has opened, the instructions in CLAUDE.md, and what you tell it.</li>
+<li><strong>It doesn't replace review.</strong> Every change is your responsibility. Read the diff before you commit.</li>
+<li><strong>It needs a paid plan.</strong> The free Claude plan doesn't include Claude Code (Chapter 64).</li>
+</ul>
+
+<h3 id="ch63-6"><span class="num">63.6</span>The agent loop in one picture</h3>
+<p>Every task, simple or huge, runs through the same <a class="gl" href="#g-agent-loop">agent loop</a>:</p>
+<div class="flow">
+<div><b>You ask</b>"Make the login tests pass."</div>
+<div><b>Claude thinks</b>The model, running in Anthropic's cloud, decides the next step: "run the tests first".</div>
+<div class="hl"><b>Permission check</b>Claude Code checks your settings. If needed, it asks you.</div>
+<div><b>Tool runs</b>On your computer. The output is captured.</div>
+<div><b>Result returns</b>The output goes back to the model, which decides the next step, and so on until done.</div>
+</div>
+<p>Two facts follow, and they're worth repeating to anyone who worries about AI touching their computer:</p>
+<ol>
+<li><strong>The thinking happens in the cloud; the doing happens on your machine.</strong> Claude Code sends the model your request and the text of what it has read or run. It doesn't upload your whole disk.</li>
+<li><strong>Every action passes a checkpoint you control.</strong> That's the permission system.</li>
+</ol>
+<p>Chapter 66 walks through this loop step by step, including what is sent where.</p>
+
+<h3 id="ch63-7"><span class="num">63.7</span>The safety model in one paragraph</h3>
+<p>Claude Code can read files freely, but changing files and running commands are governed by a <a class="gl" href="#g-permission-mode">permission mode</a> and your own allow/deny rules. In <strong>Manual</strong> mode it asks before every edit or command. In <strong>Accept edits</strong> mode it edits files freely but still asks before most commands. In <strong>Plan</strong> mode it only investigates and proposes. In <strong>Auto</strong> mode it acts without asking while a separate background safety check reviews each action and blocks risky ones. Since version 2.1.283, new interactive sessions in the terminal and VS Code start in Auto mode. You can switch at any time with <kbd>Shift</kbd>+<kbd>Tab</kbd>, and deny rules (for example "never read <code>.env</code>") are enforced in every mode. Chapter 67 explains each mode and when to use it.</p>
+<div class="box warn"><span class="tag">Know your starting mode</span><p>If someone else set up your machine, you may have been running in Auto mode without realising. That's usually fine for everyday work, but switch to Plan or Manual for anything sensitive, such as changes to shared configuration or production data. The status bar at the bottom of the session shows the current mode, for example <code>⏵⏵ auto mode on</code> or <code>⏸ plan mode on</code>.</p></div>
+
+<h3 id="ch63-8"><span class="num">63.8</span>Who uses it, and why testers should care</h3>
+<div class="cols2">
+<div><h4>Developers</h4><p>Write features, fix bugs, refactor, review pull requests, explain unfamiliar code.</p></div>
+<div><h4>Testers and QA engineers</h4><p>Write and maintain automated tests, triage failures, generate test data, read logs, draft bug reports, connect to Jira and browsers through MCP (Part XII).</p></div>
+<div><h4>Analysts and others</h4><p>Clean data files, write scripts that save repetitive work, turn messy notes into structured documents, explore a codebase to answer "how does this work?".</p></div>
+</div>
+<p>For QA in particular, Claude Code removes the biggest barrier to automation: the hours of setup, boilerplate and debugging that stand between "I know what to test" and "it runs in CI". Your testing judgement becomes the valuable part, and Claude handles much of the typing. Part XV is all about this.</p>
+
+<details class="deep"><summary>Is Claude Code a model, an app or a framework?</summary><div class="body">
+<p>It's a <strong>harness</strong>: a program that wraps a model with tools, permissions, memory files and a user interface. The model (for example Claude Opus 5.5) is the same one available through the API. Claude Code adds:</p>
+<ul>
+<li>a system prompt that teaches the model how to work as a coding agent;</li>
+<li>built-in tools (read, edit, search, shell, web, subagents) and support for MCP tools;</li>
+<li>context management: loading CLAUDE.md, compacting long conversations, saving sessions;</li>
+<li>the permission system and settings;</li>
+<li>extension points: skills, hooks, subagents and plugins (Part X).</li>
+</ul>
+<p>Anthropic also offers the same engine as a library, the Claude Agent SDK, so developers can build their own agents on it (Chapter 110). And <code>claude -p</code> ("print mode") runs Claude Code without the interactive screen, for scripts and CI pipelines.</p>
+</div></details>
+
+<h3 id="ch63-9"><span class="num">63.9</span>A guided first look</h3>
+<p>You don't need to change anything to take a tour. These steps are read-only.</p>
+<div class="lab"><div class="lab-h"><b>First look at Claude Code</b><span>20 min · VS Code or terminal</span></div><ol>
+<li>Open a project folder you're allowed to experiment in, ideally a test repository. In VS Code, open the Claude Code panel (the Claude icon, or <kbd>Cmd</kbd>+<kbd>Esc</kbd> on Mac / <kbd>Ctrl</kbd>+<kbd>Esc</kbd> on Windows). In a terminal, <code>cd</code> into the folder and type <code>claude</code>.<span class="expect">a prompt box and a status line showing the folder and the current mode.</span></li>
+<li>Press <kbd>Shift</kbd>+<kbd>Tab</kbd> until the status shows <strong>plan mode</strong>. This guarantees Claude only reads.<span class="expect"><code>⏸ plan mode on</code> (or the Plan label in VS Code).</span></li>
+<li>Ask: <em>"Give me a two-minute tour of this project: what it does, how it's organised, and how the tests are run."</em><span class="expect">Claude reading a few files (you'll see which) and a short summary, without changing anything.</span></li>
+<li>Ask: <em>"Which parts of this project have the fewest tests? Don't change anything."</em><span class="expect">a list of areas with weak coverage and how it decided. Check one claim yourself by opening the file it mentions.</span></li>
+<li>Type <code>/status</code> and press Enter.<span class="expect">your account, login method, model and version. Write them down; you'll need them in Chapter 64.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Claude Code is only for programmers."</dt><dd>It's for anyone whose work lives in files and commands. Testers, analysts and technical writers use it every day.</dd>
+<dt>"It uploads my whole project to the cloud."</dt><dd>Only what it reads or runs is sent to the model, as text. Cloud sessions are different: they deliberately work on a copy of your GitHub repository.</dd>
+<dt>"It's a different AI from the Claude chat app."</dt><dd>It uses the same Claude models and the same account. The difference is the tools and permissions around the model.</dd>
+<dt>"If it says the tests pass, they pass."</dt><dd>Ask it to show the test output, and check that the tests can actually fail (Chapter 121).</dd>
+<dt>"Auto mode means no safety."</dt><dd>Auto mode still runs a separate safety check on each action, and your deny rules always apply. It means fewer interruptions, not no checks.</dd>
+</dl></div>
+
+<h3 id="ch63-r"><span class="num">63.10</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Claude Code is an agentic coding tool: it reads, edits and runs things in your project to complete tasks you describe.</li>
+<li>The Claude app talks; Claude Code acts. Same models, same account, different tools.</li>
+<li>It runs in the terminal, VS Code, JetBrains, the desktop app and the cloud; settings and CLAUDE.md work across all of them.</li>
+<li>Thinking happens in the cloud; actions happen on your machine, through a permission check you control.</li>
+<li>Interactive sessions now start in Auto mode; switch modes with Shift+Tab and check the status bar.</li>
+<li>For QA, it turns testing knowledge into working automation much faster, but review and judgement stay human.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What's the main difference between the Claude chat app and Claude Code?</p><div class="opts"><button>Claude Code uses a different, coding-only AI model</button><button data-ok>Claude Code can read, edit and run things in your project; the app answers in a conversation</button><button>The chat app can run your tests but Claude Code can't</button></div><p class="why" hidden>Same models; Claude Code adds tools and permissions so it can act.</p></div>
+<div class="qz"><p class="q">Where do Claude Code's actions, such as running a test, actually happen?</p><div class="opts"><button>On Anthropic's servers</button><button data-ok>On your computer (or in the cloud copy, for cloud sessions)</button><button>Inside the Claude chat app</button></div><p class="why" hidden>The model decides in the cloud; the tool runs locally and the output is sent back.</p></div>
+<div class="qz"><p class="q">You've just opened a new interactive session in VS Code without changing any settings. Which permission mode is it most likely in?</p><div class="opts"><button>Manual</button><button>Plan</button><button data-ok>Auto</button></div><p class="why" hidden>Since version 2.1.283, interactive terminal and VS Code sessions start in Auto mode when it's available.</p></div>
+<div class="qz"><p class="q">Which statement about Claude Code's knowledge of your project is true?</p><div class="opts"><button>It already knows your whole codebase before you ask anything</button><button data-ok>It only knows what it has read, what's in CLAUDE.md, and what you tell it</button><button>It remembers everything from last week's sessions automatically</button></div><p class="why" hidden>Each session starts fresh; CLAUDE.md and the files it reads are its knowledge.</p></div>
+<div class="qz"><p class="q">Which task suits Claude Code better than the chat app?</p><div class="opts"><button>Brainstorming names for a new feature</button><button data-ok>Fixing three failing tests in a repository and re-running the suite</button><button>Summarising a PDF you downloaded</button></div><p class="why" hidden>Multi-step work that needs to read files and run commands is where Claude Code shines.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Write a half-page note for your team titled "Claude Code in one page". Include: what it is (one sentence), the chat-versus-Code table in your own words, which surface your team should start with and why, and two QA tasks you'd try first. Ask a colleague who has never used it whether the note makes sense.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Claude Code is Claude with hands. Instead of answering in a chat, it works inside your project: reading files, running tests, editing code, and asking permission as it goes. The thinking happens in the cloud, the actions happen on your machine, and a permission mode decides how often it asks. It runs in the terminal, VS Code, JetBrains, the desktop app and the cloud. For testers, it turns 'I know what to test' into working automation much faster, but you still review everything."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs" target="_blank" rel="noopener">Claude Code documentation</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/permission-modes" target="_blank" rel="noopener">Permission modes</a> (Auto as the interactive default since v2.1.283).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/vs-code" target="_blank" rel="noopener">VS Code</a>, <a href="https://code.claude.com/docs/en/jetbrains" target="_blank" rel="noopener">JetBrains</a>, <a href="https://code.claude.com/docs/en/desktop" target="_blank" rel="noopener">Desktop</a> and <a href="https://code.claude.com/docs/en/claude-code-on-the-web" target="_blank" rel="noopener">Claude Code on the web</a>.</li>
+<li>Anthropic, <a href="https://www.anthropic.com/news/claude-4" target="_blank" rel="noopener">Introducing Claude 4</a> (Claude Code general availability, May 2025).</li>
+<li>Local <code>claude --help</code> output, Claude Code 2.1.319.</li>
+</ol><p class="verified">Verified 9 November 2026 against Claude Code 2.1.319</p></div>

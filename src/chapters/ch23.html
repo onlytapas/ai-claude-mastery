@@ -1,0 +1,322 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>Why retrieval-augmented generation (RAG) exists, and when you don't need it</li>
+<li>The RAG pipeline, step by step: ingest, chunk, embed, store, retrieve, generate with citations</li>
+<li>What a vector database does and how similarity search finds "nearest" chunks</li>
+<li>The difference between keyword, semantic and hybrid search, and why hybrid usually wins</li>
+<li>Reranking, contextual retrieval and the common ways RAG goes wrong</li>
+<li>How to build a tiny working retriever in plain Python and feed its results to Claude</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch15">Chapter 15</a> (embeddings and cosine similarity), <a href="#ch20">Chapter 20</a> (context windows) and <a href="#ch22">Chapter 22</a> (hallucinations). This chapter is conceptual: <a href="#ch92">Chapter 92</a> covers production RAG and <a href="#ch94">Chapter 94</a> is the build project. The lab needs Python 3 and a Claude account.</div>
+
+<div class="bigidea"><p>A model only knows what was in its training data and what's in front of it right now. <a class="gl" href="#g-rag">Retrieval-augmented generation</a> (RAG) puts the right facts in front of it: before the model answers, a search step finds the most relevant passages from your own documents and adds them to the prompt. The model then answers from those passages and cites them. Most of the engineering is in the search: splitting documents into chunks, turning them into <a class="gl" href="#g-embedding">embeddings</a>, storing them in a <a class="gl" href="#g-vector-database">vector database</a>, and combining meaning-based search with old-fashioned keyword search. Good retrieval makes a good answer possible; bad retrieval guarantees a bad one.</p></div>
+
+<h3 id="ch23-1"><span class="num">23.1</span>Why RAG exists</h3>
+<p>Ask a general model "What's our retry policy for the orders API?" and it has three honest options: say it doesn't know, guess (a hallucination), or ask you. It can't know, because:</p>
+<ul>
+<li><strong>Private data was never in training.</strong> Your Confluence pages, test strategy and Jira history are yours.</li>
+<li><strong>Training has a cutoff.</strong> Anything newer than the <a class="gl" href="#g-knowledge-cutoff">knowledge cutoff</a> is missing.</li>
+<li><strong>Memory of rare facts is fuzzy.</strong> Even public, rare details are recalled unreliably (<a href="#ch22">Chapter 22</a>).</li>
+</ul>
+<p>The fix is to turn a closed-book exam into an open-book one. You can do that by hand by pasting a document into the chat. RAG does it automatically, at scale, choosing which few pages out of thousands to "open the book at".</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A good reference librarian doesn't memorise every book. When you ask a question, they search the catalogue, pull the three most relevant books, open them at the right pages and answer from them, pointing at the paragraph. RAG is the librarian. The catalogue is the index, pulling books is retrieval, and pointing at the paragraph is citation.</p></div>
+<h4>When you don't need RAG</h4>
+<p>Context windows are now large (the current Claude models accept 1 million tokens, <a href="#ch20">Chapter 20</a>). Anthropic's own article on retrieval (September 2024) suggests that if your knowledge base is smaller than about 200,000 tokens (roughly 500 pages), you can often skip RAG and put the whole thing in the prompt, using prompt caching to keep it fast and cheaper (<a href="#ch89">Chapter 89</a>). RAG earns its complexity when the material is too big, changes often, or must respect who is allowed to see what.</p>
+<div class="tbl"><table>
+<tr><th>Approach</th><th>Best when</th><th>Weak when</th></tr>
+<tr><td><b>Paste it in (long context)</b></td><td>A few documents, one-off questions</td><td>Large or changing collections; cost per question grows with size</td></tr>
+<tr><td><b>RAG</b></td><td>Large, changing collections; answers need sources</td><td>Questions that need the whole collection at once ("summarise every defect this year")</td></tr>
+<tr><td><b>Tools and agentic search</b></td><td>Live systems (Jira, databases, a code repository) the model can query step by step</td><td>Slower; needs permissions and careful tool design (<a href="#ch97">Chapter 97</a>)</td></tr>
+<tr><td><b><a class="gl" href="#g-fine-tuning">Fine-tuning</a></b></td><td>Teaching a style, format or narrow skill</td><td>Adding facts: they get blurred like any trained memory, and updating means retraining</td></tr>
+</table></div>
+<div class="box note"><span class="tag">RAG is not the only kind of retrieval</span><p>Coding agents such as Claude Code mostly find what they need by running search tools (text search across files, file listings, reading files) step by step, rather than querying a pre-built vector index. That is retrieval too, just driven by the model. "RAG" usually means the pipeline in this chapter, where a separate search step runs before the model answers.</p></div>
+
+<h3 id="ch23-2"><span class="num">23.2</span>The pipeline</h3>
+<p>RAG has two halves. The <strong>indexing</strong> half runs ahead of time, whenever documents change. The <strong>query</strong> half runs every time someone asks a question.</p>
+<div class="flow">
+<div><b>1. Ingest</b>Collect documents: Confluence, PDFs, Jira, READMEs. Extract clean text and metadata (title, date, owner, permissions)</div>
+<div><b>2. Chunk</b>Split into passages of a few hundred tokens, keeping the source with each</div>
+<div><b>3. Embed</b>Turn each chunk into a vector with an embedding model</div>
+<div><b>4. Store</b>Save vectors, text and metadata in a vector database and a keyword index</div>
+</div>
+<div class="flow">
+<div><b>5. Query</b>The user asks a question; embed it the same way</div>
+<div class="hl"><b>6. Retrieve</b>Find the most similar chunks (often keyword + semantic), optionally rerank</div>
+<div><b>7. Augment</b>Put the top chunks in the prompt with clear source labels</div>
+<div><b>8. Generate</b>The model answers only from those chunks and cites them</div>
+</div>
+<p>The name describes the second half: generation (the model writing) is augmented (improved) by retrieval (the search). The idea and the name come from a 2020 paper by Patrick Lewis and colleagues at Facebook AI Research, University College London and New York University.</p>
+
+<h3 id="ch23-3"><span class="num">23.3</span>Chunking: cutting documents into pieces</h3>
+<p>You can't embed a 300-page manual as one vector: a single list of numbers can't hold the meaning of every page, and you want to retrieve the one relevant paragraph, not the whole manual. So documents are split into <a class="gl" href="#g-chunking">chunks</a>.</p>
+<div class="tbl"><table>
+<tr><th>Strategy</th><th>How</th><th>Trade-off</th></tr>
+<tr><td>Fixed size</td><td>Every N tokens (for example a few hundred), often with an overlap between neighbours</td><td>Simple; can cut a sentence or table in half</td></tr>
+<tr><td>Structure-aware</td><td>Split on headings, paragraphs, list items, code functions</td><td>Keeps ideas whole; needs clean input</td></tr>
+<tr><td>Per record</td><td>One chunk per Jira ticket, test case or FAQ entry</td><td>Natural for structured data; long tickets may still need splitting</td></tr>
+</table></div>
+<p>Chunk size is a balance. Too small, and a chunk loses its meaning ("It must finish in under 10 minutes": what must?). Too large, and one chunk mixes several topics, so its vector is a blurred average and it matches poorly. Overlap (repeating a sentence or two between neighbours) reduces the risk of cutting an idea in half.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>A test-strategy page says under the heading "Smoke suite": "It runs on every pull request. It must finish in under 10 minutes." Split by sentence, the second chunk has no idea what "it" is. A search for "smoke test time limit" may miss it. Keeping the heading with each chunk, or prefixing a short summary of where the chunk came from, fixes this. That second fix is what Anthropic calls contextual retrieval (section 23.6).</p></div>
+
+<h3 id="ch23-4"><span class="num">23.4</span>Embeddings and vector databases</h3>
+<p>From <a href="#ch15">Chapter 15</a>: an embedding model turns text into a <a class="gl" href="#g-vector">vector</a>, a list of perhaps a thousand numbers, arranged so that texts with similar meaning get vectors that point in similar directions. "Users get logged out after a deploy" and "sign-in problems after a release" share almost no words but land close together.</p>
+<div class="box note"><span class="tag">Embeddings with Claude</span><p>Claude is a text-generation model; Anthropic does not offer its own embedding model. Anthropic's documentation describes Voyage AI (now part of MongoDB) as one embeddings provider with a wide range of models, and also advises assessing a variety of vendors. Many other providers and open-weight embedding models exist. You can mix freely: one company's embeddings for retrieval, Claude for the answer.</p></div>
+<p>A <strong>vector database</strong> stores those vectors alongside the original text and metadata, and answers one question very fast: "Which stored vectors are nearest to this query vector?" That's called nearest-neighbour or similarity search, and "nearest" is usually measured with cosine similarity (or the dot product, which gives the same ranking when vectors are normalised to length 1).</p>
+<div class="figure" role="img" aria-label="Illustrative cosine similarity scores between the query 'users get logged out after a deploy' and four chunks"><div class="bars"><div class="bt">Query: "users get logged out after a deploy" (illustrative scores)</div>
+<div class="bar-row"><span>Sign-in problems after a deploy… expired session cookie</span><span class="track"><span class="fill hl" style="width:82%">0.82</span></span></div>
+<div class="bar-row"><span>Login timeout bug QA-1423 is fixed</span><span class="track"><span class="fill" style="width:61%">0.61</span></span></div>
+<div class="bar-row"><span>Release 4.2.0 shipped on 3 March</span><span class="track"><span class="fill" style="width:44%">0.44</span></span></div>
+<div class="bar-row"><span>Orders API returns HTTP 429</span><span class="track"><span class="fill" style="width:12%">0.12</span></span></div></div>
+<div class="cap">Illustrative numbers, not from a real embedding model. Higher means closer in meaning; retrieval keeps the top few.</div></div>
+<details class="deep"><summary>Under the hood: how a vector database searches millions of vectors fast</summary><div class="body">
+<p>The simple approach compares the query with every stored vector. That's exact, and fine for thousands of chunks, but slow for hundreds of millions. Vector databases therefore use <strong>approximate nearest neighbour</strong> (ANN) indexes that trade a tiny chance of missing the true best match for huge speed-ups.</p>
+<p>A widely used one is <strong>HNSW</strong> (Hierarchical Navigable Small World graphs, Malkov and Yashunin, 2016). Every vector is linked to a few of its neighbours, in several layers: the top layer has few, long-distance links (like motorways), lower layers have more, shorter links (like local streets). A search starts at the top, hops greedily towards the query, then drops a layer and refines. It visits a tiny fraction of the vectors and still usually finds the true nearest ones.</p>
+<p>Other tricks include clustering vectors and only searching the nearest clusters, and <strong>quantisation</strong>: storing each number in fewer bits (for example 8-bit integers instead of 32-bit floats) to cut memory, at a small accuracy cost.</p>
+<p>Options range from libraries you run yourself (such as FAISS), to extensions of databases you may already have (such as pgvector for PostgreSQL, or vector search in Elasticsearch, OpenSearch and MongoDB Atlas), to dedicated vector databases (such as Pinecone, Weaviate, Qdrant, Milvus and Chroma). Which one to use is a production question for <a href="#ch92">Chapter 92</a>; the concepts are the same.</p>
+</div></details>
+
+<h3 id="ch23-5"><span class="num">23.5</span>Keyword, semantic and hybrid search</h3>
+<p>Meaning-based search sounds strictly better than matching words. It isn't. Each has blind spots, and testers will recognise them immediately.</p>
+<div class="tbl"><table>
+<tr><th></th><th><a class="gl" href="#g-keyword-search">Keyword search</a></th><th><a class="gl" href="#g-semantic-search">Semantic search</a></th></tr>
+<tr><td>Matches</td><td>The same words (after simple normalising)</td><td>Similar meaning, even with different words</td></tr>
+<tr><td>Classic method</td><td><a class="gl" href="#g-bm25">BM25</a>, the scoring formula behind many search engines</td><td>Embeddings plus nearest-neighbour search</td></tr>
+<tr><td>Great for</td><td>Exact identifiers: <code>QA-1423</code>, error codes, function names, version numbers</td><td>Questions in everyday words: "why do users get kicked out?"</td></tr>
+<tr><td>Fails on</td><td>Synonyms and paraphrase: "logged out" won't match "sign-in problems"</td><td>Rare exact tokens: an embedding may treat <code>QA-1423</code> and <code>QA-1432</code> as nearly identical</td></tr>
+</table></div>
+<p><a class="gl" href="#g-hybrid-search">Hybrid search</a> runs both and merges the results. A simple, robust way to merge is <strong>reciprocal rank fusion</strong> (RRF): each chunk gets <code>1 / (k + rank)</code> from each list it appears in (k is commonly 60), and the scores are added. Chunks that rank well in either list rise; chunks that rank well in both rise most. It needs no tuning of how scores from the two methods compare, which is why it's popular.</p>
+<details class="deep"><summary>Under the hood: what BM25 rewards</summary><div class="body">
+<p>BM25 scores a chunk for a query by adding up, for each query word found in the chunk:</p>
+<ul>
+<li><strong>Rarity (IDF):</strong> words that appear in few chunks count for more. "QA-1423" is rare, so it's decisive; "test" is everywhere, so it barely counts.</li>
+<li><strong>Frequency, with diminishing returns:</strong> a word appearing twice counts more than once, but the tenth mention adds little (controlled by a parameter usually called <code>k1</code>).</li>
+<li><strong>Length normalisation:</strong> long chunks naturally contain more words, so their scores are scaled down a little (parameter <code>b</code>).</li>
+</ul>
+<p>The lab script implements exactly this in about ten lines.</p>
+</div></details>
+
+<h3 id="ch23-6"><span class="num">23.6</span>Making retrieval better: reranking and contextual retrieval</h3>
+<p>Two widely used improvements sit on top of hybrid search.</p>
+<p><a class="gl" href="#g-reranking">Reranking.</a> First retrieval is fast but rough. A reranker is a slower, more accurate model that looks at the query and each candidate chunk <em>together</em> and scores how well the chunk answers the question. The usual pattern: retrieve many candidates (say 100–150) cheaply, rerank them, keep the best 10–20 for the prompt.</p>
+<p><strong>Contextual retrieval.</strong> In September 2024 Anthropic published a technique for the "lost context" problem from section 23.3. Before indexing, a model writes a short sentence or two explaining where each chunk sits in its document ("This chunk is from the smoke-suite section of the test strategy; 'it' refers to the smoke suite"), and that context is added to the chunk before embedding and before building the BM25 index. Anthropic reported on its own test sets that:</p>
+<div class="figure" role="img" aria-label="Anthropic-reported retrieval failure rates: baseline 5.7%, with contextual embeddings and contextual BM25 2.9%, plus reranking 1.9%"><div class="bars"><div class="bt">Top-20 retrieval failure rate (lower is better)</div>
+<div class="bar-row"><span>Standard embeddings</span><span class="track"><span class="fill" style="width:100%">5.7%</span></span></div>
+<div class="bar-row"><span>+ Contextual embeddings and contextual BM25</span><span class="track"><span class="fill" style="width:51%">2.9%</span></span></div>
+<div class="bar-row"><span>+ Reranking</span><span class="track"><span class="fill hl" style="width:33%">1.9%</span></span></div></div>
+<div class="cap">Source: Anthropic, "Introducing Contextual Retrieval" (19 September 2024): a 49% reduction, and 67% with reranking. Vendor-reported results on its own datasets; your mileage will vary.</div></div>
+
+<h3 id="ch23-7"><span class="num">23.7</span>Generating the answer, with citations</h3>
+<p>Retrieval only finds candidate text. The prompt then has to make the model use it well. The same grounding rules from <a href="#ch22">Chapter 22</a> apply:</p>
+<div class="code"><span class="cap">The shape of a RAG prompt</span><pre>Answer using ONLY the sources below. Cite the source name for every
+claim. If the sources do not contain the answer, say you don't know.
+
+&lt;source id=&quot;1&quot; name="oncall.md"&gt;Sign-in problems after a deploy are
+usually caused by an expired session cookie.&lt;/source&gt;
+&lt;source id=&quot;2&quot; name="release-notes.md"&gt;The login timeout bug QA-1423 is
+fixed.&lt;/source&gt;
+
+Question: users get logged out after a deploy</pre></div>
+<p>On the Claude API you can go further: documents (and search results you supply yourself) can be passed with citations enabled, and Claude's reply comes back with structured pointers to the exact passages it used (<a href="#ch22">Chapter 22</a>, section 22.4). That lets your application show users a clickable source for each sentence.</p>
+
+<h3 id="ch23-8"><span class="num">23.8</span>How RAG goes wrong</h3>
+<p>When a RAG system gives a wrong answer, the first question is always: did retrieval fail, or did generation fail? <a href="#ch125">Chapter 125</a> shows how to test each half separately.</p>
+<input class="filter" data-filter="#ch23Fail" data-empty="#ch23FailEmpty" type="search" placeholder="Filter failures…" aria-label="Filter RAG failure modes">
+<div class="tbl"><table id="ch23Fail">
+<tr><th>Failure</th><th>Symptom</th><th>Typical fix</th></tr>
+<tr class="group"><td colspan="3">Retrieval</td></tr>
+<tr><td>Missed chunk</td><td>"I don't know" when the answer exists</td><td>Hybrid search, better chunking, contextual retrieval</td></tr>
+<tr><td>Wrong chunk</td><td>Confident answer about a similar but different thing (QA-1432 vs QA-1423)</td><td>Keyword search for identifiers; reranking</td></tr>
+<tr><td>Stale chunk</td><td>Answer from last year's version of the policy</td><td>Re-index on change; date metadata; prefer newest</td></tr>
+<tr><td>Permission leak</td><td>A user sees text from a page they can't access</td><td>Filter by the user's permissions at retrieval time, never only in the prompt</td></tr>
+<tr class="group"><td colspan="3">Generation</td></tr>
+<tr><td>Ignores sources</td><td>Answer from general knowledge instead of the documents</td><td>Stronger grounding instructions; citations</td></tr>
+<tr><td>Over-merges</td><td>Combines two chunks into a claim neither makes</td><td>Require one citation per claim; faithfulness checks</td></tr>
+<tr><td>Injected instructions</td><td>A document says "ignore previous instructions…" and the model obeys</td><td>Treat retrieved text as data; see <a class="gl" href="#g-prompt-injection">prompt injection</a> (<a href="#ch103">Chapter 103</a>)</td></tr>
+</table></div>
+<p id="ch23FailEmpty" hidden>No rows match.</p>
+<div class="box warn"><span class="tag">Retrieval doesn't respect permissions by itself</span><p>If HR documents and engineering wikis go into the same index, a search for "salary" from an engineer will happily retrieve HR chunks. Store access rights as metadata and filter on them during retrieval, before anything reaches the prompt. Telling the model "don't reveal HR data" is not access control.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Build a tiny retriever and ground Claude with it</b><span>30 min · terminal and claude.ai</span></div>
+<p>This script is a complete, working miniature of steps 2 and 4–7 of the pipeline. It uses only the Python standard library. Real embedding models aren't free to call, so the "semantic" step uses a small hand-written synonym table as a stand-in: crude, but it shows exactly what semantic search adds over keywords.</p>
+<div class="code"><span class="cap">minirag.py</span><pre><span class="c"># minirag.py - a tiny retrieval pipeline in plain Python 3 (no packages)</span>
+import math, re, sys
+from collections import Counter
+
+DOCS = {
+    "release-notes.md": """Release 4.2.0 shipped on 3 March. Support for IE11 was removed.
+The login timeout bug QA-1423 is fixed. Password reset emails now expire after 30 minutes.""",
+    "test-strategy.md": """Smoke tests run on every pull request and must finish in under 10 minutes.
+Full regression runs nightly against the staging environment.
+Flaky tests are quarantined and must be fixed within one sprint.""",
+    "api-guide.md": """The orders API returns HTTP 429 when a client sends too many requests.
+Clients should wait and retry. Authentication uses a bearer token in the Authorization header.""",
+    "oncall.md": """If production checkout fails, page the on-call engineer.
+Sign-in problems after a deploy are usually caused by an expired session cookie.""",
+}
+
+STOP = {"the", "a", "an", "is", "are", "and", "or", "of", "to", "in", "on",
+        "for", "when", "what", "how", "do", "does", "my", "be", "after", "by", "it"}
+
+def words(text):
+    return [w for w in re.findall(r"[a-z0-9-]+", text.lower()) if w not in STOP]
+
+<span class="c"># 1. CHUNK: one sentence per chunk, remembering its source</span>
+chunks = []
+for name, text in DOCS.items():
+    for sent in re.split(r"(?&lt;=\.)\s+", text.strip()):
+        chunks.append({"source": name, "text": sent})
+
+<span class="c"># 2. KEYWORD SEARCH: BM25, the classic search-engine formula</span>
+N = len(chunks)
+avg_len = sum(len(words(c["text"])) for c in chunks) / N
+df = Counter(w for c in chunks for w in set(words(c["text"])))
+
+def bm25(query, chunk, k1=1.5, b=0.75):
+    tf = Counter(words(chunk["text"]))
+    length = sum(tf.values())
+    score = 0.0
+    for w in words(query):
+        if w not in tf:
+            continue
+        idf = math.log(1 + (N - df[w] + 0.5) / (df[w] + 0.5))
+        score += idf * tf[w] * (k1 + 1) / (tf[w] + k1 * (1 - b + b * length / avg_len))
+    return score
+
+# 3. "SEMANTIC" SEARCH: a stand-in for embeddings. Real systems use an
+<span class="c">#    embedding model; here a small synonym table maps words to concepts.</span>
+CONCEPTS = {
+    "login": "signin", "logged": "signin", "sign-in": "signin", "signin": "signin", "log": "signin",
+    "session": "signin", "password": "signin", "authentication": "signin",
+    "slow": "speed", "minutes": "speed", "timeout": "speed",
+    "throttled": "ratelimit", "429": "ratelimit", "too": "ratelimit", "many": "ratelimit",
+    "limit": "ratelimit", "retry": "ratelimit",
+    "deploy": "release", "release": "release", "shipped": "release", "4": "release",
+    "broken": "failure", "fails": "failure", "bug": "failure", "problems": "failure",
+    "flaky": "failure",
+}
+
+def vector(text):
+    return Counter(CONCEPTS.get(w, w) for w in words(text))
+
+def cosine(a, b):
+    dot = sum(a[k] * b[k] for k in a)
+    na = math.sqrt(sum(v * v for v in a.values()))
+    nb = math.sqrt(sum(v * v for v in b.values()))
+    return dot / (na * nb) if na and nb else 0.0
+
+def semantic(query, chunk):
+    return cosine(vector(query), vector(chunk["text"]))
+
+<span class="c"># 4. HYBRID: reciprocal rank fusion combines the two ranked lists</span>
+def ranked(score_fn, query):
+    scored = [(score_fn(query, c), i) for i, c in enumerate(chunks)]
+    return [i for s, i in sorted(scored, reverse=True) if s &gt; 0]   <span class="c"># drop zero scores</span>
+
+def hybrid(query, k=60):
+    fused = Counter()
+    for ranking in (ranked(bm25, query), ranked(semantic, query)):
+        for rank, i in enumerate(ranking):
+            fused[i] += 1 / (k + rank + 1)
+    return [i for i, _ in fused.most_common()]
+
+def show(title, order, top=3):
+    print(f"  {title}")
+    if not order:
+        print("    (no matches)")
+    for i in order[:top]:
+        c = chunks[i]
+        print(f"    [{c['source']}] {c['text'][:70]}")
+
+query = " ".join(sys.argv[1:]) or "users get logged out after a deploy"
+print(f"Query: {query}  ({N} chunks)")
+show("Keyword (BM25):", ranked(bm25, query))
+show("Semantic (concepts):", ranked(semantic, query))
+show("Hybrid (RRF):", hybrid(query))
+
+<span class="c"># 5. AUGMENT: build the prompt you would send to Claude</span>
+print("\n--- Prompt to paste into Claude ---")
+print("Answer using ONLY the sources below. Cite the source name for every")
+print("claim. If the sources do not contain the answer, say you don't know.\n")
+for n, i in enumerate(hybrid(query)[:3], 1):
+    print(f"&lt;source id=\"{n}\" name=\"{chunks[i]['source']}\"&gt;{chunks[i]['text']}&lt;/source&gt;")
+print(f"\nQuestion: {query}")</pre></div>
+<div class="code"><span class="cap">Expected output: python3 minirag.py</span><pre>Query: users get logged out after a deploy  (12 chunks)
+  Keyword (BM25):
+    [oncall.md] Sign-in problems after a deploy are usually caused by an expired sessi
+  Semantic (concepts):
+    [oncall.md] Sign-in problems after a deploy are usually caused by an expired sessi
+    [release-notes.md] Release 4.2.0 shipped on 3 March.
+    [release-notes.md] The login timeout bug QA-1423 is fixed.
+  Hybrid (RRF):
+    [oncall.md] Sign-in problems after a deploy are usually caused by an expired sessi
+    [release-notes.md] Release 4.2.0 shipped on 3 March.
+    [release-notes.md] The login timeout bug QA-1423 is fixed.
+
+--- Prompt to paste into Claude ---
+Answer using ONLY the sources below. Cite the source name for every
+claim. If the sources do not contain the answer, say you don't know.
+
+&lt;source id=&quot;1&quot; name="oncall.md"&gt;Sign-in problems after a deploy are usually caused by an expired session cookie.&lt;/source&gt;
+&lt;source id=&quot;2&quot; name="release-notes.md"&gt;Release 4.2.0 shipped on 3 March.&lt;/source&gt;
+&lt;source id=&quot;3&quot; name="release-notes.md"&gt;The login timeout bug QA-1423 is fixed.&lt;/source&gt;
+
+Question: users get logged out after a deploy</pre></div>
+<div class="code"><span class="cap">Expected output: python3 minirag.py login is broken (first lines)</span><pre>Query: login is broken  (12 chunks)
+  Keyword (BM25):
+    [release-notes.md] The login timeout bug QA-1423 is fixed.
+  Semantic (concepts):
+    [oncall.md] Sign-in problems after a deploy are usually caused by an expired sessi
+    [release-notes.md] The login timeout bug QA-1423 is fixed.
+    [api-guide.md] Authentication uses a bearer token in the Authorization header.
+  Hybrid (RRF):
+    [release-notes.md] The login timeout bug QA-1423 is fixed.
+    [oncall.md] Sign-in problems after a deploy are usually caused by an expired sessi
+    [api-guide.md] Authentication uses a bearer token in the Authorization header.</pre></div>
+<ol>
+<li>Save the script as <code>minirag.py</code> and run <code>python3 minirag.py</code> (the default query is "users get logged out after a deploy").<span class="expect">three ranked lists and a ready-made prompt, exactly as in the first expected-output box above.</span></li>
+<li>Compare the three lists. Keyword search found only the chunk sharing the word "deploy". Semantic search also found the login-timeout chunk through the concept "signin", and a weak match on "Release 4.2.0 shipped".<span class="expect">a concrete view of what each method adds, and of a false positive (the release chunk has the right topic but no useful content: a chunk that lost its context).</span></li>
+<li>Run <code>python3 minirag.py login is broken</code>.<span class="expect">as in the second expected-output box: keyword search finds only the chunk containing "login"; semantic search also finds the sign-in chunk and the authentication chunk, and hybrid puts the exact match first.</span></li>
+<li>Run <code>python3 minirag.py QA-1423</code>, then <code>python3 minirag.py what is the refund policy</code>.<span class="expect">the exact ticket chunk for the identifier; "(no matches)" in all three lists for the refund question, and an empty source list in the prompt.</span></li>
+<li>Copy the "Prompt to paste into Claude" from the default query into a new Claude chat.<span class="expect">an answer that mentions the expired session cookie and cites <code>oncall.md</code>, possibly noting QA-1423 with its source. It shouldn't invent causes that aren't in the sources.</span></li>
+<li>Paste the refund-policy prompt (with no sources).<span class="expect">Claude says the sources don't contain the answer. That's the "I don't know" path working.</span></li>
+<li>Optional: add a document to <code>DOCS</code> (for example your team's real definition of done, with nothing confidential) and query it.<span class="expect">its sentences appear in the results when the query shares words or mapped concepts with them.</span></li>
+</ol>
+<p><b>Troubleshooting.</b> <code>python3: command not found</code> on Windows: try <code>py minirag.py</code>. Quotes in the query confuse your shell: wrap the whole query in double quotes. A chunk you expect isn't found by semantic search: its words aren't in the <code>CONCEPTS</code> table, which is exactly the limitation real embedding models remove. Results in a slightly different order from the expected output: you've edited <code>DOCS</code> or <code>CONCEPTS</code>; that's fine.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"RAG trains the model on our documents."</dt><dd>Nothing is trained. The model's weights don't change; relevant text is added to each prompt at question time.</dd>
+<dt>"A vector database is a special kind of AI."</dt><dd>It's a database optimised for one query: find the stored vectors nearest to this one. The intelligence is in the embedding model that produced the vectors.</dd>
+<dt>"Semantic search makes keyword search obsolete."</dt><dd>Embeddings are weak at exact identifiers like ticket numbers and error codes. Hybrid search usually beats either alone.</dd>
+<dt>"With a 1M-token context window, RAG is dead."</dt><dd>Long context removes the need for RAG on small collections. Large or fast-changing collections, per-user permissions and cost per question still favour retrieval.</dd>
+<dt>"If it cites a source, the answer is right."</dt><dd>A citation shows where the model looked, not that it read the passage correctly or that retrieval picked the right passage.</dd>
+</dl></div>
+
+<h3 id="ch23-r"><span class="num">23.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>RAG gives a model the facts at question time: retrieve relevant passages, add them to the prompt, answer from them with citations.</li>
+<li>Pipeline: ingest → chunk → embed → store (indexing), then query → retrieve → augment → generate.</li>
+<li>Chunking is a balance between losing context (too small) and blurring topics (too big).</li>
+<li>A vector database finds the nearest vectors fast, usually with approximate indexes such as HNSW.</li>
+<li>Keyword search (BM25) nails exact identifiers; semantic search handles paraphrase; hybrid with rank fusion combines them.</li>
+<li>Reranking and contextual retrieval measurably reduce retrieval failures (Anthropic reported 49%, and 67% with reranking, on its datasets).</li>
+<li>For small collections, putting everything in the prompt can be simpler. Permissions must be enforced at retrieval, not in the prompt.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What does RAG change about the model?</p><div class="opts"><button>It retrains the model's weights on your documents</button><button data-ok>Nothing: it adds relevant retrieved text to the prompt at question time</button><button>It replaces the model with a search engine</button></div><p class="why" hidden>The weights stay the same. The model reads retrieved passages as part of its input.</p></div>
+<div class="qz"><p class="q">A user searches for "QA-1423" and the system returns a chunk about QA-1432. Which change helps most?</p><div class="opts"><button>Make chunks bigger</button><button data-ok>Add keyword (BM25) search and combine it with semantic search</button><button>Use a bigger language model for the answer</button></div><p class="why" hidden>Exact identifiers are where embeddings are weakest and keyword search is strongest.</p></div>
+<div class="qz"><p class="q">Why are documents split into chunks before embedding?</p><div class="opts"><button>Embedding models only accept one sentence</button><button data-ok>One vector can't represent a long document well, and you want to retrieve just the relevant passage</button><button>It makes the database smaller</button></div><p class="why" hidden>Long texts average many topics into one blurred vector. Chunks keep meaning focused and retrieval precise.</p></div>
+<div class="qz"><p class="q">What is contextual retrieval, as described by Anthropic?</p><div class="opts"><button>Retrieving the whole document instead of chunks</button><button>Letting the model browse the web</button><button data-ok>Adding a short model-written explanation of where each chunk sits in its document before indexing it</button></div><p class="why" hidden>The added context stops chunks like "It must finish in under 10 minutes" from losing what "it" refers to.</p></div>
+<div class="qz"><p class="q">Engineers can retrieve HR salary documents through the company assistant. Where should this be fixed?</p><div class="opts"><button>Add "never reveal HR data" to the system prompt</button><button data-ok>Filter retrieval by the user's access rights before chunks reach the prompt</button><button>Use a smaller chunk size</button></div><p class="why" hidden>Prompts aren't access control. Anything retrieved can end up in the answer.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Design (on paper, no code needed) a RAG assistant for your team's test documentation. Write one page covering: which sources go in and which stay out; how you'd chunk each source (test cases, wiki pages, Jira tickets); what metadata you'd store (owner, date, permissions, component); whether you'd use keyword, semantic or hybrid search and why; and 10 test questions with the document each should retrieve. Keep the questions: you'll reuse them as a retrieval eval in <a href="#ch125">Chapter 125</a> and for the build in <a href="#ch94">Chapter 94</a>.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"The model doesn't know our documents, so we look them up for it. Ahead of time, we cut our docs into small chunks and turn each into a list of numbers that captures its meaning, stored in a vector database. When someone asks a question, we find the chunks closest in meaning, plus chunks that share exact words like ticket numbers, and paste the best few into the prompt with their source names. The model answers only from those and cites them. If retrieval finds the wrong chunk, the answer will be wrong, so most of the work, and most of the testing, is in the search."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>P. Lewis et al., <a href="https://arxiv.org/abs/2005.11401" target="_blank" rel="noopener">"Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks"</a> (2020), arXiv:2005.11401.</li>
+<li>Anthropic, <a href="https://www.anthropic.com/news/contextual-retrieval" target="_blank" rel="noopener">"Introducing Contextual Retrieval"</a> (19 September 2024).</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/embeddings" target="_blank" rel="noopener">Embeddings</a> (Claude documentation: no Anthropic embedding model; Voyage AI as one provider).</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/citations" target="_blank" rel="noopener">Citations</a> (Claude documentation).</li>
+<li>Y. A. Malkov and D. A. Yashunin, <a href="https://arxiv.org/abs/1603.09320" target="_blank" rel="noopener">"Efficient and robust approximate nearest neighbor search using Hierarchical Navigable Small World graphs"</a> (2016), arXiv:1603.09320.</li>
+<li>S. Robertson and H. Zaragoza, "The Probabilistic Relevance Framework: BM25 and Beyond", <i>Foundations and Trends in Information Retrieval</i> (2009).</li>
+<li>G. V. Cormack, C. L. A. Clarke and S. Büttcher, "Reciprocal Rank Fusion outperforms Condorcet and individual Rank Learning Methods", SIGIR (2009).</li>
+</ol><p class="verified">Verified 9 November 2026 against Anthropic's Embeddings and Citations documentation and the Contextual Retrieval article. Lab script tested with Python 3.</p></div>

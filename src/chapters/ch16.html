@@ -1,0 +1,471 @@
+<style>
+.tf text{font-family:var(--f-display);font-size:13px;fill:var(--ink)}
+.tf text.s{fill:var(--ink-soft);font-size:11px}
+.tf text.b{font-weight:700}
+.tf text.o{fill:var(--ochre);font-weight:700}
+.tf .bx{fill:var(--leaf);stroke:var(--rule);stroke-width:1.3}
+.tf .hl{fill:var(--ochre-wash);stroke:var(--ochre);stroke-width:1.6}
+.tf .sg{fill:var(--sage-wash);stroke:var(--sage);stroke-width:1.3}
+.tf .in{fill:var(--info-wash);stroke:var(--info);stroke-width:1.3}
+.tf .ln{stroke:var(--ink-soft);stroke-width:1.4;fill:none}
+.tf .lo{stroke:var(--ochre);fill:none}
+.tf .dash{stroke:var(--ink-soft);stroke-width:1.3;fill:none;stroke-dasharray:5 4}
+.tf .hm{fill:var(--ochre)}
+.tf .mk{fill:var(--rule)}
+.tf .ah{fill:var(--ink-soft)}
+.tf .bus{stroke:var(--sage);stroke-width:7;fill:none;opacity:.55}
+</style>
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>The full journey from your text to the model's next word, one stage at a time</li>
+<li>How tokens become vectors, and why the model needs to be told the order of words</li>
+<li>Self-attention with queries, keys and values, worked through by hand with real numbers</li>
+<li>What softmax, multi-head attention, the feed-forward network, residual connections and layer normalisation each do</li>
+<li>How blocks are stacked, how the output layer produces next-token probabilities, and the difference between encoder, decoder and decoder-only models</li>
+<li>How to run a complete attention calculation yourself in 30 lines of plain Python</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch6">Chapter 6</a> (the story of attention and the 2017 Transformer), <a href="#ch11">Chapter 11</a> (neurons, weights and layers), <a href="#ch14">Chapter 14</a> (tokens and token IDs) and <a href="#ch15">Chapter 15</a> (embeddings). You need school maths: multiplying, adding, and the idea of "e to the power of". Every calculation is shown.</div>
+
+<div class="bigidea"><p>A Transformer turns your text into tokens, and each token into a list of numbers. It then passes those lists through a stack of identical blocks. In every block, each token first <em>looks at the earlier tokens and gathers what is relevant</em> (attention), then <em>thinks about what it gathered on its own</em> (the feed-forward network). After the last block, the model scores every token in its vocabulary and turns the scores into probabilities for the next token. It picks one, adds it to the text, and repeats. That loop is how Claude, GPT and Gemini write every word.</p></div>
+
+<h3 id="ch16-1"><span class="num">16.1</span>The whole journey in one picture</h3>
+<p>The <a class="gl" href="#g-transformer">Transformer</a> is the design inside almost every modern <a class="gl" href="#g-large-language-model">large language model</a>. Before looking at any part closely, here is the whole route your prompt takes. Keep this picture in mind; every later section zooms into one box.</p>
+
+<div class="figure" role="img" aria-label="Pipeline: text is split into tokens, tokens become vectors with position added, the vectors pass through N Transformer blocks, an output layer scores every vocabulary token, scores become probabilities, one token is picked and appended, and the loop repeats.">
+<svg class="tf" viewBox="0 0 680 190" xmlns="http://www.w3.org/2000/svg">
+<defs><marker id="ar16a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<rect class="bx" x="8" y="30" width="96" height="78" rx="10"/>
+<text class="b" x="56" y="54" text-anchor="middle">1 Text</text><text class="s" x="56" y="74" text-anchor="middle">"The login</text><text class="s" x="56" y="89" text-anchor="middle">test"</text>
+<rect class="bx" x="120" y="30" width="96" height="78" rx="10"/>
+<text class="b" x="168" y="54" text-anchor="middle">2 Tokens</text><text class="s" x="168" y="74" text-anchor="middle">numbered pieces</text><text class="s" x="168" y="89" text-anchor="middle">(Chapter 14)</text>
+<rect class="bx" x="232" y="30" width="96" height="78" rx="10"/>
+<text class="b" x="280" y="54" text-anchor="middle">3 Vectors</text><text class="s" x="280" y="74" text-anchor="middle">embedding</text><text class="s" x="280" y="89" text-anchor="middle">+ position</text>
+<rect class="hl" x="344" y="22" width="104" height="94" rx="10"/>
+<text class="b" x="396" y="48" text-anchor="middle">4 Blocks × N</text><text class="s" x="396" y="68" text-anchor="middle">attention, then</text><text class="s" x="396" y="83" text-anchor="middle">feed-forward,</text><text class="s" x="396" y="98" text-anchor="middle">repeated</text>
+<rect class="bx" x="464" y="30" width="96" height="78" rx="10"/>
+<text class="b" x="512" y="54" text-anchor="middle">5 Output</text><text class="s" x="512" y="74" text-anchor="middle">a score for every</text><text class="s" x="512" y="89" text-anchor="middle">vocabulary token</text>
+<rect class="sg" x="576" y="30" width="96" height="78" rx="10"/>
+<text class="b" x="624" y="54" text-anchor="middle">6 Pick</text><text class="s" x="624" y="74" text-anchor="middle">"failed" 51%</text><text class="s" x="624" y="89" text-anchor="middle">"passed" 23% …</text>
+<path class="ln" d="M104,69 H118" marker-end="url(#ar16a)"/><path class="ln" d="M216,69 H230" marker-end="url(#ar16a)"/><path class="ln" d="M328,69 H342" marker-end="url(#ar16a)"/><path class="ln" d="M448,69 H462" marker-end="url(#ar16a)"/><path class="ln" d="M560,69 H574" marker-end="url(#ar16a)"/>
+<path class="dash" d="M624,108 V150 H56 V110" marker-end="url(#ar16a)"/>
+<text class="s" x="340" y="170" text-anchor="middle">append the chosen token to the text and run the whole thing again for the next token</text>
+</svg>
+<div class="cap">The Transformer language model as a loop. Percentages are illustrative.</div></div>
+
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a bug-triage meeting. Each person (a token) arrives with a sticky note describing themselves. Round after round, everyone glances at the people whose notes are relevant to them and updates their own note with what they learned (attention), then quietly thinks it over (feed-forward). After many rounds, the last person's note is rich enough to answer one question: "what word comes next?"</p></div>
+<p>Two facts about this picture matter for everything else:</p>
+<ul>
+<li><strong>Every token travels as a list of numbers</strong>, a <a class="gl" href="#g-vector">vector</a>. Each block takes in one vector per token and hands back one vector per token, the same size. Only the contents change.</li>
+<li><strong>The model only ever predicts one token at a time.</strong> A 500-word answer is 500-plus trips round the loop.</li>
+</ul>
+
+<h3 id="ch16-2"><span class="num">16.2</span>Step 1: tokens become vectors</h3>
+<p>From <a href="#ch14">Chapter 14</a> you know the <a class="gl" href="#g-tokenizer">tokenizer</a> chops text into tokens and gives each a <a class="gl" href="#g-token-id">token ID</a>. A number like 4821 says nothing about meaning, so the first thing the model does is swap each ID for a learned vector: its <a class="gl" href="#g-embedding">embedding</a> (<a href="#ch15">Chapter 15</a>).</p>
+<p>The swap is a simple lookup in a big table with one row per vocabulary entry. If the vocabulary has 50,000 tokens and each vector has 512 numbers, the table holds 50,000 × 512 = 25.6 million <a class="gl" href="#g-parameter">parameters</a>, all learned in training.</p>
+<div class="tbl"><table>
+<tr><th>Token</th><th>Token ID (illustrative)</th><th>Row looked up in the embedding table (first 4 of 512 numbers, illustrative)</th></tr>
+<tr><td>"The"</td><td>464</td><td>[0.12, −0.48, 0.05, 0.91, …]</td></tr>
+<tr><td>" login"</td><td>17,250</td><td>[−0.33, 0.27, 0.80, −0.11, …]</td></tr>
+<tr><td>" test"</td><td>1,332</td><td>[−0.29, 0.31, 0.62, 0.04, …]</td></tr>
+</table></div>
+<p>The length of these vectors is called the <strong>model width</strong> (written <i>d</i><sub>model</sub>). The 2017 Transformer used 512. GPT-3 used 12,288. Wider vectors can carry more information about each token, at more cost.</p>
+<div class="box note"><span class="tag">Same word, same starting vector</span><p>At this stage "bug" in "found a bug in checkout" and "bug" in "a bug flew in" get the <em>identical</em> vector, because the lookup knows nothing about context. Making them different is exactly the job of the blocks that follow.</p></div>
+
+<h3 id="ch16-3"><span class="num">16.3</span>Step 2: telling the model the order</h3>
+<p>Here is a surprise. The attention step you'll meet next treats its input as a <em>bag</em> of tokens: shuffle them and each token would gather exactly the same information. Yet "the test blocked the release" and "the release blocked the test" mean different things. So the model must be told where each token sits. This is called <a class="gl" href="#g-positional-encoding">positional encoding</a>.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Imagine printing a test plan, cutting it into words and dropping them in a box. You'd still know which words were there, but not the order. Writing a page and line number on the back of every slip lets you rebuild it. Positional encoding is that number on the back.</p></div>
+<div class="tbl"><table>
+<tr><th>Method</th><th>How it works, in plain words</th><th>Who used it</th></tr>
+<tr><td>Fixed sine waves</td><td>Each position gets a fixed pattern of wave values, added to the token's vector. Nearby positions get similar patterns.</td><td>The original 2017 Transformer</td></tr>
+<tr><td>Learned positions</td><td>A second lookup table with one learned vector per position (position 0, 1, 2 …), added to the token's vector.</td><td>BERT, GPT-2, GPT-3</td></tr>
+<tr><td>Rotary (RoPE)</td><td>Instead of adding anything at the start, each block rotates the query and key vectors (16.5) by an angle that depends on position, so attention scores depend on how far apart two tokens are.</td><td>Many recent open-weight models, for example Meta's Llama family</td></tr>
+</table></div>
+<details class="deep"><summary>Under the hood: the sine-wave formula</summary><div class="body">
+<p>In "Attention Is All You Need", position <i>pos</i> gets a vector whose even-numbered entries are sin(<i>pos</i> / 10000<sup>2<i>i</i>/<i>d</i></sup>) and odd-numbered entries are cos of the same thing, where <i>i</i> counts pairs of entries and <i>d</i> is the model width. Early entries wiggle fast (they tell position 3 from position 4), later entries change slowly (they tell position 30 from position 3,000). It is like a clock with a seconds hand, a minute hand and an hour hand: together they pin down the exact time.</p>
+<p>Rotary position embedding (Su et al., 2021) rotates pairs of numbers in each query and key. When you then compare a query with a key, the rotation angles partly cancel, leaving only the <em>difference</em> in positions. That gives the model a natural sense of "three tokens back", which helps with long texts. Anthropic has not published which method Claude uses.</p>
+</div></details>
+
+<h3 id="ch16-4"><span class="num">16.4</span>Step 3: self-attention, the idea</h3>
+<p>Now the heart of the Transformer. <a class="gl" href="#g-self-attention">Self-attention</a> lets every token gather information from the other tokens that matter to it, and update its own vector with what it finds.</p>
+<p>Take a sentence from a bug report: "The test failed because it timed out". When the model reaches "it", the vector for "it" is just a generic pronoun. To be useful it needs to absorb something of "test". Attention does that: "it" scores how relevant each earlier token is, then takes a weighted blend of their information.</p>
+
+<div class="figure" role="img" aria-label="The token 'it' sends arcs to earlier tokens. The arc to 'test' is thickest, weight 0.62; 'failed' 0.12; 'it' itself 0.15; 'because' 0.08; 'The' 0.03. The later tokens 'timed' and 'out' are greyed out because a decoder-only model cannot look ahead.">
+<svg class="tf" viewBox="0 0 680 205" xmlns="http://www.w3.org/2000/svg">
+<path class="lo" d="M400,118 Q225,-5 50,118" style="stroke-width:1"/>
+<path class="lo" d="M400,118 Q265,20 130,118" style="stroke-width:9"/>
+<path class="lo" d="M400,118 Q310,40 220,118" style="stroke-width:3"/>
+<path class="lo" d="M400,118 Q355,62 310,118" style="stroke-width:2"/>
+<path class="lo" d="M392,118 C380,80 420,80 408,118" style="stroke-width:3.5"/>
+
+<rect class="bx" x="22" y="122" width="56" height="30" rx="7"/><text x="50" y="142" text-anchor="middle">The</text>
+<rect class="hl" x="102" y="122" width="56" height="30" rx="7"/><text class="b" x="130" y="142" text-anchor="middle">test</text>
+<rect class="bx" x="186" y="122" width="68" height="30" rx="7"/><text x="220" y="142" text-anchor="middle">failed</text>
+<rect class="bx" x="272" y="122" width="76" height="30" rx="7"/><text x="310" y="142" text-anchor="middle">because</text>
+<rect class="sg" x="376" y="122" width="48" height="30" rx="7"/><text class="b" x="400" y="142" text-anchor="middle">it</text>
+<rect class="bx" x="452" y="122" width="64" height="30" rx="7" style="opacity:.4"/><text class="s" x="484" y="142" text-anchor="middle">timed</text>
+<rect class="bx" x="530" y="122" width="52" height="30" rx="7" style="opacity:.4"/><text class="s" x="556" y="142" text-anchor="middle">out</text>
+<text class="s" x="50" y="170" text-anchor="middle">0.03</text><text class="o" x="130" y="170" text-anchor="middle">0.62</text><text class="s" x="220" y="170" text-anchor="middle">0.12</text><text class="s" x="310" y="170" text-anchor="middle">0.08</text><text class="s" x="400" y="170" text-anchor="middle">0.15</text><text class="s" x="520" y="170" text-anchor="middle">hidden (later)</text>
+<text class="s" x="300" y="196" text-anchor="middle">weight given by "it" to each token (line thickness); the weights add up to 1</text>
+</svg>
+<div class="cap">Where "it" looks. Weights are illustrative, not measured from a real model.</div></div>
+
+<p>Three properties make this powerful:</p>
+<ol>
+<li><strong>Distance doesn't matter.</strong> A token 5,000 tokens back can be reached in one step, as easily as the one next door. Older designs (RNNs, <a href="#ch6">Chapter 6</a>) had to pass information along a chain and forgot.</li>
+<li><strong>All tokens are processed at once.</strong> Every token's attention can be computed in parallel, which suits <a class="gl" href="#g-gpu">GPUs</a> perfectly. That's why Transformers could be trained on far more text.</li>
+<li><strong>Relevance is learned, not programmed.</strong> No one writes a rule "pronouns look at nouns". Training adjusts the weights until useful patterns appear.</li>
+</ol>
+<div class="box example"><span class="tag">Real-world example</span><p>You paste a 40-step test log into Claude and ask "why did step 37 fail?". The tokens around step 37 can attend directly to the setup in step 2 that created a stale session token. That direct line from any token to any earlier token is why modern models can connect a symptom to a cause far away in a long document.</p></div>
+
+<h3 id="ch16-5"><span class="num">16.5</span>Queries, keys and values: a worked example</h3>
+<p>How does a token decide what's relevant? Each token's vector is turned into three new, shorter vectors, by multiplying it by three learned weight tables (matrices called <i>W</i><sub>Q</sub>, <i>W</i><sub>K</sub> and <i>W</i><sub>V</sub>):</p>
+<div class="tbl"><table>
+<tr><th>Vector</th><th>Plain meaning</th><th>Library analogy</th></tr>
+<tr><td><b>Query</b> (Q)</td><td>"What am I looking for?"</td><td>The question you type into the library catalogue</td></tr>
+<tr><td><b>Key</b> (K)</td><td>"What do I offer? Here's my label."</td><td>The label on each book's catalogue card</td></tr>
+<tr><td><b>Value</b> (V)</td><td>"If you pick me, here's the information I hand over."</td><td>The contents of the book itself</td></tr>
+</table></div>
+<p>A token compares its query with every key. Good matches get high scores. The scores become weights, and the token takes that weighted mix of the values. Splitting "label" (key) from "contents" (value) matters: what makes a token <em>findable</em> is not always what it should <em>pass on</em>.</p>
+
+<h4>The mini example</h4>
+<p>Three tokens, "login", "test", "failed", with vectors only 2 numbers long so we can do it by hand. Suppose training has already produced these query, key and value vectors (the numbers are illustrative). We'll work out the new vector for <b>"failed"</b>, which can look at itself and the two tokens before it.</p>
+<div class="tbl"><table>
+<tr><th>Token</th><th>Key</th><th>Value</th></tr>
+<tr><td>login</td><td>(1, 0)</td><td>(1, 0)</td></tr>
+<tr><td>test</td><td>(1, 1)</td><td>(0, 2)</td></tr>
+<tr><td>failed</td><td>(0, 1)</td><td>(1, 1)</td></tr>
+</table></div>
+<p>The query of "failed" is <b>(2, 1)</b>. Now four steps.</p>
+<ol>
+<li><strong>Score each key with a dot product</strong> (multiply matching positions and add):
+login: 2×1 + 1×0 = <b>2</b>; test: 2×1 + 1×1 = <b>3</b>; failed: 2×0 + 1×1 = <b>1</b>.</li>
+<li><strong>Scale.</strong> Divide by the square root of the vector length (√2 ≈ 1.414): 1.414, 2.121, 0.707. (Why? See 16.6.)</li>
+<li><strong>Softmax</strong> turns the scores into weights that are positive and add up to 1: raise <i>e</i> (≈ 2.718) to each score, giving 4.11, 8.34 and 2.03, total 14.48; divide each by the total: <b>0.28, 0.58, 0.14</b>.</li>
+<li><strong>Blend the values</strong> using those weights: 0.28×(1, 0) + 0.58×(0, 2) + 0.14×(1, 1) = <b>(0.42, 1.29)</b>.</li>
+</ol>
+
+<div class="figure" role="img" aria-label="Worked attention for 'failed'. Its query (2,1) is compared with three keys. Scores 2, 3 and 1 are scaled to 1.41, 2.12 and 0.71, softmax gives weights 0.28, 0.58 and 0.14, and the weighted values sum to the new vector (0.42, 1.29).">
+<svg class="tf" viewBox="0 0 680 280" xmlns="http://www.w3.org/2000/svg">
+<defs><marker id="ar16b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<text class="s" x="70" y="18" text-anchor="middle">query</text><text class="s" x="215" y="18" text-anchor="middle">keys</text><text class="s" x="345" y="18" text-anchor="middle">score → ÷√2</text><text class="s" x="480" y="18" text-anchor="middle">softmax weight</text><text class="s" x="620" y="18" text-anchor="middle">values</text>
+<rect class="sg" x="12" y="78" width="116" height="52" rx="9"/><text class="b" x="70" y="99" text-anchor="middle">"failed" asks</text><text x="70" y="119" text-anchor="middle">Q = (2, 1)</text>
+<rect class="bx" x="160" y="30" width="110" height="38" rx="8"/><text x="215" y="54" text-anchor="middle">login (1, 0)</text>
+<rect class="hl" x="160" y="85" width="110" height="38" rx="8"/><text class="b" x="215" y="109" text-anchor="middle">test (1, 1)</text>
+<rect class="bx" x="160" y="140" width="110" height="38" rx="8"/><text x="215" y="164" text-anchor="middle">failed (0, 1)</text>
+<path class="ln" d="M128,96 L158,49" marker-end="url(#ar16b)"/><path class="ln" d="M128,104 H158" marker-end="url(#ar16b)"/><path class="ln" d="M128,112 L158,159" marker-end="url(#ar16b)"/>
+<text x="345" y="54" text-anchor="middle">2 → 1.41</text><text class="o" x="345" y="109" text-anchor="middle">3 → 2.12</text><text x="345" y="164" text-anchor="middle">1 → 0.71</text>
+<rect class="hm" x="420" y="38" width="34" height="20" rx="3"/><text x="462" y="54">0.28</text>
+<rect class="hm" x="420" y="93" width="70" height="20" rx="3"/><text class="o" x="498" y="109">0.58</text>
+<rect class="hm" x="420" y="148" width="17" height="20" rx="3"/><text x="445" y="164">0.14</text>
+<rect class="bx" x="570" y="30" width="100" height="38" rx="8"/><text x="620" y="54" text-anchor="middle">(1, 0)</text>
+<rect class="bx" x="570" y="85" width="100" height="38" rx="8"/><text x="620" y="109" text-anchor="middle">(0, 2)</text>
+<rect class="bx" x="570" y="140" width="100" height="38" rx="8"/><text x="620" y="164" text-anchor="middle">(1, 1)</text>
+<path class="dash" d="M620,180 V210" marker-end="url(#ar16b)"/>
+<rect class="hl" x="120" y="214" width="550" height="50" rx="10"/>
+<text x="395" y="236" text-anchor="middle">0.28 × (1, 0) + 0.58 × (0, 2) + 0.14 × (1, 1)</text>
+<text class="b" x="395" y="255" text-anchor="middle">= new vector for "failed": (0.42, 1.29)</text>
+</svg>
+<div class="cap">One attention step by hand. "failed" draws most of its new information from "test". Numbers are illustrative.</div></div>
+
+<p>The result: "failed" now carries mostly information from "test". In a real model this happens for every token at once, with vectors of 64 to 128 numbers per head, and the weight tables that produce queries, keys and values are learned during training.</p>
+
+<details class="deep"><summary>Under the hood: the formula, in matrix form</summary><div class="body">
+<p>Stack every token's query into a matrix <i>Q</i> (one row per token), likewise <i>K</i> and <i>V</i>. Then the whole layer's attention is one line, from the 2017 paper:</p>
+<div class="code"><span class="cap">Scaled dot-product attention</span><pre>Attention(Q, K, V) = softmax( Q · Kᵀ / √d<sub>k</sub> ) · V</pre></div>
+<p><i>Q</i>·<i>K</i>ᵀ gives a table of scores: row <i>i</i>, column <i>j</i> is "how much token <i>i</i> wants token <i>j</i>". Softmax runs along each row. Multiplying by <i>V</i> blends the values. Because it is all matrix multiplication, a GPU can compute it for thousands of tokens in parallel.</p>
+<p>One cost follows directly: the score table has one cell for every <em>pair</em> of tokens. Double the text and you get four times the cells. That is a big reason long <a class="gl" href="#g-context-window">context windows</a> (<a href="#ch20">Chapter 20</a>) took years of engineering to make practical.</p>
+</div></details>
+
+<h4>The causal mask: no peeking ahead</h4>
+<p>A model that writes left to right must not cheat during training by looking at the word it's meant to predict. So each token may only attend to itself and earlier tokens. Before softmax, every score for a later token is set to minus infinity, which softmax turns into a weight of exactly 0. This is called a <a class="gl" href="#g-causal-mask">causal mask</a>. Below is the full table of weights that the lab script in this chapter prints for a four-token sentence.</p>
+
+<div class="figure" role="img" aria-label="A four by four attention weight grid for the tokens the, login, test, failed. Each row is a token looking at earlier tokens. Cells above the diagonal are masked out. Row 'the': 1.00. Row 'login': 0.41, 0.59. Row 'test': 0.45, 0.45, 0.11. Row 'failed': 0.09, 0.18, 0.37, 0.37.">
+<svg class="tf" viewBox="30 0 590 275" xmlns="http://www.w3.org/2000/svg" style="max-width:560px;margin:0 auto">
+<text class="s" x="230" y="20" text-anchor="middle">the</text><text class="s" x="300" y="20" text-anchor="middle">login</text><text class="s" x="370" y="20" text-anchor="middle">test</text><text class="s" x="440" y="20" text-anchor="middle">failed</text>
+<text class="s" x="560" y="20" text-anchor="middle">← looked at</text>
+<text class="s" x="180" y="56" text-anchor="end">the</text><text class="s" x="180" y="116" text-anchor="end">login</text><text class="s" x="180" y="176" text-anchor="end">test</text><text class="s" x="180" y="244" text-anchor="end">failed</text>
+<text class="s" x="60" y="140" text-anchor="middle">looking ↓</text>
+<rect class="hm" x="196" y="30" width="68" height="58" style="opacity:1"/><text x="230" y="64" text-anchor="middle">1.00</text>
+<rect class="mk" x="266" y="30" width="68" height="58"/><rect class="mk" x="336" y="30" width="68" height="58"/><rect class="mk" x="406" y="30" width="68" height="58"/>
+<rect class="hm" x="196" y="90" width="68" height="58" style="opacity:.41"/><text x="230" y="124" text-anchor="middle">0.41</text>
+<rect class="hm" x="266" y="90" width="68" height="58" style="opacity:.59"/><text x="300" y="124" text-anchor="middle">0.59</text>
+<rect class="mk" x="336" y="90" width="68" height="58"/><rect class="mk" x="406" y="90" width="68" height="58"/>
+<rect class="hm" x="196" y="150" width="68" height="58" style="opacity:.45"/><text x="230" y="184" text-anchor="middle">0.45</text>
+<rect class="hm" x="266" y="150" width="68" height="58" style="opacity:.45"/><text x="300" y="184" text-anchor="middle">0.45</text>
+<rect class="hm" x="336" y="150" width="68" height="58" style="opacity:.11"/><text x="370" y="184" text-anchor="middle">0.11</text>
+<rect class="mk" x="406" y="150" width="68" height="58"/>
+<rect class="hm" x="196" y="210" width="68" height="58" style="opacity:.09"/><text x="230" y="244" text-anchor="middle">0.09</text>
+<rect class="hm" x="266" y="210" width="68" height="58" style="opacity:.18"/><text x="300" y="244" text-anchor="middle">0.18</text>
+<rect class="hm" x="336" y="210" width="68" height="58" style="opacity:.37"/><text x="370" y="244" text-anchor="middle">0.37</text>
+<rect class="hm" x="406" y="210" width="68" height="58" style="opacity:.37"/><text x="440" y="244" text-anchor="middle">0.37</text>
+<text class="s" x="560" y="110" text-anchor="middle">unshaded = masked</text><text class="s" x="560" y="126" text-anchor="middle">(future token,</text><text class="s" x="560" y="142" text-anchor="middle">weight 0)</text>
+</svg>
+<div class="cap">A causal attention table from an untrained toy (the lab's output). Each row adds up to 1; the unshaded triangle is the mask.</div></div>
+
+<h3 id="ch16-6"><span class="num">16.6</span>Softmax: from scores to weights</h3>
+<p><a class="gl" href="#g-softmax">Softmax</a> appears twice in a Transformer: inside every attention step, and at the very end to produce next-token probabilities. It does one job: take any list of numbers, positive or negative, and turn it into positive numbers that add up to 1, keeping the order (the biggest score gets the biggest share).</p>
+<div class="flow"><div><b>Scores</b>1.41, 2.12, 0.71</div><div><b>Raise e to each</b>4.11, 8.34, 2.03 (all positive)</div><div class="hl"><b>Divide by the total</b>÷ 14.48</div><div><b>Weights</b>0.28, 0.58, 0.14 (sum 1)</div></div>
+<p>Because it uses powers of <i>e</i>, softmax exaggerates differences: a score only 0.7 higher gets roughly twice the weight. That is why attention tends to focus on a few tokens rather than spreading evenly.</p>
+<details class="deep"><summary>Under the hood: why divide by √d<sub>k</sub>?</summary><div class="body">
+<p>A dot product adds up one product per number in the vector. With 128 numbers instead of 2, scores naturally become much larger, purely because there are more terms. Large scores push softmax to extremes: almost all the weight on one token and almost none elsewhere. That makes training unstable, because tiny changes in the weights produce almost no change in the output (the gradients, <a href="#ch12">Chapter 12</a>, become very small). Dividing by the square root of the key length <i>d</i><sub>k</sub> keeps scores in a sensible range whatever the vector size. In the lab you will remove the scaling and watch the weights snap to 0.00 and 0.50.</p>
+</div></details>
+
+<h3 id="ch16-7"><span class="num">16.7</span>Multi-head attention: several kinds of looking at once</h3>
+<p>One attention step can only blend one kind of relevance. But a token needs several at once: "which noun does 'it' refer to?", "what's the verb of this clause?", "what was the previous line of this log?". So a Transformer runs several attention calculations side by side, each with its own query, key and value weights. Each is called a <strong>head</strong>, and the whole arrangement is <a class="gl" href="#g-multi-head-attention">multi-head attention</a>.</p>
+
+<div class="figure" role="img" aria-label="Multi-head attention: each token's vector feeds several heads in parallel, each with its own Q, K and V weights and its own attention pattern. Their outputs are joined end to end and mixed by an output matrix into one vector the original size.">
+<svg class="tf" viewBox="0 0 680 230" xmlns="http://www.w3.org/2000/svg">
+<defs><marker id="ar16c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<rect class="sg" x="10" y="90" width="110" height="50" rx="9"/><text class="b" x="65" y="111" text-anchor="middle">token vectors</text><text class="s" x="65" y="128" text-anchor="middle">width 512</text>
+<rect class="bx" x="180" y="14" width="190" height="46" rx="9"/><text class="b" x="275" y="34" text-anchor="middle">Head 1</text><text class="s" x="275" y="50" text-anchor="middle">e.g. "what does 'it' refer to?"</text>
+<rect class="bx" x="180" y="70" width="190" height="46" rx="9"/><text class="b" x="275" y="90" text-anchor="middle">Head 2</text><text class="s" x="275" y="106" text-anchor="middle">e.g. "the previous token"</text>
+<rect class="bx" x="180" y="126" width="190" height="46" rx="9"/><text class="b" x="275" y="146" text-anchor="middle">Head 3</text><text class="s" x="275" y="162" text-anchor="middle">e.g. "matching bracket or quote"</text>
+<text class="s" x="275" y="196" text-anchor="middle">… up to Head 8 (each 64 wide)</text>
+<path class="ln" d="M120,108 L178,37" marker-end="url(#ar16c)"/><path class="ln" d="M120,115 L178,93" marker-end="url(#ar16c)"/><path class="ln" d="M120,122 L178,149" marker-end="url(#ar16c)"/>
+<rect class="hl" x="420" y="66" width="110" height="64" rx="9"/><text class="b" x="475" y="92" text-anchor="middle">join end</text><text class="b" x="475" y="110" text-anchor="middle">to end</text><text class="s" x="475" y="124" text-anchor="middle">8 × 64 = 512</text>
+<path class="ln" d="M370,37 L418,80" marker-end="url(#ar16c)"/><path class="ln" d="M370,93 L418,97" marker-end="url(#ar16c)"/><path class="ln" d="M370,149 L418,115" marker-end="url(#ar16c)"/>
+<rect class="sg" x="570" y="66" width="100" height="64" rx="9"/><text class="b" x="620" y="92" text-anchor="middle">mix (W<tspan baseline-shift="sub" font-size="9">O</tspan>)</text><text class="s" x="620" y="112" text-anchor="middle">back to 512</text>
+<path class="ln" d="M530,98 H568" marker-end="url(#ar16c)"/>
+</svg>
+<div class="cap">Heads in parallel. Sizes are from the 2017 base model; head "jobs" are examples of patterns researchers have found, not assigned roles.</div></div>
+
+<p>In the original base Transformer, the 512-number vector was split across 8 heads of 64 numbers each, so multi-head attention costs about the same as one big head. GPT-3's largest model used 96 heads of 128 numbers each.</p>
+<div class="box note"><span class="tag">Nobody assigns the jobs</span><p>Heads aren't told what to do. Training discovers useful patterns. Interpretability researchers, including Anthropic's (<a href="#ch38">Chapter 38</a>), have found heads that, for instance, copy a pattern seen earlier in the text ("induction heads"). Many heads have no tidy human description.</p></div>
+
+<h3 id="ch16-8"><span class="num">16.8</span>The feed-forward network: thinking it over</h3>
+<p>Attention moves information <em>between</em> tokens. The second half of each block works on each token <em>on its own</em>: a small two-layer neural network (<a href="#ch11">Chapter 11</a>), called the <a class="gl" href="#g-feed-forward-network">feed-forward network</a>, applied separately to every token's vector with the same weights.</p>
+<div class="flow"><div><b>In</b>one token's vector (512 numbers)</div><div class="hl"><b>Expand</b>multiply by a weight matrix → 2,048 numbers, then an <a class="gl" href="#g-activation-function">activation function</a> such as ReLU</div><div><b>Shrink</b>multiply by a second matrix → back to 512</div><div><b>Out</b>an update for that token</div></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>After the triage meeting's discussion round (attention), everyone goes back to their desk and thinks: "Given what I heard, what do I now know?" They consult their own experience, not each other. That private thinking is the feed-forward step.</p></div>
+<p>Most of a large model's parameters live here: with the usual four-times expansion, each feed-forward network has about twice as many weights as the attention in the same block. Research suggests these layers act partly as a store of learned associations, for example linking "capital of France" to "Paris" (Geva et al., 2021).</p>
+
+<h3 id="ch16-9"><span class="num">16.9</span>Residual connections and layer normalisation</h3>
+<p>Two plain-looking additions make deep stacks of blocks trainable at all.</p>
+<div class="cols2">
+<div><h4>Residual connection</h4><p>Each sub-step's output is <strong>added</strong> to its input instead of replacing it: new vector = old vector + update. A <a class="gl" href="#g-residual-connection">residual connection</a> means a block only has to learn a <em>change</em>, and information (and the training signal) can flow straight through dozens of blocks without fading. The idea comes from image networks (He et al., 2015).</p></div>
+<div><h4>Layer normalisation</h4><p>Before each sub-step, <a class="gl" href="#g-layer-normalisation">layer normalisation</a> rescales each token's vector so its numbers have an average of 0 and a typical size of 1 (then applies learned adjustments). It stops values drifting larger and larger as they pass through many blocks, which keeps training stable.</p></div>
+</div>
+
+<div class="figure" role="img" aria-label="One decoder Transformer block, bottom to top: input vectors; a layer norm; masked multi-head attention; an add step joining the attention output with a residual bypass from the input; a second layer norm; the feed-forward network; a second add step with another residual bypass; output vectors to the next block.">
+<svg class="tf" viewBox="0 0 440 470" xmlns="http://www.w3.org/2000/svg" style="max-width:440px;margin:0 auto">
+<defs><marker id="ar16d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<text class="b" x="200" y="20" text-anchor="middle">to the next block ↑</text>
+<path class="ln" d="M200,450 V418" marker-end="url(#ar16d)"/>
+<text class="s" x="200" y="466" text-anchor="middle">input: one vector per token</text>
+<rect class="bx" x="120" y="380" width="160" height="34" rx="8"/><text x="200" y="402" text-anchor="middle">Layer norm</text>
+<path class="ln" d="M200,380 V352" marker-end="url(#ar16d)"/>
+<rect class="hl" x="100" y="300" width="200" height="50" rx="9"/><text class="b" x="200" y="322" text-anchor="middle">Masked multi-head</text><text class="b" x="200" y="340" text-anchor="middle">attention</text>
+<path class="ln" d="M200,300 V272" marker-end="url(#ar16d)"/>
+<circle class="sg" cx="200" cy="256" r="15"/><text class="b" x="200" y="261" text-anchor="middle">+</text>
+<path class="dash" d="M200,436 H360 V256 H217" marker-end="url(#ar16d)"/><text class="s" x="366" y="350">residual</text><text class="s" x="366" y="364">bypass</text>
+<path class="ln" d="M200,241 V214" marker-end="url(#ar16d)"/>
+<rect class="bx" x="120" y="178" width="160" height="34" rx="8"/><text x="200" y="200" text-anchor="middle">Layer norm</text>
+<path class="ln" d="M200,178 V150" marker-end="url(#ar16d)"/>
+<rect class="in" x="100" y="98" width="200" height="50" rx="9"/><text class="b" x="200" y="120" text-anchor="middle">Feed-forward</text><text class="b" x="200" y="138" text-anchor="middle">network</text>
+<path class="ln" d="M200,98 V70" marker-end="url(#ar16d)"/>
+<circle class="sg" cx="200" cy="54" r="15"/><text class="b" x="200" y="59" text-anchor="middle">+</text>
+<path class="dash" d="M200,228 H360 V54 H217" marker-end="url(#ar16d)"/><text class="s" x="366" y="146">residual</text><text class="s" x="366" y="160">bypass</text>
+<path class="ln" d="M200,39 V28"/>
+<text class="s" x="20" y="330">tokens talk</text><text class="s" x="20" y="344">to each other</text>
+<text class="s" x="20" y="120">each token</text><text class="s" x="20" y="134">thinks alone</text>
+</svg>
+<div class="cap">One block of a decoder-only Transformer (the "pre-norm" layout used by GPT-2 and most later models). Read from the bottom up.</div></div>
+<details class="deep"><summary>Under the hood: pre-norm, post-norm and the residual stream</summary><div class="body">
+<p>The 2017 paper put layer normalisation <em>after</em> each add ("post-norm"). GPT-2 (2019) moved it to the <em>input</em> of each sub-step ("pre-norm"), as drawn above, which trains more reliably in very deep models. Many recent models use a simpler variant called RMSNorm, and replace ReLU with smoother activations such as GELU or SwiGLU.</p>
+<p>Because every sub-step only <em>adds</em> to the running vector, interpretability researchers describe the vector as a <strong>residual stream</strong>: a shared channel running from the bottom of the model to the top, which each attention and feed-forward step reads from and writes into. Anthropic's 2021 "Mathematical Framework for Transformer Circuits" popularised this view, and its 2024 "Scaling Monosemanticity" work found interpretable features in the residual stream of Claude 3 Sonnet (<a href="#ch38">Chapter 38</a>).</p>
+</div></details>
+
+<h3 id="ch16-10"><span class="num">16.10</span>Stacking blocks</h3>
+<p>One block is not enough. A model stacks many identical-shaped blocks (each with its own learned weights), and the output of one is the input of the next. These are the model's <a class="gl" href="#g-layer">layers</a>.</p>
+
+<div class="figure" role="img" aria-label="The residual stream as a horizontal channel from the embeddings on the left to the output layer on the right. Block 1, Block 2 and so on up to Block N sit along it; each reads the current vectors and adds its update back.">
+<svg class="tf" viewBox="0 0 680 170" xmlns="http://www.w3.org/2000/svg">
+<defs><marker id="ar16e" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<path class="bus" d="M100,120 H580"/>
+<rect class="sg" x="8" y="98" width="92" height="44" rx="8"/><text class="b" x="54" y="118" text-anchor="middle">embedding</text><text class="s" x="54" y="133" text-anchor="middle">+ position</text>
+<rect class="hl" x="580" y="98" width="92" height="44" rx="8"/><text class="b" x="626" y="118" text-anchor="middle">output</text><text class="s" x="626" y="133" text-anchor="middle">layer</text>
+<rect class="bx" x="130" y="22" width="90" height="46" rx="8"/><text class="b" x="175" y="43" text-anchor="middle">Block 1</text><text class="s" x="175" y="59" text-anchor="middle">grammar, nearby</text>
+<rect class="bx" x="250" y="22" width="90" height="46" rx="8"/><text class="b" x="295" y="43" text-anchor="middle">Block 2</text><text class="s" x="295" y="59" text-anchor="middle">phrases</text>
+<text class="b" x="390" y="50" text-anchor="middle">…</text>
+<rect class="bx" x="440" y="22" width="110" height="46" rx="8"/><text class="b" x="495" y="43" text-anchor="middle">Block N</text><text class="s" x="495" y="59" text-anchor="middle">task, next token</text>
+<path class="ln" d="M160,114 V70" marker-end="url(#ar16e)"/><path class="ln" d="M190,70 V114" marker-end="url(#ar16e)"/>
+<path class="ln" d="M280,114 V70" marker-end="url(#ar16e)"/><path class="ln" d="M310,70 V114" marker-end="url(#ar16e)"/>
+<path class="ln" d="M480,114 V70" marker-end="url(#ar16e)"/><path class="ln" d="M510,70 V114" marker-end="url(#ar16e)"/>
+<text class="s" x="340" y="155" text-anchor="middle">residual stream: each block reads the vectors (↑) and adds its update back (↓)</text>
+</svg>
+<div class="cap">Blocks stacked along the residual stream. The labels under each block are a rough tendency reported by researchers, not a fixed rule.</div></div>
+
+<p>Roughly, earlier blocks tend to handle local, surface patterns and later ones more abstract meaning and the specific prediction, but the division is fuzzy. Here are published sizes for some well-documented models:</p>
+<div class="tbl"><table>
+<tr><th>Model (year)</th><th>Blocks</th><th>Width (<i>d</i><sub>model</sub>)</th><th>Heads</th><th>Parameters</th><th>Context</th></tr>
+<tr><td>Transformer base (2017)</td><td>6 encoder + 6 decoder</td><td>512</td><td>8</td><td>about 65 million</td><td>n/a (translation)</td></tr>
+<tr><td>GPT-2 largest (2019)</td><td>48</td><td>1,600</td><td>25</td><td>1.5 billion</td><td>1,024 tokens</td></tr>
+<tr><td>GPT-3 largest (2020)</td><td>96</td><td>12,288</td><td>96</td><td>175 billion</td><td>2,048 tokens</td></tr>
+<tr><td>Current Claude models (2026)</td><td colspan="4">Not published by Anthropic</td><td>1M tokens</td></tr>
+</table></div>
+<details class="deep"><summary>Under the hood: where 175 billion parameters come from</summary><div class="body">
+<p>In one block of width <i>d</i>: the query, key, value and output matrices of attention are each <i>d</i> × <i>d</i>, so 4<i>d</i>². The feed-forward network expands to 4<i>d</i> and back: <i>d</i> × 4<i>d</i> + 4<i>d</i> × <i>d</i> = 8<i>d</i>². Total about <strong>12<i>d</i>² per block</strong> (ignoring small items such as biases and norms).</p>
+<p>For GPT-3: 12 × 12,288² × 96 blocks ≈ 173.9 billion. The token embedding table adds 50,257 × 12,288 ≈ 0.6 billion. Total ≈ 174.6 billion, matching the published 175 billion. Note that two-thirds of each block's parameters are in the feed-forward network.</p>
+</div></details>
+
+<h3 id="ch16-11"><span class="num">16.11</span>The output layer: next-token probabilities</h3>
+<p>After the last block, the vector at the <em>last position</em> holds everything the model has worked out about what should come next. The output layer turns it into a prediction in two moves:</p>
+<ol>
+<li><strong>Score every token in the vocabulary.</strong> A final layer norm, then one big matrix multiplication produces one raw score per vocabulary token, tens of thousands of them. These raw scores are called <a class="gl" href="#g-logit">logits</a>. (Many models reuse the embedding table for this, which is called weight tying.)</li>
+<li><strong>Softmax</strong> turns the logits into probabilities that add up to 1.</li>
+</ol>
+<div class="figure" role="img" aria-label="Next-token probabilities after 'The login test': failed 50.8%, passed 22.8%, timed 12.5%, is 7.6%, was 6.2%, banana under 0.1%."><div class="bars"><div class="bt">After "The login test", the next token is… (illustrative logits 3.0, 2.2, 1.6, 1.1, 0.9, −4.0 put through softmax)</div>
+<div class="bar-row"><span>failed</span><span class="track"><span class="fill hl" style="width:50.8%">50.8%</span></span></div>
+<div class="bar-row"><span>passed</span><span class="track"><span class="fill" style="width:22.8%">22.8%</span></span></div>
+<div class="bar-row"><span>timed</span><span class="track"><span class="fill" style="width:12.5%">12.5%</span></span></div>
+<div class="bar-row"><span>is</span><span class="track"><span class="fill" style="width:7.6%">7.6%</span></span></div>
+<div class="bar-row"><span>was</span><span class="track"><span class="fill" style="width:6.2%">6.2%</span></span></div>
+<div class="bar-row"><span>banana</span><span class="track"><span class="fill" style="width:0.5%"></span></span></div></div>
+<div class="cap">Illustrative numbers: a real vocabulary has tens of thousands of entries, most with tiny probabilities. "banana" is under 0.1%.</div></div>
+<p>Then a token is chosen: the most likely one, or a random draw weighted by these probabilities. How that choice is made (sampling, and the setting called <a class="gl" href="#g-temperature">temperature</a>) is covered in <a href="#ch17">Chapter 17</a>. The chosen token is appended and the loop runs again.</p>
+<div class="flow"><div><b>Read</b>all tokens so far</div><div><b>Blocks</b>run every layer</div><div><b>Probabilities</b>for the next token</div><div class="hl"><b>Choose</b>one token</div><div><b>Append</b>and repeat until a stop token or the length limit</div></div>
+<div class="box example"><span class="tag">Real-world example</span><p>This loop is why Claude's answers stream onto your screen word by word, and why output tokens take longer to produce than input tokens are to read. Your whole prompt can be processed in parallel in one pass. The answer must be produced one token after another, because each token depends on the one before. It also explains run-to-run variation (<a href="#ch125">Chapter 125</a>): if a token is drawn at random from the probabilities, two runs can take different paths from the very first word.</p></div>
+<details class="deep"><summary>Under the hood: the KV cache</summary><div class="body">
+<p>Generating token 1,001 would naively mean recomputing attention for tokens 1 to 1,000 again. But with a causal mask, earlier tokens never change when later ones are added, so their keys and values can be kept in memory and reused. This store is the <a class="gl" href="#g-kv-cache">KV cache</a>. Each new token only computes its own query, key and value and attends to the cache. The cache grows with the length of the text, which is one reason very long contexts need lots of fast GPU memory (<a href="#ch25">Chapter 25</a>). The API's prompt caching feature (<a href="#ch90">Chapter 90</a>) is a related idea: reusing work on a prompt prefix that repeats across requests.</p>
+</div></details>
+
+<h3 id="ch16-12"><span class="num">16.12</span>Encoder, decoder and decoder-only</h3>
+<p>The 2017 Transformer was built for translation and had two halves. Later models kept one half or the other.</p>
+
+<div class="figure" role="img" aria-label="Three layouts. Encoder-decoder: an encoder reads the whole source sentence in both directions, and a decoder writes the output while attending to the encoder through cross-attention. Encoder-only: reads text in both directions and outputs an understanding of it, as in BERT. Decoder-only: reads left to right with a causal mask and predicts the next token, as in GPT and Claude.">
+<svg class="tf" viewBox="0 0 680 250" xmlns="http://www.w3.org/2000/svg">
+<defs><marker id="ar16f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<text class="b" x="115" y="20" text-anchor="middle">Encoder–decoder</text><text class="b" x="345" y="20" text-anchor="middle">Encoder-only</text><text class="b" x="570" y="20" text-anchor="middle">Decoder-only</text>
+<rect class="sg" x="12" y="70" width="90" height="90" rx="9"/><text class="b" x="57" y="105" text-anchor="middle">Encoder</text><text class="s" x="57" y="122" text-anchor="middle">sees all words,</text><text class="s" x="57" y="136" text-anchor="middle">both directions</text>
+<rect class="hl" x="128" y="70" width="90" height="90" rx="9"/><text class="b" x="173" y="105" text-anchor="middle">Decoder</text><text class="s" x="173" y="122" text-anchor="middle">writes left</text><text class="s" x="173" y="136" text-anchor="middle">to right</text>
+<path class="ln" d="M102,115 H126" marker-end="url(#ar16f)"/><text class="s" x="115" y="182" text-anchor="middle">cross-attention: the decoder</text><text class="s" x="115" y="196" text-anchor="middle">looks at the encoder's output</text>
+<text class="s" x="57" y="58" text-anchor="middle">"Le test a échoué"</text><text class="s" x="173" y="58" text-anchor="middle">"The test failed"</text>
+<rect class="sg" x="290" y="70" width="110" height="90" rx="9"/><text class="b" x="345" y="105" text-anchor="middle">Encoder</text><text class="s" x="345" y="122" text-anchor="middle">every token sees</text><text class="s" x="345" y="136" text-anchor="middle">every other token</text>
+<text class="s" x="345" y="58" text-anchor="middle">"Login [MASK] after reset"</text><text class="s" x="345" y="182" text-anchor="middle">output: an understanding of</text><text class="s" x="345" y="196" text-anchor="middle">the text (label, vector, fill-in)</text>
+<rect class="hl" x="515" y="70" width="110" height="90" rx="9"/><text class="b" x="570" y="105" text-anchor="middle">Decoder</text><text class="s" x="570" y="122" text-anchor="middle">causal mask: only</text><text class="s" x="570" y="136" text-anchor="middle">earlier tokens</text>
+<text class="s" x="570" y="58" text-anchor="middle">"The login test"</text><text class="s" x="570" y="182" text-anchor="middle">output: the next token,</text><text class="s" x="570" y="196" text-anchor="middle">again and again</text>
+<path class="dash" d="M240,30 V220"/><path class="dash" d="M460,30 V220"/>
+<text class="s" x="115" y="236" text-anchor="middle">original 2017, T5</text><text class="s" x="345" y="236" text-anchor="middle">BERT</text><text class="s" x="570" y="236" text-anchor="middle">GPT series, most chat LLMs</text>
+</svg>
+<div class="cap">The three Transformer layouts. Cross-attention is attention where the queries come from one text and the keys and values from another.</div></div>
+
+<div class="tbl"><table>
+<tr><th></th><th>Encoder–decoder</th><th>Encoder-only</th><th>Decoder-only</th></tr>
+<tr><td>Attention</td><td>Encoder: all directions. Decoder: causal, plus cross-attention</td><td>All directions</td><td>Causal (earlier tokens only)</td></tr>
+<tr><td>Trained to</td><td>Map an input text to an output text</td><td>Fill in hidden words</td><td>Predict the next token</td></tr>
+<tr><td>Good for</td><td>Translation, summarisation</td><td>Classification, search, embeddings (<a href="#ch15">Chapter 15</a>)</td><td>General text generation, chat, code, agents</td></tr>
+<tr><td>Examples</td><td>Original Transformer (2017), T5 (2019)</td><td>BERT (2018)</td><td>GPT-1 to GPT-3 (2018–20), Llama</td></tr>
+</table></div>
+<p>Decoder-only won for general-purpose models because one simple objective, "predict the next token", works on any text, and translation, summarisation or Q&amp;A can all be phrased as continuing a text. Anthropic has not published Claude's detailed architecture. It describes Claude as a large language model, and its interpretability papers study Claude's layers and residual stream, consistent with the decoder-style Transformer described here. Treat finer details (exact sizes, positional method, any mixture-of-experts design) as unknown.</p>
+<div class="box opinion"><span class="tag">Opinion · researchers' debate</span><p>Some researchers argue the Transformer will eventually be replaced by designs whose cost grows more slowly with text length, such as state-space models. Others argue that improvements will keep coming inside the Transformer family (better attention variants, mixture-of-experts layers). As of late 2026 the leading published frontier models are still described as Transformer-based. This is a live debate, not a settled fact.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Run attention by hand, then break it</b><span>30 min · Python 3 on your computer (or any free online Python editor)</span></div><ol>
+<li>Check Python: open a terminal and run <code>python3 --version</code>. On Windows try <code>py --version</code>. No libraries are needed.<span class="expect">Python 3.8 or later.</span></li>
+<li>Save this as <code>attention.py</code>:
+<div class="code"><span class="cap">attention.py</span><pre><span class="c"># attention.py - one attention head, by hand, in plain Python (no libraries)</span>
+import math
+
+tokens = ["the", "login", "test", "failed"]
+
+<span class="c"># Toy 4-number embeddings (illustrative; a real model learns these)</span>
+X = [
+    [1.0, 0.0, 0.0, 0.5],   <span class="c"># the</span>
+    [0.0, 1.0, 1.0, 0.0],   <span class="c"># login</span>
+    [0.0, 1.0, 0.0, 1.0],   <span class="c"># test</span>
+    [1.0, 0.0, 1.0, 1.0],   <span class="c"># failed</span>
+]
+
+<span class="c"># Toy projection matrices (4 numbers in, 2 numbers out)</span>
+W_Q = [[1, 0], [0, 1], [1, 0], [0, 1]]
+W_K = [[0, 1], [1, 0], [0, 1], [1, 0]]
+W_V = [[1, 0], [0, 1], [0, 1], [1, 0]]
+
+def matmul(A, B):
+    return [[sum(a * b for a, b in zip(row, col)) for col in zip(*B)] for row in A]
+
+def softmax(xs):
+    m = max(xs)
+    exps = [math.exp(x - m) for x in xs]
+    total = sum(exps)
+    return [e / total for e in exps]
+
+Q, K, V = matmul(X, W_Q), matmul(X, W_K), matmul(X, W_V)
+d_k = len(K[0])
+
+print("Attention weights (row = token looking, column = token looked at)")
+print(" " * 8 + "".join(f"{t:&gt;8}" for t in tokens))
+outputs = []
+for i, q in enumerate(Q):
+    scores = []
+    for j, k in enumerate(K):
+        if j &gt; i:                       <span class="c"># causal mask: no peeking at later tokens</span>
+            scores.append(float("-inf"))
+        else:
+            scores.append(sum(a * b for a, b in zip(q, k)) / math.sqrt(d_k))
+    weights = softmax(scores)
+    out = [sum(w * v[c] for w, v in zip(weights, V)) for c in range(len(V[0]))]
+    outputs.append(out)
+    print(f"{tokens[i]:&gt;8}" + "".join(f"{w:8.2f}" for w in weights))
+
+print()
+for t, o in zip(tokens, outputs):
+    print(f"new vector for {t!r:9} = [{o[0]:.2f}, {o[1]:.2f}]")</pre></div></li>
+<li>Run it with <code>python3 attention.py</code>.<span class="expect">this exact output:</span>
+<div class="code"><span class="cap">Output</span><pre>Attention weights (row = token looking, column = token looked at)
+             the   login    test  failed
+     the    1.00    0.00    0.00    0.00
+   login    0.41    0.59    0.00    0.00
+    test    0.45    0.45    0.11    0.00
+  failed    0.09    0.18    0.37    0.37
+
+new vector for 'the'     = [1.50, 0.00]
+new vector for 'login'   = [0.62, 1.17]
+new vector for 'test'    = [0.78, 1.00]
+new vector for 'failed'  = [1.23, 1.09]</pre></div>
+Check that each row adds up to 1 (allow for rounding) and that everything above the diagonal is 0.00. Compare with the heatmap in 16.5.</li>
+<li><b>Remove the mask.</b> Change <code>if j &gt; i:</code> to <code>if False:</code> and run again.<span class="expect">the top-right zeros disappear. Row "the" becomes 0.15, 0.22, 0.31, 0.31: the first token now "sees the future". This is what an encoder (BERT-style) does, and it's why a text generator must keep the mask during training.</span></li>
+<li>Put the mask back. <b>Remove the scaling and make scores larger</b>: change <code>/ math.sqrt(d_k))</code> to <code>* 4)</code>.<span class="expect">the weights become extreme: row "failed" becomes 0.00, 0.01, 0.50, 0.50 and row "login" 0.12, 0.88. Bigger scores make softmax pick winners, as 16.6 explains.</span></li>
+<li>Undo that change. Now <b>edit one embedding</b>: change the row for "failed" to <code>[0.0, 1.0, 0.0, 1.0]</code> (the same as "test").<span class="expect">the "failed" row becomes 0.40, 0.40, 0.10, 0.10, almost the same as the "test" row, and its new vector [0.80, 1.00] lands right next to that of "test" [0.78, 1.00]. Similar vectors ask similar questions: the meaning lives in the numbers.</span></li>
+<li>Paste your script into Claude and ask: "Explain line by line what this does, and how a real Transformer differs (multiple heads, learned weights, residual connections, many layers)."<span class="expect">an explanation matching sections 16.5–16.10. Check its claims against this chapter: a good habit with any AI explanation.</span></li>
+</ol>
+<p><b>Troubleshooting.</b> <code>python3: command not found</code>: install Python from python.org, or on Windows use <code>py attention.py</code>. <code>IndentationError</code>: the copy lost its spaces; indent with four spaces consistently. <code>SyntaxError</code> on the f-strings: your Python is older than 3.6; upgrade. Numbers differ slightly in the last digit: fine, that's rounding.</p>
+</div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Attention means the model is paying attention like a person does."</dt><dd>It is a weighted average with learned weights. The name is a metaphor. It has no awareness and no single focus.</dd>
+<dt>"Attention weights explain why the model gave its answer."</dt><dd>They show where information was blended in one head of one layer. With dozens of layers and heads, plus feed-forward networks, a single attention map is a weak explanation. Interpretability research (<a href="#ch38">Chapter 38</a>) uses much richer tools.</dd>
+<dt>"The model reads the whole prompt and writes the whole answer at once."</dt><dd>It reads the prompt in parallel, but it writes one token at a time, feeding each token back in.</dd>
+<dt>"Each layer is a different kind of thing."</dt><dd>In a standard Transformer every block has the same shape (attention, then feed-forward, with residuals and norms). Only the learned numbers differ.</dd>
+<dt>"Bigger context is free."</dt><dd>Standard attention compares every pair of tokens, and the KV cache grows with length. Long contexts cost real compute and memory, and quality can still drop in very long inputs (<a href="#ch20">Chapter 20</a>).</dd>
+</dl></div>
+
+<h3 id="ch16-r"><span class="num">16.13</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Text → tokens → embedding vectors (+ position) → N identical-shaped blocks → output layer → probabilities → choose a token → repeat.</li>
+<li>Attention alone ignores word order, so position information is added (sine waves, learned positions or rotary embeddings).</li>
+<li>Self-attention: each token's query is compared with every visible key; scores are scaled by √d<sub>k</sub>, softmaxed into weights, and used to blend the values.</li>
+<li>The causal mask stops a token seeing later tokens; that's what lets a decoder be trained to predict the next token.</li>
+<li>Multi-head attention runs several attention patterns in parallel; the feed-forward network then processes each token alone and holds most of the parameters.</li>
+<li>Residual connections (add, don't replace) and layer normalisation make deep stacks trainable.</li>
+<li>Encoder-only (BERT) understands, encoder–decoder (original, T5) maps text to text, decoder-only (GPT and most chat models) generates. Claude's exact architecture is not published.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Why does a Transformer need positional encoding?</p><div class="opts"><button>To make the vocabulary smaller</button><button data-ok>Because attention on its own treats the tokens as an unordered set</button><button>To stop tokens attending to future tokens</button></div><p class="why" hidden>Without position information, "the test blocked the release" and "the release blocked the test" would look the same to attention. Stopping future-peeking is the causal mask's job.</p></div>
+<div class="qz"><p class="q">A token's query is (1, 2). Two visible keys are A = (2, 0) and B = (0, 2). Before scaling, which key scores higher?</p><div class="opts"><button>A, with a score of 2</button><button data-ok>B, with a score of 4</button><button>They tie</button></div><p class="why" hidden>Dot products: A = 1×2 + 2×0 = 2; B = 1×0 + 2×2 = 4. So B gets more weight after softmax.</p></div>
+<div class="qz"><p class="q">What does softmax guarantee about its outputs?</p><div class="opts"><button>Exactly one of them is 1 and the rest are 0</button><button>They are all equal</button><button data-ok>They are all positive and add up to 1</button></div><p class="why" hidden>Softmax keeps the order of the scores but turns them into a probability-like distribution. Very large score gaps make it close to one-hot, but never exactly.</p></div>
+<div class="qz"><p class="q">In a standard Transformer block, which part works on each token separately, without looking at other tokens?</p><div class="opts"><button>Multi-head attention</button><button data-ok>The feed-forward network</button><button>The causal mask</button></div><p class="why" hidden>Attention moves information between tokens; the feed-forward network then processes each token's vector on its own, using the same weights for every position.</p></div>
+<div class="qz"><p class="q">Which layout do GPT-style chat models use?</p><div class="opts"><button>Encoder-only, like BERT</button><button data-ok>Decoder-only, predicting the next token with a causal mask</button><button>Encoder–decoder with cross-attention</button></div><p class="why" hidden>Decoder-only models generate left to right. BERT is encoder-only; the original 2017 model and T5 are encoder–decoder.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Draw the whole Transformer from memory on one page: tokens, embeddings, position, one block (norm, attention, add, norm, feed-forward, add), the stack, the output layer and the loop. Label where the causal mask goes and where softmax appears (two places). Then extend the lab script with a <em>second head</em>: give it its own <code>W_Q</code>, <code>W_K</code> and <code>W_V</code>, compute its outputs, and join the two heads' outputs end to end so each token ends with 4 numbers. Write two sentences on what changed.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"A Transformer turns each word piece into a list of numbers and adds a note of its position. Then it runs a stack of identical blocks. In each block, every token asks a question, the query, and compares it with every earlier token's label, the key. The best matches get the most weight, and the token takes a weighted blend of their information, the values. That's attention. Then each token thinks over what it gathered with a small neural network. Results are added on top of what was there, so nothing is lost. After the last block the model scores every token in its vocabulary, picks one, appends it, and starts again. That's how Claude writes, one token at a time."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>A. Vaswani et al., <a href="https://arxiv.org/abs/1706.03762" target="_blank" rel="noopener">"Attention Is All You Need"</a>, NeurIPS (2017). Architecture, scaled dot-product attention, sine-wave positions, base model sizes.</li>
+<li>A. Radford et al., <a href="https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf" target="_blank" rel="noopener">"Language Models are Unsupervised Multitask Learners"</a> (GPT-2), OpenAI (2019). Pre-norm placement, model sizes.</li>
+<li>T. Brown et al., <a href="https://arxiv.org/abs/2005.14165" target="_blank" rel="noopener">"Language Models are Few-Shot Learners"</a> (GPT-3), 2020. Table of model sizes.</li>
+<li>J. Devlin et al., <a href="https://arxiv.org/abs/1810.04805" target="_blank" rel="noopener">"BERT"</a> (2018); C. Raffel et al., <a href="https://arxiv.org/abs/1910.10683" target="_blank" rel="noopener">"Exploring the Limits of Transfer Learning with a Unified Text-to-Text Transformer"</a> (T5), 2019.</li>
+<li>K. He et al., <a href="https://arxiv.org/abs/1512.03385" target="_blank" rel="noopener">"Deep Residual Learning for Image Recognition"</a> (2015); J. L. Ba et al., <a href="https://arxiv.org/abs/1607.06450" target="_blank" rel="noopener">"Layer Normalization"</a> (2016).</li>
+<li>J. Su et al., <a href="https://arxiv.org/abs/2104.09864" target="_blank" rel="noopener">"RoFormer: Enhanced Transformer with Rotary Position Embedding"</a> (2021); H. Touvron et al., <a href="https://arxiv.org/abs/2302.13971" target="_blank" rel="noopener">"LLaMA"</a> (2023).</li>
+<li>M. Geva et al., <a href="https://arxiv.org/abs/2012.14913" target="_blank" rel="noopener">"Transformer Feed-Forward Layers Are Key-Value Memories"</a> (2021).</li>
+<li>Anthropic, <a href="https://transformer-circuits.pub/2021/framework/index.html" target="_blank" rel="noopener">"A Mathematical Framework for Transformer Circuits"</a> (2021) and <a href="https://transformer-circuits.pub/2024/scaling-monosemanticity/index.html" target="_blank" rel="noopener">"Scaling Monosemanticity"</a> (2024).</li>
+<li>J. Alammar, <a href="https://jalammar.github.io/illustrated-transformer/" target="_blank" rel="noopener">"The Illustrated Transformer"</a>: a well-known visual walkthrough.</li>
+</ol><p class="verified">Content type: established technical concepts · Claude context size verified 9 November 2026 against Anthropic's models overview · Last reviewed 9 November 2026</p></div>

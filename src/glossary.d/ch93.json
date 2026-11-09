@@ -1,0 +1,38 @@
+{
+ "Recall@k": {
+  "d": "A retrieval measure: the share of test questions for which the right document appears anywhere in the top k search results.",
+  "see": "ch93"
+ },
+ "Mean reciprocal rank": {
+  "d": "A retrieval measure that rewards putting the right result first: 1 point at rank 1, 0.5 at rank 2, 0.33 at rank 3, 0 if missing, averaged over all questions. Often shortened to MRR.",
+  "see": "ch93"
+ },
+ "Dry run": {
+  "d": "Running a program in a safe practice mode that skips the costly or risky step, such as calling a paid AI API, so everything else can be tested for free.",
+  "see": "ch93"
+ },
+ "LLMOps": {
+  "d": "Large language model operations: the practices for running AI features in production, such as logging calls, versioning prompts, evaluation gates, monitoring quality and cost, handling model retirements and managing incidents.",
+  "see": "ch95"
+ },
+ "OpenTelemetry": {
+  "d": "An open standard and set of tools for collecting traces, metrics and logs from software, so any compatible monitoring tool can read them. Its GenAI conventions name the fields for AI calls.",
+  "see": "ch95"
+ },
+ "Span": {
+  "d": "In tracing, one timed step inside a request, such as a single call to an AI model, with a start time, a duration and named attributes.",
+  "see": "ch95"
+ },
+ "Eval gate": {
+  "d": "A step in a CI pipeline that runs an evaluation and fails the build if quality scores drop below an approved baseline by more than an agreed margin.",
+  "see": "ch95"
+ },
+ "Quality drift": {
+  "d": "A change in an AI feature's real-world quality over time without any code change, for example because users ask new kinds of questions or source documents go out of date.",
+  "see": "ch95"
+ },
+ "Runbook": {
+  "d": "A short, practical document that tells whoever is on call exactly what to check and do, step by step, when a system has a problem.",
+  "see": "ch95"
+ }
+}

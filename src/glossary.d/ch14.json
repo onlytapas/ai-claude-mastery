@@ -1,0 +1,34 @@
+{
+ "Vocabulary": {
+  "d": "The fixed list of all the tokens a tokenizer knows, each with its own number (token ID). Modern vocabularies have tens of thousands to a few hundred thousand entries.",
+  "see": "ch14"
+ },
+ "Token ID": {
+  "d": "The number a tokenizer assigns to each token in its vocabulary. A language model actually reads and predicts token IDs, not letters or words.",
+  "see": "ch14"
+ },
+ "Byte-pair encoding": {
+  "d": "A common way to build a tokenizer: start from single characters or bytes and repeatedly merge the most frequent neighbouring pair into a new token, until the vocabulary is the desired size.",
+  "see": "ch14"
+ },
+ "Access token": {
+  "d": "A secret string that proves who you are to a service, such as an API key, a GitHub personal access token or a Jira API token. Completely different from the text tokens an AI model reads. Treat it like a password.",
+  "see": "ch98"
+ },
+ "MCP server": {
+  "d": "A program, on your computer or on the internet, that offers an AI app a set of tools (and sometimes resources and prompts) through the Model Context Protocol, for example a browser, Jira or GitHub.",
+  "see": "ch83"
+ },
+ "Transport": {
+  "d": "How an AI app and an MCP server talk to each other: stdio for a local program the app starts itself, or HTTP for a remote service.",
+  "see": "ch83"
+ },
+ "MCP scope": {
+  "d": "In Claude Code, who an MCP server is set up for: local (you, this project), project (everyone, via .mcp.json) or user (you, in all your projects).",
+  "see": "ch83"
+ },
+ "OAuth": {
+  "d": "A standard way to sign in to a service through your browser and grant an app limited access without giving it your password. Many remote MCP servers use it.",
+  "see": "ch98"
+ }
+}

@@ -1,0 +1,139 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>Why human language is so hard for computers</li>
+<li>How language AI moved from hand-written rules to statistics to neural networks</li>
+<li>What word embeddings, sequence-to-sequence models and attention are, in plain terms</li>
+<li>Why the 2017 Transformer was such a big leap, and what came straight after it</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 5 (machine learning and deep learning).</div>
+
+<div class="bigidea"><p>Getting computers to understand and produce language took seventy years. First came hand-written grammar rules, which were brittle. Then statistics: counting which words tend to follow which. Then neural networks that turned words into numbers capturing meaning, and read sentences one word at a time. In 2017 the Transformer let models look at all the words at once and decide which ones matter to each other. That design, plus huge amounts of text, produced the language models we use today.</p></div>
+
+<h3 id="ch6-1"><span class="num">6.1</span>Why language is hard</h3>
+<p>Language is full of things people handle without noticing:</p>
+<div class="tbl"><table>
+<tr><th>Challenge</th><th>Example</th></tr>
+<tr><td>Ambiguity</td><td>"I saw the man with the telescope." Who has the telescope?</td></tr>
+<tr><td>Context</td><td>"It's cold in here" can be a request to close the window</td></tr>
+<tr><td>Words with many meanings</td><td>"Bank" (river or money), "bug" (insect or software fault)</td></tr>
+<tr><td>Long-distance links</td><td>"The test that the new developer wrote last Tuesday after the review <em>was</em> flaky." The verb agrees with "test", far back</td></tr>
+<tr><td>Sarcasm and tone</td><td>"Great, another production outage."</td></tr>
+<tr><td>World knowledge</td><td>"The trophy didn't fit in the suitcase because it was too big." What was too big?</td></tr>
+</table></div>
+<p>The field that tackles this is called <a class="gl" href="#g-natural-language-processing">natural language processing</a>, or NLP.</p>
+
+<h3 id="ch6-2"><span class="num">6.2</span>The rule-based era (1950s–1980s)</h3>
+<ol class="timeline">
+<li><span class="yr">1954</span><span class="ev"><b>Georgetown–IBM experiment.</b> A computer translated about 60 carefully chosen Russian sentences into English using a small vocabulary and a handful of rules. Newspapers predicted machine translation would be solved within a few years.</span></li>
+<li><span class="yr">1966</span><span class="ev"><b>ALPAC report</b> concludes machine translation isn't working; US funding collapses (Chapter 4).</span></li>
+<li class="key"><span class="yr">1964–66</span><span class="ev"><b>ELIZA</b>, by Joseph Weizenbaum at MIT, the first famous <a class="gl" href="#g-chatbot">chatbot</a>.</span></li>
+<li><span class="yr">1968–70</span><span class="ev"><b>SHRDLU</b>, by Terry Winograd, understood typed commands about a small world of coloured blocks ("Pick up the big red block") but only within that tiny world.</span></li>
+</ol>
+<h4>ELIZA and the ELIZA effect</h4>
+<p>ELIZA's best-known script, DOCTOR, imitated a certain kind of therapist. It looked for keywords and turned your words back into questions:</p>
+<div class="code"><span class="cap">An ELIZA-style exchange</span><pre>You:   I am worried about my release.
+ELIZA: Why are you worried about your release?
+You:   My manager is angry.
+ELIZA: Tell me more about your manager.</pre></div>
+<p>It understood nothing; it matched patterns like "I am X" → "Why are you X?". Yet people, including Weizenbaum's own secretary, confided in it and felt understood. Weizenbaum was disturbed by this and spent much of his later career warning about trusting computers too much. The tendency to assume understanding behind fluent text is now called the <strong>ELIZA effect</strong>, and it's worth remembering whenever an AI sounds empathetic.</p>
+
+<h3 id="ch6-3"><span class="num">6.3</span>The statistical turn (late 1980s–2000s)</h3>
+<p>Instead of writing grammar rules, researchers started counting. Given large amounts of text, how often does each word follow each other word? IBM researchers led by Frederick Jelinek applied this to speech recognition and translation with striking success. A remark attributed to Jelinek captures the mood: "Every time I fire a linguist, the performance of the speech recognizer goes up."</p>
+<p>The simplest statistical language model is an <strong>n-gram model</strong>: predict the next word from the previous one or two words, based on counts.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Your phone keyboard suggesting the next word is a descendant of this idea. Type "Happy" and it suggests "birthday", because it has seen that pair so many times. The problem: it only looks at the last word or two, so it can't follow the meaning of a whole sentence or paragraph.</p></div>
+<p>Remember Claude Shannon from Chapter 2? In 1948–51 he ran experiments in which people guessed the next letter of English text, to measure how predictable language is. Predicting what comes next turned out to be one of the most powerful ideas in AI.</p>
+
+<h3 id="ch6-4"><span class="num">6.4</span>Words become numbers: embeddings (2003–2013)</h3>
+<p>Counting treats every word as unrelated: "cat" and "kitten" are as different as "cat" and "carburettor". Neural approaches fixed this by representing each word as a list of numbers, an <a class="gl" href="#g-embedding">embedding</a>, learned so that words used in similar ways get similar numbers.</p>
+<ul>
+<li>In 2003 Yoshua Bengio and colleagues published a neural language model that learned word representations while predicting the next word.</li>
+<li>In 2013 Tomas Mikolov and colleagues at Google released <strong>word2vec</strong>, which learned good word embeddings quickly from billions of words.</li>
+</ul>
+<div class="box example"><span class="tag">Real-world example: word arithmetic</span><p>word2vec embeddings had a surprising property: you could do arithmetic with meaning. Take the numbers for "king", subtract "man", add "woman", and the closest word is "queen". Similarly "Paris − France + Italy" lands near "Rome". The model was never told about royalty or capitals; it picked up these relationships from how words are used. Chapter 15 explains how.</p></div>
+
+<h3 id="ch6-5"><span class="num">6.5</span>Reading in sequence: RNNs, LSTMs and seq2seq (2014)</h3>
+<p>To understand sentences, networks needed memory. <strong>Recurrent neural networks</strong> (RNNs) read text one word at a time, carrying a running summary forward. The <strong>LSTM</strong> (1997, Chapter 5) improved how long that memory lasted.</p>
+<p>In 2014 Ilya Sutskever, Oriol Vinyals and Quoc Le at Google showed <strong>sequence-to-sequence</strong> ("seq2seq") learning: one network reads a whole sentence into a summary, and a second network writes a translation from that summary.</p>
+<div class="flow">
+<div><b>Encoder</b>Reads "The cat sat on the mat" one word at a time</div>
+<div class="hl"><b>Summary</b>One fixed list of numbers meant to hold the whole meaning</div>
+<div><b>Decoder</b>Writes "Le chat était assis sur le tapis" one word at a time</div>
+</div>
+<p>The weak point is the middle box. Squeezing a whole long sentence into one fixed summary loses information, like describing a whole film in a single sentence and then asking someone to retell it scene by scene.</p>
+
+<h3 id="ch6-6"><span class="num">6.6</span>Attention: look back at what matters (2014)</h3>
+<p>In 2014 Dzmitry Bahdanau, Kyunghyun Cho and Yoshua Bengio proposed <a class="gl" href="#g-attention">attention</a>. Instead of relying only on the single summary, the decoder can look back at <em>all</em> the input words each time it writes a word, focusing on whichever are most relevant right now.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>When a human interpreter translates a long sentence, they don't memorise it and then recite. They glance back at the original, focusing on the part they're translating at that moment. Translating "assis" (sat), their attention is on "sat". That glancing back is attention.</p></div>
+<p>In 2016 Google switched Google Translate to a neural system using these ideas, with a large jump in quality. But a limitation remained: the networks still read words one after another, which was slow to train and still struggled with very long texts.</p>
+
+<h3 id="ch6-7"><span class="num">6.7</span>2017: the Transformer</h3>
+<p>In June 2017 eight researchers at Google (Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan Gomez, Łukasz Kaiser and Illia Polosukhin) published a paper with a confident title: <strong>"Attention Is All You Need"</strong>. They removed the word-by-word reading entirely. Their new design, the <a class="gl" href="#g-transformer">Transformer</a>, uses attention for everything: every word looks at every other word in the text at the same time.</p>
+<div class="cols2">
+<div><h4>Before: reading in order</h4><p>Like reading a book one word at a time through a keyhole, keeping a running memory. Slow, and early words fade.</p></div>
+<div><h4>After: the Transformer</h4><p>Like spreading the whole page out on a table and drawing lines between every pair of related words at once.</p></div>
+</div>
+<p>This had two huge benefits:</p>
+<ol>
+<li><strong>Better understanding of context.</strong> In "The trophy didn't fit in the suitcase because it was too big", the word "it" can directly look at "trophy" and "suitcase" and work out which one fits.</li>
+<li><strong>Massive speed-up in training.</strong> Because all words are processed at once, the work fits perfectly onto GPUs (Chapter 2). That meant models could be trained on far more text than ever before.</li>
+</ol>
+<p>That second point turned out to be decisive. The Transformer didn't just improve translation; it made it practical to train on a large share of the internet. Chapter 16 takes you through it step by step.</p>
+
+<h3 id="ch6-8"><span class="num">6.8</span>Immediately after: BERT and GPT (2018)</h3>
+<p>Within a year, two influential families appeared, using different halves of the Transformer:</p>
+<div class="tbl"><table>
+<tr><th></th><th>BERT (Google, 2018)</th><th>GPT (OpenAI, 2018)</th></tr>
+<tr><td>Uses</td><td>The "encoder" side: reads text in both directions</td><td>The "decoder" side: predicts the next word, left to right</td></tr>
+<tr><td>Good at</td><td>Understanding: search, classification, answering from a passage</td><td>Generating: continuing and writing text</td></tr>
+<tr><td>Trained by</td><td>Hiding words and guessing them ("fill in the blank")</td><td>Guessing the next word, over and over</td></tr>
+<tr><td>Legacy</td><td>Improved Google Search from 2019</td><td>The line that leads to ChatGPT; Claude and most chat models use the same next-word approach</td></tr>
+</table></div>
+<p>GPT stands for <strong>Generative Pre-trained Transformer</strong>: generative (it writes), pre-trained (first trained on a large general text collection), Transformer (the design). The idea of training a general model first and specialising it later is called <a class="gl" href="#g-pre-training">pre-training</a>, and it's how every major language model is built. Chapter 7 tells the story of what happened when these models were scaled up.</p>
+
+<details class="deep"><summary>Why "predict the next word" teaches so much</summary><div class="body">
+<p>It sounds too simple to produce intelligence. But consider what you'd need to know to predict the next word well across all kinds of text. To finish "The capital of Japan is…" you need geography. To finish a line of code, you need programming. To finish "She was furious, so she…" you need some model of human behaviour. To finish a maths proof, you need to follow the logic.</p>
+<p>A model trained to predict the next word across trillions of words is pushed to pick up grammar, facts, reasoning patterns and styles, because each of them reduces its prediction error. That's the deep reason simple next-word prediction, at enormous scale, produces surprisingly capable systems. It also explains their weaknesses: they learn what text tends to say, not what's guaranteed to be true (Chapter 22).</p>
+</div></details>
+
+<div class="lab"><div class="lab-h"><b>From ELIZA to Claude</b><span>25 min · claude.ai</span></div><ol>
+<li>Ask Claude: "Pretend to be ELIZA from 1966. Only use simple pattern rules, no real understanding." Chat for a few turns.<span class="expect">shallow, reflected questions ("Why do you say…?").</span></li>
+<li>Ask Claude, as itself: "The trophy didn't fit in the suitcase because it was too big. What was too big? Now replace 'big' with 'small'. What changes?"<span class="expect">trophy for "big", suitcase for "small", with the reasoning. Rule-based and early statistical systems found this very hard.</span></li>
+<li>Ask: "Explain attention using a classroom where each student can look at any other student's notes."<span class="expect">an analogy where each word gathers information from the most relevant others.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Language models store sentences and look them up."</dt><dd>They learn patterns and generate new text word by word. They can reproduce text they saw many times, but they aren't a database.</dd>
+<dt>"The Transformer was designed to build chatbots."</dt><dd>It was designed for machine translation. Its suitability for large-scale text prediction was discovered as people applied it more widely.</dd>
+<dt>"Sounding understanding means understanding."</dt><dd>That's the ELIZA effect. Fluency is evidence of something, but not proof of human-like understanding.</dd>
+</dl></div>
+
+<h3 id="ch6-r"><span class="num">6.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Language is hard because of ambiguity, context, multiple meanings and world knowledge.</li>
+<li>Rule-based NLP (1950s–80s) was brittle; ELIZA showed how easily people attribute understanding to fluent text.</li>
+<li>Statistical methods (from the late 1980s) counted word patterns and worked better.</li>
+<li>Embeddings (2003, word2vec 2013) turned words into numbers that capture meaning.</li>
+<li>Seq2seq (2014) and attention (2014) improved translation; Google Translate went neural in 2016.</li>
+<li>The Transformer (2017) used attention alone, processed all words at once and trained efficiently on GPUs.</li>
+<li>BERT and GPT (2018) followed; GPT's next-word approach leads to ChatGPT and Claude.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What is the "ELIZA effect"?</p><div class="opts"><button>A method for training chatbots</button><button data-ok>People's tendency to assume understanding behind fluent computer text</button><button>A bug in early translation systems</button></div><p class="why" hidden>ELIZA understood nothing, yet people confided in it.</p></div>
+<div class="qz"><p class="q">What did word embeddings make possible?</p><div class="opts"><button>Storing words more cheaply</button><button data-ok>Representing words as numbers so that similar meanings are close together</button><button>Translating without any training</button></div><p class="why" hidden>That's why "king − man + woman" lands near "queen".</p></div>
+<div class="qz"><p class="q">What was the key change introduced by the Transformer?</p><div class="opts"><button>Reading text one word at a time with better memory</button><button data-ok>Using attention so every word can look at every other word at once</button><button>Using hand-written grammar rules</button></div><p class="why" hidden>Processing all words at once also made training much faster on GPUs.</p></div>
+<div class="qz"><p class="q">What does GPT stand for?</p><div class="opts"><button>General Purpose Technology</button><button data-ok>Generative Pre-trained Transformer</button><button>Google Processing Tool</button></div><p class="why" hidden>Generative (writes), pre-trained (general training first), Transformer (the design).</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Write five sentences that are ambiguous in different ways (meaning, reference, sarcasm, context, world knowledge). Ask Claude to interpret each and explain any ambiguity. Record where it handled the sentence well and where it didn't. This is your first small language evaluation; you'll build larger ones in Chapter 125.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Language AI went from grammar rules, which were brittle, to counting word patterns, to neural networks that turn words into meaningful numbers. Older networks read one word at a time and forgot. In 2017 the Transformer let every word look at every other word at once using attention, and trained fast on GPUs. GPT models then learned by predicting the next word across huge amounts of text, and that's the approach behind ChatGPT and Claude."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>J. Weizenbaum, "ELIZA: A Computer Program for the Study of Natural Language Communication between Man and Machine", <i>Communications of the ACM</i> (1966); and <i>Computer Power and Human Reason</i> (1976).</li>
+<li>C. E. Shannon, "Prediction and Entropy of Printed English", <i>Bell System Technical Journal</i> (1951).</li>
+<li>Y. Bengio, R. Ducharme, P. Vincent and C. Jauvin, "A Neural Probabilistic Language Model", <i>Journal of Machine Learning Research</i> (2003).</li>
+<li>T. Mikolov et al., "Efficient Estimation of Word Representations in Vector Space" (2013), arXiv:1301.3781.</li>
+<li>I. Sutskever, O. Vinyals and Q. V. Le, "Sequence to Sequence Learning with Neural Networks", NeurIPS (2014).</li>
+<li>D. Bahdanau, K. Cho and Y. Bengio, "Neural Machine Translation by Jointly Learning to Align and Translate" (2014), arXiv:1409.0473.</li>
+<li>A. Vaswani et al., "Attention Is All You Need", NeurIPS (2017), arXiv:1706.03762.</li>
+<li>J. Devlin et al., "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding" (2018), arXiv:1810.04805.</li>
+<li>A. Radford et al., "Improving Language Understanding by Generative Pre-Training", OpenAI (2018).</li>
+</ol><p class="verified">Content type: established history · Last reviewed 9 November 2026</p></div>

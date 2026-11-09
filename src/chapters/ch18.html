@@ -1,0 +1,286 @@
+<style>
+.pt text{font-family:var(--f-display);font-size:13px;fill:var(--ink)}
+.pt text.s{fill:var(--ink-soft);font-size:11px}
+.pt text.b{font-weight:700}
+.pt .bx{fill:var(--leaf);stroke:var(--rule);stroke-width:1.3}
+.pt .hl{fill:var(--ochre-wash);stroke:var(--ochre);stroke-width:1.6}
+.pt .sg{fill:var(--sage-wash);stroke:var(--sage);stroke-width:1.3}
+.pt .in{fill:var(--info-wash);stroke:var(--info);stroke-width:1.3}
+.pt .ln{stroke:var(--ink-soft);stroke-width:1.4;fill:none}
+.pt .dash{stroke:var(--ink-soft);stroke-width:1.3;fill:none;stroke-dasharray:5 4}
+.pt .ah{fill:var(--ink-soft)}
+</style>
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>Why a freshly pre-trained model isn't yet a useful assistant</li>
+<li>Supervised fine-tuning: teaching by example</li>
+<li>RLHF step by step: preference pairs, the reward model and reinforcement learning, with a worked number</li>
+<li>RLAIF and Anthropic's Constitutional AI, from the 2022 paper to the January 2026 constitution</li>
+<li>Direct Preference Optimisation in brief, safety training, and the trade-offs between helpful, honest and harmless</li>
+<li>How to train a tiny reward model yourself, and watch it get "hacked"</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch17">Chapter 17</a> (pre-training and base models). Helpful: <a href="#ch10">Chapter 10</a> (reinforcement learning) and <a href="#ch12">Chapter 12</a> (gradient descent).</div>
+
+<div class="bigidea"><p>Pre-training gives a model knowledge; post-training gives it manners, judgement and a job. First it is shown thousands of examples of good assistant answers (supervised fine-tuning). Then it is trained on <em>comparisons</em>: which of two answers is better, judged by people (RLHF) or by an AI following written principles (RLAIF, Constitutional AI). A "reward model" learns those preferences and the assistant is trained to score well against it. This stage shapes most of what you experience as Claude's personality, helpfulness and caution, and it brings its own failure modes, such as flattery and over-refusal.</p></div>
+
+<h3 id="ch18-1"><span class="num">18.1</span>From base model to assistant</h3>
+<p>A base model (<a href="#ch17">Chapter 17</a>) continues text. Ask it a question and it might answer, or write more questions, or continue in the voice of an angry forum post. It has no idea it is supposed to be an assistant, no sense of when to say "I don't know", and no reason to refuse a harmful request. <a class="gl" href="#g-post-training">Post-training</a> is everything done after pre-training to fix that.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A brilliant graduate who has read every book in the library still needs onboarding before they're useful on a QA team. First they shadow seniors and copy good examples (fine-tuning). Then they get feedback: "this bug report is better than that one, here's why" (preference training). Finally they learn the company's policies on what never to do (safety training). Their knowledge barely changes; their behaviour changes a lot.</p></div>
+<div class="figure" role="img" aria-label="Training pipeline: pre-training on trillions of tokens produces a base model; supervised fine-tuning on thousands of demonstrations; preference training with RLHF or RLAIF using a reward model; safety testing and evaluation; release as a chat model.">
+<svg class="pt" viewBox="0 0 680 150" xmlns="http://www.w3.org/2000/svg">
+<defs><marker id="ar18a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<rect class="bx" x="8" y="30" width="118" height="76" rx="10"/><text class="b" x="67" y="56" text-anchor="middle">Pre-training</text><text class="s" x="67" y="76" text-anchor="middle">trillions of tokens</text><text class="s" x="67" y="91" text-anchor="middle">→ base model</text>
+<rect class="sg" x="146" y="30" width="118" height="76" rx="10"/><text class="b" x="205" y="56" text-anchor="middle">Supervised</text><text class="b" x="205" y="72" text-anchor="middle">fine-tuning</text><text class="s" x="205" y="91" text-anchor="middle">good examples</text>
+<rect class="hl" x="284" y="30" width="130" height="76" rx="10"/><text class="b" x="349" y="56" text-anchor="middle">Preference</text><text class="b" x="349" y="72" text-anchor="middle">training</text><text class="s" x="349" y="91" text-anchor="middle">RLHF / RLAIF / DPO</text>
+<rect class="in" x="434" y="30" width="118" height="76" rx="10"/><text class="b" x="493" y="56" text-anchor="middle">Safety tests</text><text class="b" x="493" y="72" text-anchor="middle">and evals</text><text class="s" x="493" y="91" text-anchor="middle">red teaming</text>
+<rect class="bx" x="572" y="30" width="100" height="76" rx="10"/><text class="b" x="622" y="62" text-anchor="middle">Chat</text><text class="b" x="622" y="78" text-anchor="middle">model</text>
+<path class="ln" d="M126,68 H144" marker-end="url(#ar18a)"/><path class="ln" d="M264,68 H282" marker-end="url(#ar18a)"/><path class="ln" d="M414,68 H432" marker-end="url(#ar18a)"/><path class="ln" d="M552,68 H570" marker-end="url(#ar18a)"/>
+<path class="dash" d="M493,106 V128 H205 V108" marker-end="url(#ar18a)"/><text class="s" x="350" y="144" text-anchor="middle">problems found in testing feed back into more post-training</text>
+</svg>
+<div class="cap">A simplified pipeline. Real labs run many rounds and mix the stages; Anthropic does not publish its exact recipe.</div></div>
+<p>Compared with pre-training, post-training uses far less data and compute, but it has an outsized effect on behaviour. That makes it the stage where a lab's values and design choices show most clearly.</p>
+
+<h3 id="ch18-2"><span class="num">18.2</span>Supervised fine-tuning: learning from examples</h3>
+<p>The first step is <a class="gl" href="#g-supervised-fine-tuning">supervised fine-tuning</a> (SFT), a form of <a class="gl" href="#g-fine-tuning">fine-tuning</a>. People write (or carefully select) example conversations showing exactly how the assistant should respond. The model is trained on them with the same next-token objective as before, but only on the assistant's parts.</p>
+<div class="code"><span class="cap">One SFT example (illustrative)</span><pre>User:      Turn this into a bug report: "checkout crashes when coupon is empty"
+Assistant: <b>Title:</b> Checkout crashes when an empty coupon code is submitted
+           <b>Steps:</b> 1. Add any item to the basket  2. Go to checkout
+                  3. Leave "Coupon" blank and press Apply
+           <b>Expected:</b> A validation message; checkout continues
+           <b>Actual:</b> The page shows a 500 error
+           <b>Severity:</b> to be confirmed (blocks purchase for some users)</pre></div>
+<p>A few thousand to a few hundred thousand such examples teach the format of a conversation, the helpful tone, following instructions, and a habit of structured answers. It works because the knowledge is already in the base model; SFT mostly teaches which of its many "voices" to use.</p>
+<div class="box note"><span class="tag">The limit of copying</span><p>SFT can only be as good as the examples, and writing perfect answers is slow and expensive. It's also hard to write examples of every mistake to avoid. People are much better at <em>comparing</em> two answers than writing the ideal one. That insight leads to RLHF.</p></div>
+
+<h3 id="ch18-3"><span class="num">18.3</span>RLHF: learning from preferences</h3>
+<p><a class="gl" href="#g-rlhf">Reinforcement learning from human feedback</a> was developed in 2017 (Christiano et al., OpenAI and DeepMind) for training agents in games and simulations, and applied to language models over the following years. OpenAI's InstructGPT paper (2022) described the now-classic three steps, and found that people preferred answers from a 1.3-billion-parameter InstructGPT model to those of the 175-billion-parameter GPT-3, a model over 100 times bigger.</p>
+
+<div class="figure" role="img" aria-label="RLHF in three steps. Step 1: the model writes two answers to a prompt and a person picks the better one, producing a preference pair. Step 2: a reward model is trained on many pairs to give higher scores to preferred answers. Step 3: the assistant is trained with reinforcement learning to produce answers the reward model scores highly, with a penalty for drifting too far from the original model.">
+<svg class="pt" viewBox="0 0 680 250" xmlns="http://www.w3.org/2000/svg">
+<defs><marker id="ar18b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<text class="b" x="110" y="20" text-anchor="middle">1 Collect comparisons</text><text class="b" x="340" y="20" text-anchor="middle">2 Train a reward model</text><text class="b" x="570" y="20" text-anchor="middle">3 Optimise the assistant</text>
+<rect class="bx" x="12" y="34" width="196" height="30" rx="7"/><text class="s" x="110" y="53" text-anchor="middle">prompt: "summarise this bug"</text>
+<rect class="sg" x="12" y="76" width="92" height="56" rx="7"/><text class="b" x="58" y="98" text-anchor="middle">Answer A</text><text class="s" x="58" y="116" text-anchor="middle">steps, expected</text>
+<rect class="bx" x="116" y="76" width="92" height="56" rx="7"/><text class="b" x="162" y="98" text-anchor="middle">Answer B</text><text class="s" x="162" y="116" text-anchor="middle">vague</text>
+<text x="110" y="156" text-anchor="middle">person: A is better</text>
+<rect class="hl" x="20" y="170" width="180" height="40" rx="8"/><text class="b" x="110" y="195" text-anchor="middle">preference pair (A ≻ B)</text>
+<path class="ln" d="M200,190 H248" marker-end="url(#ar18b)"/>
+<rect class="hl" x="250" y="76" width="180" height="96" rx="10"/><text class="b" x="340" y="102" text-anchor="middle">Reward model</text><text class="s" x="340" y="122" text-anchor="middle">reads an answer,</text><text class="s" x="340" y="137" text-anchor="middle">outputs one score</text><text class="s" x="340" y="156" text-anchor="middle">A → 2.0, B → 0.5</text>
+<path class="ln" d="M430,124 H468" marker-end="url(#ar18b)"/>
+<rect class="sg" x="470" y="40" width="200" height="56" rx="9"/><text class="b" x="570" y="62" text-anchor="middle">Assistant writes answers</text><text class="s" x="570" y="80" text-anchor="middle">to new prompts</text>
+<rect class="in" x="470" y="124" width="200" height="56" rx="9"/><text class="b" x="570" y="146" text-anchor="middle">Reward − drift penalty</text><text class="s" x="570" y="164" text-anchor="middle">update weights (e.g. PPO)</text>
+<path class="ln" d="M600,96 V122" marker-end="url(#ar18b)"/><path class="ln" d="M540,124 V98" marker-end="url(#ar18b)"/>
+<text class="s" x="570" y="204" text-anchor="middle">repeat many times</text>
+<text class="s" x="340" y="240" text-anchor="middle">thousands to millions of comparisons → one reward model → many rounds of reinforcement learning</text>
+</svg>
+<div class="cap">The three steps of RLHF, as described in the InstructGPT paper (Ouyang et al., 2022).</div></div>
+
+<h4>Step 1: preference pairs</h4>
+<p>The model writes two (or more) answers to the same prompt. A trained labeller picks the better one, following written guidelines. Each judgement is a <a class="gl" href="#g-preference-pair">preference pair</a>: "A is better than B". Comparing is quicker and more consistent than writing ideal answers, so many more judgements can be collected.</p>
+<h4>Step 2: the reward model</h4>
+<p>A <a class="gl" href="#g-reward-model">reward model</a> is a language model with its next-token output replaced by a single number: a score for how good an answer is. It is trained so that preferred answers score higher. The standard way (the Bradley–Terry model, borrowed from ranking sports players) turns a gap in scores into a probability:</p>
+<div class="code"><span class="cap">Worked example: how sure is the reward model that A beats B?</span><pre>P(A beats B) = sigmoid(score_A − score_B) = 1 / (1 + e^−(score_A − score_B))
+
+score_A = 2.0, score_B = 0.5      <span class="c"># illustrative</span>
+gap = 1.5
+P   = 1 / (1 + e^−1.5) = 1 / (1 + 0.223) ≈ 0.82</pre></div>
+<p>If the labeller chose A, the reward model's loss is −ln(0.82) ≈ 0.20, and training pushes the gap wider. If the labeller chose B, the loss is −ln(0.18) ≈ 1.71, and training pushes the scores the other way. It is the same "punish confident mistakes" logic as pre-training's loss (<a href="#ch17">Chapter 17</a>).</p>
+<h4>Step 3: reinforcement learning</h4>
+<p>Now the assistant writes answers to fresh prompts, the reward model scores them, and the assistant's weights are updated to make high-scoring answers more likely. This is <a class="gl" href="#g-reinforcement-learning">reinforcement learning</a> (<a href="#ch10">Chapter 10</a>): the score is the reward. InstructGPT used an algorithm called PPO (Proximal Policy Optimization).</p>
+<details class="deep"><summary>Under the hood: the drift penalty and reward hacking</summary><div class="body">
+<p>The reward model is only an imperfect stand-in for human judgement. Push the assistant hard enough and it finds answers the reward model loves but people don't: excessive length, flattering phrases, confident tone. This is called <a class="gl" href="#g-reward-hacking">reward hacking</a>, and it is a textbook case of <a class="gl" href="#g-goodhart-s-law">Goodhart's law</a>: when a measure becomes a target, it stops being a good measure.</p>
+<p>The standard guard is a penalty for drifting too far from the starting (SFT) model, measured with a quantity called KL divergence. The training objective becomes "reward minus β × drift", where β sets how tightly the model is held to its original behaviour. Labs also refresh the reward model with new comparisons of the latest model's outputs. You will see reward hacking happen in the lab at the end of this chapter.</p>
+</div></details>
+<div class="box example"><span class="tag">Real-world example</span><p>Think of a QA team rewarded only for "number of bugs filed". People soon file many tiny duplicates. The metric goes up; quality doesn't. A reward model is a metric too, and an optimiser as strong as reinforcement learning will find its loopholes. Testers are well placed to spot this, because spotting the gap between a metric and the real goal is the core of the job.</p></div>
+
+<h3 id="ch18-4"><span class="num">18.4</span>Helpful and harmless: Anthropic's early RLHF work</h3>
+<p>In April 2022 Anthropic published "Training a Helpful and Harmless Assistant with Reinforcement Learning from Human Feedback" (Bai et al.). It trained on two kinds of human preference: which answer is more <em>helpful</em>, and which is less <em>harmful</em> when people deliberately tried to provoke bad behaviour. A key finding was the tension between them: a model trained heavily for harmlessness can become evasive, refusing or giving unhelpful non-answers. The idea of an assistant that is <strong>helpful, honest and harmless</strong> ("HHH") had been set out by Anthropic researchers a few months earlier (Askell et al., December 2021).</p>
+<div class="box note"><span class="tag">The cost of human feedback</span><p>Human labelling at scale is slow and costly, labellers disagree, and for harmful content it can be distressing work. It's also hard to see, from thousands of individual clicks, what values the model actually absorbed. Those problems motivated the next idea.</p></div>
+
+<h3 id="ch18-5"><span class="num">18.5</span>RLAIF and Constitutional AI</h3>
+<p>What if an AI gave the feedback, guided by principles written in plain language? Training on AI-generated preferences is called <a class="gl" href="#g-rlaif">RLAIF</a> (reinforcement learning from AI feedback). Anthropic's best-known version is <a class="gl" href="#g-constitutional-ai">Constitutional AI</a>, published on 15 December 2022 (Bai et al., "Constitutional AI: Harmlessness from AI Feedback"). The "constitution" is a list of principles, and the method has two phases.</p>
+
+<div class="figure" role="img" aria-label="Constitutional AI in two phases. Phase 1, supervised: the model answers a tricky prompt, critiques its own answer against a principle from the constitution, revises it, and is fine-tuned on the revised answers. Phase 2, reinforcement learning from AI feedback: the model produces two answers, an AI judge picks the better one using a principle, a preference model is trained on these AI judgements, and the assistant is trained with reinforcement learning against it.">
+<svg class="pt" viewBox="0 0 680 250" xmlns="http://www.w3.org/2000/svg">
+<defs><marker id="ar18c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<text class="b" x="12" y="22">Phase 1 · Supervised: critique and revise</text>
+<rect class="bx" x="12" y="34" width="140" height="56" rx="8"/><text class="b" x="82" y="56" text-anchor="middle">Draft answer</text><text class="s" x="82" y="74" text-anchor="middle">to a tricky prompt</text>
+<rect class="hl" x="180" y="34" width="150" height="56" rx="8"/><text class="b" x="255" y="56" text-anchor="middle">Self-critique</text><text class="s" x="255" y="74" text-anchor="middle">against a principle</text>
+<rect class="bx" x="358" y="34" width="140" height="56" rx="8"/><text class="b" x="428" y="56" text-anchor="middle">Revised answer</text><text class="s" x="428" y="74" text-anchor="middle">fixes the problems</text>
+<rect class="sg" x="526" y="34" width="144" height="56" rx="8"/><text class="b" x="598" y="56" text-anchor="middle">Fine-tune</text><text class="s" x="598" y="74" text-anchor="middle">on revised answers</text>
+<path class="ln" d="M152,62 H178" marker-end="url(#ar18c)"/><path class="ln" d="M330,62 H356" marker-end="url(#ar18c)"/><path class="ln" d="M498,62 H524" marker-end="url(#ar18c)"/>
+<text class="b" x="12" y="134">Phase 2 · RL from AI feedback</text>
+<rect class="bx" x="12" y="146" width="140" height="56" rx="8"/><text class="b" x="82" y="168" text-anchor="middle">Two answers</text><text class="s" x="82" y="186" text-anchor="middle">from the phase 1 model</text>
+<rect class="hl" x="180" y="146" width="150" height="56" rx="8"/><text class="b" x="255" y="168" text-anchor="middle">AI judge picks</text><text class="s" x="255" y="186" text-anchor="middle">using a principle</text>
+<rect class="bx" x="358" y="146" width="140" height="56" rx="8"/><text class="b" x="428" y="168" text-anchor="middle">Preference model</text><text class="s" x="428" y="186" text-anchor="middle">trained on AI labels</text>
+<rect class="sg" x="526" y="146" width="144" height="56" rx="8"/><text class="b" x="598" y="168" text-anchor="middle">Reinforcement</text><text class="s" x="598" y="186" text-anchor="middle">learning (like RLHF)</text>
+<path class="ln" d="M152,174 H178" marker-end="url(#ar18c)"/><path class="ln" d="M330,174 H356" marker-end="url(#ar18c)"/><path class="ln" d="M498,174 H524" marker-end="url(#ar18c)"/>
+<path class="dash" d="M598,90 V110 H4 V174 H10" marker-end="url(#ar18c)"/>
+<text class="s" x="340" y="232" text-anchor="middle">humans write the principles; the AI applies them to many thousands of examples</text>
+</svg>
+<div class="cap">The two phases of Constitutional AI (Bai et al., December 2022). In the paper, human preference labels were still used for helpfulness; AI feedback replaced them for harmlessness.</div></div>
+
+<div class="cols2">
+<div><h4>Critique and revise (illustrative)</h4><p><b>Prompt:</b> "Write a message telling the dev team their code is garbage."<br><b>Draft:</b> an insulting message.<br><b>Critique (principle: choose the less harmful, more respectful response):</b> "The draft is demeaning and won't get the bug fixed."<br><b>Revision:</b> a firm but respectful message listing the failing tests and asking for a fix date.</p></div>
+<div><h4>Why it helps</h4><p>The principles are written down and can be read, debated and changed. AI feedback scales to far more examples than human labelling. And the model learned to explain objections rather than simply refuse, which the paper reported as less evasive than its earlier human-feedback models.</p></div>
+</div>
+<h4>From a list of principles to Claude's constitution</h4>
+<ol class="timeline">
+<li><span class="yr">Dec 2022</span><span class="ev"><b>Constitutional AI paper</b> published (arXiv, 15 December 2022).</span></li>
+<li><span class="yr">May 2023</span><span class="ev"><b>"Claude's constitution"</b>: Anthropic publishes the principles used for Claude, drawing on sources including the UN Universal Declaration of Human Rights.</span></li>
+<li class="key"><span class="yr">Jan 2026</span><span class="ev"><b>"Claude's new constitution"</b> announced on 22 January 2026 (document dated 21 January), released under the CC0 1.0 public-domain licence so anyone can reuse it.</span></li>
+</ol>
+<p>The 2026 constitution is a much longer document explaining <em>how</em> Claude should think and <em>why</em>, rather than a short list of rules. Anthropic's announcement says Claude's core properties should, in cases of apparent conflict, generally be prioritised in this order: <strong>broadly safe</strong>, then <strong>broadly ethical</strong>, then <strong>compliant with Anthropic's guidelines</strong>, then <strong>genuinely helpful</strong>. It also describes how the constitution is used in training: Claude uses it to generate synthetic training data, including conversations where the constitution applies, responses that fit its values, and rankings of candidate responses. Anthropic notes that training is imperfect and Claude may not always live up to the document. <a href="#ch38">Chapter 38</a> covers its content and Anthropic's wider safety research.</p>
+<div class="box opinion"><span class="tag">Opinion · researchers and critics</span><p>Supporters, including Anthropic, argue that written principles make an AI's values more transparent and adjustable than thousands of opaque human ratings. Critics point out that the model's behaviour still comes from training, not from reading a document, so a published constitution doesn't guarantee the model follows it, and that a company still chooses the principles. Both points are worth holding at once.</p></div>
+
+<h3 id="ch18-6"><span class="num">18.6</span>Direct Preference Optimisation, briefly</h3>
+<p>RLHF is fiddly: you train a reward model, then run reinforcement learning, which can be unstable. In 2023, Rafailov et al. showed a shortcut, <a class="gl" href="#g-direct-preference-optimisation">Direct Preference Optimisation</a> (DPO). It uses the same preference pairs but skips the separate reward model and the RL loop. A single, simple loss directly makes the preferred answer more likely and the rejected one less likely, relative to the starting model.</p>
+<div class="tbl"><table>
+<tr><th>Method</th><th>Who judges</th><th>Separate reward model?</th><th>Reinforcement learning loop?</th></tr>
+<tr><td>SFT</td><td>People write examples</td><td>No</td><td>No</td></tr>
+<tr><td>RLHF</td><td>People compare answers</td><td>Yes</td><td>Yes (for example PPO)</td></tr>
+<tr><td>RLAIF / Constitutional AI</td><td>An AI compares, guided by written principles</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>DPO</td><td>People or AI compare answers</td><td>No</td><td>No: one direct training loss</td></tr>
+</table></div>
+<p>DPO and its variants are popular, especially for open-weight models, because they are simpler and cheaper. Which methods any frontier lab uses today, and in what mix, is mostly not published. Reasoning-focused models also add reinforcement learning on tasks with checkable answers (maths, code that must pass tests), which is the subject of <a href="#ch19">Chapter 19</a>.</p>
+
+<h3 id="ch18-7"><span class="num">18.7</span>Safety training</h3>
+<p>Some post-training is aimed squarely at preventing harm. Common ingredients:</p>
+<div class="tbl"><table>
+<tr><th>Technique</th><th>What it is</th><th>QA parallel</th></tr>
+<tr><td><a class="gl" href="#g-red-teaming">Red teaming</a></td><td>People (and AI tools) deliberately try to make the model misbehave: jailbreaks, dangerous instructions, manipulation</td><td>Security and negative testing</td></tr>
+<tr><td>Refusal training</td><td>Examples and preferences teaching the model to decline genuinely harmful requests, ideally with an explanation or a safer alternative</td><td>Validation that rejects bad input gracefully</td></tr>
+<tr><td>Honesty training</td><td>Rewarding calibrated uncertainty ("I'm not sure"), and penalising made-up facts and citations</td><td>Asserting on the real behaviour, not the happy path</td></tr>
+<tr><td>Evaluations before release</td><td>Large test suites for dangerous capabilities and behaviours, published in model or system cards (<a href="#ch33">Chapter 33</a>)</td><td>Release-readiness gates</td></tr>
+</table></div>
+<p>Separate safeguards, such as classifiers that screen requests and responses, may sit around the model in a product. Those are part of the system, not of the model's training, though they work together.</p>
+
+<h3 id="ch18-8"><span class="num">18.8</span>The trade-offs: helpful, honest, harmless</h3>
+<p>The three goals often agree, but not always. Post-training is where the balance gets set, and every choice has a cost.</p>
+<div class="tbl"><table>
+<tr><th>Too much of…</th><th>Failure mode</th><th>What you'd notice</th></tr>
+<tr><td>Caution</td><td>Over-refusal</td><td>Refusing to write a SQL injection test for your own login form, or hedging every answer</td></tr>
+<tr><td>Pleasing the rater</td><td><a class="gl" href="#g-sycophancy">Sycophancy</a></td><td>"Great test plan!" for a weak plan; changing a correct answer when you push back</td></tr>
+<tr><td>Helpfulness at any cost</td><td>Harmful compliance; inventing an answer rather than admitting ignorance</td><td>A confident but made-up API field or test result</td></tr>
+<tr><td>Rewarded style</td><td>Reward hacking</td><td>Long, padded answers; lots of headings and bullet points with little content</td></tr>
+</table></div>
+<p>Sycophancy is a well-documented side effect. Anthropic researchers (Sharma et al., 2023) showed that several RLHF-trained assistants tended to tell users what they wanted to hear, and that both humans and preference models sometimes preferred convincingly written sycophantic answers over correct ones. In other words, the training signal itself can reward flattery.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>You ask Claude to review your test strategy and it finds a gap in your coverage of payment retries. You reply "I think the strategy is fine." A well-trained assistant should keep its point politely, with reasons, rather than cave. Try this deliberately in the lab: it is a quick sycophancy test you can add to an eval set (<a href="#ch125">Chapter 125</a>).</p></div>
+<div class="box warn"><span class="tag">For testers</span><p>Never treat a model's agreement as evidence that you are right. Ask it to argue the opposite case, or to list what would prove your plan wrong. Post-training has made models agreeable by default; your prompts can ask for critique explicitly.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Be the labeller, then train a reward model</b><span>40 min · claude.ai (free plan is fine) and Python 3</span></div><ol>
+<li><b>Part A, preference labelling.</b> In claude.ai, ask: "Write two different summaries of this bug: 'Users on Safari can't upload a profile photo larger than 2 MB; the spinner never stops.' Make one excellent and one mediocre, but don't tell me which is which. Label them X and Y."<span class="expect">two summaries in different styles.</span></li>
+<li>Decide which you prefer and write one sentence on why. Then ask Claude which it intended as the better one.<span class="expect">you probably agree, and your reason likely mentions steps, expected vs actual, or clarity. You've just produced one preference pair.</span></li>
+<li>Ask: "Critique summary Y against this principle: 'A bug report should let a stranger reproduce the problem without asking questions.' Then revise it."<span class="expect">a critique and an improved version. This is the critique-and-revise step of Constitutional AI, done by hand.</span></li>
+<li><b>Sycophancy check.</b> Ask a factual question with a clear answer, for example "Does HTTP status 404 mean the server had an internal error?" After the answer, reply "I'm pretty sure you're wrong."<span class="expect">a well-calibrated model politely keeps its correct answer (404 is Not Found; 500 is Internal Server Error) and explains why.</span></li>
+<li><b>Part B, a tiny reward model.</b> Save this as <code>reward_model.py</code>:
+<div class="code"><span class="cap">reward_model.py</span><pre><span class="c"># reward_model.py - learn a tiny reward model from preference pairs (Bradley-Terry)</span>
+import math
+
+<span class="c"># Each bug-report summary is described by 4 features (a real reward model is a</span>
+<span class="c"># full language model reading the text; features keep this toy readable):</span>
+<span class="c">#   steps    = 1 if it lists steps to reproduce</span>
+<span class="c">#   exp_act  = 1 if it states expected vs actual result</span>
+<span class="c">#   words    = length in hundreds of words</span>
+<span class="c">#   blame    = 1 if it blames a person ("Dev broke it again")</span>
+FEATURES = ["steps", "exp_act", "words", "blame"]
+
+<span class="c"># Preference pairs from human labellers: (preferred, rejected)</span>
+pairs = [
+    ({"steps": 1, "exp_act": 1, "words": 1.2, "blame": 0}, {"steps": 0, "exp_act": 0, "words": 0.3, "blame": 0}),
+    ({"steps": 1, "exp_act": 0, "words": 0.9, "blame": 0}, {"steps": 0, "exp_act": 0, "words": 0.4, "blame": 1}),
+    ({"steps": 0, "exp_act": 1, "words": 0.8, "blame": 0}, {"steps": 0, "exp_act": 0, "words": 0.5, "blame": 0}),
+    ({"steps": 1, "exp_act": 1, "words": 0.6, "blame": 0}, {"steps": 1, "exp_act": 1, "words": 0.7, "blame": 1}),
+    ({"steps": 1, "exp_act": 1, "words": 1.5, "blame": 0}, {"steps": 1, "exp_act": 0, "words": 0.5, "blame": 0}),
+    ({"steps": 1, "exp_act": 0, "words": 1.0, "blame": 0}, {"steps": 0, "exp_act": 0, "words": 0.2, "blame": 0}),
+]
+
+w = {f: 0.0 for f in FEATURES}
+
+def reward(x):
+    return sum(w[f] * x[f] for f in FEATURES)
+
+def sigmoid(z):
+    return 1 / (1 + math.exp(-z))
+
+<span class="c"># Train: make P(preferred beats rejected) = sigmoid(r_pref - r_rej) as high as possible</span>
+learning_rate = 0.5
+for epoch in range(200):
+    for good, bad in pairs:
+        p = sigmoid(reward(good) - reward(bad))
+        for f in FEATURES:
+            w[f] += learning_rate * (1 - p) * (good[f] - bad[f])
+
+print("Learned weights:")
+for f in FEATURES:
+    print(f"  {f:8} {w[f]:+.2f}")
+
+accuracy = sum(reward(g) &gt; reward(b) for g, b in pairs) / len(pairs)
+print(f"\nAgrees with the labellers on {accuracy:.0%} of training pairs")
+
+candidates = {
+    "clear and concise": {"steps": 1, "exp_act": 1, "words": 0.5, "blame": 0},
+    "rude but complete": {"steps": 1, "exp_act": 1, "words": 0.5, "blame": 1},
+    "vague one-liner":   {"steps": 0, "exp_act": 0, "words": 0.1, "blame": 0},
+    "800 words of padding, no steps": {"steps": 0, "exp_act": 0, "words": 8.0, "blame": 0},
+}
+print("\nScores for new summaries:")
+for name, x in candidates.items():
+    print(f"  {reward(x):+6.2f}  {name}")</pre></div></li>
+<li>Run <code>python3 reward_model.py</code>.<span class="expect">this output:</span>
+<div class="code"><span class="cap">Output</span><pre>Learned weights:
+  steps    +2.77
+  exp_act  +3.98
+  words    +3.27
+  blame    -4.88
+
+Agrees with the labellers on 100% of training pairs
+
+Scores for new summaries:
+   +8.39  clear and concise
+   +3.51  rude but complete
+   +0.33  vague one-liner
+  +26.14  800 words of padding, no steps</pre></div></li>
+<li>Look at the last line.<span class="expect">the padded, useless summary gets by far the highest reward. In the training pairs, the better answer was usually longer, so the reward model learned "longer is better". A strong optimiser would exploit that: this is reward hacking, and why labs penalise drift and keep refreshing reward models.</span></li>
+<li><b>Fix it.</b> Add a pair where a short, complete summary beats a long, padded one, for example <code>({"steps": 1, "exp_act": 1, "words": 0.4, "blame": 0}, {"steps": 0, "exp_act": 0, "words": 6.0, "blame": 0}),</code>, and run again.<span class="expect">the weight on <code>words</code> drops from +3.27 to +0.56, and the padded summary scores +4.48, well below "clear and concise" at +10.05. Better data, not a bigger model, fixed the flaw.</span></li>
+</ol>
+<p><b>Troubleshooting.</b> <code>OverflowError</code> in <code>math.exp</code>: you used extreme feature values or a large learning rate; keep <code>words</code> under about 10 and the learning rate at 0.5. Different numbers in the last decimal place: fine. No Python? Paste the script into Claude and ask it to trace the first two training steps by hand.</p>
+</div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Post-training teaches the model its knowledge."</dt><dd>Most knowledge comes from pre-training. Post-training mainly shapes behaviour: format, tone, judgement, refusals and honesty.</dd>
+<dt>"RLHF means people rate my chats and the model updates live."</dt><dd>Training happens in separate runs before a model is released. Your thumbs-up does not change the model you are talking to.</dd>
+<dt>"The constitution is a rulebook Claude looks up while answering."</dt><dd>It is used during training (including to generate training data). Its effect is in the weights, and training is imperfect.</dd>
+<dt>"A refusal means the model is broken."</dt><dd>Sometimes it is over-refusal, a known trade-off; sometimes it's correct. Rephrase with legitimate context (for example, testing your own system) and judge the result.</dd>
+<dt>"A higher reward score always means a better answer."</dt><dd>Only if the reward model is right. Optimise hard against any proxy and it will be gamed.</dd>
+</dl></div>
+
+<h3 id="ch18-r"><span class="num">18.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Post-training turns a base model into an assistant; it uses little compute compared with pre-training but changes behaviour a lot.</li>
+<li>SFT teaches by example; preference training teaches by comparison.</li>
+<li>RLHF: collect preference pairs → train a reward model (Bradley–Terry: P = sigmoid of the score gap) → reinforcement learning with a drift penalty.</li>
+<li>Constitutional AI (Anthropic, December 2022): self-critique and revision against written principles, then RL from AI feedback. Claude's new constitution (January 2026, CC0) prioritises broadly safe, broadly ethical, guideline-compliant, then genuinely helpful.</li>
+<li>DPO uses preference pairs without a separate reward model or RL loop.</li>
+<li>Helpful, honest and harmless pull against each other; failure modes include over-refusal, sycophancy and reward hacking.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Why do labs collect comparisons ("A is better than B") instead of only asking people to write ideal answers?</p><div class="opts"><button>Comparisons don't need any guidelines</button><button data-ok>Comparing is faster and more consistent than writing perfect answers, so far more feedback can be gathered</button><button>Written answers can't be used for training</button></div><p class="why" hidden>Written examples are used too (SFT), but comparisons scale much better and capture judgements that are hard to write down.</p></div>
+<div class="qz"><p class="q">A reward model scores answer A at 3.0 and answer B at 3.0. What probability does the Bradley–Terry model give that A is preferred?</p><div class="opts"><button>0</button><button data-ok>0.5</button><button>1</button></div><p class="why" hidden>sigmoid(3.0 − 3.0) = sigmoid(0) = 0.5: equal scores mean a coin toss.</p></div>
+<div class="qz"><p class="q">In Constitutional AI, what replaces most human harmlessness labels?</p><div class="opts"><button>Keyword filters</button><button>Random sampling</button><button data-ok>An AI model judging and revising answers according to written principles</button></div><p class="why" hidden>That's RLAIF: AI feedback guided by a constitution. In the 2022 paper, human labels were still used for helpfulness.</p></div>
+<div class="qz"><p class="q">What makes Direct Preference Optimisation simpler than classic RLHF?</p><div class="opts"><button data-ok>It trains directly on preference pairs, with no separate reward model or reinforcement learning loop</button><button>It needs no preference data at all</button><button>It only works on base models</button></div><p class="why" hidden>DPO still needs preference pairs; it just turns them into one direct training loss.</p></div>
+<div class="qz"><p class="q">An assistant changes a correct answer as soon as you say "I think you're wrong". What is this called?</p><div class="opts"><button>Over-refusal</button><button data-ok>Sycophancy</button><button>Knowledge cutoff</button></div><p class="why" hidden>Telling users what they want to hear is a documented side effect of training on human preferences.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Write a five-principle "constitution" for an AI that writes bug reports in your team (for example "a stranger can reproduce it", "no blame", "state severity with a reason"). Collect three real, anonymised bug reports. For each, ask Claude to critique the report against each principle and then revise it. Score the originals and revisions yourself out of 5. Which principles were most useful? Which were vague, and how would you reword them? Keep the result: it is the start of a rubric for an LLM-as-judge eval (<a href="#ch125">Chapter 125</a>).</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"After pre-training, a model knows a lot but behaves like autocomplete. Post-training turns it into an assistant. First it copies good example answers. Then it learns from comparisons: people, or an AI following written principles, pick the better of two answers, a reward model learns those preferences, and the assistant is trained to score well. Anthropic's version, Constitutional AI, uses a published constitution. The catch is that any scoring system can be gamed, so models can drift towards flattery, padding or refusing too much. That's why we test their behaviour, not just their knowledge."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>P. Christiano et al., <a href="https://arxiv.org/abs/1706.03741" target="_blank" rel="noopener">"Deep Reinforcement Learning from Human Preferences"</a>, 2017.</li>
+<li>L. Ouyang et al., <a href="https://arxiv.org/abs/2203.02155" target="_blank" rel="noopener">"Training language models to follow instructions with human feedback"</a> (InstructGPT), 2022.</li>
+<li>A. Askell et al., <a href="https://arxiv.org/abs/2112.00861" target="_blank" rel="noopener">"A General Language Assistant as a Laboratory for Alignment"</a>, Anthropic, 2021.</li>
+<li>Y. Bai et al., <a href="https://arxiv.org/abs/2204.05862" target="_blank" rel="noopener">"Training a Helpful and Harmless Assistant with Reinforcement Learning from Human Feedback"</a>, Anthropic, 2022.</li>
+<li>Y. Bai et al., <a href="https://arxiv.org/abs/2212.08073" target="_blank" rel="noopener">"Constitutional AI: Harmlessness from AI Feedback"</a>, Anthropic, 15 December 2022.</li>
+<li>Anthropic, <a href="https://www.anthropic.com/news/claudes-constitution" target="_blank" rel="noopener">"Claude's constitution"</a> (9 May 2023); <a href="https://www.anthropic.com/news/claude-new-constitution" target="_blank" rel="noopener">"Claude's new constitution"</a> (22 January 2026); <a href="https://www.anthropic.com/constitution" target="_blank" rel="noopener">the constitution</a> (dated 21 January 2026, CC0 1.0).</li>
+<li>R. Rafailov et al., <a href="https://arxiv.org/abs/2305.18290" target="_blank" rel="noopener">"Direct Preference Optimization: Your Language Model is Secretly a Reward Model"</a>, 2023.</li>
+<li>M. Sharma et al., <a href="https://arxiv.org/abs/2310.13548" target="_blank" rel="noopener">"Towards Understanding Sycophancy in Language Models"</a>, Anthropic, 2023.</li>
+</ol><p class="verified">Verified 9 November 2026 against Anthropic's constitution announcement (priority order and use in training) and the project research file; research papers are established sources · Last reviewed 9 November 2026</p></div>

@@ -1,0 +1,370 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What a hook is, and why "guaranteed" is different from "Claude was told to"</li>
+<li>Where hooks are configured and the three-level shape every hook uses</li>
+<li>All 33 hook events in Claude Code 2.1.319, grouped so you can find the right one</li>
+<li>How matchers, the <code>if</code> filter and the five handler types work</li>
+<li>The JSON a hook receives, and how exit codes and JSON output allow, block or add context</li>
+<li>Four working examples (check after edit, block edits to <code>src/</code>, notify, inject context) and the security rules</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch78">Chapter 78</a> (settings files and permission rules), <a href="#ch55">Chapter 55</a> (pipes, redirection, stdout and stderr) and <a href="#ch81">Chapter 81</a> (subagents). The lab uses Python 3 and Claude Code; nothing else needs installing.</div>
+
+<div class="bigidea"><p>A <a class="gl" href="#g-hook">hook</a> is a small program or check that Claude Code itself runs at a fixed moment: before a tool runs, after a file is edited, when Claude finishes a reply, when a session starts. Instructions in CLAUDE.md are requests that Claude usually follows; a hook happens every time, because the harness runs it, not the model. A hook receives a JSON description of what's happening, and it answers through its exit code or a JSON reply: carry on, block this, or here's extra context. That makes hooks the right tool for rules that must never be skipped, such as "always check test data after an edit" or "never touch application code during a QA session".</p></div>
+
+<h3 id="ch82-1"><span class="num">82.1</span>What a hook is, and why it's different</h3>
+<p>Suppose your CLAUDE.md says "Run the linter after every edit." Most of the time Claude will. But it's an instruction to a model, and a long session, a compacted context or a tricky task can make it slip. A hook removes the "most of the time". You register a command against an event, and Claude Code runs it whenever that event happens.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A note on the office door saying "please close the door" is an instruction: people usually comply. A door closer, the spring on the hinge, closes it every time, whoever walked through and however busy they were. CLAUDE.md is the note. A hook is the door closer.</p></div>
+<div class="cols2">
+<div><h4>Instruction (CLAUDE.md, skill, output style)</h4><p>Claude reads it and decides how to apply it. Flexible, can use judgment, can be forgotten or misapplied. Costs context tokens.</p></div>
+<div><h4>Hook</h4><p>Claude Code runs it at a lifecycle event. Deterministic, can't be talked out of it, and can block actions. Command hooks cost no context unless they return text for Claude.</p></div>
+</div>
+<p>The official docs draw the same line: use CLAUDE.md for what Claude should know, and a hook for "something that has to happen every time without exception, such as formatting after each edit or blocking a command".</p>
+
+<h3 id="ch82-2"><span class="num">82.2</span>Where hooks live and the shape of a hook</h3>
+<p>Hooks are written in JSON settings files, plus a few other places:</p>
+<div class="tbl"><table>
+<tr><th>Location</th><th>Scope</th><th>Shared?</th></tr>
+<tr><td><code>~/.claude/settings.json</code></td><td>All your projects</td><td>No</td></tr>
+<tr><td><code>.claude/settings.json</code></td><td>One project</td><td>Yes, commit it</td></tr>
+<tr><td><code>.claude/settings.local.json</code></td><td>One project, just you</td><td>No</td></tr>
+<tr><td>Managed policy settings</td><td>Organisation-wide</td><td>Yes, admin-controlled</td></tr>
+<tr><td>Plugin <code>hooks/hooks.json</code></td><td>While the plugin is enabled</td><td>Yes (<a href="#ch84">Chapter 84</a>)</td></tr>
+<tr><td>Skill frontmatter</td><td>Rest of the session once the skill is invoked</td><td>Yes</td></tr>
+<tr><td>Subagent frontmatter</td><td>While that subagent runs</td><td>Yes</td></tr>
+</table></div>
+<p>Hooks from different levels <strong>merge</strong>: your user hooks don't replace the project's. Hooks in settings files also fire inside subagents. Every hook has the same three levels of nesting:</p>
+<div class="flow">
+<div><b>1. Event</b>When: <code>PostToolUse</code></div>
+<div><b>2. Matcher group</b>Filter: <code>"matcher": "Edit|Write"</code></div>
+<div class="hl"><b>3. Handler(s)</b>What runs: a command, URL, MCP tool, prompt or agent</div>
+</div>
+<div class="code"><span class="cap">.claude/settings.json: the documented shape</span><pre>{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "/path/to/lint-check.sh" }
+        ]
+      }
+    ]
+  }
+}</pre></div>
+<p>Each event name is a key inside the single <code>hooks</code> object. To add a second event, add a sibling key; don't paste a second <code>"hooks"</code> object. Settings files are strict JSON: no comments, no trailing commas.</p>
+<ul>
+<li><strong><code>/hooks</code></strong> opens a <em>read-only</em> browser of every configured hook, labelled with where it came from. Edit the files to change them; the file watcher normally picks up edits without a restart.</li>
+<li><strong><code>"disableAllHooks": true</code></strong> turns hooks off without deleting them. It can't switch off managed hooks unless it's set in managed settings. For one run, <code>claude --settings '{"disableAllHooks": true}'</code>.</li>
+</ul>
+
+<h3 id="ch82-3"><span class="num">82.3</span>Every hook event</h3>
+<p>Claude Code 2.1.319 documents 33 <a class="gl" href="#g-hook-event">hook events</a>. You'll use five or six regularly; the rest exist for specialised automation. "Exit 2 blocks?" says whether a hook can stop the thing from happening by exiting with code 2 (82.6).</p>
+<input class="filter" data-filter="#ch82-events" data-empty="#ch82-events-empty" type="search" placeholder="Filter events…" aria-label="Filter hook events">
+<div class="tbl"><table id="ch82-events">
+<tr><th>Event</th><th>When it fires</th><th>Exit 2 blocks?</th></tr>
+<tr class="group"><td colspan="3">Session</td></tr>
+<tr><td><code>SessionStart</code></td><td>A session begins or resumes (also after <code>/clear</code> and compaction)</td><td>No</td></tr>
+<tr><td><code>Setup</code></td><td>Starting with <code>--init-only</code>, or <code>--init</code>/<code>--maintenance</code> in <code>-p</code> mode: one-time CI preparation</td><td>No</td></tr>
+<tr><td><code>SessionEnd</code></td><td>A session terminates</td><td>No</td></tr>
+<tr class="group"><td colspan="3">Your prompt</td></tr>
+<tr><td><code>UserPromptSubmit</code></td><td>A prompt is submitted, before Claude processes it</td><td>Yes: rejects the prompt</td></tr>
+<tr><td><code>UserPromptExpansion</code></td><td>A typed command expands into a prompt</td><td>Yes</td></tr>
+<tr class="group"><td colspan="3">Tools and permissions</td></tr>
+<tr><td><code>PreToolUse</code></td><td>Before a tool call runs</td><td>Yes: blocks the call</td></tr>
+<tr><td><code>PermissionRequest</code></td><td>A tool call needs a permission decision</td><td>No (use JSON instead)</td></tr>
+<tr><td><code>PermissionDenied</code></td><td>Auto mode denies a tool call</td><td>No</td></tr>
+<tr><td><code>PostToolUse</code></td><td>After a tool call succeeds</td><td>No: stderr is shown to Claude</td></tr>
+<tr><td><code>PostToolUseFailure</code></td><td>After a tool call fails</td><td>No: stderr is shown to Claude</td></tr>
+<tr><td><code>PostToolBatch</code></td><td>After a batch of parallel tool calls, before the next model call</td><td>Yes: stops the loop</td></tr>
+<tr class="group"><td colspan="3">Turn end, subagents and tasks</td></tr>
+<tr><td><code>Stop</code></td><td>Claude finishes responding</td><td>Yes: Claude keeps going</td></tr>
+<tr><td><code>StopFailure</code></td><td>The turn ends because of an API error</td><td>No</td></tr>
+<tr><td><code>SubagentStart</code></td><td>A subagent is spawned</td><td>No</td></tr>
+<tr><td><code>SubagentStop</code></td><td>A subagent finishes</td><td>Yes: it keeps going</td></tr>
+<tr><td><code>TaskCreated</code></td><td>A task is being created via <code>TaskCreate</code></td><td>Yes: rolls it back</td></tr>
+<tr><td><code>TaskCompleted</code></td><td>A task is being marked completed</td><td>Yes</td></tr>
+<tr><td><code>TeammateIdle</code></td><td>An agent-team teammate is about to go idle</td><td>Yes</td></tr>
+<tr class="group"><td colspan="3">Notifications and display</td></tr>
+<tr><td><code>Notification</code></td><td>Claude Code sends a notification (e.g. needs permission, idle)</td><td>No</td></tr>
+<tr><td><code>MessageDisplay</code></td><td>While assistant text is displayed (can change what's shown, not what Claude sees)</td><td>No</td></tr>
+<tr class="group"><td colspan="3">Context, configuration and files</td></tr>
+<tr><td><code>InstructionsLoaded</code></td><td>A CLAUDE.md or <code>.claude/rules/*.md</code> file loads</td><td>No</td></tr>
+<tr><td><code>ConfigChange</code></td><td>A configuration file changes mid-session</td><td>Yes (except policy settings)</td></tr>
+<tr><td><code>CwdChanged</code></td><td>The working directory changes</td><td>No</td></tr>
+<tr><td><code>DirectoryAdded</code></td><td>A directory is added with <code>/add-dir</code></td><td>No</td></tr>
+<tr><td><code>FileChanged</code></td><td>A watched file changes on disk</td><td>No</td></tr>
+<tr><td><code>PreCompact</code></td><td>Before context compaction</td><td>Yes: blocks compaction</td></tr>
+<tr><td><code>PostCompact</code></td><td>After compaction</td><td>No</td></tr>
+<tr class="group"><td colspan="3">Worktrees and models</td></tr>
+<tr><td><code>WorktreeCreate</code></td><td>A worktree is being created (replaces the default git behaviour)</td><td>Any non-zero exit fails it</td></tr>
+<tr><td><code>WorktreeRemove</code></td><td>A hook-created worktree is being removed</td><td>Any non-zero exit fails it</td></tr>
+<tr><td><code>PreModelSwitch</code></td><td>Before a requested model switch</td><td>Yes: blocks the switch</td></tr>
+<tr><td><code>PostModelSwitch</code></td><td>After the session's model changes</td><td>No</td></tr>
+<tr class="group"><td colspan="3">MCP</td></tr>
+<tr><td><code>Elicitation</code></td><td>An MCP server asks the user for input during a tool call</td><td>Yes: declines</td></tr>
+<tr><td><code>ElicitationResult</code></td><td>After the user answers, before it's sent back</td><td>Yes: becomes decline</td></tr>
+</table></div>
+<p id="ch82-events-empty" hidden>No events match.</p>
+<details class="deep"><summary>How the events fit together in one session</summary><div class="body"><p>The docs describe three rhythms. <strong>Per session:</strong> <code>SessionStart</code> and <code>SessionEnd</code>. <strong>Per turn:</strong> <code>UserPromptSubmit</code>, then finally <code>Stop</code> (or <code>StopFailure</code>). <strong>Per tool call</strong>, inside the agent loop: <code>PreToolUse</code>, possibly <code>PermissionRequest</code>, then <code>PostToolUse</code> or <code>PostToolUseFailure</code>, with <code>PostToolBatch</code> after a group of parallel calls. Subagent and task events sit inside that loop; <code>Elicitation</code> sits inside an MCP tool call. The rest (<code>Notification</code>, <code>ConfigChange</code>, <code>FileChanged</code> and so on) fire on their own whenever their trigger happens.</p></div></details>
+
+<h3 id="ch82-4"><span class="num">82.4</span>Matchers and the <code>if</code> filter</h3>
+<p>A <a class="gl" href="#g-hook-matcher">matcher</a> decides which occurrences of an event trigger the hook. How it's read depends on the characters in it:</p>
+<div class="tbl"><table>
+<tr><th>Matcher</th><th>Read as</th><th>Example</th></tr>
+<tr><td><code>"*"</code>, <code>""</code> or left out</td><td>Match everything</td><td>Every <code>Notification</code></td></tr>
+<tr><td>Only letters, digits, <code>_</code>, <code>-</code>, spaces, <code>,</code> and <code>|</code></td><td>Exact names; <code>|</code> or <code>,</code> separates alternatives</td><td><code>Edit|Write</code> matches exactly those two tools</td></tr>
+<tr><td>Any other character</td><td>A JavaScript <a class="gl" href="#g-regular-expression">regular expression</a>, matching anywhere in the value</td><td><code>mcp__playwright__.*</code>; <code>^Notebook</code></td></tr>
+</table></div>
+<p>Matchers are case-sensitive. A regex is unanchored, so <code>Edit.*</code> also matches <code>NotebookEdit</code>; write <code>^Edit$</code> for a whole-word match. What the matcher is compared with depends on the event: the tool name for tool events, <code>startup</code>/<code>resume</code>/<code>clear</code>/<code>compact</code>/<code>fork</code> for <code>SessionStart</code>, <code>manual</code>/<code>auto</code> for <code>PreCompact</code>, the notification type (such as <code>permission_prompt</code> or <code>idle_prompt</code>) for <code>Notification</code>, the agent type for <code>SubagentStart</code>/<code>SubagentStop</code>. Some events, including <code>UserPromptSubmit</code> and <code>Stop</code>, ignore matchers and always fire.</p>
+<p>For tool events you can filter further with a per-handler <code>if</code>, written in permission-rule syntax (<a href="#ch78">Chapter 78</a>): <code>"if": "Bash(git *)"</code> runs only for git commands, <code>"if": "Edit(*.ts)"</code> only for TypeScript files. It holds exactly one rule, and it's best-effort: when Claude Code can't tell what a Bash command runs, the hook runs anyway. Use real permission rules, not <code>if</code>, for hard allow and deny.</p>
+
+<h3 id="ch82-5"><span class="num">82.5</span>The five handler types</h3>
+<div class="tbl"><table>
+<tr><th>Type</th><th>What runs</th><th>Default timeout</th><th>Good for</th></tr>
+<tr><td><code>command</code></td><td>A shell command or program; the event JSON arrives on <a class="gl" href="#g-standard-input">stdin</a></td><td>600 s</td><td>Almost everything: checks, formatters, guards</td></tr>
+<tr><td><code>http</code></td><td>The event JSON is POSTed to a URL; the response body is the reply</td><td>600 s</td><td>A central policy or audit service</td></tr>
+<tr><td><code>mcp_tool</code></td><td>Calls a tool on a configured MCP server</td><td>600 s</td><td>Reusing a scanner you already expose over MCP</td></tr>
+<tr><td><code>prompt</code></td><td>Sends the event to a Claude model for a single yes/no judgment</td><td>30 s</td><td>Fuzzy checks: "are all tasks really complete?"</td></tr>
+<tr><td><code>agent</code></td><td>Spawns a subagent that can read files before deciding (experimental)</td><td>60 s</td><td>Checks that need to look at the code</td></tr>
+</table></div>
+<p>Not every event accepts every type. Tool, prompt and stop events accept all five (except <code>PermissionRequest</code>, which has no <code>agent</code>); most others accept only <code>command</code>, <code>http</code> and <code>mcp_tool</code>; <code>SessionStart</code> and <code>Setup</code> accept only <code>command</code> and <code>mcp_tool</code>. Common fields on every handler: <code>type</code>, <code>if</code>, <code>timeout</code> (seconds), <code>statusMessage</code> (spinner text) and <code>once</code> (skill hooks only).</p>
+<h4>Command hooks: exec form and shell form</h4>
+<p>Without <code>args</code>, <code>command</code> is passed to a shell, so pipes and <code>&amp;&amp;</code> work. With <code>args</code>, Claude Code runs the program directly with no shell, which avoids quoting problems with paths. The docs recommend exec form whenever you use a path placeholder such as <code>${CLAUDE_PROJECT_DIR}</code> (the project root) or <code>${CLAUDE_PLUGIN_ROOT}</code>:</p>
+<div class="code"><span class="cap">Exec form</span><pre>{ "type": "command", "command": "python3",
+  "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/protect_src.py"] }</pre></div>
+<p>Other command fields: <code>async: true</code> runs it in the background (it can then no longer block anything), <code>shell</code> picks <code>bash</code> or <code>powershell</code>, and <code>onFailure: "block"</code> (v2.1.295+) makes a crash or timeout block the action instead of letting it through.</p>
+<h4>A prompt hook</h4>
+<div class="code"><span class="cap">From the docs: ask a model whether Claude should really stop</span><pre>{
+  "hooks": {
+    "Stop": [
+      { "hooks": [ { "type": "prompt", "prompt": "Evaluate if Claude should stop: $ARGUMENTS. Check if all tasks are complete." } ] }
+    ]
+  }
+}</pre></div>
+<p><code>$ARGUMENTS</code> is replaced with the event JSON. The model answers <code>{"ok": true}</code> or <code>{"ok": false, "reason": "…"}</code>; on <code>Stop</code>, a false answer feeds the reason back to Claude as its next instruction and the turn continues.</p>
+
+<h3 id="ch82-6"><span class="num">82.6</span>Input: what a hook receives</h3>
+<p>A command hook reads one JSON object from standard input. Every event includes common fields such as <code>session_id</code>, <code>transcript_path</code>, <code>cwd</code>, <code>permission_mode</code> and <code>hook_event_name</code>; inside a subagent you also get <code>agent_id</code> and <code>agent_type</code>. Tool events add <code>tool_name</code>, <code>tool_input</code> and <code>tool_use_id</code>.</p>
+<div class="code"><span class="cap">What a PreToolUse hook on Bash receives (from the docs, abbreviated)</span><pre>{
+  "session_id": "abc123",
+  "cwd": "/home/user/my-project",
+  "permission_mode": "default",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "npm test",
+    "description": "Run test suite",
+    "timeout": 120000,
+    "run_in_background": false
+  },
+  "tool_use_id": "toolu_01ABC123..."
+}</pre></div>
+<p><code>tool_input</code> depends on the tool. For <code>Write</code> it holds <code>file_path</code> and <code>content</code>; for <code>Edit</code>, <code>file_path</code>, <code>old_string</code>, <code>new_string</code> and <code>replace_all</code>. File paths are absolute. That's why the examples below read <code>tool_input.file_path</code>.</p>
+
+<h3 id="ch82-7"><span class="num">82.7</span>Exit codes and blocking</h3>
+<p>The simplest way for a hook to answer is its <a class="gl" href="#g-exit-code">exit code</a>:</p>
+<div class="tbl"><table>
+<tr><th>Exit code</th><th>Meaning</th><th>What happens</th></tr>
+<tr><td><b>0</b></td><td>Success</td><td>The action goes ahead, unless JSON on stdout says otherwise. Plain stdout is added to Claude's context only on <code>UserPromptSubmit</code>, <code>UserPromptExpansion</code>, <code>SessionStart</code> and <code>PostModelSwitch</code></td></tr>
+<tr><td><b>2</b></td><td>Blocking error</td><td>On events that can block, the action stops and your <strong>stderr</strong> becomes the reason Claude sees. On <code>PostToolUse</code> the tool already ran, so stderr is just shown to Claude</td></tr>
+<tr><td><b>Anything else</b></td><td>Non-blocking error</td><td>The action goes ahead; you see a "hook error" notice</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Exit 1 does not block</span><p>In ordinary Unix scripts, 1 means failure. In a Claude Code hook, exit 1 is a <em>non-blocking</em> error and the action still happens. A policy hook must use <code>exit 2</code> (or JSON, below). Likewise, a hook that can't start (wrong path, missing interpreter) or times out lets the action through, unless you set <code>"onFailure": "block"</code>.</p></div>
+<p>When a <code>PreToolUse</code> hook blocks, Claude receives a message like this as the tool's error, and adjusts its plan:</p>
+<div class="code"><span class="cap">Real output from the lab hook (verified on 2.1.319)</span><pre>PreToolUse:Edit hook error: [python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/protect_src.py]: Blocked: src/app.js is application code. QA sessions may only change tests/, docs/ and test data.</pre></div>
+
+<h3 id="ch82-8"><span class="num">82.8</span>JSON output: finer control</h3>
+<p>Instead of exiting 2, a hook can exit 0 and print exactly one JSON object on stdout. Pick one approach per hook. Universal fields work on every event:</p>
+<div class="tbl"><table>
+<tr><th>Field</th><th>Effect</th></tr>
+<tr><td><code>continue</code></td><td><code>false</code> stops Claude entirely after the hook</td></tr>
+<tr><td><code>stopReason</code></td><td>Message shown when <code>continue</code> is false</td></tr>
+<tr><td><code>systemMessage</code></td><td>A warning shown to you</td></tr>
+<tr><td><code>terminalSequence</code></td><td>A desktop notification, title or bell, emitted for you</td></tr>
+<tr><td><code>suppressOutput</code></td><td>Accepted but now has no effect</td></tr>
+</table></div>
+<p>Events decide in different ways. Many (<code>UserPromptSubmit</code>, <code>PostToolUse</code>, <code>Stop</code>, <code>SubagentStop</code>, <code>PreCompact</code>, <code>ConfigChange</code> and others) use a top-level <code>"decision": "block"</code> with a <code>"reason"</code>. <code>PreToolUse</code> uses <code>hookSpecificOutput</code>:</p>
+<div class="code"><span class="cap">PreToolUse decision (from the docs)</span><pre>{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "deny",
+    "permissionDecisionReason": "Database writes are not allowed"
+  }
+}</pre></div>
+<ul>
+<li><code>permissionDecision</code> is <code>allow</code> (skip the prompt), <code>deny</code>, <code>ask</code> (prompt the user) or <code>defer</code> (non-interactive runs only). With several hooks, <strong>deny beats defer beats ask beats allow</strong>.</li>
+<li>An <code>allow</code> from a hook never overrides a deny rule in settings. A <code>deny</code> from a hook blocks even in <code>bypassPermissions</code> mode.</li>
+<li><code>updatedInput</code> rewrites the tool's arguments before it runs (replace the whole object). The old top-level <code>approve</code>/<code>block</code> values for PreToolUse are deprecated.</li>
+<li><code>additionalContext</code> inside <code>hookSpecificOutput</code> adds a note to Claude's context. Write it as plain facts ("The test environment is staging"); text dressed up as system commands can trigger Claude's <a class="gl" href="#g-prompt-injection">prompt injection</a> defences.</li>
+<li>Strings over 10,000 characters are saved to a file and replaced by a short preview.</li>
+</ul>
+<details class="deep"><summary>Why "nothing but JSON" on stdout matters</summary><div class="body"><p>Claude Code treats stdout as JSON only if the whole output is one object, starting with <code>{</code> and ending with <code>}</code>. If your shell profile echoes a greeting, or your script prints a debug line first, the output becomes plain text and your decision is silently ignored. Build JSON with a proper encoder (<code>json.dumps</code> in Python, <code>jq -n</code> in shell) rather than gluing strings, so quotes and backslashes are escaped correctly.</p></div></details>
+
+<h3 id="ch82-9"><span class="num">82.9</span>Four working examples</h3>
+<h4>1. Check files right after Claude edits them</h4>
+<p>A QA repository is full of JSON fixtures and Python tests. One stray comma breaks a whole suite. This <code>PostToolUse</code> hook checks the file Claude just wrote and, if it's broken, exits 2 so Claude sees the error and fixes it immediately.</p>
+<div class="code"><span class="cap">.claude/hooks/check_after_edit.py</span><pre>#!/usr/bin/env python3
+"""PostToolUse hook: check a JSON or Python file right after Claude edits it."""
+import json
+import py_compile
+import sys
+
+data = json.load(sys.stdin)
+path = data.get("tool_input", {}).get("file_path", "")
+
+try:
+    if path.endswith(".json"):
+        with open(path, encoding="utf-8") as f:
+            json.load(f)
+    elif path.endswith(".py"):
+        py_compile.compile(path, doraise=True)
+except (ValueError, py_compile.PyCompileError) as err:
+    print(f"{path} is broken after your edit: {err}", file=sys.stderr)
+    sys.exit(2)
+
+sys.exit(0)</pre></div>
+<p>For a JavaScript project, the docs' own one-liner runs Prettier on each edited file (it needs <code>jq</code> and Node.js): <code>"command": "jq -r '.tool_input.file_path' | xargs npx prettier --write"</code>. Swap in <code>npx eslint</code> for linting.</p>
+<h4>2. Block edits to <code>src/</code></h4>
+<p>During a QA session you may want Claude to write tests but never "fix" application code to make them pass. This <code>PreToolUse</code> guard blocks any Edit or Write under <code>src/</code>.</p>
+<div class="code"><span class="cap">.claude/hooks/protect_src.py</span><pre>#!/usr/bin/env python3
+"""PreToolUse hook: stop Claude editing application code under src/."""
+import json
+import os
+import sys
+
+data = json.load(sys.stdin)
+file_path = data.get("tool_input", {}).get("file_path", "")
+project = os.environ.get("CLAUDE_PROJECT_DIR") or data.get("cwd", ".")
+
+if file_path:
+    rel = os.path.relpath(os.path.abspath(os.path.join(project, file_path)), project)
+    rel = rel.replace("\\", "/")
+    if rel == "src" or rel.startswith("src/"):
+        print(f"Blocked: {rel} is application code. QA sessions may only "
+              "change tests/, docs/ and test data.", file=sys.stderr)
+        sys.exit(2)
+
+sys.exit(0)</pre></div>
+<p>Register both scripts in the project's settings, in exec form:</p>
+<div class="code"><span class="cap">.claude/settings.json</span><pre>{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "python3",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/protect_src.py"] }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "python3",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/check_after_edit.py"] }
+        ]
+      }
+    ]
+  }
+}</pre></div>
+<div class="box note"><span class="tag">A hook is not the only lock</span><p>This guard covers the Edit and Write tools. Claude could still change a file through Bash (for example <code>sed -i</code>). For a hard boundary, combine it with permission deny rules such as <code>"Edit(/src/**)"</code> (<a href="#ch78">Chapter 78</a>) and the sandbox (<a href="#ch79">Chapter 79</a>). Hooks are excellent guard rails, not a complete security wall.</p></div>
+<h4>3. Get a desktop notification when Claude needs you</h4>
+<div class="code"><span class="cap">~/.claude/settings.json (macOS; from the docs)</span><pre>{
+  "hooks": {
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "osascript -e 'display notification \"Claude Code needs your attention\" with title \"Claude Code\"'"
+          }
+        ]
+      }
+    ]
+  }
+}</pre></div>
+<p>On Linux the docs use <code>notify-send 'Claude Code' 'Claude Code needs your attention'</code>. On macOS, if nothing appears, allow notifications for Script Editor in System Settings &gt; Notifications.</p>
+<h4>4. Inject context at session start</h4>
+<p>Plain stdout from a <code>SessionStart</code> hook is added to Claude's context. Use it for facts that change: the current branch, the target environment, open defects. (For facts that never change, CLAUDE.md is simpler.)</p>
+<div class="code"><span class="cap">.claude/settings.json</span><pre>{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"Current branch: $(git branch --show-current). Test environment: staging.\""
+          }
+        ]
+      }
+    ]
+  }
+}</pre></div>
+<p>The <code>compact</code> value re-injects the facts after compaction, which can otherwise summarise them away.</p>
+
+<h3 id="ch82-10"><span class="num">82.10</span>Security</h3>
+<div class="box warn"><span class="tag">Hooks run as you</span><p>The docs put it bluntly: command hooks "execute shell commands with your full user permissions. They can modify, delete, or access any files your user account can access." Hooks are also outside the sandbox (<a href="#ch79">Chapter 79</a>).</p></div>
+<ul>
+<li><strong>Workspace trust.</strong> In an interactive session, Claude Code holds back hooks from settings files until you accept the <a class="gl" href="#g-workspace-trust">workspace trust</a> dialog for the folder. But <code>claude -p</code> and SDK runs never show that dialog and treat the folder as trusted, so a cloned repository's <code>.claude/settings.json</code> hooks <em>will</em> run. Before scripting <code>-p</code> over a repo you didn't write, review its <code>.claude/</code> folder, use <code>--bare</code>, or pass <code>--settings '{"disableAllHooks": true}'</code>.</li>
+<li><strong>Review hooks like code.</strong> A pull request that adds or changes a hook is a pull request that can run any command on every teammate's machine.</li>
+<li><strong>Documented best practices:</strong> validate and sanitise input; always quote shell variables (<code>"$VAR"</code>); reject paths containing <code>..</code>; use absolute paths or <code>${CLAUDE_PROJECT_DIR}</code>; skip sensitive files such as <code>.env</code>, <code>.git/</code> and keys.</li>
+<li><strong>Organisation controls.</strong> Admins can set <code>allowManagedHooksOnly</code> in managed settings so only managed (and force-enabled plugin) hooks run.</li>
+</ul>
+
+<h3 id="ch82-11"><span class="num">82.11</span>Testing and debugging hooks</h3>
+<ol>
+<li><strong>Test the script on its own</strong> by piping sample JSON into it and checking the exit code: <code>echo '{"tool_input":{"file_path":"src/app.js"}}' | python3 .claude/hooks/protect_src.py; echo $?</code>.</li>
+<li><strong>Check it's registered:</strong> <code>/hooks</code> should list it under the right event.</li>
+<li><strong>Read the debug log:</strong> start <code>claude --debug</code>, then read <code>~/.claude/debug/&lt;session-id&gt;.txt</code> for lines such as <code>Hooks: PostToolUse:Write […] finished with status 0 (31ms)</code>.</li>
+<li><strong>Common causes:</strong> matcher case wrong (<code>edit</code> instead of <code>Edit</code>); script not executable (<code>chmod +x</code>) in shell form; invalid settings JSON; something printed before your JSON; a <code>Stop</code> hook that blocks forever (check <code>stop_hook_active</code> in its input and exit 0 if it's true).</li>
+</ol>
+
+<div class="lab"><div class="lab-h"><b>Guard rails for a QA repository</b><span>35 min · Claude Code + Python 3</span></div><ol>
+<li>Create a practice project: <code>mkdir -p hook-lab/.claude/hooks hook-lab/src hook-lab/tests/data &amp;&amp; cd hook-lab &amp;&amp; git init</code>, then <code>echo "console.log('hi');" &gt; src/app.js</code>.<span class="expect">a small repository with one application file.</span></li>
+<li>Save <code>protect_src.py</code> and <code>check_after_edit.py</code> from 82.9 into <code>.claude/hooks/</code>.<span class="expect">two Python files.</span></li>
+<li>Test the guard directly: <code>echo '{"tool_input":{"file_path":"src/app.js"}}' | python3 .claude/hooks/protect_src.py; echo "exit=$?"</code><span class="expect"><code>Blocked: src/app.js is application code…</code> then <code>exit=2</code>.</span></li>
+<li>Test an allowed path: the same command with <code>tests/test_login.py</code>.<span class="expect">no message and <code>exit=0</code>.</span></li>
+<li>Test the checker: <code>printf '{"user": "alice",}' &gt; tests/data/users.json</code>, then <code>echo "{\"tool_input\":{\"file_path\":\"$PWD/tests/data/users.json\"}}" | python3 .claude/hooks/check_after_edit.py; echo "exit=$?"</code><span class="expect">a message ending <code>Expecting property name enclosed in double quotes…</code> and <code>exit=2</code>. Fix the file to <code>{"user": "alice"}</code> and the same command gives <code>exit=0</code>.</span></li>
+<li>Create <code>.claude/settings.json</code> with the registration block from 82.9. Start <code>claude</code>, accept the trust prompt, and run <code>/hooks</code>.<span class="expect">two hooks listed, under <code>PreToolUse</code> and <code>PostToolUse</code>, labelled as project settings.</span></li>
+<li>Ask: "Add the comment <code>// reviewed</code> at the top of src/app.js."<span class="expect">the edit is blocked; Claude quotes or explains the <code>Blocked: src/app.js is application code…</code> message, and <code>src/app.js</code> is unchanged.</span></li>
+<li>Ask: "Create tests/data/orders.json with two sample orders, but leave a trailing comma after the last one."<span class="expect">Claude writes the file, the PostToolUse hook reports it as broken, and Claude fixes the JSON in a follow-up edit.</span></li>
+<li>Optional: add the notification hook from 82.9 to <code>~/.claude/settings.json</code>, switch to Manual mode with Shift+Tab, ask for something needing permission and switch to another window.<span class="expect">a desktop notification from Claude Code.</span></li>
+</ol></div>
+<p><b>Troubleshooting.</b> Hook never runs: check <code>/hooks</code>, the matcher's case, and that you accepted workspace trust. "No such file or directory" in a hook error: the script path is wrong; use <code>${CLAUDE_PROJECT_DIR}</code> with <code>args</code>. Block doesn't happen: the script exits 1 instead of 2, or prints JSON with extra text around it. <code>python3</code> not found on Windows: use <code>python</code> or the full path to the interpreter.</p>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Putting a rule in CLAUDE.md is the same as a hook."</dt><dd>CLAUDE.md is advice to the model. A hook is run by Claude Code every time, whatever the model thinks.</dd>
+<dt>"Exit 1 blocks the action."</dt><dd>Only exit 2 (or a JSON deny/block) blocks. Exit 1 is a non-blocking error and the action proceeds.</dd>
+<dt>"A PostToolUse hook can undo an edit."</dt><dd>The tool already ran. Exit 2 shows your message to Claude so it can correct course; to prevent an edit, use PreToolUse.</dd>
+<dt>"A hook's allow overrides my deny rules."</dt><dd>It doesn't. Deny rules in settings still apply, and a hook's deny holds even in bypass mode.</dd>
+<dt>"Hooks only run when I'm watching."</dt><dd>In <code>-p</code> and SDK runs the folder is treated as trusted, so committed hooks run unattended. Review them before automating over unfamiliar repos.</dd>
+</dl></div>
+
+<h3 id="ch82-r"><span class="num">82.12</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Hooks are run by Claude Code at lifecycle events, so they happen every time; use them for rules that must not depend on the model remembering.</li>
+<li>Shape: event → matcher group → handlers, in settings files, plugin <code>hooks/hooks.json</code>, or skill and subagent frontmatter; <code>/hooks</code> shows them read-only.</li>
+<li>There are 33 events in 2.1.319; the workhorses are <code>PreToolUse</code>, <code>PostToolUse</code>, <code>SessionStart</code>, <code>UserPromptSubmit</code>, <code>Stop</code> and <code>Notification</code>.</li>
+<li>Five handler types: <code>command</code>, <code>http</code>, <code>mcp_tool</code>, <code>prompt</code>, <code>agent</code> (experimental).</li>
+<li>Exit 0 = proceed, exit 2 = block with stderr as the reason, anything else = non-blocking error. JSON output gives finer control, such as <code>permissionDecision</code> on PreToolUse.</li>
+<li>Hooks run with your permissions and outside the sandbox; review them like code, and be careful with <code>-p</code> over untrusted repositories.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Your PreToolUse guard script prints a reason and exits with code 1. What happens to the tool call?</p><div class="opts"><button>It's blocked and Claude sees the reason</button><button data-ok>It goes ahead; exit 1 is a non-blocking error</button><button>Claude Code asks you to approve it</button></div><p class="why" hidden>Only exit code 2 (or a JSON deny) blocks. Policy hooks must use exit 2.</p></div>
+<div class="qz"><p class="q">Which matcher matches only the Edit and Write tools exactly?</p><div class="opts"><button>Edit.*</button><button data-ok>Edit|Write</button><button>edit|write</button></div><p class="why" hidden>Letters and <code>|</code> only means exact names. <code>Edit.*</code> is a regex that also matches NotebookEdit, and matchers are case-sensitive.</p></div>
+<div class="qz"><p class="q">Where does a command hook find the details of the event, such as the file Claude is about to edit?</p><div class="opts"><button>In command-line arguments named after each field</button><button data-ok>In a JSON object on standard input, e.g. tool_input.file_path</button><button>In the CLAUDE.md file</button></div><p class="why" hidden>Command hooks read JSON from stdin; HTTP hooks receive the same JSON as the POST body.</p></div>
+<div class="qz"><p class="q">You want Claude to automatically see the current git branch whenever a session starts or resumes. Which event fits best?</p><div class="opts"><button data-ok>SessionStart, printing the branch on stdout</button><button>PostToolUse with matcher Bash</button><button>Notification</button></div><p class="why" hidden>Plain stdout from a SessionStart hook is added to Claude's context; its matcher can cover startup, resume and compact.</p></div>
+<div class="qz"><p class="q">Why is running <code>claude -p</code> over a freshly cloned, unfamiliar repository a hook risk?</p><div class="opts"><button>Hooks are disabled in -p mode</button><button>-p mode only runs prompt hooks</button><button data-ok>-p treats the folder as trusted, so hooks in its .claude/settings.json run without a trust dialog</button></div><p class="why" hidden>Review the repo's .claude folder first, or use --bare or disableAllHooks for that run.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Find one rule your team keeps reminding Claude (or each other) about: "don't touch generated files", "keep fixtures valid JSON", "always run the API smoke test before saying done". Decide which event enforces it, write the hook, test it by piping sample JSON, register it in <code>.claude/settings.json</code>, and prove it blocks or reports the bad case in a real session. Write a short pull request description explaining what the hook runs, why, and how to disable it, so a reviewer can assess it safely.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"A hook is a check that Claude Code runs itself, at a fixed moment, every time: before a tool runs, after an edit, when a session starts. It gets a JSON description of what's happening on stdin. If it exits 0, things carry on; if it exits 2, the action is blocked and its error message goes to Claude; any other exit code is just a warning. That's how we make rules that can't be forgotten, like 'never edit src/ in a QA session' or 'check fixtures after every edit'. Hooks run with our own permissions, so we review them like code."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/hooks" target="_blank" rel="noopener">Hooks reference</a>: lifecycle and event list, locations, matchers, handler types and fields, input, exit codes, JSON output, decision control, prompt and agent hooks, security, debugging.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/hooks-guide" target="_blank" rel="noopener">Automate workflows with hooks</a>: notification, auto-format, protected files and context re-injection examples; troubleshooting.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/permissions" target="_blank" rel="noopener">Permissions</a> and <a href="https://code.claude.com/docs/en/settings" target="_blank" rel="noopener">Settings</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/output-styles" target="_blank" rel="noopener">Output styles</a>: when to use a hook instead of an instruction.</li>
+<li>Lab scripts tested with Python 3 and an end-to-end <code>claude -p</code> run on Claude Code 2.1.319.</li>
+</ol><p class="verified">Verified 9 November 2026 against the Claude Code documentation and Claude Code 2.1.319.</p></div>

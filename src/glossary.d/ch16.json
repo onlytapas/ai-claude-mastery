@@ -1,0 +1,102 @@
+{
+ "Positional encoding": {
+  "d": "Information added to each token's vector (or applied inside attention) that tells a Transformer where the token sits in the text, because attention on its own ignores word order.",
+  "see": "ch16"
+ },
+ "Softmax": {
+  "d": "A calculation that turns a list of scores into positive numbers that add up to 1, giving the biggest share to the biggest score. Used inside attention and to produce next-token probabilities.",
+  "see": "ch16"
+ },
+ "Causal mask": {
+  "d": "The rule inside a text-generating Transformer that stops each token from attending to tokens that come after it, so the model can't peek at the word it is meant to predict.",
+  "see": "ch16"
+ },
+ "Multi-head attention": {
+  "d": "Running several attention calculations (heads) side by side, each with its own learned weights, so a token can gather different kinds of information at once.",
+  "see": "ch16"
+ },
+ "Feed-forward network": {
+  "d": "The small two-layer neural network in every Transformer block that processes each token's vector on its own after attention. It holds most of a model's parameters.",
+  "see": "ch16"
+ },
+ "Residual connection": {
+  "d": "A shortcut that adds a layer's output to its input instead of replacing it, so information and training signals flow easily through very deep networks.",
+  "see": "ch16"
+ },
+ "Layer normalisation": {
+  "d": "A step that rescales each token's vector to a standard average and size before (or after) each sub-step, keeping a deep network's numbers stable during training.",
+  "see": "ch16"
+ },
+ "Logit": {
+  "d": "A raw, unnormalised score a model gives each possible next token before softmax turns the scores into probabilities.",
+  "see": "ch16"
+ },
+ "KV cache": {
+  "d": "Stored keys and values for tokens already processed, so a model generating text doesn't recompute them for every new token. It grows with the length of the text.",
+  "see": "ch16"
+ },
+ "Next-token prediction": {
+  "d": "The training task behind language models: given the text so far, predict the token that comes next.",
+  "see": "ch17"
+ },
+ "Cross-entropy loss": {
+  "d": "The standard measure of a language model's error: minus the logarithm of the probability it gave to the token that actually came next. Confident mistakes are punished most.",
+  "see": "ch17"
+ },
+ "Scaling laws": {
+  "d": "Observed rules showing that a model's loss falls smoothly and predictably as parameters, training data and compute grow, used to plan large training runs.",
+  "see": "ch17"
+ },
+ "FLOP": {
+  "d": "Floating-point operation: one addition or multiplication on decimal numbers. Training compute is counted in FLOPs, often around 6 times parameters times training tokens.",
+  "see": "ch17"
+ },
+ "Greedy decoding": {
+  "d": "Generating text by always picking the single most likely next token. Predictable, but can be repetitive.",
+  "see": "ch17"
+ },
+ "Top-p sampling": {
+  "d": "Also called nucleus sampling: choosing the next token at random only from the smallest set of tokens whose probabilities add up to p (for example 0.9).",
+  "see": "ch17"
+ },
+ "Base model": {
+  "d": "A language model straight out of pre-training. It continues text well but doesn't reliably follow instructions or behave like an assistant until post-training.",
+  "see": "ch17"
+ },
+ "Post-training": {
+  "d": "All training done after pre-training to turn a base model into a useful, safe assistant: supervised fine-tuning, preference training (RLHF, RLAIF, DPO) and safety training.",
+  "see": "ch18"
+ },
+ "Supervised fine-tuning": {
+  "d": "Training a pre-trained model on example conversations showing the desired answers, so it learns the assistant's format and behaviour. Often shortened to SFT.",
+  "see": "ch18"
+ },
+ "Preference pair": {
+  "d": "Two answers to the same prompt plus a judgement of which is better. The basic data of RLHF, RLAIF and DPO.",
+  "see": "ch18"
+ },
+ "Reward model": {
+  "d": "A model trained on preference pairs to give each answer a score for how good it is; used as the reward when training an assistant with reinforcement learning.",
+  "see": "ch18"
+ },
+ "Reward hacking": {
+  "d": "When a model trained to maximise a reward finds ways to score highly that don't match what people actually want, such as padding answers because longer ones were usually preferred.",
+  "see": "ch18"
+ },
+ "RLAIF": {
+  "d": "Reinforcement learning from AI feedback: like RLHF, but an AI model, usually guided by written principles, judges which answers are better.",
+  "see": "ch18"
+ },
+ "Direct Preference Optimisation": {
+  "d": "A simpler alternative to RLHF (2023) that trains directly on preference pairs without a separate reward model or reinforcement learning loop. Often shortened to DPO.",
+  "see": "ch18"
+ },
+ "Sycophancy": {
+  "d": "A model's tendency to tell users what they want to hear, such as praising weak work or abandoning a correct answer when challenged. A known side effect of preference training.",
+  "see": "ch18"
+ },
+ "Red teaming": {
+  "d": "Deliberately trying to make an AI system misbehave (jailbreaks, harmful requests, manipulation) to find weaknesses before real users do.",
+  "see": "ch18"
+ }
+}

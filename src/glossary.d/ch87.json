@@ -1,0 +1,46 @@
+{
+ "Stateless": {
+  "d": "Describes an API that keeps no memory between requests. The Claude Messages API is stateless: to continue a conversation, your program sends the whole history again with every request.",
+  "see": "ch87"
+ },
+ "Stop reason": {
+  "d": "The stop_reason field in a Claude API response, saying why Claude stopped writing: end_turn (finished), max_tokens (cut off), tool_use (wants a tool), refusal, and others. Stop reasons arrive in normal successful responses, so code must check them.",
+  "see": "ch87"
+ },
+ "Streaming": {
+  "d": "Receiving a model's answer in small pieces as it is generated, instead of waiting for the whole reply. It shows text sooner but costs the same. The Claude API streams using server-sent events.",
+  "see": "ch87"
+ },
+ "Server-sent events": {
+  "d": "SSE: a simple web standard where a server keeps a connection open and sends a series of named text events. The Claude API uses it for streaming: message_start, content block events, message_delta and message_stop.",
+  "see": "ch87"
+ },
+ "Prefill": {
+  "d": "Starting Claude's reply for it by ending the request with a partial assistant message. It was used to force formats such as JSON; Claude 4.6 and later models reject it with a 400 error.",
+  "see": "ch87"
+ },
+ "Indirect prompt injection": {
+  "d": "An attack where instructions are hidden in content the model reads on a user's behalf, such as a web page, email, document or tool result, rather than typed by the user.",
+  "see": "ch88"
+ },
+ "Context budget": {
+  "d": "A planned maximum number of tokens for each part of a model's context (instructions, examples, documents, history, output), used to control cost, speed and quality.",
+  "see": "ch88"
+ },
+ "Prompt versioning": {
+  "d": "Treating prompt templates like code: stored in version control with an ID (such as testgen-v4), reviewed, tested with evals, and logged with every call so outputs can be traced to the prompt that produced them.",
+  "see": "ch88"
+ },
+ "Tool result": {
+  "d": "The tool_result block your program sends back to Claude after running a tool it requested, matched by tool_use_id, with is_error set to true if the tool failed.",
+  "see": "ch89"
+ },
+ "Tool choice": {
+  "d": "The tool_choice request field: auto (Claude decides), any (must use a tool), tool (must use a named tool) or none. Forcing a tool returns an error on some newer models.",
+  "see": "ch89"
+ },
+ "Strict tool use": {
+  "d": "Setting strict: true on a tool definition so Claude's tool inputs are guaranteed to match the tool's JSON Schema, using grammar-constrained sampling.",
+  "see": "ch89"
+ }
+}

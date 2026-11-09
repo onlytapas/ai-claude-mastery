@@ -1,0 +1,210 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>Why you must measure a <a class="gl" href="#g-baseline">baseline</a> before you start using AI, and how to do it in a week</li>
+<li>Which QA measurements show real value: effort, speed, coverage, quality and risk</li>
+<li>How to avoid <a class="gl" href="#g-vanity-metric">vanity metrics</a> and the trap known as <a class="gl" href="#g-goodhart-s-law">Goodhart's law</a></li>
+<li>How to work out what AI costs, using seat plans and pay-per-use pricing</li>
+<li>How to calculate <a class="gl" href="#g-roi">ROI</a> step by step, with a worked (illustrative) example</li>
+<li>How to present the case to management on one page, framed as "same team, more coverage"</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch118">Chapter 118</a> (the AI-powered QA engineer) and <a href="#ch119">Chapter 119</a> (the ideas catalogue) give you the use-cases you'll be measuring. No maths beyond simple multiplication is needed.</div>
+
+<div class="bigidea"><p>"AI makes us faster" is a feeling. Management needs evidence. The evidence comes from three simple steps: <strong>measure how things are today, try AI on a few specific tasks, and measure again</strong>, counting not only time saved but also coverage gained and any new risks. Do that honestly and you'll have a business case that holds up, and you'll know which uses of AI are actually worth keeping.</p></div>
+
+<h3 id="ch126-1"><span class="num">126.1</span>Why measuring matters</h3>
+<p>Every organisation that adopts AI eventually gets asked the same question: <em>"Is this worth what we're paying?"</em> Teams that can't answer it lose budget, or keep paying for tools nobody uses well. Teams that can answer it get more investment, and they learn which practices to spread.</p>
+<p>Measuring also protects you. AI can make some work faster while quietly making other work worse: for example, generating lots of test cases that someone then has to review, or automation that's quick to write but flaky. Only measurement shows the full picture.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>If you start a new diet, you weigh yourself first. Otherwise, a month later you can't tell whether it worked. You also notice whether you feel tired or hungry, because losing weight isn't a win if you feel awful. Measuring AI is the same: a starting point, the main result, and the side effects.</p></div>
+
+<h3 id="ch126-2"><span class="num">126.2</span>Start with a baseline</h3>
+<p>A baseline is a snapshot of how work is done <em>before</em> AI. It doesn't need to be perfect. One or two weeks of honest records for a handful of tasks is enough.</p>
+<div class="flow">
+<div><b>1 · Pick tasks</b>Three to five repeatable QA tasks, e.g. writing test cases for a story</div>
+<div><b>2 · Define a unit</b>"Per story", "per bug report", "per failing build"</div>
+<div><b>3 · Record</b>Time spent, output produced, quality notes, for 1–2 weeks</div>
+<div><b>4 · Try AI</b>Same tasks, same people, with AI help, for 2–4 weeks</div>
+<div class="hl"><b>5 · Compare</b>Before vs after, including quality and side effects</div>
+</div>
+<div class="box example"><span class="tag">Real-world example: a simple baseline sheet</span><p>A tester keeps a spreadsheet with one row per task done: date, task type ("test design", "bug report", "triage failing run"), story or ticket ID, minutes spent, and a short quality note ("two cases missed in review"). Ten minutes a day of note-taking for two weeks gives a usable baseline. Many teams already have some of this data in Jira, test management tools or CI dashboards; use it where you can.</p></div>
+<div class="box warn"><span class="tag">Be fair to the "before"</span><p>Don't measure the baseline during an unusually quiet or chaotic period, and don't compare your best AI-assisted day with an average manual one. Compare like with like: similar stories, similar complexity, the same people.</p></div>
+
+<h3 id="ch126-3"><span class="num">126.3</span>What to measure in QA</h3>
+<p>Group your measurements into five families. You don't need all of them. Choose two or three per use-case.</p>
+<div class="tbl"><table>
+<tr><th>Family</th><th>Measurement</th><th>How to collect it</th><th>Good for proving…</th></tr>
+<tr><td rowspan="2"><b>Effort</b></td><td>Time per task (e.g. minutes to design tests for one story)</td><td>Time log or estimate per task</td><td>Efficiency</td></tr>
+<tr><td>Review effort (time spent checking AI output)</td><td>Time log</td><td>That savings are real, not shifted</td></tr>
+<tr><td rowspan="2"><b>Speed</b></td><td><a class="gl" href="#g-cycle-time">Cycle time</a> (story ready for test → signed off)</td><td>Jira status timestamps</td><td>Faster delivery</td></tr>
+<tr><td><a class="gl" href="#g-mttr">MTTR</a> for failing tests or builds</td><td>CI timestamps (red → green)</td><td>Faster diagnosis</td></tr>
+<tr><td rowspan="3"><b>Coverage</b></td><td>Test design throughput (scenarios designed per story)</td><td>Test management tool</td><td>More thorough design</td></tr>
+<tr><td>Automation coverage (share of regression cases automated)</td><td>Test inventory</td><td>Less manual regression</td></tr>
+<tr><td>Risk areas covered (e.g. accessibility, security, negative paths)</td><td>Coverage checklist per release</td><td>Broader testing</td></tr>
+<tr><td rowspan="3"><b>Quality</b></td><td>Requirement defects caught early (ambiguities found before development)</td><td>Count of questions or defects raised at refinement</td><td>"Shift left" value</td></tr>
+<tr><td><a class="gl" href="#g-escaped-defect">Escaped defects</a> per release</td><td>Production bug tracker</td><td>Better outcomes for customers</td></tr>
+<tr><td><a class="gl" href="#g-flaky-test">Flaky test</a> rate</td><td>CI history</td><td>Healthier automation</td></tr>
+<tr><td><b>Risk</b></td><td>AI-introduced defects; review rejections; data-handling incidents</td><td>Review notes, incident log</td><td>That AI is safe to scale</td></tr>
+</table></div>
+<p>The risk family is the one most teams forget, and it's the one that makes your case trustworthy (section 117.7).</p>
+
+<details class="deep"><summary>Leading and lagging indicators</summary><div class="body">
+<p>Some numbers move quickly; others take months. A <a class="gl" href="#g-leading-indicator">leading indicator</a> changes early and hints at where results are going, for example "requirement ambiguities raised before development" or "time to design tests". A <strong>lagging indicator</strong> shows the end result but only after a delay, for example "escaped defects per quarter".</p>
+<p>A 90-day pilot (<a href="#ch128">Chapter 128</a>) is too short to prove much about lagging indicators. So report leading indicators during the pilot, and promise to track lagging ones over the following two or three releases. Saying this openly makes your case more credible, not less.</p>
+</div></details>
+
+<h3 id="ch126-4"><span class="num">126.4</span>Vanity metrics and Goodhart's law</h3>
+<p>Some numbers are easy to count and look impressive but don't show value. These are vanity metrics:</p>
+<div class="cols2">
+<div><h4>Vanity metrics (avoid)</h4><ul><li>Number of prompts sent</li><li>Number of test cases generated</li><li>Lines of test code written</li><li>"Percentage of people who tried the tool"</li></ul></div>
+<div><h4>Value metrics (prefer)</h4><ul><li>Time to design tests for a story, at the same review quality</li><li>Requirement defects caught before development</li><li>Regression run time and manual hours removed</li><li>Escaped defects over several releases</li></ul></div>
+</div>
+<p>Goodhart's law warns that <em>when a measure becomes a target, it stops being a good measure.</em> If you reward "test cases generated", people (and AI) will generate lots of shallow, duplicate test cases. If you reward "tests passing", someone may weaken assertions.</p>
+<div class="box example"><span class="tag">Real-world example: a QA version of Goodhart's law</span><p>A team set a target to "automate 80% of regression cases this quarter". With AI help they hit it, but many of the new tests only checked that pages loaded, not that the right data appeared. The number looked great; the safety net was thin. The fix was to pair the coverage target with a quality check: sample ten new tests a week and confirm each one fails when the feature is broken (<a href="#ch121">Chapter 121</a>). <em>(Illustrative scenario.)</em></p></div>
+
+<h3 id="ch126-5"><span class="num">126.5</span>What AI actually costs</h3>
+<p>There are two main ways to pay for Claude, and many organisations use both.</p>
+<div class="tbl"><table>
+<tr><th>Model</th><th>How it's charged</th><th>Typical QA use</th></tr>
+<tr><td><b>Seats</b> (Team or Enterprise plans)</td><td>A fixed price per person per month, with usage limits or included usage</td><td>Testers using the Claude apps and Claude Code day to day</td></tr>
+<tr><td><b>Usage</b> (Claude API)</td><td>Pay per million <a class="gl" href="#g-token">tokens</a> sent and received</td><td>Automated jobs: CI summaries, test-data generation, custom tools (<a href="#ch127">Chapter 127</a>)</td></tr>
+</table></div>
+<p>Published prices as checked on 9 November 2026 <span class="vchip">Verified 9 Nov 2026</span>:</p>
+<div class="tbl"><table>
+<tr><th>Item</th><th>Published price</th></tr>
+<tr><td>Team plan, Standard seat</td><td>$25 per seat per month billed monthly, or $20 billed annually</td></tr>
+<tr><td>Team plan, Premium seat (more usage)</td><td>$125 per seat per month billed monthly, or $100 billed annually</td></tr>
+<tr><td>Enterprise</td><td>From $20 per seat per month billed annually (20-seat minimum), plus usage at API rates</td></tr>
+<tr><td>API: Claude Sonnet 5.5</td><td>$2 per million input tokens, $10 per million output tokens</td></tr>
+<tr><td>API: Claude Haiku 5.5</td><td>From $0.10 / $0.50 per million input/output tokens</td></tr>
+<tr><td>API: Claude Opus 5.5</td><td>$4 / $20 per million input/output tokens</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Check before you quote</span><p>Prices, plan names and what's included change often, and enterprise contracts are negotiated. Use these figures to understand the structure, then get your organisation's actual prices from your account team or the official pricing pages before putting numbers in front of management.</p></div>
+<p>Remember the hidden costs too:</p>
+<ul>
+<li><strong>Time to learn.</strong> Training hours (this book), practice and early slow-downs.</li>
+<li><strong>Setup and maintenance.</strong> Shared CLAUDE.md, skills, MCP servers, permission rules (<a href="#ch128">Chapter 128</a>).</li>
+<li><strong>Review time.</strong> Every AI output that matters needs a human check.</li>
+<li><strong>Governance.</strong> Security review, policy work, approving MCP servers.</li>
+</ul>
+
+<h3 id="ch126-6"><span class="num">126.6</span>Calculating ROI, step by step</h3>
+<div class="box note"><span class="tag">The formula</span><p><strong>ROI = (benefit − cost) ÷ cost</strong>, shown as a percentage. If you spend 100 and get 300 of value back, ROI = (300 − 100) ÷ 100 = 200%.</p></div>
+<p>The hard part is turning "benefit" into a number. The usual approach for QA is to convert <em>hours saved</em> into money using a loaded hourly cost, then <em>subtract</em> the extra review time. Coverage and quality gains are often harder to price; list them separately rather than inventing a figure.</p>
+<div class="box example"><span class="tag">Worked example · all numbers are illustrative, not real data</span>
+<p><b>Team:</b> 8 testers. <b>Use-cases piloted:</b> test design from stories, and failure triage.</p>
+<div class="tbl"><table>
+<tr><th>Step</th><th>Calculation</th><th>Result</th></tr>
+<tr><td>1. Baseline test design</td><td>3 hours per story × 20 stories a month</td><td>60 hours/month</td></tr>
+<tr><td>2. With AI (including review)</td><td>1.75 hours per story × 20 stories</td><td>35 hours/month</td></tr>
+<tr><td>3. Hours saved, test design</td><td>60 − 35</td><td>25 hours/month</td></tr>
+<tr><td>4. Baseline triage</td><td>40 failing runs × 45 min</td><td>30 hours/month</td></tr>
+<tr><td>5. With AI (including checking)</td><td>40 × 25 min</td><td>about 16.7 hours/month</td></tr>
+<tr><td>6. Hours saved, triage</td><td>30 − 16.7</td><td>about 13.3 hours/month</td></tr>
+<tr><td>7. Total hours saved</td><td>25 + 13.3</td><td>about 38 hours/month</td></tr>
+<tr><td>8. Value of hours</td><td>38 × an assumed loaded cost of $50/hour</td><td>$1,900/month</td></tr>
+<tr><td>9. Cost</td><td>8 seats × an assumed $25 + an assumed $100 API usage</td><td>$300/month</td></tr>
+<tr><td>10. ROI</td><td>(1,900 − 300) ÷ 300</td><td>about 533%</td></tr>
+</table></div>
+<p>Plus benefits listed but not priced: more scenarios designed per story, ambiguities caught at refinement, and faster feedback to developers.</p>
+</div>
+<p>Notice what makes this example honest:</p>
+<ul>
+<li>"With AI" times <strong>include review</strong>. Savings that ignore review time are fake savings.</li>
+<li>Assumptions (hourly cost, seat price, API spend) are <strong>stated</strong>, so anyone can change them.</li>
+<li>Training and setup time are left out of the monthly figure but should appear as a one-off cost in the full case.</li>
+<li>Hard-to-price benefits are <strong>listed, not invented</strong>.</li>
+</ul>
+<details class="deep"><summary>Sensitivity: what if your assumptions are wrong?</summary><div class="body">
+<p>Good business cases show a range, not a single number. Recalculate with pessimistic assumptions: say, half the hours saved and double the cost. In the illustrative example that gives benefit $950 and cost $600, so ROI = (950 − 600) ÷ 600 ≈ 58%. Still positive. If your case only works under optimistic assumptions, that's a sign to pick better use-cases or run a longer pilot.</p>
+<p>Also calculate the <strong>payback period</strong>: one-off costs (training, setup) ÷ monthly net benefit. If setup costs $4,000 of time and monthly net benefit is $1,600, payback is about 2.5 months.</p>
+</div></details>
+
+<h3 id="ch126-7"><span class="num">126.7</span>Counter-metrics: watching for harm</h3>
+<p>For every efficiency metric, track at least one quality or risk metric alongside it. These are called counter-metrics, and they stop you celebrating speed that is secretly hurting quality.</p>
+<div class="tbl"><table>
+<tr><th>If you measure…</th><th>…also watch</th><th>Warning sign</th></tr>
+<tr><td>Time to design tests</td><td>Cases missed in peer review; defects later traced to missing tests</td><td>Faster design but more escapes</td></tr>
+<tr><td>Automation written per week</td><td>Flaky rate; tests that can't fail</td><td>Coverage up, trust down</td></tr>
+<tr><td>Triage time</td><td>Wrong root causes accepted</td><td>Bugs reopened</td></tr>
+<tr><td>Bug reports drafted by AI</td><td>Reports rejected or bounced by developers</td><td>Reports look polished but lack facts</td></tr>
+<tr><td>Anything using MCP or company data</td><td>Data-handling or permission incidents</td><td>Any incident at all (<a href="#ch105">Chapter 105</a>)</td></tr>
+<tr><td>All of the above</td><td>Review burden on senior testers</td><td>Seniors become a bottleneck</td></tr>
+</table></div>
+
+<h3 id="ch126-8"><span class="num">126.8</span>Same team, more coverage</h3>
+<p>When AI saves time, someone will ask whether the team can shrink. How you frame the answer matters, for your colleagues and for the quality of the product.</p>
+<p>Most QA organisations have a long list of things they <em>should</em> test but don't have time for: accessibility checks, negative and edge cases, performance smoke tests, better test data, regression of older features, exploratory sessions on risky areas. Saved hours can be <strong>reinvested</strong> in that list. That turns time saved into risk reduced, which is usually what the business actually wants.</p>
+<div class="flow">
+<div><b>Hours saved</b>From routine design, triage, reporting</div>
+<div><b>Reinvested</b>Accessibility, edge cases, exploratory testing, automation backlog</div>
+<div class="hl"><b>Business outcome</b>More coverage and fewer escaped defects with the same team</div>
+</div>
+<div class="box opinion"><span class="tag">Opinion · how to frame the case</span><p>Presenting AI purely as a way to cut headcount tends to damage trust, slow adoption and lose experienced people, and the savings often turn out smaller once review time is counted. Presenting it as "the same team covering more risk, faster" is usually more accurate and more persuasive. Organisations do make staffing decisions for many reasons; your job is to give them honest numbers and show the full range of options.</p></div>
+
+<h3 id="ch126-9"><span class="num">126.9</span>Presenting the case on one page</h3>
+<div class="code"><span class="cap">One-page business case template</span><pre>TITLE: AI-assisted QA pilot results – [team], [dates]
+
+1. WHAT WE TRIED (2–3 lines)
+   Use-cases: test design from stories; failure triage.
+   People: 8 testers. Tools: Claude (Team plan), Claude Code.
+
+2. RESULTS (leading indicators, vs baseline)
+   Test design time per story:  3.0 h → 1.75 h incl. review
+   Triage time per failing run: 45 min → 25 min
+   Ambiguities raised at refinement: 4 → 11 per sprint
+
+3. COST
+   Monthly: seats + API usage = $___    One-off: training + setup = $___
+
+4. ROI (stated assumptions)
+   Expected: ___%   Pessimistic: ___%   Payback: ___ months
+
+5. QUALITY AND RISK (counter-metrics)
+   Review rejections: ___  Flaky rate: ___  Data incidents: 0
+
+6. WHAT WE'LL DO WITH SAVED TIME
+   Accessibility checks on top 10 journeys; edge-case automation backlog.
+
+7. ASK
+   Extend to [teams]; approve [MCP servers]; [training time].</pre></div>
+<p>Lead with results, show costs plainly, state your assumptions, and end with a specific request. Managers trust a modest, well-evidenced claim far more than a dramatic one.</p>
+
+<div class="lab"><div class="lab-h"><b>Build your own mini business case</b><span>40 min · spreadsheet + Claude</span></div><ol>
+<li>Pick two QA tasks you do every week. Estimate honestly how long each takes today and how often you do it.<span class="expect">two rows like "test design · 3 h · 5 per week".</span></li>
+<li>Do each task once with Claude's help (a Project for test design, Claude Code for triage) and time it, <em>including</em> your review.<span class="expect">a with-AI time for each task.</span></li>
+<li>Ask Claude: "Here are my before/after times and these assumptions [paste]. Calculate monthly hours saved, value, ROI and a pessimistic case. Show the working and list every assumption."<span class="expect">a table you can check line by line. Recalculate one row yourself to verify the maths.</span></li>
+<li>Add one counter-metric you'll watch, and one thing you'd do with the saved time.<span class="expect">a short, honest summary you could paste into the template in 117.9.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"We'll measure once we've started."</dt><dd>Then you have nothing to compare with. Take the baseline first, even a rough one.</dd>
+<dt>"Time saved writing equals time saved overall."</dt><dd>Only if you subtract review time. AI output that isn't reviewed isn't a saving; it's a risk.</dd>
+<dt>"More test cases means better coverage."</dt><dd>Duplicates and shallow cases add review work without reducing risk. Measure risk areas covered, not raw counts.</dd>
+<dt>"Our ROI is 500%, so the case is proven."</dt><dd>A single optimistic figure invites doubt. Show assumptions, a pessimistic case and counter-metrics.</dd>
+<dt>"The goal is fewer testers."</dt><dd>The stronger, more accurate case is usually more coverage and faster feedback with the same team.</dd>
+</dl></div>
+
+<h3 id="ch126-r"><span class="num">126.10</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Measure a baseline before using AI: a few tasks, a clear unit, one or two weeks of honest records.</li>
+<li>Track effort, speed, coverage, quality and risk; choose two or three measures per use-case.</li>
+<li>Prefer value metrics over vanity metrics; pair every target with a counter-metric to avoid Goodhart's law.</li>
+<li>AI costs include seats or API usage plus training, setup, review and governance time.</li>
+<li>ROI = (benefit − cost) ÷ cost; include review time, state assumptions, show a pessimistic case and a payback period.</li>
+<li>Frame the result as "same team, more coverage" and present it on one page with a clear ask.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Why must you measure a baseline before introducing AI?</p><div class="opts"><button>Because management requires paperwork</button><button data-ok>Without a "before" measurement you can't show what changed</button><button>Because AI tools need the data to work</button></div><p class="why" hidden>The baseline is the comparison point for every claim you make later.</p></div>
+<div class="qz"><p class="q">Which of these is a vanity metric?</p><div class="opts"><button>Requirement defects caught before development</button><button data-ok>Number of test cases generated by AI</button><button>Escaped defects per release</button></div><p class="why" hidden>It's easy to count and looks impressive but says nothing about risk reduced.</p></div>
+<div class="qz"><p class="q">AI cut test design from 3 hours to 1 hour, but review takes 45 extra minutes. What's the real saving per story?</p><div class="opts"><button>2 hours</button><button data-ok>1 hour 15 minutes</button><button>3 hours</button></div><p class="why" hidden>3 h − (1 h + 0.75 h) = 1.25 h. Always include review time.</p></div>
+<div class="qz"><p class="q">A team spends $400 a month and gets $1,200 of value. What is the ROI?</p><div class="opts"><button>300%</button><button data-ok>200%</button><button>66%</button></div><p class="why" hidden>(1,200 − 400) ÷ 400 = 2, which is 200%.</p></div>
+<div class="qz"><p class="q">What is Goodhart's law?</p><div class="opts"><button>AI gets twice as good every year</button><button data-ok>When a measure becomes a target, it stops being a good measure</button><button>Costs always exceed estimates</button></div><p class="why" hidden>People optimise the number instead of the real goal, so pair targets with quality checks.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Run a two-week baseline for three QA tasks on your team, then a two-week AI-assisted trial on the same tasks. Produce the one-page business case from 117.9 with an expected and a pessimistic ROI, at least two counter-metrics and a plan for the saved time. Ask a colleague to challenge every assumption before you share it.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"To prove AI is worth it, measure how long tasks take today, try AI on the same tasks, and measure again, including the time spent reviewing AI's work. Track quality alongside speed so we don't celebrate shortcuts. ROI is benefit minus cost, divided by cost; state the assumptions and show a pessimistic case. And frame it as the same team covering more risk, not as cutting people."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://claude.com/pricing" target="_blank" rel="noopener">Claude pricing</a> (plans and seat prices) and <a href="https://platform.claude.com/docs/en/about-claude/models/overview" target="_blank" rel="noopener">models overview</a> (API prices), checked 9 November 2026.</li>
+<li>C. A. E. Goodhart, "Problems of Monetary Management: The U.K. Experience" (1975), the origin of Goodhart's law; and M. Strathern's widely quoted 1997 phrasing, "When a measure becomes a target, it ceases to be a good measure."</li>
+<li>N. Forsgren, J. Humble and G. Kim, <i>Accelerate</i> (2018): the DORA research on software delivery metrics such as lead time and time to restore service.</li>
+<li>Anthropic, <a href="https://www.anthropic.com/research/the-anthropic-economic-index" target="_blank" rel="noopener">The Anthropic Economic Index</a>, research on how AI is used across tasks and occupations.</li>
+</ol><p class="verified">Prices verified 9 November 2026 · all ROI figures in this chapter are illustrative</p></div>

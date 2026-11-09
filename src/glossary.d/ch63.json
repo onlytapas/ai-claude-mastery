@@ -1,0 +1,26 @@
+{
+ "Permission mode": {
+  "d": "The Claude Code setting that decides what Claude may do without asking you first, from asking before every edit (Manual) to running most actions while a safety check watches (Auto).",
+  "see": "ch67"
+ },
+ "Agent loop": {
+  "d": "The repeating cycle an AI agent follows: read the situation, decide on an action, use a tool, look at the result, and decide again, until the task is done.",
+  "see": "ch66"
+ },
+ "Shell": {
+  "d": "The program inside a terminal window that reads the commands you type and runs them. Common shells are Zsh (the macOS default), Bash and PowerShell.",
+  "see": "ch52"
+ },
+ "PATH": {
+  "d": "An environment variable listing the folders your shell searches when you type a command name. If a program's folder isn't on the PATH you get 'command not found'.",
+  "see": "ch56"
+ },
+ "Native installer": {
+  "d": "Anthropic's recommended way to install Claude Code: a one-line script that downloads the program into your home folder and keeps it updated automatically.",
+  "see": "ch64"
+ },
+ "Credentials": {
+  "d": "The secret proof of who you are that a program stores after you sign in, such as a login token or API key. Claude Code keeps them in the macOS Keychain or a protected file.",
+  "see": "ch64"
+ }
+}

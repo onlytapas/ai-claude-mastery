@@ -1,0 +1,273 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How to read any error message: who is complaining, about what, and where</li>
+<li>A calm, repeatable method for fixing problems instead of guessing</li>
+<li>What the most common terminal errors mean and how to fix them: command not found, no such file, permission denied, port already in use, and network errors</li>
+<li>How to read a Python traceback and an npm error from the right end</li>
+<li>How to find answers yourself with <code>--help</code> and <code>man</code></li>
+<li>How to search for an error online without leaking secrets, and which "fixes" to distrust</li>
+<li>How to ask Claude for help so you get a useful answer the first time</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch54">Chapter 54</a> (first commands), <a href="#ch55">Chapter 55</a> (standard error and exit codes) and <a href="#ch56">Chapter 56</a> (PATH, processes and permissions). <a href="#ch61">Chapter 61</a> helps for the Git examples. macOS is shown; Linux and Windows differences are noted.</div>
+
+<div class="bigidea"><p>An error message is not the computer being rude. It's a short, precise report written by a program that knows exactly what went wrong and is trying to tell you. Most say three things: which program is speaking, what failed, and which file, line or address was involved. A small number of errors cause most of the trouble, and each has a usual cause and a usual fix. If you read the message slowly, check one assumption at a time, and only then search or ask Claude (with the exact text and your context), most problems take minutes rather than hours. Every output in this chapter was produced by really running the commands.</p></div>
+
+<h3 id="ch62-1"><span class="num">62.1</span>How to read an error message</h3>
+<p>Here is one of the most common errors you'll ever see, from asking <code>cat</code> to show a file with a typo in its name:</p>
+<div class="code"><span class="cap">Terminal</span><pre>cat reprot.txt</pre></div>
+<div class="code"><span class="cap">Output</span><pre>cat: reprot.txt: No such file or directory</pre></div>
+<p>Most terminal errors follow this pattern, separated by colons:</p>
+<div class="tbl"><table>
+<tr><th>Part</th><th>In this example</th><th>What it tells you</th></tr>
+<tr><td>Who is speaking</td><td><code>cat</code></td><td>Which program failed. If it says <code>zsh</code> or <code>bash</code>, the shell itself couldn't even start your command.</td></tr>
+<tr><td>What it was working on</td><td><code>reprot.txt</code></td><td>The file, command, URL or line involved. Read it letter by letter: here, the typo is right there.</td></tr>
+<tr><td>What went wrong</td><td><code>No such file or directory</code></td><td>The reason. These phrases are standard and searchable.</td></tr>
+</table></div>
+<p>Two more clues are always available. The <a class="gl" href="#g-exit-code">exit code</a> (<code>echo $?</code> straight after the command, from <a href="#ch55">Chapter 55</a>) is <code>0</code> for success and anything else for failure. And errors are usually written to <a class="gl" href="#g-standard-error">standard error</a>, a separate output channel from normal results, which is why redirecting output with <code>&gt;</code> doesn't hide them.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A warning light on a car dashboard. Panicking doesn't help, and nor does ignoring it. You read which light it is, look it up in the manual, and check the obvious thing first (is the petrol cap loose?) before calling the garage. When you do call, you say exactly which light came on and what you were doing, not "the car's broken".</p></div>
+<h4>Read errors in the right order</h4>
+<ul>
+<li><strong>Read the whole message, slowly, once.</strong> Most people's eyes slide over red text. The answer is often in it, including suggested commands (Git and npm are very good at this).</li>
+<li><strong>For long outputs, find the first real error.</strong> One early failure often causes a cascade of later ones. Fix the first and the rest may disappear.</li>
+<li><strong>For a traceback (a list of function calls, section 62.4), start at the last line.</strong> That's the actual error; the lines above show how the program got there.</li>
+<li><strong>Separate warnings from errors.</strong> A <code>WARN</code> or <code>deprecated</code> line usually means "this still works, but change it eventually". It's rarely why your command failed.</li>
+</ul>
+
+<h3 id="ch62-2"><span class="num">62.2</span>A method instead of guessing</h3>
+<p>Under pressure (a broken CI build, a demo in ten minutes), people change three things at once and can't tell which one helped. Debugging is the same skill as testing: form a hypothesis, check it, record the result.</p>
+<div class="flow"><div><b>1. Read</b>The full message. What, where, which program?</div><div><b>2. Reproduce</b>Run it again. Same error every time?</div><div class="hl"><b>3. Check assumptions</b>Right folder? Right file name? Right version? Is the service running?</div><div><b>4. Change one thing</b>Then run again</div><div><b>5. Confirm and note</b>What fixed it, and why</div></div>
+<p>Step 3 solves most problems. The quick checks that cover most assumptions:</p>
+<div class="tbl"><table>
+<tr><th>Question</th><th>Command</th></tr>
+<tr><td>Where am I?</td><td><code>pwd</code></td></tr>
+<tr><td>What's actually here (including hidden files)?</td><td><code>ls -la</code></td></tr>
+<tr><td>Which copy of this program runs, if any?</td><td><code>which python3</code> (or <code>command -v python3</code>)</td></tr>
+<tr><td>Which version?</td><td><code>python3 --version</code>, <code>node --version</code>, <code>git --version</code></td></tr>
+<tr><td>Did the last command succeed?</td><td><code>echo $?</code></td></tr>
+<tr><td>Is something listening on this port?</td><td><code>lsof -nP -iTCP:8080 -sTCP:LISTEN</code></td></tr>
+<tr><td>Is a variable set?</td><td><code>echo "$API_BASE_URL"</code> (never echo a secret on a shared screen)</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A colleague says "the Playwright tests don't run on my machine". Rather than reinstalling everything, you ask three questions: what exact message do you see, what does <code>pwd</code> say, and what does <code>node --version</code> say? The answer: they're one folder above the project, so <code>npx playwright test</code> can't find the config. One <code>cd</code> fixes it. Reading and checking took two minutes; reinstalling would have taken an hour and fixed nothing.</p></div>
+
+<h3 id="ch62-3"><span class="num">62.3</span>The five errors you'll meet most</h3>
+<h4>1. Command not found</h4>
+<div class="code"><span class="cap">Output (zsh on macOS; bash says "bash: pyhton3: command not found")</span><pre>zsh: command not found: pyhton3</pre></div>
+<p>The speaker is the shell (<code>zsh</code>), not the program: the shell looked in every folder on your <a class="gl" href="#g-path">PATH</a> and found nothing with that name. The exit code is <code>127</code>. Causes, in order of likelihood:</p>
+<ol>
+<li><strong>A typo</strong>, as here (<code>pyhton3</code> instead of <code>python3</code>).</li>
+<li><strong>Not installed.</strong> Install it (<a href="#ch58">Chapter 58</a>), for example <code>brew install jq</code> on macOS.</li>
+<li><strong>Installed, but not on PATH.</strong> Common straight after installing a tool: open a new terminal window, or follow the installer's instruction to add a line to <code>~/.zshrc</code> (<a href="#ch56">Chapter 56</a>). <code>echo $PATH</code> shows where the shell is looking.</li>
+<li><strong>It's a project tool, not a global one.</strong> Tools installed with <code>npm install</code> live in the project's <code>node_modules</code>; run them with <code>npx playwright</code>, not <code>playwright</code>.</li>
+</ol>
+<h4>2. No such file or directory</h4>
+<div class="code"><span class="cap">Output</span><pre>cat: reprot.txt: No such file or directory
+cd: no such file or directory: nowhere</pre></div>
+<p>The path doesn't exist <em>from where you are</em>. Check spelling and capital letters (Linux treats <code>Report.txt</code> and <code>report.txt</code> as different files), run <code>pwd</code> and <code>ls</code>, and remember that a relative path like <code>reports/run1.html</code> is relative to the current folder (<a href="#ch53">Chapter 53</a>). Spaces in names need quotes: <code>cat "test results.txt"</code>.</p>
+<div class="box note"><span class="tag">A confusing variant</span><p>Running a script can say "No such file or directory" even when the script plainly exists. Then it's usually the program named on the script's first line (the shebang, <a href="#ch57">Chapter 57</a>) that's missing, or the script was saved with Windows line endings. <code>head -1 script.sh</code> shows the first line.</p></div>
+<h4>3. Permission denied</h4>
+<div class="code"><span class="cap">Terminal and output</span><pre>./run-tests.sh
+zsh: permission denied: ./run-tests.sh
+
+ls -l run-tests.sh
+-rw-r--r--@ 1 asha  staff  31 Nov  9 14:48 run-tests.sh</pre></div>
+<p>The file exists, but you aren't allowed to do what you asked. Here the permissions <code>-rw-r--r--</code> contain no <code>x</code>, so the file isn't executable (exit code <code>126</code>). The fix is <code>chmod +x run-tests.sh</code>, after which it prints <code>running tests</code>. The other common form is writing where you have no rights:</p>
+<div class="code"><span class="cap">Output</span><pre>touch: /etc/qa.txt: Permission denied</pre></div>
+<p>Here the right fix is almost always to write somewhere you own (your home folder or the project), not to reach for <code>sudo</code>. <a href="#ch56">Chapter 56</a> explains permissions and when <code>sudo</code> is appropriate.</p>
+<div class="box warn"><span class="tag">Two "fixes" to refuse</span><p><code>sudo</code> in front of <code>npm install</code> or <code>pip install</code> creates files owned by the administrator, which causes worse permission errors later. <code>chmod 777</code> makes a file writable and runnable by everyone on the machine. Both make the message go away by removing a safety rail. Find out why permission was refused instead.</p></div>
+<h4>4. Port already in use</h4>
+<p>A <a class="gl" href="#g-port">port</a> is a numbered door on your computer that a server listens on, like 3000 for a front-end dev server or 8080 for an API. Only one program can listen on a port at a time. Start a second server on a busy port and it fails. Python's version ends like this:</p>
+<div class="code"><span class="cap">Last line of the output (python3 -m http.server 8765, run twice)</span><pre>OSError: [Errno 48] Address already in use</pre></div>
+<p>Node.js reports the same thing as <code>EADDRINUSE</code>; on Linux the Python number is <code>Errno 98</code>. Usually the "other program" is your own server from earlier, still running in another tab or left behind by a crashed test run. Find it:</p>
+<div class="code"><span class="cap">Terminal</span><pre>lsof -nP -iTCP:8765 -sTCP:LISTEN</pre></div>
+<div class="code"><span class="cap">Output</span><pre>COMMAND   PID       USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+Python  80051       asha    4u  IPv6 0x889326a7ace7adc6      0t0  TCP *:8765 (LISTEN)</pre></div>
+<p><code>lsof</code> lists open files and network connections; <code>-nP</code> shows plain numbers instead of names (without it, the port may appear as a service name such as <code>ultraseek-http</code>), and the rest means "TCP port 8765, listening only". The <code>PID</code> column is the process ID. If it's yours and safe to stop, go to its terminal and press <kbd>Ctrl+C</kbd>, or run <code>kill 80051</code>. Otherwise just use a different port. On Windows, <code>netstat -ano | findstr :8765</code> in PowerShell gives the PID.</p>
+<h4>5. Network errors</h4>
+<p><code>curl</code> (<a href="#ch56">Chapter 56</a>) is the quickest way to test a connection, and its errors pinpoint which stage failed:</p>
+<div class="code"><span class="cap">Output of three failing curl commands</span><pre>curl: (6) Could not resolve host: no-such-host.invalid
+curl: (7) Failed to connect to localhost port 8765 after 0 ms: Couldn't connect to server
+curl: (28) Connection timed out after 2008 milliseconds</pre></div>
+<div class="tbl"><table>
+<tr><th>Message</th><th>Stage that failed</th><th>Usual causes</th></tr>
+<tr><td>Could not resolve host (6)</td><td>Turning the name into an address (<a class="gl" href="#g-dns">DNS</a>)</td><td>Typo in the host name; no internet; an internal host that needs the company VPN</td></tr>
+<tr><td>Failed to connect / Connection refused (7)</td><td>Reaching the address, but nothing answered on that port</td><td>The server isn't running; wrong port; it listens on a different address</td></tr>
+<tr><td>Timed out (28)</td><td>No reply at all</td><td>Firewall or proxy silently dropping traffic; VPN off; server overloaded</td></tr>
+<tr><td>SSL certificate problem</td><td>The secure connection</td><td>Corporate proxy inspecting traffic, or a test server with a self-signed certificate. Ask IT; don't switch checks off globally</td></tr>
+</table></div>
+<p>An HTTP status code is <em>not</em> a network error. If the server replies <code>404</code> (not found), <code>401</code> (not signed in), <code>403</code> (not allowed) or <code>500</code> (server crashed), the network worked fine and the server answered. Plain <code>curl</code> even exits with <code>0</code> in that case; add <code>-f</code> to make it fail on HTTP errors. To see the status, use <code>curl -i</code> or:</p>
+<div class="code"><span class="cap">Terminal and output</span><pre>curl -sS -o /dev/null -w '%{http_code}\n' https://example.com/no-such-page
+404</pre></div>
+<p>For a tester this distinction matters in a bug report: "DNS fails for staging-api" goes to the network team; "staging-api returns 500 on POST /orders" goes to the developers.</p>
+
+<h4>Quick reference: more errors you'll see</h4>
+<input class="filter" data-filter="#ch62Errors" data-empty="#ch62Empty" type="search" placeholder="Filter errors…" aria-label="Filter errors">
+<div class="tbl"><table id="ch62Errors">
+<tr><th>Message (or part of it)</th><th>Means</th><th>First thing to try</th></tr>
+<tr class="group"><td colspan="3">Shell and files</td></tr>
+<tr><td><code>command not found</code></td><td>Shell can't find the program</td><td>Spelling; installed?; new terminal; <code>npx</code> for project tools</td></tr>
+<tr><td><code>No such file or directory</code></td><td>Path doesn't exist from here</td><td><code>pwd</code>, <code>ls</code>, check spelling and case</td></tr>
+<tr><td><code>Permission denied</code></td><td>Not allowed to read, write or run it</td><td><code>ls -l</code>; <code>chmod +x</code> for scripts; write somewhere you own</td></tr>
+<tr><td><code>Is a directory</code></td><td>You gave a folder where a file was expected</td><td>Add the file name to the path</td></tr>
+<tr><td><code>unrecognized option</code></td><td>The program doesn't have that option</td><td>Check <code>--help</code>; macOS and Linux versions of tools differ (macOS <code>ls</code> has no <code>--colour</code>)</td></tr>
+<tr class="group"><td colspan="3">Git</td></tr>
+<tr><td><code>fatal: not a git repository</code></td><td>You're not inside a repository</td><td><code>cd</code> into the project folder</td></tr>
+<tr><td><code>! [rejected] … (fetch first)</code></td><td>Someone pushed before you</td><td><code>git pull</code>, then push (<a href="#ch61">Chapter 61</a>)</td></tr>
+<tr><td><code>CONFLICT (content)</code></td><td>Two changes to the same lines</td><td>Edit the file, remove markers, <code>git add</code>, commit</td></tr>
+<tr><td><code>Permission denied (publickey)</code></td><td>GitHub didn't accept your SSH key</td><td>Add the key to GitHub, or use HTTPS with <code>gh auth login</code></td></tr>
+<tr class="group"><td colspan="3">Python and Node</td></tr>
+<tr><td><code>ModuleNotFoundError</code></td><td>A Python package isn't installed in this environment</td><td>Activate the virtual environment, then install (<a href="#ch58">Chapter 58</a>)</td></tr>
+<tr><td><code>KeyError: 'status'</code></td><td>A dictionary has no such key</td><td>Print the data: the field name differs from what the code expects</td></tr>
+<tr><td><code>npm error Missing script</code></td><td>No such script in <code>package.json</code></td><td><code>npm run</code> lists the real script names</td></tr>
+<tr><td><code>EADDRINUSE</code> / <code>Address already in use</code></td><td>Port is busy</td><td><code>lsof -nP -iTCP:&lt;port&gt; -sTCP:LISTEN</code></td></tr>
+<tr class="group"><td colspan="3">Network and HTTP</td></tr>
+<tr><td><code>Could not resolve host</code></td><td>DNS lookup failed</td><td>Spelling, internet, VPN</td></tr>
+<tr><td><code>Connection refused</code></td><td>Nothing listening there</td><td>Start the server; check the port</td></tr>
+<tr><td><code>401</code> / <code>403</code></td><td>Not signed in / not allowed</td><td>Check the token is set and has the right scope (<a href="#ch98">Chapter 98</a>)</td></tr>
+<tr><td><code>429</code></td><td>Too many requests</td><td>Slow down and retry with a delay (<a href="#ch60">Chapter 60</a>)</td></tr>
+</table></div>
+<p id="ch62Empty" hidden>No errors match. Try a shorter word.</p>
+
+<h3 id="ch62-4"><span class="num">62.4</span>Reading tracebacks and tool errors</h3>
+<p>When a Python program crashes, it prints a <strong>traceback</strong> (other languages call it a <a class="gl" href="#g-stack-trace">stack trace</a>): the chain of function calls that led to the error. Here is a small script that calculates a pass rate from a JSON results file, run on data where one result uses the field <code>state</code> instead of <code>status</code>:</p>
+<div class="code"><span class="cap">Output (paths shortened)</span><pre>Traceback (most recent call last):
+  File "/Users/asha/qa/summarise.py", line 9, in &lt;module&gt;
+    print(pass_rate("results.json"))
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/asha/qa/summarise.py", line 6, in pass_rate
+    passed = sum(1 for r in results if r["status"] == "PASS")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/asha/qa/summarise.py", line 6, in &lt;genexpr&gt;
+    passed = sum(1 for r in results if r["status"] == "PASS")
+                                       ~^^^^^^^^^^
+KeyError: 'status'</pre></div>
+<p>Read it from the <strong>bottom up</strong>:</p>
+<ol>
+<li><strong>Last line: the error.</strong> <code>KeyError: 'status'</code>: some item has no <code>status</code> key.</li>
+<li><strong>Just above: where.</strong> Line 6 of <code>summarise.py</code>, in <code>pass_rate</code>, and the <code>^^^</code> marks point at <code>r["status"]</code>.</li>
+<li><strong>Further up: how we got there.</strong> Line 9 called <code>pass_rate</code>. "Most recent call last" means the top is where the program started.</li>
+</ol>
+<p>The bug may be in the data, not the code: a test reporter that writes <code>state</code> for some results. That's exactly the kind of finding worth putting in a bug report. In real projects, many traceback lines come from libraries you didn't write; look for the lowest line that points at <em>your</em> files. <a href="#ch59">Chapter 59</a> covers Python errors in more depth.</p>
+<h4>Tool errors that tell you the fix</h4>
+<p>Modern tools often suggest the answer. Read before searching:</p>
+<div class="code"><span class="cap">Output of npm run tset</span><pre>npm error Missing script: "tset"
+npm error
+npm error Did you mean this?
+npm error   npm set # Set a value in the npm configuration
+npm error
+npm error To see a list of scripts, run:
+npm error   npm run
+npm error A complete log of this run can be found in: /Users/asha/.npm/_logs/2026-11-09T09_18_58_908Z-debug-0.log</pre></div>
+<p>Its guess (<code>npm set</code>) is wrong, but its second suggestion is right: <code>npm run</code> lists the real scripts, and you'll see <code>test</code>. Note the log path on the last line too: tools often save a full log with more detail than the screen shows.</p>
+
+<h3 id="ch62-5"><span class="num">62.5</span>Finding answers yourself: --help and man</h3>
+<p>Before searching the web, ask the tool. Almost every command has built-in help:</p>
+<div class="tbl"><table>
+<tr><th>Form</th><th>Example</th><th>Gives</th></tr>
+<tr><td><code>--help</code></td><td><code>curl --help</code>, <code>npx playwright test --help</code></td><td>A summary of options, printed straight away</td></tr>
+<tr><td><code>-h</code></td><td><code>git commit -h</code></td><td>A short usage summary (Git's long help is <code>git help commit</code>)</td></tr>
+<tr><td><code>man</code></td><td><code>man ls</code></td><td>The full manual page (<a class="gl" href="#g-man-page">man page</a>) for system commands</td></tr>
+</table></div>
+<div class="code"><span class="cap">Output of git commit -h (first lines)</span><pre>usage: git commit [-a | --interactive | --patch] [-s] [-v] [-u[&lt;mode&gt;]] [--amend]
+                  [--dry-run] [(-c | -C | --squash) &lt;commit&gt; | --fixup [(amend|reword):]&lt;commit&gt;]
+                  [-F &lt;file&gt; | -m &lt;msg&gt;] [--reset-author] [--allow-empty]</pre></div>
+<p>How to read a usage line: square brackets <code>[ ]</code> mean optional; <code>|</code> means "one or the other"; words in angle brackets <code>&lt;msg&gt;</code> are placeholders you replace; <code>...</code> means "you can repeat this".</p>
+<p>Inside <code>man</code>, you are in a pager: arrow keys or space to move, <kbd>/</kbd> then a word to search (<kbd>n</kbd> for the next match), and <kbd>q</kbd> to quit. Help is too long for the screen? Pipe it: <code>curl --help all | less</code> or <code>curl --help all | grep -i proxy</code>. Windows PowerShell commands use <code>Get-Help</code> instead of <code>man</code>.</p>
+<div class="box note"><span class="tag">Help matches your version</span><p>Built-in help describes the version you actually have installed. A blog post may describe a newer or older one, or the Linux version of a tool when you're on a Mac. When they disagree, believe <code>--help</code>.</p></div>
+
+<h3 id="ch62-6"><span class="num">62.6</span>Searching for errors safely</h3>
+<p>Searching the exact message is often the fastest route, because someone has almost certainly hit it before. Do it well:</p>
+<ul>
+<li><strong>Search the stable part.</strong> Copy the error text but remove things unique to you: file paths, user names, IDs, timestamps, port numbers. <code>"OSError: [Errno 48] Address already in use"</code> finds answers; your full path won't.</li>
+<li><strong>Add the tool and platform.</strong> "npm error Missing script macOS" is better than the message alone.</li>
+<li><strong>Prefer primary sources.</strong> Official documentation, the tool's GitHub issues and its changelog beat a random blog post. Check the date: an answer from years ago may describe an old version.</li>
+</ul>
+<div class="box warn"><span class="tag">Never paste these into a search box, forum or chatbot</span><p>API keys, tokens and passwords (they often appear in logs and in <code>env</code> output); internal host names and URLs; customer or personal data from test environments; proprietary code your company hasn't approved for sharing. Read the error before pasting it, and replace anything sensitive with a placeholder such as <code>&lt;TOKEN&gt;</code>. If a secret has been pasted somewhere public, revoke it (<a href="#ch98">Chapter 98</a>). Check your company's policy on which AI tools may see work data (<a href="#ch132">Chapter 132</a>).</p></div>
+<div class="box warn"><span class="tag">Distrust "fixes" that remove safety</span><p>Be suspicious of any answer that tells you to run <code>sudo</code>, <code>chmod 777</code>, <code>rm -rf</code>, <code>git push --force</code>, to turn off SSL verification, or to pipe a downloaded script straight into the shell (<code>curl … | sh</code>) from a site you don't recognise. Some of these are sometimes right, but understand what each does before running it, and never as a guess.</p></div>
+
+<h3 id="ch62-7"><span class="num">62.7</span>Asking Claude for help effectively</h3>
+<p>Claude is excellent at explaining error messages, but it only knows what you tell it. "It doesn't work" gets a guess. A good request gets a diagnosis. Include:</p>
+<div class="tbl"><table>
+<tr><th>Include</th><th>Why</th></tr>
+<tr><td>The exact command you ran</td><td>One character can matter</td></tr>
+<tr><td>The full error text, copied, not retyped or summarised</td><td>Retyping introduces typos and drops the useful lines</td></tr>
+<tr><td>What you expected to happen</td><td>So Claude knows what "working" means</td></tr>
+<tr><td>Your setup: operating system, tool versions, where you are</td><td>Many fixes differ on macOS, Linux and Windows</td></tr>
+<tr><td>What you already tried, and what happened</td><td>Avoids answers you've ruled out</td></tr>
+<tr><td>What you want: explanation, fix, or both</td><td>And ask it to explain the cause, so you learn</td></tr>
+</table></div>
+<div class="cols2">
+<div><h4>Weak request</h4><p>"npm test is broken, help"</p></div>
+<div><h4>Strong request</h4><p>"On macOS 15, Node v25, in my Playwright project folder, I ran <code>npm run tset</code> and got <code>npm error Missing script: "tset"</code> (full output below). I expected the test suite to run. <code>npm run</code> lists <code>test</code> and <code>test:e2e</code>. Explain what the error means and which command I should use."</p></div>
+</div>
+<p>In the Claude apps you paste all this into the chat. In Claude Code it's easier, because Claude can run the checks itself: ask it to run the failing command and read the output, approving each command as it asks (<a href="#ch65">Chapter 65</a>). You can also type <code>!</code> followed by a command, such as <code>! npm test</code>, to run it in <a class="gl" href="#g-shell-mode">shell mode</a>: the output goes into the conversation and Claude responds to it. And you can pipe a saved log in from the terminal: <code>cat build-error.log | claude -p "Explain the first real error in this log"</code> (<a href="#ch75">Chapter 75</a>).</p>
+<div class="code"><span class="cap">Prompt for Claude Code</span><pre>Run npx playwright test tests/checkout.spec.ts and read the full output.
+Find the FIRST real error, explain the cause in plain words,
+and propose a fix. Don't change any files until I've agreed.</pre></div>
+<div class="box warn"><span class="tag">Check before you run</span><p>Claude can be confidently wrong, especially about flags that vary between versions. Before running a command it suggests, read it. If it includes any of the risky patterns from 62.6, ask why. Verify a suggested flag with <code>--help</code>. And after a fix, confirm it worked by re-running the original command, not by taking anyone's word for it.</p></div>
+<div class="box opinion"><span class="tag">Opinion · many engineering teams</span><p>A common view among senior engineers is that people who read an error themselves for a minute before asking an AI learn faster and ask better questions. A reasonable habit: read the message, run one or two checks from 62.2, then ask Claude, including what your checks showed.</p></div>
+
+<details class="deep"><summary>Under the hood: where errors and exit codes come from</summary><div class="body">
+<p>Many low-level messages ("No such file or directory", "Permission denied", "Address already in use", "Connection refused") are standard descriptions of operating-system error numbers, often named <code>ENOENT</code>, <code>EACCES</code>, <code>EADDRINUSE</code> and <code>ECONNREFUSED</code>. That's why so many different programs use exactly the same wording, and why Python shows a number such as <code>[Errno 2]</code>. The numbers themselves differ between macOS and Linux (48 versus 98 for "address in use"), but the names and messages match.</p>
+<p>Exit codes have some conventions. <code>0</code> is success, <code>1</code> is a general failure, the shell uses <code>126</code> for "found but can't run" and <code>127</code> for "command not found", and a process stopped by a signal reports 128 plus the signal number (130 after <kbd>Ctrl+C</kbd>). Tools define their own as well: <code>curl</code>'s numbers in brackets, such as 6, 7 and 28, are documented in <code>man curl</code>, and Git uses <code>128</code> for fatal errors. CI systems only look at the exit code to decide pass or fail, which is why a script that prints "ERROR" but exits with 0 shows as green.</p>
+</div></details>
+
+<div class="lab"><div class="lab-h"><b>Break things on purpose, then read and fix them</b><span>30 min · macOS, Linux or WSL · Python 3 and curl</span></div><ol>
+<li>Make a practice folder: <code>mkdir -p ~/error-practice &amp;&amp; cd ~/error-practice</code>.<span class="expect">No output; <code>pwd</code> ends in <code>error-practice</code>.</span></li>
+<li>Run <code>pyhton3 --version</code>, then <code>echo $?</code>. Fix the typo and run it again.<span class="expect"><code>zsh: command not found: pyhton3</code> (or the bash form), exit code <code>127</code>; then <code>Python 3.x.y</code>.</span></li>
+<li>Run <code>cat reprot.txt</code> and <code>echo $?</code>.<span class="expect"><code>cat: reprot.txt: No such file or directory</code> and <code>1</code>.</span></li>
+<li>Create a script without execute permission: <code>printf '#!/bin/sh\necho "running tests"\n' &gt; run-tests.sh</code>, then run <code>./run-tests.sh</code> and <code>ls -l run-tests.sh</code>. Fix with <code>chmod +x run-tests.sh</code> and run again.<span class="expect"><code>permission denied: ./run-tests.sh</code>; permissions <code>-rw-r--r--</code>; after chmod, <code>running tests</code>.</span></li>
+<li>Occupy a port: <code>python3 -m http.server 8765</code> in this terminal. Open a second terminal tab and run the same command.<span class="expect">The first prints "Serving HTTP on … port 8765". The second ends with <code>OSError: [Errno 48] Address already in use</code> (<code>Errno 98</code> on Linux).</span></li>
+<li>In the second tab, find the owner: <code>lsof -nP -iTCP:8765 -sTCP:LISTEN</code>. Stop the first server with <kbd>Ctrl+C</kbd> in its tab, then run <code>lsof</code> again.<span class="expect">One <code>Python</code> line with a PID and <code>TCP *:8765 (LISTEN)</code>; afterwards, no output.</span></li>
+<li>Network errors: run <code>curl -sS https://no-such-host.invalid</code> and <code>curl -sS http://localhost:8765</code> (with the server stopped).<span class="expect"><code>curl: (6) Could not resolve host</code> and <code>curl: (7) Failed to connect to localhost port 8765</code>.</span></li>
+<li>HTTP is not network: <code>curl -sS -o /dev/null -w '%{http_code}\n' https://example.com/no-such-page; echo $?</code>.<span class="expect"><code>404</code> then exit code <code>0</code>: the server answered.</span></li>
+<li>Traceback: save this as <code>summarise.py</code> and the data as <code>results.json</code>, then run <code>python3 summarise.py</code>.
+<div class="code"><span class="cap">summarise.py</span><pre>import json
+
+def pass_rate(path):
+    with open(path) as f:
+        results = json.load(f)
+    passed = sum(1 for r in results if r["status"] == "PASS")
+    return passed / len(results)
+
+print(pass_rate("results.json"))</pre></div>
+<div class="code"><span class="cap">Terminal</span><pre>echo '[{"status":"PASS"},{"state":"FAIL"}]' &gt; results.json
+python3 summarise.py</pre></div>
+<span class="expect">A traceback ending in <code>KeyError: 'status'</code>, pointing at line 6. Change <code>state</code> to <code>status</code> in <code>results.json</code> and it prints <code>0.5</code>.</span></li>
+<li>Help: run <code>git commit -h | head -3</code> and <code>man ls</code> (search with <code>/sort</code>, quit with <kbd>q</kbd>).<span class="expect">A usage line with brackets; the ls manual page.</span></li>
+<li>Write a strong help request (62.7) for the <code>KeyError</code>, with placeholders for anything sensitive. If you have Claude or Claude Code, send it and compare the answer with your own diagnosis.<span class="expect">Claude names the missing <code>status</code> key and suggests fixing the data or handling the missing key.</span></li>
+</ol>
+<p><b>Troubleshooting.</b> <em>Step 5 doesn't fail</em>: the first server isn't running, or you used different ports. <em><code>lsof</code> not found on Linux</em>: install it, or use <code>ss -ltnp</code>. <em>Step 7 hangs</em>: a VPN or proxy may intercept lookups; press <kbd>Ctrl+C</kbd> and add <code>--max-time 5</code>. <em>On Windows without WSL</em>: use Git Bash for most steps and <code>netstat -ano</code> in place of <code>lsof</code>.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"The error message is gibberish; just search it."</dt><dd>Most messages say exactly what's wrong and where. Read it first; search the stable part second.</dd>
+<dt>"The last line of a long log is the problem."</dt><dd>For tracebacks, yes. For build and test logs, the <em>first</em> real error usually caused the rest.</dd>
+<dt>"Permission denied means I need sudo."</dt><dd>Usually it means a missing execute bit or writing in the wrong place. <code>sudo</code> is rarely the right fix.</dd>
+<dt>"A 404 or 500 is a network problem."</dt><dd>The network worked: the server replied. Network failures are "could not resolve", "connection refused" and "timed out".</dd>
+<dt>"Claude's fix worked because the error went away."</dt><dd>Check it fixed the cause, not the symptom: re-run the original command and read what changed.</dd>
+</dl></div>
+
+<h3 id="ch62-r"><span class="num">62.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Errors say who failed, what with, and why. Read the whole message slowly; tools often include the fix.</li>
+<li>Use a method: read, reproduce, check assumptions (<code>pwd</code>, <code>ls</code>, <code>which</code>, versions), change one thing, confirm.</li>
+<li>Command not found: spelling, install, PATH, or use <code>npx</code>. No such file: wrong folder or name. Permission denied: <code>chmod +x</code> or write somewhere you own.</li>
+<li>Port in use: find the owner with <code>lsof -nP -iTCP:&lt;port&gt; -sTCP:LISTEN</code>. Network: resolve (DNS), connect, timeout; HTTP status codes are server replies, not network failures.</li>
+<li>Read tracebacks bottom-up; read build logs from the first error.</li>
+<li><code>--help</code>, <code>-h</code> and <code>man</code> describe the version you actually have.</li>
+<li>Search the stable part of a message, never paste secrets, and distrust fixes that remove safety. Give Claude the exact command, full error, expected result, setup and what you tried.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">You see <code>zsh: command not found: playwright</code> in a project where Playwright is installed with npm. What's the most likely fix?</p><div class="opts"><button>Run it with sudo</button><button data-ok>Run it with npx playwright</button><button>Reinstall the operating system</button></div><p class="why" hidden>Project tools live in <code>node_modules</code>, not on your PATH; <code>npx</code> finds and runs them.</p></div>
+<div class="qz"><p class="q">A Python traceback is 40 lines long. Where do you look first?</p><div class="opts"><button>The first line</button><button data-ok>The last line, then the lines just above it that point at your own files</button><button>The middle</button></div><p class="why" hidden>The last line is the error itself; the frames above show the path the program took to get there.</p></div>
+<div class="qz"><p class="q"><code>curl</code> prints <code>curl: (6) Could not resolve host: staging-api.internal</code>. What failed?</p><div class="opts"><button>The server returned an error</button><button>The server isn't listening on that port</button><button data-ok>Turning the host name into an address (DNS), often a typo or a VPN that's off</button></div><p class="why" hidden>Error 6 happens before any connection is attempted. "Connection refused" (7) would mean the address was found but nothing answered.</p></div>
+<div class="qz"><p class="q">Your dev server fails with <code>EADDRINUSE</code> on port 3000. What should you do first?</p><div class="opts"><button data-ok>Find what's listening on 3000 with lsof, and stop it if it's a leftover server of yours</button><button>Restart the computer</button><button>Run chmod 777 on the project</button></div><p class="why" hidden>Usually an earlier copy of your own server is still running. lsof shows its PID; stop it or use another port.</p></div>
+<div class="qz"><p class="q">Which is the best thing to send when asking Claude about an error?</p><div class="opts"><button>"It's broken again, any ideas?"</button><button>A screenshot of the last line, cropped</button><button data-ok>The exact command, the full error text with secrets removed, what you expected, your setup and what you tried</button></div><p class="why" hidden>Claude only knows what you tell it. Complete, exact context gets a diagnosis instead of a guess.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Start an "error diary" for two weeks. Each time you meet an error at work (terminal, CI, test run), write down the exact message (with sensitive parts replaced), what it meant, how you found out, and what fixed it. At the end, group them: which kinds came up most? Turn your three most common into a one-page "first checks" guide for your team, in the style of the quick-reference table in 62.3, and share it.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"An error message is a precise report, so read it before you search. It usually says which program failed, on what, and why. Then check your assumptions: which folder am I in, does the file exist, is the tool installed, is the server running? Five errors cover most problems: command not found, no such file, permission denied, port in use, and network failures. For a Python traceback, start at the bottom. When you ask Claude, give it the exact command, the full error with secrets removed, what you expected, and what you've tried. And never accept a fix that just turns safety off."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>GNU Bash manual, <a href="https://www.gnu.org/software/bash/manual/html_node/Exit-Status.html" target="_blank" rel="noopener">Exit Status</a> (126, 127 and 128+n conventions).</li>
+<li>curl, <a href="https://curl.se/libcurl/c/libcurl-errors.html" target="_blank" rel="noopener">libcurl error codes</a> and <a href="https://curl.se/docs/manpage.html" target="_blank" rel="noopener">curl man page</a> (exit codes, <code>-f</code>, <code>-w</code>).</li>
+<li>Python documentation, <a href="https://docs.python.org/3/tutorial/errors.html" target="_blank" rel="noopener">Errors and Exceptions</a> and <a href="https://docs.python.org/3/library/exceptions.html" target="_blank" rel="noopener">Built-in Exceptions</a> (<code>OSError</code>, <code>KeyError</code>).</li>
+<li>MDN, <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status" target="_blank" rel="noopener">HTTP response status codes</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/interactive-mode" target="_blank" rel="noopener">Claude Code interactive mode</a> (<code>!</code> shell mode) and <a href="https://code.claude.com/docs/en/cli-reference" target="_blank" rel="noopener">CLI reference</a> (piping into <code>claude -p</code>).</li>
+</ol><p class="verified">Verified 9 November 2026. Outputs reproduced on macOS with zsh, bash, git 2.54.0, Python 3.11, Node 25, npm 11.9 and the system curl; user names and paths changed to a placeholder user. Linux and Windows variants noted from the tools' documentation.</p></div>

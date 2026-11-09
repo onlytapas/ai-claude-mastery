@@ -1,0 +1,253 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What an <a class="gl" href="#g-embedding">embedding</a> is: a list of numbers that captures meaning</li>
+<li>Why "meaning as distance" works, with a picture you can hold in your head</li>
+<li>How to calculate <a class="gl" href="#g-cosine-similarity">cosine similarity</a> by hand, step by step</li>
+<li>What the "dimensions" of an embedding are, and why there are hundreds or thousands of them</li>
+<li>How word embeddings, token embeddings inside a language model, and sentence embeddings differ</li>
+<li>Where embeddings are used: <a class="gl" href="#g-semantic-search">semantic search</a>, clustering, duplicate bug detection, and <a class="gl" href="#g-rag">RAG</a></li>
+<li>Which embedding options exist for Claude users, since Anthropic doesn't make its own embedding model</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch14">Chapter 14</a> (tokens and token IDs). <a href="#ch6">Chapter 6</a> introduced word2vec and the "king − man + woman ≈ queen" example; this chapter explains how it works. A little school maths (multiplying and adding) is all you need.</div>
+
+<div class="bigidea"><p>Computers are good with numbers and bad with meaning. An embedding bridges the gap: it turns a word, a sentence or a whole document into a long list of numbers, chosen so that texts with similar meanings get similar lists. You can then measure how close two meanings are with simple arithmetic. That one trick powers search that understands what you mean rather than just the words you typed, finds duplicate bug reports written in different words, groups thousands of log messages into themes, and lets Claude look up the right documents before it answers.</p></div>
+
+<h3 id="ch15-1"><span class="num">15.1</span>From IDs to meaning</h3>
+<p>In <a href="#ch14">Chapter 14</a>, text became <a class="gl" href="#g-token-id">token IDs</a>: "login" might be number 4,512 and "sign" number 1,873. But those numbers are just positions in a list, like seat numbers in a theatre. Seat 4,512 isn't "more" than seat 1,873, and neighbouring seats have nothing in common. The IDs carry no meaning.</p>
+<p>What a model needs is a representation where <em>similar meanings are close together</em>. That is an embedding: a <a class="gl" href="#g-vector">vector</a> (a list of numbers) for each piece of text, learned so that "login" and "sign in" end up near each other, and far from "invoice".</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a map. Every town has two numbers: latitude and longitude. Those numbers mean something. Towns with similar numbers are close together, and you can measure the distance between any two. An embedding is a map of meaning. Every word or sentence gets coordinates, and similar meanings are neighbours. The difference is that a real map has two dimensions, while a meaning map has hundreds or thousands.</p></div>
+
+<h3 id="ch15-2"><span class="num">15.2</span>A meaning map you can draw</h3>
+<p>Let's build a tiny meaning map by hand, with just three dimensions so we can picture it. We'll score some bug titles on three questions, from 0 to 1. These scores are made up (illustrative); a real model learns its own dimensions, and they rarely have neat names.</p>
+<div class="tbl"><table>
+<tr><th>Bug title</th><th>About login?</th><th>About payment?</th><th>About performance?</th><th>Vector</th></tr>
+<tr><td>Login fails with valid password</td><td>0.9</td><td>0.1</td><td>0.0</td><td>[0.9, 0.1, 0.0]</td></tr>
+<tr><td>Cannot sign in after reset</td><td>0.8</td><td>0.0</td><td>0.2</td><td>[0.8, 0.0, 0.2]</td></tr>
+<tr><td>Card payment declined</td><td>0.1</td><td>0.9</td><td>0.1</td><td>[0.1, 0.9, 0.1]</td></tr>
+<tr><td>Dashboard loads slowly</td><td>0.1</td><td>0.0</td><td>0.9</td><td>[0.1, 0.0, 0.9]</td></tr>
+</table></div>
+<p>Notice something important: "Login fails with valid password" and "Cannot sign in after reset" share almost no words, yet their vectors are almost the same. That's the whole point. A keyword search for "login" would miss the second bug; a search by meaning would find it.</p>
+<p>Imagine each vector as an arrow from the centre of a room. The login bugs point towards one corner, the payment bug towards another wall, and the performance bug towards the ceiling. Similar meaning means the arrows point in a similar direction.</p>
+
+<h3 id="ch15-3"><span class="num">15.3</span>Cosine similarity, worked by hand</h3>
+<p>To compare two arrows, the most common measure is <strong>cosine similarity</strong>. It measures the angle between them, ignoring their length:</p>
+<div class="tbl"><table>
+<tr><th>Cosine similarity</th><th>Angle between arrows</th><th>Meaning</th></tr>
+<tr><td>1</td><td>0° (same direction)</td><td>Same meaning</td></tr>
+<tr><td>around 0</td><td>90° (at right angles)</td><td>Unrelated</td></tr>
+<tr><td>−1</td><td>180° (opposite)</td><td>Opposite direction (rare in practice with text embeddings)</td></tr>
+</table></div>
+<p>The recipe has three steps:</p>
+<div class="flow">
+<div><b>1. Dot product</b>Multiply matching numbers and add them up</div>
+<div><b>2. Lengths</b>For each vector: square each number, add, take the square root</div>
+<div class="hl"><b>3. Divide</b>Dot product ÷ (length A × length B)</div>
+</div>
+<p>Compare <b>A</b> "Login fails with valid password" [0.9, 0.1, 0.0] with <b>B</b> "Cannot sign in after reset" [0.8, 0.0, 0.2]:</p>
+<div class="tbl"><table>
+<tr><th>Step</th><th>Calculation</th><th>Result</th></tr>
+<tr><td>Dot product</td><td>0.9×0.8 + 0.1×0.0 + 0.0×0.2</td><td>0.72</td></tr>
+<tr><td>Length of A</td><td>√(0.81 + 0.01 + 0)</td><td>√0.82 ≈ 0.906</td></tr>
+<tr><td>Length of B</td><td>√(0.64 + 0 + 0.04)</td><td>√0.68 ≈ 0.825</td></tr>
+<tr><td>Cosine similarity</td><td>0.72 ÷ (0.906 × 0.825)</td><td><b>≈ 0.96</b>: very similar</td></tr>
+</table></div>
+<p>Now compare A with <b>C</b> "Card payment declined" [0.1, 0.9, 0.1]:</p>
+<div class="tbl"><table>
+<tr><th>Step</th><th>Calculation</th><th>Result</th></tr>
+<tr><td>Dot product</td><td>0.9×0.1 + 0.1×0.9 + 0.0×0.1</td><td>0.18</td></tr>
+<tr><td>Length of C</td><td>√(0.01 + 0.81 + 0.01)</td><td>√0.83 ≈ 0.911</td></tr>
+<tr><td>Cosine similarity</td><td>0.18 ÷ (0.906 × 0.911)</td><td><b>≈ 0.22</b>: not very similar</td></tr>
+</table></div>
+<div class="box note"><span class="tag">Why ignore length?</span><p>A long, wordy bug report and a short one about the same problem should count as similar. Cosine similarity cares only about direction, so length differences don't matter. Many embedding providers also <em>normalise</em> their vectors to length 1. Then the lengths in step 2 are both 1 and cosine similarity is just the dot product, which is faster to compute. Anthropic's embeddings guide notes that Voyage AI embeddings are normalised this way.</p></div>
+<details class="deep"><summary>Other ways to measure closeness</summary><div class="body">
+<p><strong>Euclidean distance</strong> is the straight-line distance between the tips of two arrows: subtract matching numbers, square, add, take the square root. Smaller means closer. <strong>Dot product</strong> is step 1 alone; it rewards both direction and length. For vectors normalised to length 1, all three give the same ranking of results, which is why providers often say "use any of them". If vectors aren't normalised, cosine similarity is the safe default for text.</p>
+<p>The similarity score itself has no universal scale. With one model, related texts might score 0.8 and unrelated ones 0.3; with another, the numbers cluster differently. Never copy a threshold such as "duplicates are above 0.85" from one model to another without testing it on your own data.</p>
+</div></details>
+
+<h3 id="ch15-4"><span class="num">15.4</span>Dimensions: why so many numbers?</h3>
+<p>Our toy map had three dimensions. Real embeddings have hundreds or thousands. Each <strong>dimension</strong> is one number in the list. More dimensions give more room to separate subtle differences: tone, topic, language, formality, technical domain and thousands of other features at once.</p>
+<div class="tbl"><table>
+<tr><th>Example</th><th>Dimensions</th><th>Note</th></tr>
+<tr><td>Our toy map</td><td>3</td><td>Illustrative</td></tr>
+<tr><td>word2vec (Google, 2013), commonly used size</td><td>300</td><td>One vector per word</td></tr>
+<tr><td>all-MiniLM-L6-v2 (open-source sentence model)</td><td>384</td><td>Small and free; runs on a laptop</td></tr>
+<tr><td>Voyage AI <code>voyage-4</code> (default)</td><td>1,024</td><td>Can also output 256, 512 or 2,048 (verified 9 Nov 2026)</td></tr>
+</table></div>
+<p>In a learned embedding, the dimensions usually don't have tidy names like "about login". Meaning is spread across many of them together. You can't point at dimension 417 and say what it means; what matters is how whole vectors relate to each other.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Describing a wine with two numbers (red or white, sweet or dry) works for basic choices. A sommelier uses dozens of qualities: fruit, acidity, tannin, oak, region, age. More dimensions let you tell apart wines that the two-number description would lump together. Embeddings are the same, with far more qualities, none of which a person chose.</p></div>
+<div class="box note"><span class="tag">Trade-off</span><p>More dimensions usually means better quality but more storage and slower search. Ten million documents × 1,024 numbers × 4 bytes each is about 41 GB of vectors (illustrative arithmetic). Some providers let you choose a shorter vector, and Voyage AI supports "Matryoshka" embeddings, where the first part of a long vector works as a shorter one.</p></div>
+
+<h3 id="ch15-5"><span class="num">15.5</span>How embeddings are learned</h3>
+<p>Nobody sets the numbers by hand. They are learned by training a neural network (<a href="#ch12">Chapter 12</a>) on a task where similar meanings must end up close together. The core idea comes from linguist J. R. Firth's 1957 line: "You shall know a word by the company it keeps."</p>
+<div class="cols2">
+<div><h4>Word embeddings (word2vec, 2013)</h4><p>The network learns to predict a word from its neighbours, or the neighbours from a word. Words used in similar contexts ("login", "sign-in", "authenticate") end up with similar vectors. One vector per word, regardless of context.</p></div>
+<div><h4>Sentence embeddings (2019 onwards)</h4><p>Models such as Sentence-BERT (Reimers and Gurevych, 2019) are trained on pairs of texts: pull pairs that mean the same thing (a question and its answer, two paraphrases) closer together, push unrelated ones apart. This is called <strong>contrastive learning</strong>. The result is one vector for a whole sentence or paragraph.</p></div>
+</div>
+<details class="deep"><summary>Why "king − man + woman ≈ queen" works</summary><div class="body">
+<p>If many directions in the space consistently correspond to relationships, then arithmetic can follow them. In word2vec, the arrow from "man" to "woman" turned out roughly parallel to the arrow from "king" to "queen", because those pairs appear in similar contexts differing in a similar way. So king − man + woman lands near queen. The same works, approximately, for capitals (Paris − France + Italy ≈ Rome) and verb tenses.</p>
+<p>This is a famous result, but it's approximate and cherry-picked: many analogies don't work, and the trick usually excludes the input words from the answer. Embeddings also absorb biases in their training text. Bolukbasi and colleagues (2016) showed word2vec placed "man : computer programmer" as analogous to "woman : homemaker". The data lessons from <a href="#ch13">Chapter 13</a> apply here too.</p>
+</div></details>
+
+<h3 id="ch15-6"><span class="num">15.6</span>Three kinds of embedding you'll hear about</h3>
+<div class="tbl"><table>
+<tr><th>Kind</th><th>What gets a vector</th><th>Where it lives</th><th>Do you use it directly?</th></tr>
+<tr><td><b>Word embeddings</b></td><td>Each word, one fixed vector</td><td>Older NLP systems (word2vec, GloVe)</td><td>Rarely today</td></tr>
+<tr><td><b>Token embeddings inside an LLM</b></td><td>Each token ID, as the first step inside the model</td><td>Inside Claude, GPT, Gemini and others. The model adjusts these vectors layer by layer to reflect context, so "bug" in "fix the bug" and "a bug in the garden" end up different.</td><td>No. You never see them. <a href="#ch16">Chapter 16</a> follows them through the Transformer.</td></tr>
+<tr><td><b>Sentence / document embeddings</b></td><td>A whole sentence, paragraph or document</td><td>Separate <a class="gl" href="#g-embedding-model">embedding models</a> offered through an API or run locally</td><td>Yes. These power search, clustering and RAG.</td></tr>
+</table></div>
+<div class="flow">
+<div><b>Text</b>"Login fails on Safari"</div>
+<div><b>Tokens</b>Login · ␣fails · ␣on · ␣Safari</div>
+<div><b>Token IDs</b>e.g. 4512 · 9021 · 389 · 30117 (made-up numbers)</div>
+<div class="hl"><b>Embedding lookup</b>Each ID becomes a long vector</div>
+<div><b>Transformer layers</b>Vectors are updated using context (Chapter 16)</div>
+</div>
+<div class="box note"><span class="tag">Verified 9 Nov 2026 · Anthropic</span><p>Anthropic does not offer its own embedding model. Its documentation names Voyage AI (by MongoDB) as one embeddings provider with a wide range of models, while advising you to assess several vendors for your use case. Voyage's current general-purpose models include <code>voyage-4-large</code>, <code>voyage-4</code> and <code>voyage-4-lite</code>, plus <code>voyage-code-4</code> for code and an open-weight <code>voyage-4-nano</code>. Keys are created in MongoDB Atlas. So a Claude-based search system typically uses one company's model to embed and find documents, and Claude to read them and write the answer.</p></div>
+<p>Other companies, including OpenAI and Google, sell embedding models through their APIs, and there are many free open-source models you can run yourself. Check each provider's current documentation for model names and prices; they change often.</p>
+
+<h3 id="ch15-7"><span class="num">15.7</span>What embeddings are used for</h3>
+<div class="tbl"><table>
+<tr><th>Use</th><th>How it works</th><th>QA example</th></tr>
+<tr><td><b>Semantic search</b></td><td>Embed every document once. Embed the query. Return the documents whose vectors are closest.</td><td>Search 5,000 test cases for "password reset" and also find "forgotten credentials" cases</td></tr>
+<tr><td><b>Duplicate detection</b></td><td>Embed each new item; flag any existing item above a similarity threshold</td><td>A new Jira bug triggers "possible duplicate of BUG-1042 (similarity 0.91)"</td></tr>
+<tr><td><b>Clustering</b></td><td>Group vectors that sit close together (<a class="gl" href="#g-unsupervised-learning">unsupervised learning</a>, <a href="#ch10">Chapter 10</a>)</td><td>Group 20,000 CI failure messages into 30 themes so the team triages themes, not lines</td></tr>
+<tr><td><b>Classification</b></td><td>Use the vectors as features for a simple classifier, or compare to an example of each category</td><td>Route incoming bugs to UI, API or Data</td></tr>
+<tr><td><b>Retrieval for an LLM (RAG)</b></td><td>Find the most relevant chunks, then give them to Claude to answer from</td><td>"What does our test strategy say about mobile?" answered from the real strategy doc, with citations (<a href="#ch23">Chapter 23</a>)</td></tr>
+<tr><td><b>Recommendation and anomaly detection</b></td><td>Suggest close neighbours; flag items far from everything</td><td>Spot a log message unlike any seen before</td></tr>
+</table></div>
+<div class="flow">
+<div><b>Ahead of time</b>Embed every document; store the vectors</div>
+<div><b>Query</b>Embed the user's question</div>
+<div class="hl"><b>Compare</b>Find the closest stored vectors</div>
+<div><b>Use</b>Show results, or give them to Claude to answer from</div>
+</div>
+<p>Storing and searching millions of vectors quickly is the job of a <strong>vector database</strong> or a vector index in an ordinary database. <a href="#ch23">Chapter 23</a> covers the full retrieval pipeline and when to combine semantic search with ordinary keyword search.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>A QA team receives about 60 new bug reports a week (illustrative), many of them duplicates written by different people. They embed the title and description of every open bug. When a new one arrives, a small script compares it with all open bugs and posts a comment listing the three most similar, with scores. Triage still decides; the script just saves the search. After two weeks of checking its suggestions against human decisions, they set the threshold at the score where it was right most of the time on <em>their</em> data.</p></div>
+<div class="box warn"><span class="tag">Limits</span><ul>
+<li><b>Similar is not the same as relevant or correct.</b> "Login works on Safari" and "Login fails on Safari" can score very high, because embeddings often blur negation.</li>
+<li><b>Exact identifiers.</b> Embeddings are weak at exact matches like <code>BUG-1042</code>, error code <code>E4031</code> or a specific version number. Keyword search is better there, which is why systems often combine both.</li>
+<li><b>Model lock-in.</b> Vectors from different models aren't compatible. Change model and you must re-embed everything.</li>
+<li><b>Privacy.</b> Sending text to an embedding API sends your data to that provider. Check policy before embedding customer data or internal documents.</li>
+</ul></div>
+
+<h3 id="ch15-8"><span class="num">15.8</span>Lab: compute similarity yourself</h3>
+<p>Part A needs only Python 3. It does the hand calculation from 15.3 in code, then builds the simplest possible "embedding" from word counts to show why learned embeddings are needed. Part B (optional) uses a real, free embedding model on your laptop.</p>
+<div class="code"><span class="cap">similarity.py</span><pre># similarity.py - cosine similarity by hand, then a tiny duplicate-bug finder
+import math
+import re
+from collections import Counter
+
+def cosine(a, b):
+    dot = sum(x * y for x, y in zip(a, b))
+    len_a = math.sqrt(sum(x * x for x in a))
+    len_b = math.sqrt(sum(y * y for y in b))
+    return dot / (len_a * len_b)
+
+# Part 1: hand-made 3-number "embeddings" (illustrative)
+# dimensions: [about login, about payment, about performance]
+toy = {
+    "Login fails with valid password": [0.9, 0.1, 0.0],
+    "Cannot sign in after reset":      [0.8, 0.0, 0.2],
+    "Card payment declined":           [0.1, 0.9, 0.1],
+    "Dashboard loads slowly":          [0.1, 0.0, 0.9],
+}
+query = "Login fails with valid password"
+print(f"Similarity to: {query!r}")
+for text, vec in toy.items():
+    print(f"  {cosine(toy[query], vec):.2f}  {text}")
+
+# Part 2: word-count vectors for real bug titles
+bugs = [
+    "Login button does nothing on Safari",
+    "Safari: clicking the login button has no effect",
+    "Unable to sign in using Safari browser",
+    "Checkout total wrong when coupon applied",
+    "Coupon discount not applied to checkout total",
+]
+
+def words(text):
+    return re.findall(r"[a-z]+", text.lower())
+
+vocab = sorted({w for b in bugs for w in words(b)})
+
+def count_vector(text):
+    c = Counter(words(text))
+    return [c[w] for w in vocab]
+
+vectors = [count_vector(b) for b in bugs]
+print(f"\nVocabulary size (dimensions): {len(vocab)}")
+print("Pairs with similarity &gt;= 0.30:")
+for i in range(len(bugs)):
+    for j in range(i + 1, len(bugs)):
+        s = cosine(vectors[i], vectors[j])
+        if s &gt;= 0.30:
+            print(f"  {s:.2f}  #{i + 1} vs #{j + 1}")
+print(f"Bug #1 vs #3 (same bug, different words): {cosine(vectors[0], vectors[2]):.2f}")</pre></div>
+<div class="code"><span class="cap">real_embeddings.py (optional, Part B)</span><pre># real_embeddings.py - the same bug titles with a free, local embedding model
+from sentence_transformers import SentenceTransformer, util
+
+bugs = [
+    "Login button does nothing on Safari",
+    "Safari: clicking the login button has no effect",
+    "Unable to sign in using Safari browser",
+    "Checkout total wrong when coupon applied",
+    "Coupon discount not applied to checkout total",
+]
+
+model = SentenceTransformer("all-MiniLM-L6-v2")   # downloads the model on first run
+emb = model.encode(bugs)
+print("Vector length:", len(emb[0]))
+
+scores = util.cos_sim(emb, emb)
+for i in range(len(bugs)):
+    for j in range(i + 1, len(bugs)):
+        print(f"  {float(scores[i][j]):.2f}  #{i + 1} vs #{j + 1}")</pre></div>
+
+<div class="lab"><div class="lab-h"><b>Find duplicate bugs by meaning</b><span>30 min · your computer, Python 3 (Part B needs internet once)</span></div><ol>
+<li>Create a folder, save <code>similarity.py</code> in it and run <code>python3 similarity.py</code> (on Windows, <code>py similarity.py</code>).<span class="expect">The first block shows 1.00 for the query itself, <code>0.96 Cannot sign in after reset</code>, <code>0.22 Card payment declined</code> and <code>0.11 Dashboard loads slowly</code>. The 0.96 and 0.22 match your hand calculation in 15.3.</span></li>
+<li>Read the second block, which uses word counts as a crude "embedding".<span class="expect"><code>Vocabulary size (dimensions): 25</code>. Two pairs pass the threshold: <code>0.43 #1 vs #2</code> (shared words "login", "button", "safari") and <code>0.62 #4 vs #5</code>. The last line says <code>Bug #1 vs #3 (same bug, different words): 0.15</code>.</span></li>
+<li>Think about why #1 and #3 scored so low.<span class="expect">They describe the same problem, but share only the word "safari". Word counts know nothing about "login" meaning "sign in". This is exactly the gap learned embeddings fill.</span></li>
+<li>Optional Part B: run <code>python3 -m pip install sentence-transformers</code>, save <code>real_embeddings.py</code>, then run <code>python3 real_embeddings.py</code>.<span class="expect">The first run downloads the model (tens of megabytes) and may take a minute. It prints <code>Vector length: 384</code>, then ten pair scores. #1 vs #3 should now score much higher than it did with word counts, and the login bugs should score clearly higher with each other than with the coupon bugs. Exact numbers depend on the library version.</span></li>
+<li>Add a tricky pair to the <code>bugs</code> list in Part B: <code>"Login works on Safari"</code>. Rerun.<span class="expect">It probably scores high against #1 even though it says the opposite. Embeddings capture topic well and negation poorly, so a human or Claude should confirm suggested duplicates.</span></li>
+<li>Choose a threshold. Looking at your Part B scores, pick a number that separates true duplicates from the rest.<span class="expect">You'll find there's no perfect line, only a trade-off between missed duplicates and false alarms. That's a test-design decision: tune it on real examples and track both error types.</span></li>
+</ol></div>
+<div class="box note"><span class="tag">Troubleshooting</span><p><b>"No module named sentence_transformers"</b>: the install went to a different Python; use <code>python3 -m pip install</code> with the same <code>python3</code> you run the script with, or create a virtual environment with <code>python3 -m venv .venv</code> and activate it first. <b>Install is very slow or fails</b>: the library pulls in PyTorch, which is large; Part A alone covers the chapter's ideas. <b>Download blocked at work</b>: the model comes from Hugging Face; ask IT, or skip Part B. <b>Want to use Voyage AI instead</b>: Anthropic's embeddings guide has a ready-to-run example using <code>pip install -U voyageai</code> and an API key in the <code>VOYAGE_API_KEY</code> <a class="gl" href="#g-environment-variable">environment variable</a>. Never paste the key into code.</p></div>
+
+<div class="box opinion"><span class="tag">Opinion · practitioners building search systems</span><p>Many engineers who build retrieval systems report that a hybrid of keyword and embedding search, followed by a "reranker" model that rescores the top results, beats either method alone. Voyage AI and others sell rerankers for this reason. Others argue that with good long-context models, simpler pipelines are often enough. The right answer depends on your documents and should be measured with your own evaluation set (<a href="#ch24">Chapter 24</a>).</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Claude can create embeddings for me through the Claude API."</dt><dd>Anthropic doesn't offer an embedding model. Use a separate provider such as Voyage AI, or an open-source model.</dd>
+<dt>"Each dimension means something specific, like 'about login'."</dt><dd>That was true only of our toy example. In learned embeddings, meaning is spread across many dimensions at once.</dd>
+<dt>"A similarity of 0.8 always means 'very similar'."</dt><dd>Scores depend on the model. Set thresholds by testing on your own data.</dd>
+<dt>"High similarity means the texts agree."</dt><dd>It means they're about similar things. "Test passed" and "Test failed" can be close.</dd>
+<dt>"Embeddings store the text, so you can read it back."</dt><dd>You can't simply turn a vector back into the original words, but researchers have shown that text can sometimes be partly reconstructed from embeddings. Treat stored vectors of sensitive text as sensitive data.</dd>
+</dl></div>
+
+<h3 id="ch15-r"><span class="num">15.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>An embedding is a list of numbers that places text on a "map of meaning", where similar meanings are close.</li>
+<li>Cosine similarity compares direction: dot product ÷ (length × length). 1 is the same direction, about 0 is unrelated.</li>
+<li>Real embeddings have hundreds to thousands of dimensions; meaning is spread across them, not one per dimension.</li>
+<li>Embeddings are learned from context ("the company a word keeps") and, for sentences, from pairs that should be close or far.</li>
+<li>Token embeddings live inside language models; sentence embeddings come from separate embedding models you call yourself.</li>
+<li>Anthropic has no embedding model of its own; its docs point to Voyage AI as one option among several.</li>
+<li>Uses: semantic search, duplicate detection, clustering, classification and RAG. Weaknesses: negation, exact IDs, model lock-in, privacy.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Two vectors are [1, 0] and [0, 1]. What is their cosine similarity?</p><div class="opts"><button>1</button><button data-ok>0</button><button>−1</button></div><p class="why" hidden>The dot product is 1×0 + 0×1 = 0, so the similarity is 0: the arrows are at right angles, meaning unrelated.</p></div>
+<div class="qz"><p class="q">Why can embedding search find "Cannot sign in" when you search for "login failure"?</p><div class="opts"><button>It searches for shared letters</button><button data-ok>Texts with similar meanings get similar vectors, even with different words</button><button>It asks Claude to rewrite the query</button></div><p class="why" hidden>Learned embeddings place paraphrases close together, which keyword search can't do.</p></div>
+<div class="qz"><p class="q">Your team builds a Claude-based assistant over internal test documents. Where do the document embeddings come from?</p><div class="opts"><button>Claude's API has an embeddings endpoint</button><button data-ok>A separate embedding model, such as Voyage AI or an open-source model</button><button>They are the token IDs from Chapter 14</button></div><p class="why" hidden>Anthropic does not offer its own embedding model; its documentation points to Voyage AI as one provider and suggests assessing several.</p></div>
+<div class="qz"><p class="q">Which search is embedding similarity worst at?</p><div class="opts"><button>Finding paraphrased bug reports</button><button>Grouping log messages by theme</button><button data-ok>Finding the exact ticket ID BUG-1042</button></div><p class="why" hidden>Exact identifiers are a keyword-search job. Many systems combine keyword and embedding search for this reason.</p></div>
+<div class="qz"><p class="q">You switch to a newer embedding model. What must you do with the millions of vectors already stored?</p><div class="opts"><button>Nothing; vectors are universal</button><button data-ok>Re-embed all documents with the new model</button><button>Multiply them by a conversion factor</button></div><p class="why" hidden>Each model has its own space. Vectors from different models can't be compared with each other.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Export 30–50 bug titles from a project you can share (or write realistic ones, including at least five pairs of duplicates phrased differently and two near-opposites like "works" vs "fails"). Run them through <code>real_embeddings.py</code>, or through Voyage AI if your company allows it. Record for each true duplicate pair its score, and the highest score of any non-duplicate pair. Write a short recommendation: what threshold would you use, how many duplicates it would catch, how many false alarms it would raise, and what a human or Claude should check before closing a bug as a duplicate.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"An embedding turns text into a long list of numbers, like map coordinates for meaning. Texts that mean similar things get coordinates that are close, even if they use different words, so 'can't sign in' sits right next to 'login fails'. To compare two, we use cosine similarity, which checks whether the arrows point the same way: 1 is identical, near 0 is unrelated. That's how semantic search, duplicate-bug detection and RAG work. Two things to remember: Anthropic doesn't make an embedding model, so you use another provider like Voyage AI or an open-source model; and similar isn't the same as identical, because 'works' and 'fails' can look close. Always check the threshold on your own data."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/embeddings" target="_blank" rel="noopener">Embeddings</a> (no Anthropic embedding model; Voyage AI models, dimensions, normalisation, Python example).</li>
+<li>T. Mikolov et al., "<a href="https://arxiv.org/abs/1301.3781" target="_blank" rel="noopener">Efficient Estimation of Word Representations in Vector Space</a>" (word2vec, 2013).</li>
+<li>N. Reimers and I. Gurevych, "<a href="https://arxiv.org/abs/1908.10084" target="_blank" rel="noopener">Sentence-BERT</a>", EMNLP 2019.</li>
+<li>T. Bolukbasi et al., "<a href="https://arxiv.org/abs/1607.06520" target="_blank" rel="noopener">Man is to Computer Programmer as Woman is to Homemaker?</a>" (2016).</li>
+<li>J. R. Firth, "A synopsis of linguistic theory 1930–1955", in <i>Studies in Linguistic Analysis</i> (1957).</li>
+<li><a href="https://www.sbert.net/" target="_blank" rel="noopener">Sentence Transformers documentation</a> and the <a href="https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2" target="_blank" rel="noopener">all-MiniLM-L6-v2 model card</a>.</li>
+</ol><p class="verified">Verified 9 November 2026: Anthropic's embeddings guide (no first-party embedding model, Voyage AI model names and dimensions). Concepts: established · Last reviewed 9 November 2026. Part A output produced by running the code shown with Python 3; Part B was not run while writing, so its scores are described rather than quoted.</p></div>

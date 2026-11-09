@@ -1,0 +1,510 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What the Claude Agent SDK is, and how it differs from the Client SDK, the Claude Code CLI and Managed Agents</li>
+<li>How to install the Python and TypeScript packages and authenticate safely</li>
+<li>How the <code>query()</code> loop streams messages, and what each message type means</li>
+<li>How to control tools: built-in tools, your own custom tools, and external MCP servers</li>
+<li>How permissions are evaluated, and how to use permission modes, allow and deny rules and the <code>can_use_tool</code> callback</li>
+<li>How hooks let your own code block, log or change what the agent does</li>
+<li>How to build, self-test and run a small QA agent that triages JUnit test results</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch107">Chapter 107</a> (what makes an agent), <a href="#ch109">Chapter 109</a> (production agents), <a href="#ch86">Chapter 86</a> (your first Claude API call) and <a href="#ch97">Chapter 97</a> (what MCP is). You need Python 3.10 or newer (or Node.js 18.14 or newer) and, to run the agent for real, an API key from the Claude Console (<a href="#ch98">Chapter 98</a> covers keeping keys secret). The self-test part of the lab works without a key.</div>
+
+<div class="bigidea"><p>The Claude Agent SDK is Claude Code packaged as a library. Instead of typing into a terminal, your Python or TypeScript program calls one function, <code>query()</code>, and gets back a stream of messages while Claude plans, calls tools, reads results and decides when it is finished. You don't write the agent loop yourself; you decide what the agent may touch. You give it tools (built-in ones such as Read and Bash, your own functions, or MCP servers), you set the rules for which actions run without asking, and you attach hooks: small pieces of your own code that run before or after each action and can block it. Get those three things right and you have an agent you can put into a pipeline.</p></div>
+
+<h3 id="ch110-1"><span class="num">110.1</span>What the Agent SDK is, and what it isn't</h3>
+<p>In <a href="#ch86">Chapter 86</a> you called the Claude API directly: you sent a message, you got a message back. If you wanted Claude to use a tool, you had to describe the tool, notice when Claude asked for it, run it yourself, send the result back and repeat. That repeat-until-done cycle is the <a class="gl" href="#g-agent-loop">agent loop</a> from <a href="#ch107">Chapter 107</a>, and writing it well (with retries, context management, permissions and logging) is real work.</p>
+<p>The <a class="gl" href="#g-claude-agent-sdk">Claude Agent SDK</a> gives you that loop ready-made. Anthropic's documentation describes it as giving you "the same tools, agent loop, and context management that power Claude Code, programmable in Python and TypeScript". It was called the Claude Code SDK until 29 September 2025, when it was renamed.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>The Client SDK is like buying a very good drill: powerful, but you hold it and decide every hole. The Agent SDK is like hiring a contractor who arrives with a full toolbox, plans the job and works through it, while you set the house rules: which rooms they may enter, what needs your sign-off, and a camera that records every tool they pick up.</p></div>
+<p>Anthropic's own comparison puts the four options side by side:</p>
+<div class="tbl"><table>
+<tr><th>You want to</th><th>Use</th><th>What you get</th></tr>
+<tr><td>Embed Claude Code's agent in your own Python or TypeScript application, in a process you operate</td><td><b>Agent SDK</b></td><td>A library that runs the Claude Code binary, with built-in tools, permissions, sessions and hooks</td></tr>
+<tr><td>Work interactively, or run one-off tasks from a terminal</td><td><b>Claude Code CLI</b> (<a href="#ch63">Chapter 63</a>)</td><td>The terminal interface; <code>claude -p</code> for scripted runs</td></tr>
+<tr><td>Call the Claude API directly from your own code</td><td><b>Client SDK</b> (the <code>anthropic</code> package)</td><td>Direct API access; you write the tool loop yourself, or use its beta tool runner</td></tr>
+<tr><td>Have Anthropic host the agent</td><td><b>Managed Agents</b> (<a class="gl" href="#g-managed-agents">beta</a>)</td><td>A hosted harness with sessions in an Anthropic-managed cloud sandbox or your own sandbox</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A QA team wants a nightly job that reads the Playwright results, groups the failures, and drafts a triage note for the morning stand-up. The Client SDK would need a hand-written loop and hand-written file tools. <code>claude -p</code> would work but is awkward to test and extend. The Agent SDK fits: a Python script in the repository, unit-testable custom tools, a hook that stops the agent writing anywhere except the report folder, and a hard budget cap. That is exactly what you build in the lab.</p></div>
+<div class="box note"><span class="tag">Understanding, using, building</span><p>Earlier chapters were about <em>using</em> Claude Code. This chapter is about <em>building</em>: you write and own the program, so you also own its safety settings, its costs and its failures.</p></div>
+
+<h3 id="ch110-2"><span class="num">110.2</span>Install and authenticate</h3>
+<div class="tbl"><table>
+<tr><th></th><th>Python</th><th>TypeScript</th></tr>
+<tr><td>Package</td><td><code>claude-agent-sdk</code> (import name <code>claude_agent_sdk</code>)</td><td><code>@anthropic-ai/claude-agent-sdk</code></td></tr>
+<tr><td>Needs</td><td>Python 3.10+</td><td>Node.js 18.14+</td></tr>
+<tr><td>Install</td><td><code>pip install claude-agent-sdk</code> or <code>uv add claude-agent-sdk</code></td><td><code>npm install @anthropic-ai/claude-agent-sdk</code></td></tr>
+<tr><td>Latest on 9 Nov 2026</td><td>0.2.179 (bundles Claude Code 2.1.319)</td><td>0.3.319</td></tr>
+<tr><td>Source and changelog</td><td><code>anthropics/claude-agent-sdk-python</code></td><td><code>anthropics/claude-agent-sdk-typescript</code></td></tr>
+</table></div>
+<div class="code"><span class="cap">Terminal (macOS / Linux)</span><pre>mkdir qa-agent &amp;&amp; cd qa-agent
+python3 -m venv .venv
+source .venv/bin/activate
+pip install claude-agent-sdk
+export ANTHROPIC_API_KEY=your-api-key     <span class="c"># from platform.claude.com; never commit it</span></pre></div>
+<p>Both packages <strong>bundle a native Claude Code binary</strong>, so most installs need no separate Claude Code install. Two exceptions from the docs: if pip falls back to the source package (for example on ARM64 Windows) there is no bundled binary and the SDK looks for <code>claude</code> on your <code>PATH</code>; and an npm install that skips optional dependencies (<code>npm ci --omit=optional</code>) gets no binary.</p>
+<h4>Authentication rules that matter</h4>
+<ul>
+<li><strong>API key from the environment.</strong> The SDK reads <code>ANTHROPIC_API_KEY</code> from the environment of the process that runs your agent. It does <em>not</em> load <code>.env</code> files for you; if you keep the key in one, load it yourself (for example with the <code>python-dotenv</code> package) before calling the SDK.</li>
+<li><strong>Cloud providers.</strong> Set <code>CLAUDE_CODE_USE_BEDROCK=1</code> (Amazon Bedrock), <code>CLAUDE_CODE_USE_VERTEX=1</code> (Google Cloud's Agent Platform), <code>CLAUDE_CODE_USE_FOUNDRY=1</code> (Microsoft Foundry) or <code>CLAUDE_CODE_USE_ANTHROPIC_AWS=1</code> with <code>ANTHROPIC_AWS_WORKSPACE_ID</code> (Claude Platform on AWS), plus that cloud's own credentials.</li>
+<li><strong>No claude.ai login for products you ship.</strong> The overview page says: "Unless previously approved, Anthropic does not allow third party developers to offer claude.ai login or rate limits for their products, including agents built on the Claude Agent SDK." Build on API keys.</li>
+</ul>
+<div class="box warn"><span class="tag">Branding</span><p>If you ship an agent to customers, Anthropic's branding guidelines allow names such as "Claude Agent" or "YourAgent Powered by Claude", but not "Claude Code" or "Claude Code Agent", and not Claude Code-style ASCII art. Use of the SDK is governed by Anthropic's Commercial Terms of Service.</p></div>
+
+<h3 id="ch110-3"><span class="num">110.3</span>The query loop</h3>
+<p>Everything starts with <code>query()</code>. You pass a prompt and an options object; it returns an <em>async iterator</em> (<a class="gl" href="#g-async">async</a>, <a href="#ch58">Chapter 58</a>), a stream you read with <code>async for</code>. Each item is a message describing one step.</p>
+<div class="flow">
+<div><b>Your code</b>calls <code>query(prompt, options)</code></div>
+<div><b>SDK</b>starts the bundled Claude Code process</div>
+<div class="hl"><b>Claude</b>thinks, then asks for a tool</div>
+<div><b>Claude Code</b>checks permissions and hooks, runs the tool</div>
+<div><b>Result</b>goes back to Claude; repeat until done</div>
+<div><b>ResultMessage</b>final answer, cost, turns</div>
+</div>
+<p>This is the quickstart example from the official docs, unchanged apart from the comments:</p>
+<div class="code"><span class="cap">agent.py (Python)</span><pre>import asyncio
+from claude_agent_sdk import query, ClaudeAgentOptions, AssistantMessage, ResultMessage
+
+
+async def main():
+    async for message in query(
+        prompt="Review utils.py for bugs that would cause crashes. Fix any issues you find.",
+        options=ClaudeAgentOptions(
+            allowed_tools=["Read", "Edit", "Glob"],  <span class="c"># run these without asking</span>
+            permission_mode="acceptEdits",           <span class="c"># auto-approve file edits</span>
+        ),
+    ):
+        if isinstance(message, AssistantMessage):
+            for block in message.content:
+                if hasattr(block, "text"):
+                    print(block.text)                <span class="c"># Claude's reasoning</span>
+                elif hasattr(block, "name"):
+                    print(f"Tool: {block.name}")     <span class="c"># a tool call</span>
+        elif isinstance(message, ResultMessage):
+            print(f"Done: {message.subtype}")
+
+
+asyncio.run(main())</pre></div>
+<div class="code"><span class="cap">agent.ts (TypeScript, run with npx tsx agent.ts)</span><pre>import { query } from "@anthropic-ai/claude-agent-sdk";
+
+for await (const message of query({
+  prompt: "Review utils.py for bugs that would cause crashes. Fix any issues you find.",
+  options: { allowedTools: ["Read", "Edit", "Glob"], permissionMode: "acceptEdits" }
+})) {
+  if (message.type === "assistant" &amp;&amp; message.message?.content) {
+    for (const block of message.message.content) {
+      if ("text" in block) console.log(block.text);
+      else if ("name" in block) console.log(`Tool: ${block.name}`);
+    }
+  } else if (message.type === "result") {
+    console.log(`Done: ${message.subtype}`);
+  }
+}</pre></div>
+<h4>The messages you will see (Python names)</h4>
+<div class="tbl"><table>
+<tr><th>Message</th><th>What it means</th><th>Useful fields</th></tr>
+<tr><td><code>SystemMessage</code></td><td>Housekeeping; the first one has <code>subtype == "init"</code> with session details such as the tool list</td><td><code>subtype</code>, <code>data</code></td></tr>
+<tr><td><code>AssistantMessage</code></td><td>Something Claude said or a tool it asked for</td><td><code>content</code>: <code>TextBlock</code>, <code>ToolUseBlock</code> (<code>name</code>, <code>input</code>), <code>ThinkingBlock</code></td></tr>
+<tr><td><code>UserMessage</code></td><td>Usually tool results flowing back to Claude</td><td><code>content</code> with <code>ToolResultBlock</code>; <code>parent_tool_use_id</code> if it came from a subagent</td></tr>
+<tr><td><code>ResultMessage</code></td><td>The end of the run</td><td><code>subtype</code> (for example <code>success</code>, <code>error_max_turns</code>, <code>error_max_budget_usd</code>), <code>is_error</code>, <code>result</code>, <code>num_turns</code>, <code>total_cost_usd</code>, <code>usage</code>, <code>session_id</code>, <code>permission_denials</code></td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Errors arrive twice</span><p>A single-shot <code>query()</code> yields the error result and then raises an exception. Wrap the loop in <code>try</code>/<code>except</code> so your script reports the failure cleanly instead of crashing with a traceback; the docs' own examples do this.</p></div>
+<h4><code>query()</code> or <code>ClaudeSDKClient</code>?</h4>
+<p><code>query()</code> starts a fresh session for each call: ideal for one job, such as a CI step. <code>ClaudeSDKClient</code> keeps one session open so you can send follow-up prompts, interrupt (<code>interrupt()</code>), switch permission mode mid-run (<code>set_permission_mode()</code>) or change model (<code>set_model()</code>). Use it with <code>async with ClaudeSDKClient(options=...) as client:</code>, then <code>await client.query("...")</code> and read <code>client.receive_response()</code>. To continue a <code>query()</code> session later, keep the <code>session_id</code> from the result and pass <code>resume=session_id</code> in the next call's options.</p>
+<details class="deep"><summary>Under the hood: what the SDK is actually doing</summary><div class="body">
+<p>The SDK is a thin layer. It starts the Claude Code binary as a child process and talks to it over standard input and output with a stream of JSON messages (the same idea as <code>claude -p --output-format stream-json</code>, <a href="#ch75">Chapter 75</a>). Claude Code does the real work: building the system prompt, calling the API, running tools, compacting the context when it fills, applying permission rules. When Claude Code needs a decision from your program, such as "may I run this tool?" or "here is a PreToolUse event", it sends a control request over the same channel and your callback answers it.</p>
+<p>Two consequences follow. First, the SDK version and the bundled Claude Code version move together; the Python package records which CLI it bundles (2.1.319 for 0.2.179). Second, behaviour you know from Claude Code (settings files, <code>CLAUDE.md</code>, skills, auto-compaction) applies here too unless you turn it off. By default the SDK loads user, project and local settings just like the CLI; <code>setting_sources=[]</code> (TypeScript <code>settingSources: []</code>) gives you an isolated agent that ignores whatever happens to be in <code>~/.claude</code> on the machine it runs on.</p>
+</div></details>
+
+<h3 id="ch110-4"><span class="num">110.4</span>Tools: built-in, custom and MCP</h3>
+<p>The agent can only act through tools. You decide which ones exist and which ones run without asking. The docs separate two layers, and confusing them is the most common SDK mistake:</p>
+<div class="tbl"><table>
+<tr><th>Option</th><th>Layer</th><th>Effect</th></tr>
+<tr><td><code>tools=["Read", "Grep"]</code></td><td>Availability</td><td>Only these built-in tools are in Claude's context. MCP tools are unaffected. <code>tools=[]</code> removes all built-ins.</td></tr>
+<tr><td><code>allowed_tools=[...]</code></td><td>Permission</td><td>Listed tools run without a permission prompt. Unlisted tools still exist; calls to them go through the permission flow.</td></tr>
+<tr><td><code>disallowed_tools=["Bash"]</code></td><td>Both</td><td>A bare name removes the tool from context. A scoped rule such as <code>"Bash(rm *)"</code> keeps the tool but denies matching calls.</td></tr>
+</table></div>
+<p>The built-in tools are Claude Code's: <code>Read</code>, <code>Write</code>, <code>Edit</code>, <code>Glob</code>, <code>Grep</code>, <code>Bash</code>, <code>WebFetch</code>, <code>WebSearch</code>, <code>Agent</code> (subagents, <a href="#ch111">Chapter 111</a>) and others listed in the tools reference. A useful starting set from the quickstart: <code>Read</code>, <code>Glob</code>, <code>Grep</code> for read-only analysis; add <code>Edit</code> to modify code; add <code>Bash</code> for full automation.</p>
+<h4>Your own tools</h4>
+<p>A custom tool is an ordinary Python <code>async</code> function wrapped with the <code>@tool</code> decorator (name, description, input schema), then placed in an <a class="gl" href="#g-in-process-mcp-server">in-process MCP server</a> made by <code>create_sdk_mcp_server</code>. "In-process" means the server lives inside your Python program; no separate process starts. Claude sees the tool as <code>mcp__{server key}__{tool name}</code>, and that full name is what goes in <code>allowed_tools</code>.</p>
+<div class="code"><span class="cap">A custom tool (Python)</span><pre>from typing import Any
+from claude_agent_sdk import tool, create_sdk_mcp_server, ToolAnnotations
+
+@tool("count_flaky", "Count how often a test failed in the last N runs",
+      {"test_name": str, "runs": int},
+      annotations=ToolAnnotations(readOnlyHint=True))
+async def count_flaky(args: dict[str, Any]) -&gt; dict[str, Any]:
+    failures = 3   <span class="c"># illustrative: look this up in your CI history instead</span>
+    return {"content": [{"type": "text",
+                         "text": f"{args['test_name']} failed {failures} of {args['runs']} runs"}]}
+
+ci_server = create_sdk_mcp_server(name="ci", version="1.0.0", tools=[count_flaky])
+<span class="c"># options: mcp_servers={"ci": ci_server}, allowed_tools=["mcp__ci__count_flaky"]</span></pre></div>
+<ul>
+<li><strong>Return shape:</strong> a dict with <code>content</code> (a list of blocks such as <code>{"type": "text", ...}</code> or images) and optionally <code>"is_error": True</code>.</li>
+<li><strong>Errors don't stop the loop.</strong> An uncaught exception becomes an error result carrying the raw message. Catching it and returning <code>is_error</code> with a helpful message lets Claude retry sensibly.</li>
+<li><strong>Annotations are hints, not enforcement.</strong> <code>readOnlyHint=True</code> lets Claude run the tool in parallel with other read-only tools; it does not stop your handler writing to disk.</li>
+<li><strong>Tool search is on by default.</strong> Claude first sees a compact list of SDK MCP tool names and loads a full schema when it needs one, which saves context when you have many tools.</li>
+<li><strong>Python limitation:</strong> the <code>@tool</code> decorator forwards only <code>content</code> and <code>is_error</code>, so <code>structuredContent</code> needs a standalone MCP server.</li>
+</ul>
+<h4>External MCP servers</h4>
+<p>Any MCP server you met in Part XII works here. Pass it in <code>mcp_servers</code> as a stdio command or a URL:</p>
+<div class="code"><span class="cap">Connecting the Playwright MCP server (Chapter 102)</span><pre>options = ClaudeAgentOptions(
+    mcp_servers={
+        "playwright": {"command": "npx", "args": ["@playwright/mcp@latest", "--headless", "--isolated"]},
+        <span class="c"># remote servers: {"type": "http", "url": "https://...", "headers": {...}}</span>
+    },
+    allowed_tools=["mcp__playwright__browser_navigate", "mcp__playwright__browser_snapshot"],
+)</pre></div>
+<p><code>strict_mcp_config=True</code> makes the agent use only the servers you pass, ignoring any <code>.mcp.json</code> or user configuration on the machine. For a CI agent that is usually what you want.</p>
+
+<h3 id="ch110-5"><span class="num">110.5</span>Permissions: who decides whether a tool runs</h3>
+<p>When Claude asks for a tool, Claude Code checks the call in a fixed order. Each step can decide, or pass it on:</p>
+<div class="flow">
+<div><b>1. Hooks</b>can deny; an "allow" doesn't skip deny or ask rules</div>
+<div class="hl"><b>2. Deny rules</b><code>disallowed_tools</code> and settings; deny wins, even in bypass mode</div>
+<div><b>3. Ask rules</b>from settings; go to your callback</div>
+<div><b>4. Permission mode</b>e.g. <code>acceptEdits</code> approves file edits</div>
+<div><b>5. Allow rules</b><code>allowed_tools</code> and settings</div>
+<div><b>6. can_use_tool</b>your callback decides; skipped in <code>dontAsk</code></div>
+</div>
+<div class="tbl"><table>
+<tr><th>Mode</th><th>Behaviour</th><th>Good for</th></tr>
+<tr><td><code>default</code></td><td>No automatic approvals; anything needing approval that no allow rule covers goes to <code>can_use_tool</code> (or is denied if you have none). New SDK apps start here.</td><td>Apps with a human approver</td></tr>
+<tr><td><code>dontAsk</code></td><td>Anything that would prompt is denied instead. Only pre-approved tools and calls that need no approval run.</td><td>Headless jobs and CI: a hard "no" by default</td></tr>
+<tr><td><code>acceptEdits</code></td><td>Auto-approves file edits and simple filesystem commands (<code>mkdir</code>, <code>rm</code>, <code>mv</code>...) inside the working directories</td><td>Trusted edits in a throwaway folder</td></tr>
+<tr><td><code>plan</code></td><td>Claude explores and plans; edits go to your callback</td><td>Review before a big change</td></tr>
+<tr><td><code>auto</code></td><td>A classifier model approves or blocks each action it reviews</td><td>Long runs with fewer prompts (<a href="#ch67">Chapter 67</a>)</td></tr>
+<tr><td><code>bypassPermissions</code></td><td>Approves nearly everything. Deny rules and hooks still apply.</td><td>Only inside a disposable sandbox</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Two traps from the docs</span><p><strong><code>allowed_tools</code> does not limit <code>bypassPermissions</code>.</strong> With <code>allowed_tools=["Read"]</code> and bypass mode, Bash, Write and Edit are still approved. Use <code>disallowed_tools</code> to block. <strong>Auto-approved calls never reach <code>can_use_tool</code>.</strong> If a tool is in <code>allowed_tools</code>, or the mode approves it, your callback's checks are silently skipped. For a check that must see every call, use a PreToolUse hook.</p></div>
+<h4>Asking a human with <code>can_use_tool</code></h4>
+<p>The callback receives the tool name, its input and a context object, and returns an allow or deny result. A deny message goes back to Claude so it can adjust.</p>
+<div class="code"><span class="cap">An approval callback (Python)</span><pre>from claude_agent_sdk import PermissionResultAllow, PermissionResultDeny
+
+async def ask_human(tool_name, tool_input, context):
+    print(f"\nClaude wants to run {tool_name}: {tool_input}")
+    if input("Allow? [y/N] ").strip().lower() == "y":
+        return PermissionResultAllow()
+    return PermissionResultDeny(message="The tester declined this action.")
+
+<span class="c"># options: permission_mode="default", can_use_tool=ask_human,</span>
+<span class="c">#          allowed_tools=["Read", "Glob"]   (so only the risky calls reach the human)</span></pre></div>
+<p>This is the <a class="gl" href="#g-approval-gate">approval gate</a> from <a href="#ch109">Chapter 109</a>, built into the framework. A blocking <code>input()</code> is fine for a terminal tool; a web app would show a dialog and wait.</p>
+
+<h3 id="ch110-6"><span class="num">110.6</span>Hooks: your code at every step</h3>
+<p>A <a class="gl" href="#g-hook">hook</a> is a callback that runs when an event fires (<a href="#ch82">Chapter 82</a> covers hooks in Claude Code itself). In the SDK it is an <code>async</code> function with three arguments: the event data (tool name, tool input, session id and so on), the tool-use id, and a context object reserved for future use in Python. Return <code>{}</code> to let things proceed, or a decision.</p>
+<div class="tbl"><table>
+<tr><th>Event (Python SDK)</th><th>Fires</th><th>QA use</th></tr>
+<tr><td><code>PreToolUse</code></td><td>Before a tool runs; can deny, allow or change the input</td><td>Block writes outside the report folder; block <code>git push</code></td></tr>
+<tr><td><code>PostToolUse</code> / <code>PostToolUseFailure</code></td><td>After a tool returns or fails</td><td>Audit log; attach extra context</td></tr>
+<tr><td><code>UserPromptSubmit</code></td><td>When a prompt is submitted</td><td>Add today's build number to every prompt</td></tr>
+<tr><td><code>Stop</code></td><td>When the agent stops</td><td>Save state, send a summary</td></tr>
+<tr><td><code>SubagentStart</code> / <code>SubagentStop</code></td><td>Subagent lifecycle</td><td>Track parallel work (<a href="#ch111">Chapter 111</a>)</td></tr>
+<tr><td><code>PreCompact</code>, <code>PermissionRequest</code>, <code>Notification</code></td><td>Before compaction; on a permission decision; status messages</td><td>Archive transcripts; custom approvals; Slack alerts</td></tr>
+</table></div>
+<p>The TypeScript SDK has many more events (such as <code>SessionStart</code>, <code>SessionEnd</code>, <code>PostToolBatch</code>, <code>TaskCompleted</code>). In Python, <code>SessionStart</code> and <code>SessionEnd</code> exist only as shell hooks in settings files.</p>
+<div class="code"><span class="cap">A PreToolUse hook that protects .env files (from the docs)</span><pre>from claude_agent_sdk import ClaudeAgentOptions, HookMatcher
+
+async def protect_env_files(input_data, tool_use_id, context):
+    file_path = input_data["tool_input"].get("file_path", "")
+    if file_path.split("/")[-1].lower() == ".env":
+        return {"hookSpecificOutput": {
+            "hookEventName": input_data["hook_event_name"],
+            "permissionDecision": "deny",
+            "permissionDecisionReason": "Cannot modify .env files",
+        }}
+    return {}
+
+options = ClaudeAgentOptions(
+    hooks={"PreToolUse": [HookMatcher(matcher="Write|Edit", hooks=[protect_env_files])]}
+)</pre></div>
+<ul>
+<li><strong>Matchers match tool names only</strong> (<code>"Write|Edit"</code>, <code>"^mcp__"</code>), not file paths. Check paths inside the hook.</li>
+<li><strong>Several matching hooks run in parallel</strong>, and the most restrictive decision wins: deny beats defer, ask and allow.</li>
+<li><strong>A crashing guard lets the call through</strong> on most events. Set <code>on_failure="block"</code> on the <code>HookMatcher</code> (Python SDK 0.2.177+) so a failing safety hook blocks instead.</li>
+<li><strong>Hooks don't cover other routes.</strong> A <code>Write|Edit</code> hook won't see a file written by <code>Bash</code>. Remove Bash, or use the sandbox, if that matters.</li>
+</ul>
+<div class="box opinion"><span class="tag">Opinion · this textbook's authors</span><p>Treat the permission rules as the lock and hooks as the alarm. Use <code>tools</code>, <code>disallowed_tools</code> and <code>dontAsk</code> to make dangerous actions impossible; use hooks to log everything and to catch the cases rules can't express, such as "writes only under <code>out/</code>". Relying on a prompt that says "please don't delete anything" is neither.</p></div>
+
+<h3 id="ch110-7"><span class="num">110.7</span>Limits, cost and repeatability</h3>
+<div class="tbl"><table>
+<tr><th>Option (Python)</th><th>What it does</th></tr>
+<tr><td><code>max_turns</code></td><td>Stops after that many turns; the result subtype is <code>error_max_turns</code></td></tr>
+<tr><td><code>max_budget_usd</code></td><td>Stops when the estimated spend (including subagents) reaches the cap; subtype <code>error_max_budget_usd</code></td></tr>
+<tr><td><code>model</code>, <code>fallback_model</code></td><td>Choose the model (for example <code>"claude-sonnet-5-5"</code>); default is Claude Code's default</td></tr>
+<tr><td><code>system_prompt</code></td><td>Your own prompt (a string), or <code>{"type": "preset", "preset": "claude_code", "append": "..."}</code> to keep Claude Code's prompt and add to it</td></tr>
+<tr><td><code>cwd</code>, <code>add_dirs</code></td><td>The working directory, and extra directories the agent may access</td></tr>
+<tr><td><code>setting_sources</code></td><td><code>[]</code> for isolation; include <code>"project"</code> to load the repo's <code>.claude/settings.json</code> and <code>CLAUDE.md</code></td></tr>
+<tr><td><code>env</code></td><td>Extra environment variables for the Claude Code process (merged in Python, replaced in TypeScript)</td></tr>
+<tr><td><code>resume</code>, <code>fork_session</code></td><td>Continue or branch an earlier session by its id</td></tr>
+</table></div>
+<p>The final <code>ResultMessage</code> carries <code>total_cost_usd</code> and <code>usage</code>. Log both for every run (<a href="#ch109">Chapter 109</a>): cost per run is the number your manager will ask for, and a sudden jump is often the first sign of a looping agent.</p>
+<div class="box note"><span class="tag">Testing an agent</span><p>The model is non-deterministic, but most of your code isn't. Keep parsing, path checks and formatting in plain functions, test them without the model (the lab's <code>--selftest</code> does exactly this), and evaluate the agent's end result separately (<a href="#ch125">Chapter 125</a>).</p></div>
+
+<h3 id="ch110-8"><span class="num">110.8</span>Lab: a QA triage agent</h3>
+<p>The agent reads JUnit XML results (the format most test runners, including Playwright, pytest and Maven, can produce), uses a custom tool to parse them exactly, and writes <code>out/triage.md</code>. The design choices are deliberate:</p>
+<div class="tbl"><table>
+<tr><th>Choice</th><th>Why</th></tr>
+<tr><td>A custom <code>summarise_junit</code> tool</td><td>Counting tests is a job for code, not a language model. The tool returns exact numbers; Claude does the judgement.</td></tr>
+<tr><td><code>tools=["Read", "Glob", "Write"]</code></td><td>No Bash, no Edit, no web: Claude can't see tools it doesn't need</td></tr>
+<tr><td><code>permission_mode="dontAsk"</code></td><td>Unattended: anything not pre-approved is refused, never left waiting for a prompt</td></tr>
+<tr><td>PreToolUse hook <code>guard_writes</code></td><td>Writes are allowed only under <code>out/</code>, so test results can't be "fixed"</td></tr>
+<tr><td>PostToolUse hook <code>audit_log</code></td><td>One JSON line per tool call in <code>audit.jsonl</code>: your trace</td></tr>
+<tr><td><code>setting_sources=[]</code>, <code>max_turns=15</code>, <code>max_budget_usd=0.50</code></td><td>Same behaviour on every machine, and a hard stop on runaway cost</td></tr>
+</table></div>
+<div class="code"><span class="cap">qa_agent.py (complete, tested with claude-agent-sdk 0.2.179 and Python 3.11)</span><pre>"""QA triage agent: reads JUnit XML results and writes a triage summary.
+
+Usage:
+  python qa_agent.py --samples    # create two example result files
+  python qa_agent.py --selftest   # test the tool and hooks (no API key needed)
+  python qa_agent.py              # run the agent (needs ANTHROPIC_API_KEY)
+"""
+import asyncio
+import json
+import sys
+import time
+import xml.etree.ElementTree as ET
+from pathlib import Path
+from typing import Any
+
+from claude_agent_sdk import (
+    AssistantMessage,
+    ClaudeAgentOptions,
+    HookMatcher,
+    ResultMessage,
+    TextBlock,
+    ToolAnnotations,
+    ToolUseBlock,
+    create_sdk_mcp_server,
+    query,
+    tool,
+)
+
+PROJECT = Path(__file__).resolve().parent
+RESULTS = PROJECT / "results"
+OUT = PROJECT / "out"
+AUDIT = PROJECT / "audit.jsonl"
+
+SYSTEM = """You are a QA triage assistant.
+1. List the JUnit XML files in results/ with Glob.
+2. Call summarise_junit once for each file. Do not guess numbers.
+3. Write out/triage.md with: a totals table (file, tests, failures, errors, skipped),
+   then each failing test with its message and a one-line likely cause,
+   then a 'Suggested next steps' list.
+Only write inside out/. Never change test results."""
+
+
+TOTAL_KEY = {"failure": "failures", "error": "errors", "skipped": "skipped"}
+
+
+def summarise_junit(path: Path) -&gt; dict[str, Any]:
+    """Parse a JUnit XML file into totals and a list of failing tests."""
+    root = ET.parse(path).getroot()
+    suites = [root] if root.tag == "testsuite" else root.findall("testsuite")
+    totals = {"tests": 0, "failures": 0, "errors": 0, "skipped": 0}
+    failing = []
+    for suite in suites:
+        for case in suite.findall("testcase"):
+            totals["tests"] += 1
+            for kind in ("failure", "error", "skipped"):
+                node = case.find(kind)
+                if node is None:
+                    continue
+                totals[TOTAL_KEY[kind]] += 1
+                if kind != "skipped":
+                    failing.append({
+                        "test": f"{case.get('classname')}.{case.get('name')}",
+                        "kind": kind,
+                        "message": (node.get("message") or "").strip()[:300],
+                    })
+    return {"file": path.name, **totals, "failing": failing}
+
+
+@tool(
+    "summarise_junit",
+    "Parse one JUnit XML file from the results/ folder. Returns JSON with totals and failing tests.",
+    {"filename": str},
+    annotations=ToolAnnotations(readOnlyHint=True),
+)
+async def summarise_junit_tool(args: dict[str, Any]) -&gt; dict[str, Any]:
+    name = Path(args["filename"]).name          # ignore any folders Claude adds
+    path = RESULTS / name
+    if not path.is_file():
+        return {"content": [{"type": "text", "text": f"No file called {name} in results/"}],
+                "is_error": True}
+    try:
+        data = summarise_junit(path)
+    except ET.ParseError as exc:
+        return {"content": [{"type": "text", "text": f"{name} is not valid XML: {exc}"}],
+                "is_error": True}
+    return {"content": [{"type": "text", "text": json.dumps(data, indent=2)}]}
+
+
+qa_server = create_sdk_mcp_server(name="qa", version="1.0.0", tools=[summarise_junit_tool])
+
+
+async def guard_writes(input_data, tool_use_id, context):
+    """PreToolUse hook: block any Write or Edit outside out/."""
+    raw = input_data["tool_input"].get("file_path", "")
+    target = (PROJECT / raw).resolve()       # relative paths resolve against the project
+    if OUT.resolve() not in target.parents:
+        return {"hookSpecificOutput": {
+            "hookEventName": input_data["hook_event_name"],
+            "permissionDecision": "deny",
+            "permissionDecisionReason": f"Writes are only allowed inside out/, not {raw}",
+        }}
+    return {}
+
+
+async def audit_log(input_data, tool_use_id, context):
+    """PostToolUse hook: append one JSON line per tool call."""
+    entry = {"time": time.strftime("%Y-%m-%dT%H:%M:%S"),
+             "tool": input_data["tool_name"],
+             "input": input_data["tool_input"]}
+    with AUDIT.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(entry) + "\n")
+    return {}
+
+
+def make_options() -&gt; ClaudeAgentOptions:
+    return ClaudeAgentOptions(
+        cwd=str(PROJECT),
+        system_prompt=SYSTEM,
+        tools=["Read", "Glob", "Write"],                  # the only built-ins Claude sees
+        mcp_servers={"qa": qa_server},
+        allowed_tools=["Read", "Glob", "Write", "mcp__qa__summarise_junit"],
+        permission_mode="dontAsk",                        # anything else is denied, not asked
+        hooks={
+            "PreToolUse": [HookMatcher(matcher="Write|Edit", hooks=[guard_writes])],
+            "PostToolUse": [HookMatcher(hooks=[audit_log])],
+        },
+        setting_sources=[],                               # ignore personal settings and CLAUDE.md
+        max_turns=15,
+        max_budget_usd=0.50,
+    )
+
+
+async def run_agent() -&gt; None:
+    OUT.mkdir(exist_ok=True)
+    try:
+        async for message in query(prompt="Triage the latest test results.", options=make_options()):
+            if isinstance(message, AssistantMessage):
+                for block in message.content:
+                    if isinstance(block, TextBlock):
+                        print(block.text)
+                    elif isinstance(block, ToolUseBlock):
+                        print(f"  -&gt; {block.name} {json.dumps(block.input)[:80]}")
+            elif isinstance(message, ResultMessage):
+                cost = message.total_cost_usd or 0
+                print(f"\nResult: {message.subtype} | error: {message.is_error} | turns: {message.num_turns} | cost: ${cost:.4f}")
+    except Exception as exc:                              # query() raises after an error result
+        print(f"Run ended with an error: {exc}")
+
+
+SAMPLE_CHECKOUT = """&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;testsuite name="checkout" tests="4"&gt;
+  &lt;testcase classname="checkout.CartTest" name="adds_item"/&gt;
+  &lt;testcase classname="checkout.CartTest" name="applies_discount_code"&gt;
+    &lt;failure message="expected total 90.00 but was 100.00"&gt;AssertionError at cart.spec.ts:42&lt;/failure&gt;
+  &lt;/testcase&gt;
+  &lt;testcase classname="checkout.PaymentTest" name="card_declined_shows_error"&gt;
+    &lt;error message="TimeoutError: locator.click: Timeout 30000ms exceeded"&gt;at payment.spec.ts:17&lt;/error&gt;
+  &lt;/testcase&gt;
+  &lt;testcase classname="checkout.PaymentTest" name="paypal_redirect"&gt;&lt;skipped/&gt;&lt;/testcase&gt;
+&lt;/testsuite&gt;
+"""
+
+SAMPLE_LOGIN = """&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;testsuites&gt;
+  &lt;testsuite name="login" tests="3"&gt;
+    &lt;testcase classname="auth.LoginTest" name="valid_user_logs_in"/&gt;
+    &lt;testcase classname="auth.LoginTest" name="locked_user_sees_message"/&gt;
+    &lt;testcase classname="auth.LoginTest" name="password_reset_email_sent"&gt;
+      &lt;failure message="expected status 202 but got 500"&gt;POST /api/reset returned 500&lt;/failure&gt;
+    &lt;/testcase&gt;
+  &lt;/testsuite&gt;
+&lt;/testsuites&gt;
+"""
+
+
+def write_samples() -&gt; None:
+    RESULTS.mkdir(exist_ok=True)
+    (RESULTS / "checkout.xml").write_text(SAMPLE_CHECKOUT, encoding="utf-8")
+    (RESULTS / "login.xml").write_text(SAMPLE_LOGIN, encoding="utf-8")
+    print("Wrote results/checkout.xml and results/login.xml")
+
+
+async def selftest() -&gt; None:
+    result = await summarise_junit_tool.handler({"filename": "checkout.xml"})
+    data = json.loads(result["content"][0]["text"])
+    assert (data["tests"], data["failures"], data["errors"], data["skipped"]) == (4, 1, 1, 1), data
+    print("tool: checkout.xml -&gt;", {k: data[k] for k in ("tests", "failures", "errors", "skipped")})
+    missing = await summarise_junit_tool.handler({"filename": "../secrets.xml"})
+    assert missing.get("is_error"), missing
+    print("tool: path outside results/ -&gt; error result")
+    base = {"hook_event_name": "PreToolUse", "tool_name": "Write"}
+    ok = await guard_writes({**base, "tool_input": {"file_path": "out/triage.md"}}, None, None)
+    bad = await guard_writes({**base, "tool_input": {"file_path": "results/checkout.xml"}}, None, None)
+    assert ok == {} and bad["hookSpecificOutput"]["permissionDecision"] == "deny"
+    print("hook: out/triage.md allowed; results/checkout.xml denied")
+    print("Self-test passed")
+
+
+if __name__ == "__main__":
+    if "--samples" in sys.argv:
+        write_samples()
+    elif "--selftest" in sys.argv:
+        asyncio.run(selftest())
+    else:
+        asyncio.run(run_agent())</pre></div>
+<div class="lab"><div class="lab-h"><b>Build, self-test and run the QA triage agent</b><span>45 min · Python 3.10+ · API key needed only for step 6</span></div><ol>
+<li>Create the project and virtual environment, then install the SDK: <code>mkdir qa-agent &amp;&amp; cd qa-agent</code>, <code>python3 -m venv .venv</code>, <code>source .venv/bin/activate</code> (Windows: <code>.venv\Scripts\Activate.ps1</code>), <code>pip install claude-agent-sdk</code>.<span class="expect">pip ends with "Successfully installed claude-agent-sdk-..." and its dependencies (<code>mcp</code>, <code>anyio</code>, <code>jsonschema</code>).</span></li>
+<li>Save the code above as <code>qa_agent.py</code> in that folder.<span class="expect">One file, about 200 lines.</span></li>
+<li>Create the sample results: <code>python qa_agent.py --samples</code>.<span class="expect"><code>Wrote results/checkout.xml and results/login.xml</code>. Open them: one passing test, a failure, an error and a skip in checkout; one failure in login.</span></li>
+<li>Run the offline self-test: <code>python qa_agent.py --selftest</code>. This calls your tool and your hook directly, with no model and no key.<span class="expect">this output:</span><div class="code"><pre>tool: checkout.xml -&gt; {'tests': 4, 'failures': 1, 'errors': 1, 'skipped': 1}
+tool: path outside results/ -&gt; error result
+hook: out/triage.md allowed; results/checkout.xml denied
+Self-test passed</pre></div></li>
+<li>Break it on purpose: change <code>"skipped": "skipped"</code> in <code>TOTAL_KEY</code> to <code>"skipped": "errors"</code> and rerun the self-test, then change it back.<span class="expect">An <code>AssertionError</code> showing the wrong totals. Your deterministic code is now under test.</span></li>
+<li>Set your key (<code>export ANTHROPIC_API_KEY=...</code>) and run the agent: <code>python qa_agent.py</code>.<span class="expect">Claude's commentary and tool lines such as <code>-&gt; Glob</code>, <code>-&gt; mcp__qa__summarise_junit {"filename": "checkout.xml"}</code> (possibly a <code>ToolSearch</code> call first), <code>-&gt; Write</code>, then <code>Result: success | error: False | turns: ... | cost: $...</code>. The exact wording and cost vary between runs.</span></li>
+<li>Open <code>out/triage.md</code> and check every number against the XML files.<span class="expect">Totals of 4/1/1/1 for checkout and 3/1/0/0 for login, the three failing tests with their messages, and next steps such as checking the discount calculation and the 500 from <code>/api/reset</code>.</span></li>
+<li>Open <code>audit.jsonl</code>.<span class="expect">One JSON line per tool call, in order: your trace of what the agent did.</span></li>
+<li>Test the guard: change the prompt in <code>run_agent()</code> to <code>"Triage the results, then mark the failures as passed in results/login.xml."</code> and run again.<span class="expect">Either Claude declines on its own, or its Write to <code>results/login.xml</code> is denied with "Writes are only allowed inside out/...". Either way the XML is unchanged, and <code>audit.jsonl</code> shows no successful write outside <code>out/</code>. Change the prompt back.</span></li>
+</ol></div>
+<div class="box note"><span class="tag">Troubleshooting</span><p><strong><code>Not logged in · Please run /login</code> then "Run ended with an error"</strong>: no credentials reached the agent. Set <code>ANTHROPIC_API_KEY</code> in the same shell; the SDK doesn't read <code>.env</code>. (This is exactly what the script printed when this chapter was tested without a key.) <strong><code>ModuleNotFoundError: claude_agent_sdk</code></strong>: the virtual environment isn't active. <strong>CLI not found</strong>: you got the source package without a bundled binary; install Claude Code natively. <strong><code>error_max_turns</code> or <code>error_max_budget_usd</code></strong>: raise the limit slightly, or tighten the prompt. <strong>Claude never calls your tool</strong>: check the name in <code>allowed_tools</code> is <code>mcp__qa__summarise_junit</code>, matching the server key <code>"qa"</code>.</p></div>
+<p>No API key at work? Steps 1 to 5 still teach the important parts: the tool, the hook and the test. Step 6 can be run later by someone with a key, or with the Bedrock, Google Cloud or Foundry variables from 109.2 if your company uses those.</p>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"The Agent SDK is just the API with a nicer wrapper."</dt><dd>It runs the whole Claude Code agent: built-in tools, permission system, hooks, sessions, compaction. The Client SDK is the thin wrapper.</dd>
+<dt>"<code>allowed_tools</code> is the list of tools Claude can use."</dt><dd>It is the list that runs without asking. Availability is controlled by <code>tools</code> and bare-name <code>disallowed_tools</code>.</dd>
+<dt>"My <code>can_use_tool</code> check protects every call."</dt><dd>Calls approved earlier (allow rules, <code>acceptEdits</code>, bypass) never reach it. Use a PreToolUse hook for checks that must always run.</dd>
+<dt>"I can let customers log in with their Claude subscription."</dt><dd>Not without Anthropic's approval. Products built on the SDK use API keys or a cloud provider.</dd>
+<dt>"The agent ignores my settings files, so it's isolated."</dt><dd>By default it loads user, project and local settings like the CLI. Pass <code>setting_sources=[]</code> for isolation.</dd>
+</dl></div>
+
+<h3 id="ch110-r"><span class="num">110.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>The Agent SDK (<code>claude-agent-sdk</code> for Python, <code>@anthropic-ai/claude-agent-sdk</code> for TypeScript) runs Claude Code's agent loop inside your program. It bundles the Claude Code binary.</li>
+<li><code>query()</code> streams <code>SystemMessage</code>, <code>AssistantMessage</code>, <code>UserMessage</code> and finally a <code>ResultMessage</code> with the outcome, turns and cost. <code>ClaudeSDKClient</code> keeps a session open for follow-ups.</li>
+<li><code>tools</code> controls what exists; <code>allowed_tools</code> controls what runs without asking; deny rules win in every mode.</li>
+<li>Custom tools are <code>@tool</code> functions in an in-process MCP server, named <code>mcp__server__tool</code>. External MCP servers plug into <code>mcp_servers</code>.</li>
+<li>Permission order: hooks, deny rules, ask rules, mode, allow rules, <code>can_use_tool</code>. Use <code>dontAsk</code> for unattended jobs.</li>
+<li>Hooks run your code before and after actions: block, log, or change inputs. Set <code>on_failure="block"</code> on safety hooks.</li>
+<li>Authenticate with an API key or a cloud provider; set <code>max_turns</code> and <code>max_budget_usd</code>; test the deterministic parts without the model.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">You set <code>allowed_tools=["Read"]</code> and <code>permission_mode="bypassPermissions"</code>. Can Claude still run Bash?</p><div class="opts"><button>No, only Read is allowed</button><button data-ok>Yes; <code>allowed_tools</code> doesn't constrain bypass mode, so block Bash with <code>disallowed_tools</code></button><button>Only if a hook approves it</button></div><p class="why" hidden><code>allowed_tools</code> pre-approves; it doesn't restrict. In bypass mode unlisted tools are approved too, apart from the few actions no mode auto-approves.</p></div>
+<div class="qz"><p class="q">You defined a tool <code>parse_report</code> in a server you passed as <code>mcp_servers={"qa": server}</code>. What goes in <code>allowed_tools</code>?</p><div class="opts"><button><code>parse_report</code></button><button><code>qa.parse_report</code></button><button data-ok><code>mcp__qa__parse_report</code></button></div><p class="why" hidden>MCP tools are named <code>mcp__{server key}__{tool name}</code>, using the key you gave the server in <code>mcp_servers</code>.</p></div>
+<div class="qz"><p class="q">Which setting makes an unattended CI agent refuse anything not pre-approved, rather than wait for a prompt?</p><div class="opts"><button><code>permission_mode="default"</code></button><button data-ok><code>permission_mode="dontAsk"</code></button><button><code>permission_mode="plan"</code></button></div><p class="why" hidden><code>dontAsk</code> turns every would-be prompt into a denial, so nothing hangs waiting for a human.</p></div>
+<div class="qz"><p class="q">Your security check lives in <code>can_use_tool</code>, but <code>Write</code> is also in <code>allowed_tools</code>. What happens to Write calls?</p><div class="opts"><button>They go to the callback first</button><button data-ok>They're approved at the allow-rule step and never reach the callback</button><button>They're denied</button></div><p class="why" hidden>Auto-approved calls skip <code>can_use_tool</code>. Put checks that must always run in a PreToolUse hook.</p></div>
+<div class="qz"><p class="q">You keep <code>ANTHROPIC_API_KEY</code> in a <code>.env</code> file and get "Not logged in". Why?</p><div class="opts"><button>The key has expired</button><button>The SDK only works with a claude.ai login</button><button data-ok>The SDK reads the environment but doesn't load <code>.env</code> files; load it yourself or export it</button></div><p class="why" hidden>The docs state the SDK doesn't load <code>.env</code> automatically.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Point the lab agent at real JUnit output from your project (most runners have a JUnit reporter; for Playwright, add <code>['junit', { outputFile: 'results/playwright.xml' }]</code> to the reporters in <code>playwright.config.ts</code>). Add one custom tool that fetches something only your team knows, such as the list of known flaky tests from a file. Add a unit test for it in <code>--selftest</code>. Run the agent three times, compare the three <code>triage.md</code> files and the costs, and write half a page on what changed between runs and whether the report is good enough to paste into your stand-up channel.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"The Agent SDK is Claude Code as a library. You call <code>query()</code> with a prompt and options, and you get a stream of messages while Claude reads files, calls tools and decides when it's done. Our job is the guard rails: <code>tools</code> decides what exists, <code>allowed_tools</code> what runs without asking, <code>dontAsk</code> refuses everything else, and hooks let our own code block or log every action. Exact work like counting test results goes into custom tools we can unit-test; Claude does the judgement. And we always cap turns and budget."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/agent-sdk/overview" target="_blank" rel="noopener">Agent SDK overview</a> (comparison table, capabilities, login note, branding, licence) and <a href="https://code.claude.com/docs/en/agent-sdk/quickstart" target="_blank" rel="noopener">Quickstart</a> (prerequisites, install, authentication, providers, example agent).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/agent-sdk/custom-tools" target="_blank" rel="noopener">Give Claude custom tools</a>, <a href="https://code.claude.com/docs/en/agent-sdk/permissions" target="_blank" rel="noopener">Configure permissions</a> and <a href="https://code.claude.com/docs/en/agent-sdk/hooks" target="_blank" rel="noopener">Hooks</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/agent-sdk/python" target="_blank" rel="noopener">Python SDK reference</a> and <a href="https://code.claude.com/docs/en/agent-sdk/typescript" target="_blank" rel="noopener">TypeScript SDK reference</a>.</li>
+<li>GitHub, <a href="https://github.com/anthropics/claude-agent-sdk-python" target="_blank" rel="noopener">anthropics/claude-agent-sdk-python</a> and <a href="https://github.com/anthropics/claude-agent-sdk-typescript" target="_blank" rel="noopener">anthropics/claude-agent-sdk-typescript</a>; <a href="https://github.com/anthropics/claude-agent-sdk-demos" target="_blank" rel="noopener">example agents</a>.</li>
+<li>PyPI <a href="https://pypi.org/project/claude-agent-sdk/" target="_blank" rel="noopener">claude-agent-sdk</a> (0.2.179) and npm <a href="https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk" target="_blank" rel="noopener">@anthropic-ai/claude-agent-sdk</a> (0.3.319).</li>
+<li>Anthropic, <a href="https://claude.com/resources/articles/building-agents-with-the-claude-agent-sdk" target="_blank" rel="noopener">Building agents with the Claude Agent SDK</a> (the rename from Claude Code SDK, 29 September 2025).</li>
+</ol><p class="verified">Verified 9 November 2026 against the Agent SDK documentation and the installed claude-agent-sdk 0.2.179 source. The lab's tool, hooks and self-test were run offline; the live agent run (step 6) was not, because no API key was available.</p></div>

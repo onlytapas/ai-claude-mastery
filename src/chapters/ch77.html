@@ -1,0 +1,257 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>The two memory systems in Claude Code: <a class="gl" href="#g-claude-md">CLAUDE.md</a> files you write, and <a class="gl" href="#g-auto-memory">auto memory</a> Claude writes</li>
+<li>Every place a CLAUDE.md can live, the order they load in, and what happens when they disagree</li>
+<li>How to split instructions with <code>@</code> imports and <code>.claude/rules/</code>, including rules that load only for certain files</li>
+<li>What <a class="gl" href="#g-claude-local-md">CLAUDE.local.md</a> is for, and how Claude Code treats an existing <a class="gl" href="#g-agents-md">AGENTS.md</a></li>
+<li>How to inspect and edit everything with <code>/memory</code>, <code>/context all</code> and <code>/init</code></li>
+<li>How to write a CLAUDE.md that Claude actually follows, with a complete example for a QA repository, and the anti-patterns to avoid</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch65">Chapter 65</a> (your first session), <a href="#ch66">Chapter 66</a> (what goes into the context) and <a href="#ch68">Chapter 68</a> (context, compaction and sessions). <a href="#ch61">Chapter 61</a> helps with the Git parts. You need Claude Code installed and signed in. This chapter was checked against Claude Code 2.1.319.</div>
+
+<div class="bigidea"><p>Every Claude Code session starts with a fresh, empty memory of the conversation. Two mechanisms carry knowledge from one session to the next. <strong>CLAUDE.md</strong> files are plain Markdown instructions that you (and your team) write: build commands, conventions, "always do this" rules. <strong>Auto memory</strong> is a set of notes Claude writes for itself as it learns your preferences and corrections. Both are loaded at the start of every session as context, which means Claude reads them and tries to follow them, but nothing forces it to. Short, specific, consistent instructions get followed; long, vague or contradictory ones don't. Anything that must be enforced belongs in settings or hooks instead.</p></div>
+
+<h3 id="ch77-1"><span class="num">77.1</span>Why Claude Code needs memory files</h3>
+<p>Claude doesn't remember yesterday's session unless you resume it (<a href="#ch68">Chapter 68</a>). Without memory files you would start every session the same way: "We use Playwright with TypeScript. Tests go in <code>tests/e2e</code>. Use <code>data-testid</code> selectors. Run <code>npm run test:smoke</code> before you finish." A CLAUDE.md file is where you write that down once.</p>
+<div class="tbl"><table>
+<tr><th></th><th>CLAUDE.md files</th><th>Auto memory</th></tr>
+<tr><td>Who writes it</td><td>You and your team</td><td>Claude</td></tr>
+<tr><td>What it contains</td><td>Instructions and rules</td><td>Learnings: your preferences, corrections, project context it can't work out from the code</td></tr>
+<tr><td>Scope</td><td>Organisation, user, project or local</td><td>One per git repository, on your machine only</td></tr>
+<tr><td>How much loads</td><td>The whole file (files over 4 MiB are skipped)</td><td>The first 200 lines or 25KB of its index, <code>MEMORY.md</code></td></tr>
+<tr><td>Shared with the team?</td><td>Yes, if committed to Git</td><td>No</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A new contractor joins your QA team for a day at a time, and every morning they've forgotten everything. CLAUDE.md is the one-page briefing sheet you hand them at the door: how to run the tests, where things live, the house rules. Auto memory is the contractor's own notebook, where they jot down "Asha prefers bullet-point bug reports" and "staging is down on Fridays". The briefing sheet is yours to write and the whole team uses it. The notebook belongs to the contractor, but you're allowed to read it and cross things out.</p></div>
+<div class="box note"><span class="tag">Not the same as memory in the Claude apps</span><p>The Claude apps on the web, desktop and mobile have their own memory and personalisation features, covered in <a href="#ch50">Chapter 50</a>. This chapter is about Claude Code's files on your computer. They're separate systems.</p></div>
+<div class="box warn"><span class="tag">Context, not enforcement</span><p>CLAUDE.md is delivered to Claude as context, not as configuration. Writing "never edit files in <code>src/</code>" makes that unlikely, not impossible. To block an action whatever Claude decides, use a permission deny rule (<a href="#ch78">Chapter 78</a>) or a hook (<a href="#ch82">Chapter 82</a>). Permissions are enforced by Claude Code itself, and CLAUDE.md text can't grant or remove access.</p></div>
+
+<h3 id="ch77-2"><span class="num">77.2</span>Where CLAUDE.md files live, and the order they load</h3>
+<p>There are four scopes, listed here from broadest to most specific. This is also the order they're loaded, so a project instruction appears in context after a user instruction:</p>
+<div class="tbl"><table>
+<tr><th>Scope</th><th>Location</th><th>Who it's for</th><th>Commit to Git?</th></tr>
+<tr><td><b>Managed policy</b></td><td>macOS <code>/Library/Application Support/ClaudeCode/CLAUDE.md</code><br>Linux and WSL <code>/etc/claude-code/CLAUDE.md</code><br>Windows <code>C:\Program Files\ClaudeCode\CLAUDE.md</code></td><td>Everyone in an organisation; deployed by IT</td><td>No: IT installs it</td></tr>
+<tr><td><b>User</b></td><td><code>~/.claude/CLAUDE.md</code></td><td>You, in every project</td><td>No</td></tr>
+<tr><td><b>Project</b></td><td><code>./CLAUDE.md</code> or <code>./.claude/CLAUDE.md</code></td><td>Everyone working on the project</td><td>Yes</td></tr>
+<tr><td><b>Local</b></td><td><code>./CLAUDE.local.md</code></td><td>You, in this project only</td><td>No: add it to <code>.gitignore</code></td></tr>
+</table></div>
+<h4>Walking up and down the folder tree</h4>
+<p>When you start <code>claude</code> in a folder, Claude Code looks in that folder <strong>and every folder above it</strong>, and loads every CLAUDE.md and CLAUDE.local.md it finds. Start it in <code>shop/tests/</code> and it loads <code>shop/CLAUDE.md</code> and <code>shop/tests/CLAUDE.md</code>.</p>
+<p>CLAUDE.md files in folders <strong>below</strong> where you started aren't loaded at launch. Each one loads on demand, the first time Claude reads or edits a file in that folder.</p>
+<div class="flow"><div><b>Managed</b>Organisation policy, if any</div><div><b>User</b><code>~/.claude/CLAUDE.md</code></div><div><b>Project, top down</b>Each folder from the root down to where you started: CLAUDE.md, then CLAUDE.local.md</div><div class="hl"><b>Launch complete</b>All of the above are in context together</div><div><b>On demand</b>Subfolder CLAUDE.md files, as Claude works there</div></div>
+<h4>"Precedence": they add up, they don't override</h4>
+<p>This surprises people used to settings files. CLAUDE.md files are <strong>concatenated</strong>: joined end to end, with nothing replaced. All of them go into the context, ordered from the top of the folder tree down to your working folder, with <code>CLAUDE.local.md</code> added after <code>CLAUDE.md</code> at each level. So instructions closer to where you started, and your personal notes, are the last things Claude reads.</p>
+<p>Being read last is not the same as winning. If two files contradict each other ("use npm" in one, "use pnpm" in another), Claude may pick either one. The fix is not to rely on order, but to remove the contradiction.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>Your company's managed CLAUDE.md says "Never paste customer data into prompts or files." Your user file says "Answer in British English, keep summaries short." The checkout team's project CLAUDE.md lists the Playwright commands and selector conventions. Your CLAUDE.local.md says "My test environment is https://qa3.shop.internal and my test user is qa.asha." When you start Claude Code in the checkout repository, all four are loaded together, and none of them cancels another.</p></div>
+<details class="deep"><summary>Under the hood: how CLAUDE.md reaches the model</summary><div class="body">
+<p>According to the Claude Code documentation, CLAUDE.md content is delivered as a user message after the system prompt, not as part of the system prompt itself. That's one reason it guides rather than commands. If you really need text at system-prompt level, for example in a script, the documented route is the <code>--append-system-prompt</code> flag at launch (<a href="#ch75">Chapter 75</a>).</p>
+<p>A few details that matter in practice:</p>
+<ul>
+<li>Block-level HTML comments (<code>&lt;!-- note for maintainers --&gt;</code>) are stripped before the content reaches Claude, so you can leave notes for humans without spending tokens.</li>
+<li>After <code>/compact</code>, the project-root CLAUDE.md is re-read from disk and injected again. Subfolder CLAUDE.md files and path-scoped rules load again on demand. Anything you said only in conversation may be lost in the summary, which is a good reason to move it into CLAUDE.md.</li>
+<li><code>claude --bare</code> skips CLAUDE.md discovery and auto memory altogether, which is useful in CI where you want a predictable run.</li>
+<li>In a monorepo where another team's CLAUDE.md gets picked up, the <code>claudeMdExcludes</code> setting skips specific files by path or glob. It can't exclude the managed file.</li>
+<li>The <code>InstructionsLoaded</code> hook event (<a href="#ch82">Chapter 82</a>) can log which files loaded and why, which helps when debugging rules that load on demand.</li>
+</ul>
+</div></details>
+
+<h3 id="ch77-3"><span class="num">77.3</span>Imports and the rules folder</h3>
+<h4>Imports with @</h4>
+<p>A CLAUDE.md can pull in other files by writing <code>@</code> followed by a path, anywhere in the text:</p>
+<div class="code"><span class="cap">CLAUDE.md</span><pre>See @README.md for the project overview and @package.json for the npm scripts.
+
+# Additional instructions
+- Bug report format: @docs/bug-report-template.md</pre></div>
+<p>The rules:</p>
+<ul>
+<li>Relative paths resolve from the file that contains the import, not from where you started Claude.</li>
+<li>Absolute paths and <code>~/</code> (home) paths are allowed.</li>
+<li>Imported files can import others, up to a maximum depth of <strong>four hops</strong>.</li>
+<li>Imports inside code spans and code blocks are ignored, so writing <code>`@README.md`</code> in backticks mentions the file without importing it.</li>
+<li>Escape spaces in a path with a backslash: <code>@Design\ Docs/api.md</code>.</li>
+<li>The first time a project file imports something outside the working folder (such as <code>@~/.claude/my-notes.md</code>), Claude Code shows a one-time approval dialog. That protects you from files someone else committed.</li>
+</ul>
+<div class="box note"><span class="tag">Imports organise; they don't shrink</span><p>An imported file loads together with the CLAUDE.md that imports it. Splitting a long file into imports makes it easier to maintain, but costs exactly the same context. To load something only when it's needed, use a path-scoped rule (below) or a skill (<a href="#ch80">Chapter 80</a>).</p></div>
+<h4>The .claude/rules/ folder</h4>
+<p>For bigger projects, put one topic per file in <code>.claude/rules/</code>. Every <code>.md</code> file in it (including subfolders) loads like <code>.claude/CLAUDE.md</code>. Personal rules for all your projects can go in <code>~/.claude/rules/</code>.</p>
+<div class="code"><span class="cap">Project layout</span><pre>checkout-tests/
+├── CLAUDE.md
+├── CLAUDE.local.md          <span class="c"># personal, gitignored</span>
+└── .claude/
+    └── rules/
+        ├── test-style.md
+        ├── bug-reports.md
+        └── api-tests.md     <span class="c"># path-scoped, see below</span></pre></div>
+<h4>Path-scoped rules: only when relevant</h4>
+<p>A rule file can start with <code>paths</code> frontmatter: a short block between <code>---</code> lines listing file patterns. Then it loads only when Claude works with matching files, which keeps it out of the context the rest of the time. This is a <a class="gl" href="#g-path-scoped-rule">path-scoped rule</a>.</p>
+<div class="code"><span class="cap">.claude/rules/api-tests.md</span><pre>---
+paths:
+  - "tests/api/**/*.ts"
+---
+# API test rules
+- Assert on the status code AND the response body schema, never status alone
+- Read the base URL from process.env.API_BASE_URL; never hard-code hosts
+- Every negative test names the error code it expects (e.g. 422 VALIDATION_ERROR)</pre></div>
+<p><code>**</code> means "any number of folders", so this rule loads when Claude reads or edits any <code>.ts</code> file anywhere under <code>tests/api/</code>, and not when it's working on UI tests.</p>
+
+<h3 id="ch77-4"><span class="num">77.4</span>CLAUDE.local.md and AGENTS.md</h3>
+<h4>CLAUDE.local.md: personal, per project</h4>
+<p><code>CLAUDE.local.md</code> sits at the project root next to CLAUDE.md, loads with it, and is treated the same way. It's for things that are true for you but not for the team: your sandbox URL, your preferred test data, "explain Git commands before running them, I'm still learning". It's still documented and supported. Add it to <code>.gitignore</code> so it's never committed. (With the environment variable <code>CLAUDE_CODE_NEW_INIT=1</code> set, <code>/init</code>'s personal option creates the file and gitignores it for you.)</p>
+<div class="box warn"><span class="tag">Personal doesn't mean secret</span><p>Don't put passwords, tokens or API keys in CLAUDE.local.md either. It's a plain text file that goes into the model's context. Point to an environment variable instead: "the test user's password is in <code>$QA_USER_PASSWORD</code>" (<a href="#ch98">Chapter 98</a>).</p></div>
+<h4>AGENTS.md: the file other coding tools use</h4>
+<p>Many repositories already contain an <code>AGENTS.md</code>, an instructions file read by several other AI coding agents. From version 2.1.277, Claude Code reads it directly when there's no CLAUDE.md:</p>
+<div class="tbl"><table>
+<tr><th>Your repository has</th><th>Claude Code reads (by default)</th></tr>
+<tr><td>An AGENTS.md, and no CLAUDE.md or CLAUDE.local.md in your folder or above it</td><td>The AGENTS.md</td></tr>
+<tr><td>Both an AGENTS.md and a CLAUDE.md (or CLAUDE.local.md)</td><td>Only the CLAUDE.md files</td></tr>
+<tr><td>A CLAUDE.md that imports AGENTS.md with <code>@AGENTS.md</code></td><td>Both, through the import</td></tr>
+</table></div>
+<p>Your <code>~/.claude/CLAUDE.md</code>, the managed file and <code>.claude/rules/</code> don't count for this check; they load alongside AGENTS.md. The default can be changed in <code>/config</code> under <strong>Project instructions</strong>. If you want one shared file for every tool plus some Claude-only extras, the import pattern keeps both:</p>
+<div class="code"><span class="cap">CLAUDE.md</span><pre>@AGENTS.md
+
+## Claude Code only
+Use plan mode before changing anything under tests/fixtures/.</pre></div>
+<div class="box warn"><span class="tag">A trap</span><p>Because CLAUDE.local.md counts as "a CLAUDE.md" for this check, creating one in a project that relies on AGENTS.md stops Claude from reading the AGENTS.md. Either import AGENTS.md from a CLAUDE.md, or change the Project instructions setting to read both.</p></div>
+
+<h3 id="ch77-5"><span class="num">77.5</span>Tools: /init, /memory and /context</h3>
+<div class="tbl"><table>
+<tr><th>Command</th><th>What it does</th><th>When to use it</th></tr>
+<tr><td><code>/init</code></td><td>Analyses the codebase and writes a starter CLAUDE.md with the build and test commands and conventions it finds. If one exists, it suggests improvements instead of overwriting. <code>CLAUDE_CODE_NEW_INIT=1</code> gives an interactive flow.</td><td>The first time you use Claude Code in a repository</td></tr>
+<tr><td><code>/memory</code></td><td>Lists your CLAUDE.md, CLAUDE.local.md and other memory files at user and project level and opens one in your editor (creating it if missing). Also toggles auto memory on or off and opens the auto memory folder.</td><td>Editing instructions; checking what Claude has saved</td></tr>
+<tr><td><code>/context all</code></td><td>Shows what's using the context window. The <strong>Memory files</strong> list shows which CLAUDE.md files loaded at launch.</td><td>"Is my file being read at all?"</td></tr>
+<tr><td><code>/doctor</code></td><td>A setup checkup that includes CLAUDE.md; <code>/doctor prompt-audit</code> looks for outdated or contradictory instructions and proposes edits.</td><td>Periodic tidy-ups</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Changed in newer versions</span><p>Older tutorials say that starting a message with <code>#</code> saves it to memory. That shortcut was removed in version 2.0.70. Ask Claude ("add this to CLAUDE.md") or edit the file through <code>/memory</code>.</p></div>
+
+<h3 id="ch77-6"><span class="num">77.6</span>Auto memory: notes Claude keeps for itself</h3>
+<p>As it works, Claude saves notes that will be useful in future sessions. It doesn't save something every session; it decides what's worth keeping. Each note has one of four types:</p>
+<div class="tbl"><table>
+<tr><th>Type</th><th>What it records</th><th>QA example</th></tr>
+<tr><td><code>user</code></td><td>Your role, expertise and working preferences</td><td>"Asha is a QA engineer, new to TypeScript; explain type errors"</td></tr>
+<tr><td><code>feedback</code></td><td>Corrections you give and approaches you confirm</td><td>"Don't use waitForTimeout; use web-first assertions"</td></tr>
+<tr><td><code>project</code></td><td>Ongoing work, deadlines and decisions it can't learn from the code</td><td>"Release 4.2 code freeze is Thursday; only P1 fixes"</td></tr>
+<tr><td><code>reference</code></td><td>Where to find information outside the project</td><td>"Flaky-test dashboard is the CI 'Insights' tab"</td></tr>
+</table></div>
+<p>Where it lives and how it loads:</p>
+<ul>
+<li>Folder: <code>~/.claude/projects/&lt;project&gt;/memory/</code>. There's one per Git repository, shared across its worktrees, and it stays on your machine (it isn't shared with colleagues or other computers).</li>
+<li>It contains <code>MEMORY.md</code>, an index with one line per memory, plus a topic file for each memory.</li>
+<li>The first <strong>200 lines or 25KB</strong> of <code>MEMORY.md</code> (whichever comes first) load at the start of each session. Topic files are read only when needed.</li>
+<li>When you say "remember that…", Claude saves it to auto memory. To put it in CLAUDE.md instead, say so explicitly ("add this to CLAUDE.md") or edit the file via <code>/memory</code>.</li>
+</ul>
+<p>Auto memory is on by default in local sessions. To turn it off: use the toggle in <code>/memory</code>, set <code>"autoMemoryEnabled": false</code> in a settings file, or set the environment variable <code>CLAUDE_CODE_DISABLE_AUTO_MEMORY=1</code>. To store it somewhere else, set <code>autoMemoryDirectory</code> to an absolute or <code>~/</code> path (<a href="#ch78">Chapter 78</a> covers settings files).</p>
+<div class="box example"><span class="tag">Real-world example</span><p>Twice in one week you tell Claude "our staging login needs the VPN, so check the VPN before blaming the app". The next week, when a login test fails with a timeout, Claude's first suggestion is to check the VPN. It saved a <code>feedback</code> memory. If the whole team needs to know this, move it into the project CLAUDE.md, because auto memory is yours alone.</p></div>
+<div class="box warn"><span class="tag">Audit what it saved</span><p>Memory files are plain Markdown you can read, edit and delete. Open the folder from <code>/memory</code> every few weeks. Remove anything wrong or out of date, and anything sensitive that slipped in (a customer name from a bug report, an internal URL you'd rather not keep).</p></div>
+
+<h3 id="ch77-7"><span class="num">77.7</span>Writing a CLAUDE.md that works</h3>
+<p>The official guidance comes down to three words: <strong>specific, short, consistent</strong>.</p>
+<ul>
+<li><strong>Specific enough to check.</strong> "Run <code>npm run test:smoke</code> before saying you're done" beats "test your changes". "Selectors: <code>getByTestId</code> only" beats "write good selectors".</li>
+<li><strong>Short.</strong> Aim for under 200 lines per file. Longer files use more context and are followed less reliably. Move rarely needed detail into path-scoped rules or skills.</li>
+<li><strong>Consistent.</strong> If two instructions contradict each other, Claude may pick either. Review all your files together now and then.</li>
+<li><strong>Structured.</strong> Markdown headings and bullet points are easier to follow than dense paragraphs.</li>
+<li><strong>Only what Claude can't work out.</strong> It can read your folder structure and <code>package.json</code> itself. Spend lines on commands, conventions, gotchas and the reasons behind them.</li>
+</ul>
+<p>When to add a line: Claude makes the same mistake twice; a code review catches something Claude should have known; you type the same correction you typed last session; a new team member would need the same explanation.</p>
+<h4>A complete project CLAUDE.md for a QA repository</h4>
+<div class="code"><span class="cap">CLAUDE.md (checkout-tests repository)</span><pre># Checkout test suite
+
+Playwright + TypeScript end-to-end and API tests for the web shop checkout.
+&lt;!-- Owner: QA guild. Review this file at each sprint retro. --&gt;
+
+## Commands
+- Install: `npm ci`
+- Smoke tests (about 2 minutes): `npm run test:smoke`
+- One file: `npx playwright test tests/e2e/coupon.spec.ts`
+- Lint: `npm run lint`
+- Before saying a task is done, run lint and the smoke tests and report the result.
+
+## Layout
+- UI tests: `tests/e2e/`  · API tests: `tests/api/`  · Page objects: `tests/pages/`
+- Test data builders: `tests/data/` (never hard-code users or card numbers in tests)
+
+## Conventions
+- Selectors: `getByTestId` first, then `getByRole`. Never CSS classes or XPath.
+- Assertions: web-first (`await expect(...)`). No `waitForTimeout`.
+- Name tests after behaviour: "rejects an expired coupon", not "coupon test 3".
+- Each new test links its Jira key in a comment, e.g. `// SHOP-412`.
+
+## Environments
+- Base URL comes from `BASE_URL`; secrets come from environment variables only.
+- Never run tests against production.
+
+## Gotchas
+- Staging needs the VPN; a login timeout is usually the VPN, not the app.
+- The payment sandbox rejects amounts over 5000.00; use `tests/data/cards.ts`.
+
+@.claude/rules/bug-reports.md</pre></div>
+<p>And a personal file to go with it, which stays out of Git:</p>
+<div class="code"><span class="cap">CLAUDE.local.md</span><pre># Asha's preferences for this repo
+- My environment: BASE_URL=https://qa3.shop.example
+- I'm learning TypeScript: explain any type error before fixing it.
+- Ask before running the full suite; it takes 25 minutes on my laptop.</pre></div>
+
+<h4>Anti-patterns</h4>
+<div class="tbl"><table>
+<tr><th>Anti-pattern</th><th>Why it fails</th><th>Do this instead</th></tr>
+<tr><td>A 600-line CLAUDE.md copied from the wiki</td><td>Costs context every session; important rules get lost</td><td>Keep under 200 lines; move topics into path-scoped rules or skills</td></tr>
+<tr><td>Vague wishes: "write clean, high-quality tests"</td><td>Nothing to check; Claude already tries to</td><td>Concrete rules: "no <code>waitForTimeout</code>", "one behaviour per test"</td></tr>
+<tr><td>"NEVER delete files!!!" as the only protection</td><td>It's guidance, not enforcement</td><td>A permission deny rule or a hook (<a href="#ch78">Chapter 78</a>, <a href="#ch82">Chapter 82</a>)</td></tr>
+<tr><td>Secrets, tokens or passwords in the file</td><td>Committed to Git and sent as context</td><td>Name the environment variable that holds them</td></tr>
+<tr><td>Contradictions between user, project and subfolder files</td><td>Claude may follow either</td><td>Review files together; run <code>/doctor prompt-audit</code></td></tr>
+<tr><td>Long step-by-step procedures ("how to cut a release")</td><td>Loaded every session even when irrelevant</td><td>A skill that loads only when needed (<a href="#ch80">Chapter 80</a>)</td></tr>
+<tr><td>Describing the folder tree file by file</td><td>Claude can read it itself, and it goes stale</td><td>Mention only the non-obvious places</td></tr>
+<tr><td>Personal preferences in the shared file</td><td>Imposes your habits on the team</td><td><code>~/.claude/CLAUDE.md</code> or <code>CLAUDE.local.md</code></td></tr>
+</table></div>
+<div class="box opinion"><span class="tag">Opinion · common team practice</span><p>Many teams treat the project CLAUDE.md like any other code: changes go through pull requests, and someone owns it. A reasonable rule of thumb is that each line should earn its place by preventing a mistake that has actually happened. If nobody can remember why a line is there, delete it and see whether the mistake comes back.</p></div>
+<div class="box note"><span class="tag">Which tool for which job</span><p>CLAUDE.md is for facts Claude needs in every session. Multi-step procedures belong in skills (<a href="#ch80">Chapter 80</a>); things that must happen at a fixed moment, like linting after every edit, belong in hooks (<a href="#ch82">Chapter 82</a>); allowed and blocked actions belong in permission settings (<a href="#ch78">Chapter 78</a>). <a href="#ch84">Chapter 84</a> has a full decision table.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Set up layered memory for a test repository and prove what loads</b><span>35 min · Claude Code in a terminal</span></div><ol>
+<li>Create a practice repository: <code>mkdir -p ~/memory-lab/tests/api &amp;&amp; cd ~/memory-lab &amp;&amp; git init -b main</code>.<span class="expect"><code>Initialized empty Git repository in …/memory-lab/.git/</code></span></li>
+<li>Create a project file: <code>printf '# Memory lab\n\n- Always call the test suite "the regression pack".\n- Selectors: getByTestId only.\n' &gt; CLAUDE.md</code>.<span class="expect">No output. <code>cat CLAUDE.md</code> shows the two rules.</span></li>
+<li>Create a personal file and ignore it: <code>printf -- '- Start every answer with "QA:".\n' &gt; CLAUDE.local.md</code>, then <code>echo CLAUDE.local.md &gt;&gt; .gitignore</code> and <code>git status --short</code>.<span class="expect"><code>?? .gitignore</code> and <code>?? CLAUDE.md</code>, but no CLAUDE.local.md.</span></li>
+<li>Start <code>claude</code> in <code>~/memory-lab</code> (trust the folder if asked) and run <code>/context all</code>.<span class="expect">Under <strong>Memory files</strong>, both <code>CLAUDE.md</code> and <code>CLAUDE.local.md</code> are listed (plus <code>~/.claude/CLAUDE.md</code> if you have one).</span></li>
+<li>Ask: <code>What do you call our test suite, and what selector rule do we follow?</code><span class="expect">An answer starting "QA:" that mentions "the regression pack" and getByTestId.</span></li>
+<li>Exit (<code>/exit</code>). Create a subfolder file from your shell, not via Claude: <code>printf -- '- API tests must assert the response schema.\n' &gt; tests/api/CLAUDE.md</code> and <code>echo "// placeholder" &gt; tests/api/orders.spec.ts</code>. Start <code>claude</code> again and run <code>/context all</code>.<span class="expect"><code>tests/api/CLAUDE.md</code> is <em>not</em> listed yet: subfolder files load on demand.</span></li>
+<li>Ask: <code>Read tests/api/orders.spec.ts and tell me any rules that apply to API tests.</code><span class="expect">A "Loaded" line with the subfolder CLAUDE.md path may appear, and Claude mentions asserting the response schema.</span></li>
+<li>Add an import: exit, create <code>docs/bugs.md</code> containing <code>- Bug titles: [Area] Symptom when Action</code> (<code>mkdir docs</code> first), and append <code>@docs/bugs.md</code> as the last line of CLAUDE.md. Restart and ask: <code>What format should bug titles use?</code><span class="expect">Claude answers with the [Area] Symptom when Action format.</span></li>
+<li>Run <code>/memory</code>.<span class="expect">A list of memory files at user and project level, an auto memory toggle, and an option to open the auto memory folder.</span></li>
+<li>Teach auto memory: say <code>Remember that the staging environment needs the VPN.</code> Then open the auto memory folder from <code>/memory</code> (or, in a terminal, <code>ls ~/.claude/projects/</code> and look inside the folder for this project).<span class="expect">Claude confirms it saved a memory; the folder holds <code>MEMORY.md</code> and a topic file. Folder names on disk vary.</span></li>
+<li>Run <code>/init</code>.<span class="expect">Because a CLAUDE.md exists, Claude suggests improvements rather than overwriting it. Accept or decline as you like.</span></li>
+<li>Clean up: delete the practice memory topic through <code>/memory</code> if you want, then <code>rm -rf ~/memory-lab</code>.<span class="expect">Nothing left behind except any auto memory folder you chose to keep.</span></li>
+</ol>
+<p><b>Troubleshooting.</b> <em>A file isn't listed in <code>/context all</code></em>: check you started <code>claude</code> in the right folder (<code>pwd</code>) and that the name is exactly <code>CLAUDE.md</code> (capitals matter on Linux). <em>No "QA:" prefix</em>: instructions are guidance, so rephrase more specifically, or check for a conflicting line in <code>~/.claude/CLAUDE.md</code>. <em>Nothing saved to auto memory</em>: it may be turned off; look at the toggle in <code>/memory</code> and for <code>CLAUDE_CODE_DISABLE_AUTO_MEMORY</code> in your environment. <em>An approval dialog about external imports</em>: expected for imports outside the project folder; approve only files you trust.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"The most specific CLAUDE.md overrides the others."</dt><dd>They're all loaded together. More specific files are read later, but a contradiction means Claude may follow either one. Remove conflicts instead.</dd>
+<dt>"If it's in CLAUDE.md, Claude can't break the rule."</dt><dd>CLAUDE.md is context, not enforcement. Use permission rules or hooks for hard limits.</dd>
+<dt>"Splitting CLAUDE.md into imports saves context."</dt><dd>Imports load with the file that imports them. Path-scoped rules and skills are what load only when needed.</dd>
+<dt>"Typing # saves a memory."</dt><dd>Removed in version 2.0.70. Ask Claude, or use <code>/memory</code>.</dd>
+<dt>"Auto memory is shared with my team."</dt><dd>It's per repository on your machine only. Shared knowledge goes in the committed CLAUDE.md.</dd>
+<dt>"Claude Code ignores AGENTS.md."</dt><dd>From 2.1.277 it reads AGENTS.md directly when there's no CLAUDE.md or CLAUDE.local.md; otherwise import it with <code>@AGENTS.md</code>.</dd>
+</dl></div>
+
+<h3 id="ch77-r"><span class="num">77.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>CLAUDE.md files (written by you) and auto memory (written by Claude) carry knowledge between sessions. Both are context, not enforcement.</li>
+<li>Scopes: managed, user (<code>~/.claude/CLAUDE.md</code>), project (<code>./CLAUDE.md</code> or <code>./.claude/CLAUDE.md</code>) and local (<code>./CLAUDE.local.md</code>, gitignored).</li>
+<li>Files in the working folder and every parent load at launch and are concatenated, root first, with CLAUDE.local.md after CLAUDE.md at each level. Subfolder files load on demand.</li>
+<li><code>@path</code> imports (relative to the importing file, up to four hops) organise but don't save context; <code>.claude/rules/</code> with <code>paths</code> frontmatter loads only for matching files.</li>
+<li>AGENTS.md is read directly (2.1.277+) when no CLAUDE.md or CLAUDE.local.md exists; otherwise use <code>@AGENTS.md</code>.</li>
+<li>Auto memory lives in <code>~/.claude/projects/&lt;project&gt;/memory/</code>; the first 200 lines or 25KB of <code>MEMORY.md</code> load each session. Manage it with <code>/memory</code>.</li>
+<li>Good files are specific, under 200 lines, consistent, and free of secrets.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Your user CLAUDE.md says "use npm" and the project CLAUDE.md says "use pnpm". What happens?</p><div class="opts"><button>The project file overrides the user file, so Claude always uses pnpm</button><button data-ok>Both are loaded; Claude may follow either, so you should remove the contradiction</button><button>Claude Code refuses to start until you fix it</button></div><p class="why" hidden>CLAUDE.md files are concatenated, not overridden. The project file is read later, but contradictions make Claude's choice unpredictable.</p></div>
+<div class="qz"><p class="q">Where should your personal test-environment URL for one project go?</p><div class="opts"><button>The project CLAUDE.md</button><button data-ok>CLAUDE.local.md at the project root, added to .gitignore</button><button>The managed policy CLAUDE.md</button></div><p class="why" hidden>CLAUDE.local.md is for personal, project-specific preferences and stays out of Git.</p></div>
+<div class="qz"><p class="q">You must make sure Claude can never run <code>git push</code> in this repository. What should you use?</p><div class="opts"><button>A line in CLAUDE.md saying "never push"</button><button>An auto memory note</button><button data-ok>A permission deny rule in settings (or a hook)</button></div><p class="why" hidden>CLAUDE.md and auto memory are guidance. Permission rules and hooks are enforced by Claude Code itself.</p></div>
+<div class="qz"><p class="q">A repository has an AGENTS.md and you add a CLAUDE.local.md with your own notes. What changes, by default?</p><div class="opts"><button>Nothing: both files load</button><button data-ok>Claude stops reading AGENTS.md, because CLAUDE.local.md counts as a CLAUDE.md</button><button>CLAUDE.local.md is ignored while AGENTS.md exists</button></div><p class="why" hidden>AGENTS.md is read only when no CLAUDE.md, .claude/CLAUDE.md or CLAUDE.local.md exists in the folder or above. Import it, or change the Project instructions setting.</p></div>
+<div class="qz"><p class="q">How much of auto memory's <code>MEMORY.md</code> loads at the start of a session?</p><div class="opts"><button>All of it, however long</button><button data-ok>The first 200 lines or 25KB, whichever comes first</button><button>None: Claude reads it only when asked</button></div><p class="why" hidden>That's why Claude keeps the index short and moves detail into topic files, which it reads on demand.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Write (or rewrite) the CLAUDE.md for one real test repository your team uses. Start with <code>/init</code>, then cut it to under 200 lines: commands, the non-obvious layout, conventions, environments and gotchas. Move one topic that applies only to part of the repository into a path-scoped rule. Check that every line is specific enough to verify and that nothing contains a secret. Run <code>/context all</code> to confirm what loads, then open a pull request so the team can review the file like code. In the description, list two mistakes Claude used to make that these instructions should prevent.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Claude Code forgets everything between sessions, so we write a briefing file called CLAUDE.md. There's one for the company, one for you, one for the project that we commit to Git, and a CLAUDE.local.md for your personal notes that stays out of Git. They don't override each other; they all get loaded, so don't let them contradict each other. Keep each one short and specific, under 200 lines, and never put secrets in them. Claude also keeps its own notebook, auto memory, which you can read and edit with /memory. Remember: these files are advice to Claude. If something must never happen, block it with a permission rule or a hook."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/memory" target="_blank" rel="noopener">How Claude remembers your project</a> (CLAUDE.md locations and load order, imports, rules, AGENTS.md, auto memory, <code>/memory</code>, troubleshooting).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/settings" target="_blank" rel="noopener">Claude Code settings</a> (<code>autoMemoryEnabled</code>, <code>autoMemoryDirectory</code>, <code>claudeMdExcludes</code>).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/commands" target="_blank" rel="noopener">Claude Code commands</a> (<code>/init</code>, <code>/memory</code>, <code>/context</code>, <code>/doctor</code>) and the changelog entry removing the <code>#</code> memory shortcut (v2.0.70).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/permissions" target="_blank" rel="noopener">Permissions</a> and <a href="https://code.claude.com/docs/en/hooks-guide" target="_blank" rel="noopener">Hooks guide</a> (enforcement, as opposed to guidance).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/headless" target="_blank" rel="noopener">Run Claude Code programmatically</a> (<code>--bare</code> skips CLAUDE.md and auto memory).</li>
+</ol><p class="verified">Verified 9 November 2026 against the Claude Code documentation and Claude Code 2.1.319.</p></div>

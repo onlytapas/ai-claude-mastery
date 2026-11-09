@@ -1,0 +1,280 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How every file on your computer sits in one big upside-down tree, starting at the root</li>
+<li>What your home folder is, and why <code>~</code> means "home"</li>
+<li>The difference between absolute and relative paths, and how to read both</li>
+<li>What <code>.</code> and <code>..</code> mean, and how to move up and down the tree</li>
+<li>What hidden files and file extensions are, and why they matter to tools like Git and Claude Code</li>
+<li>Why upper and lower case can break a test in CI, and how to handle spaces in names safely</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch52">Chapter 52</a>: you can open a terminal and recognise the prompt. This chapter uses three commands lightly: <code>pwd</code> (show where I am), <code>ls</code> (list what's here) and <code>cd</code> (move). <a href="#ch54">Chapter 54</a> covers them in full.</div>
+
+<div class="bigidea"><p>Every file and folder on a computer has an address called a path. On macOS and Linux all addresses start from a single top folder, the root, written <code>/</code>, and folders inside folders are joined with more slashes, like <code>/Users/alex/Documents/report.pdf</code>. You can give an address in full from the root (absolute) or starting from where you are now (relative), and a few shorthands, <code>~</code>, <code>.</code> and <code>..</code>, mean "home", "here" and "one level up". Once you can read paths, most terminal errors and most of what Claude Code reports about your project make sense. Small details, such as capital letters, spaces and a leading dot, change what a path points to.</p></div>
+
+<h3 id="ch53-1"><span class="num">53.1</span>The filesystem is a tree</h3>
+<p>A <a class="gl" href="#g-file">file</a> is a named piece of stored data: a document, a photo, a test script, a log. A <a class="gl" href="#g-directory">directory</a> is a container for files and other directories. "Directory" and "folder" mean the same thing; terminal documentation tends to say directory, the desktop says folder. The way the OS organises all of them is called the <a class="gl" href="#g-filesystem">filesystem</a>.</p>
+<p>Folders inside folders form a tree. Computer people draw it upside down: the single starting point, the <a class="gl" href="#g-root-directory">root</a>, is at the top, and everything branches down from it.</p>
+<div class="code"><span class="cap">Part of a Mac's filesystem (simplified)</span><pre>/                               <span class="c"># the root: top of everything</span>
+├── Applications                <span class="c"># installed apps</span>
+├── System                      <span class="c"># macOS itself (don't touch)</span>
+├── Users
+│   ├── Shared
+│   └── alex                    <span class="c"># alex's home folder</span>
+│       ├── Desktop
+│       ├── Documents
+│       │   └── test-plan.md
+│       ├── Downloads
+│       └── projects
+│           └── shop-tests
+│               ├── package.json
+│               └── tests
+│                   └── login.spec.ts
+├── bin                         <span class="c"># basic commands like ls and cp</span>
+├── tmp                         <span class="c"># temporary files</span>
+└── usr                         <span class="c"># more programs and their files</span></pre></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a library. The building is the root. Inside are floors, on each floor are rooms, in each room are shelves, and on each shelf are books. To tell someone where a book is, you give the route from the entrance: "Building / Floor 2 / Science room / Shelf 4 / <em>Biology Basics</em>". A path is exactly that kind of route.</p></div>
+<p>You can list what sits directly under the root on your own Mac. This is real output:</p>
+<div class="code"><span class="cap">Terminal (macOS, real output)</span><pre>ls /
+Applications
+Library
+System
+Users
+Volumes
+bin
+cores
+dev
+etc
+home
+opt
+private
+sbin
+tmp
+usr
+var</pre></div>
+<p><code>ls</code> means "list". The <code>/</code> after it says which folder to list: the root. You'll spend nearly all your time inside <code>/Users</code> (your own files). <code>/System</code>, <code>/bin</code>, <code>/usr</code> and the rest belong to the operating system; look but don't change them.</p>
+<div class="tbl"><table>
+<tr><th>Location</th><th>macOS</th><th>Linux</th><th>Windows</th></tr>
+<tr><td>Top of the tree</td><td><code>/</code></td><td><code>/</code></td><td>One tree per drive: <code>C:\</code>, <code>D:\</code></td></tr>
+<tr><td>Users' home folders</td><td><code>/Users/alex</code></td><td><code>/home/alex</code></td><td><code>C:\Users\alex</code></td></tr>
+<tr><td>Installed apps</td><td><code>/Applications</code></td><td><code>/usr/bin</code>, <code>/opt</code></td><td><code>C:\Program Files</code></td></tr>
+<tr><td>System settings files</td><td><code>/etc</code>, <code>/Library</code></td><td><code>/etc</code></td><td><code>C:\Windows</code>, the Registry</td></tr>
+<tr><td>Temporary files</td><td><code>/tmp</code></td><td><code>/tmp</code></td><td><code>%TEMP%</code></td></tr>
+<tr><td>Separator between folder names</td><td><code>/</code></td><td><code>/</code></td><td><code>\</code> (most tools also accept <code>/</code>)</td></tr>
+</table></div>
+<div class="box note"><span class="tag">Windows and WSL</span><p>Windows starts each drive with a letter and uses backslashes: <code>C:\Users\alex\Documents</code>. Inside WSL, Linux has its own tree starting at <code>/</code>, and your Windows C: drive appears at <code>/mnt/c</code>, so the same Documents folder is <code>/mnt/c/Users/alex/Documents</code>. Git Bash shows it as <code>/c/Users/alex/Documents</code>.</p></div>
+
+<h3 id="ch53-2"><span class="num">53.2</span>Your home folder and <code>~</code></h3>
+<p>Each person who logs in gets a <a class="gl" href="#g-home-directory">home directory</a>: a personal folder for their documents, downloads and settings. On a Mac it's <code>/Users/</code> followed by your user name. Because you use it constantly, every Unix shell gives it a one-character nickname: <code>~</code> (the tilde, usually next to the 1 key or Shift+<code>`</code>).</p>
+<div class="code"><span class="cap">Terminal (macOS, real output, name changed)</span><pre>echo ~                <span class="c"># what does ~ stand for?</span>
+/Users/alex
+echo ~/Documents      <span class="c"># ~ works at the start of longer paths too</span>
+/Users/alex/Documents
+ls ~                  <span class="c"># list my home folder</span>
+Desktop
+Documents
+Downloads
+Library
+Movies
+Music
+Pictures
+Public</pre></div>
+<p>The shell replaces <code>~</code> with your real home path <em>before</em> running the command, so <code>echo</code> simply prints the result. Your home folder will contain more than this, depending on what you've installed. When a new terminal opens, it starts in your home folder, which is why the prompt shows <code>~</code>.</p>
+<p>On Windows the home folder is <code>C:\Users\alex</code>. PowerShell also understands <code>~</code> and <code>$HOME</code>; Command Prompt uses <code>%USERPROFILE%</code>. Documentation for Claude Code writes paths like <code>~/.claude/settings.json</code>; on Windows that means <code>%USERPROFILE%\.claude\settings.json</code>.</p>
+<div class="box warn"><span class="tag">Your Desktop may not be on your disk</span><p>If iCloud Drive's "Desktop &amp; Documents Folders" option (or OneDrive's folder backup on Windows) is turned on, those folders sync to the cloud and files may be stored online until opened. That's usually fine, but for code projects and test runs, a plain folder such as <code>~/projects</code> avoids slow syncing and surprise conflicts.</p></div>
+
+<h3 id="ch53-3"><span class="num">53.3</span>Absolute and relative paths</h3>
+<p>At every moment your shell is "standing" in one folder, called the current or <a class="gl" href="#g-working-directory">working directory</a>. The command <code>pwd</code> ("print working directory") tells you which:</p>
+<div class="code"><span class="cap">Terminal (macOS, real output, name changed)</span><pre>pwd
+/Users/alex</pre></div>
+<p>There are two ways to write the address of a file:</p>
+<div class="cols2"><div><h4><a class="gl" href="#g-absolute-path">Absolute path</a></h4><p>The full route from the root. Always starts with <code>/</code> (or <code>~</code>, which expands to one). It means the same thing no matter where you're standing.</p><p><code>/Users/alex/projects/shop-tests/tests/login.spec.ts</code></p></div><div><h4><a class="gl" href="#g-relative-path">Relative path</a></h4><p>The route from where you are now. Never starts with <code>/</code>. Its meaning depends on your working directory.</p><p>Standing in <code>/Users/alex/projects</code>: <code>shop-tests/tests/login.spec.ts</code></p></div></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>An absolute path is a full postal address: "12 High Street, Leeds, LS1 4AB, UK". Anyone anywhere can find it. A relative path is directions from where you're standing: "second door on the left". Perfect if you're in the right corridor, useless if you're not.</p></div>
+<p>How the shell turns a relative path into an absolute one:</p>
+<div class="flow"><div><b>Working directory</b><code>/Users/alex/projects</code></div><div><b>Relative path typed</b><code>shop-tests/tests</code></div><div class="hl"><b>Shell joins them with /</b><code>/Users/alex/projects/shop-tests/tests</code></div><div><b>Result</b>the folder it uses</div></div>
+<p>Reading a path is just reading the folder names left to right, each <code>/</code> meaning "go inside":</p>
+<div class="tbl"><table>
+<tr><th>Piece</th><th>Meaning</th></tr>
+<tr><td><code>/</code></td><td>Start at the root</td></tr>
+<tr><td><code>Users/</code></td><td>go into the Users folder</td></tr>
+<tr><td><code>alex/</code></td><td>go into alex's home folder</td></tr>
+<tr><td><code>projects/shop-tests/tests/</code></td><td>then three more folders down</td></tr>
+<tr><td><code>login.spec.ts</code></td><td>the file itself (the last name in a path may be a file or a folder)</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A Playwright run fails in CI with <code>Error: ENOENT: no such file or directory, open 'fixtures/users.json'</code>. That's a relative path. It worked on your laptop because you ran the tests from the project folder. The CI job ran them from a different folder, so the same relative path pointed nowhere. The fix is either to run from the right folder or build the path from the test file's own location. Recognising "this is relative, so it depends where I'm standing" turns a mysterious error into a two-minute fix.</p></div>
+<div class="box note"><span class="tag">Why Claude Code cares</span><p>Claude Code treats the folder you start it in as its working directory, and works freely inside it while asking before going outside (<a href="#ch65">Chapter 65</a>). So <code>cd</code> into your project before typing <code>claude</code>. Its messages and permission prompts often show paths; reading them tells you exactly which file it wants to touch.</p></div>
+
+<h3 id="ch53-4"><span class="num">53.4</span>Dot and dot-dot: here and up</h3>
+<p>Two special names exist in every folder:</p>
+<div class="tbl"><table>
+<tr><th>Name</th><th>Means</th><th>Example</th></tr>
+<tr><td><code>.</code></td><td>This folder, right here</td><td><code>./run-tests.sh</code> = "the run-tests.sh in this folder"; <code>open .</code> opens the current folder in Finder</td></tr>
+<tr><td><code>..</code></td><td>The folder one level up (the parent)</td><td><code>cd ..</code> = go up one; <code>ls ..</code> = list the parent</td></tr>
+<tr><td><code>../..</code></td><td>Two levels up</td><td><code>cd ../..</code></td></tr>
+<tr><td><code>../reports</code></td><td>Up one, then into a sibling folder called reports</td><td><code>ls ../reports</code></td></tr>
+</table></div>
+<p>A real session, moving around a practice folder (paths shortened to <code>/Users/alex</code> for readability):</p>
+<div class="code"><span class="cap">Terminal (macOS, real output)</span><pre>pwd
+/Users/alex/terminal-practice
+cd reports/2026       <span class="c"># relative: down two levels</span>
+pwd
+/Users/alex/terminal-practice/reports/2026
+cd ..                 <span class="c"># up one</span>
+pwd
+/Users/alex/terminal-practice/reports
+cd ../..              <span class="c"># up two</span>
+pwd
+/Users/alex
+cd /tmp               <span class="c"># absolute: jump straight there</span>
+pwd
+/tmp
+cd                    <span class="c"># cd with nothing after it = go home</span>
+pwd
+/Users/alex</pre></div>
+<p>Notice that <code>cd</code> prints nothing when it works: the change shows up in the prompt and in <code>pwd</code>. On a Mac, <code>pwd</code> after <code>cd /tmp</code> prints <code>/tmp</code>, though <code>/tmp</code> is actually a shortcut to <code>/private/tmp</code>; <code>pwd -P</code> shows the real location.</p>
+<details class="deep"><summary>Under the hood: why does every folder contain . and ..?</summary><div class="body">
+<p>In Unix filesystems, a directory is itself a small table that maps names to the stored files. Every directory's table contains two extra entries created automatically: <code>.</code> points to the directory itself and <code>..</code> points to its parent. The root's <code>..</code> points back to the root, so <code>cd ..</code> at <code>/</code> keeps you at <code>/</code>. You can see the two entries with <code>ls -a</code> (next section). The <code>./</code> in <code>./run-tests.sh</code> matters for a different reason: for safety, the shell doesn't look in the current folder for programs to run unless you say so explicitly (<a href="#ch56">Chapter 56</a> explains the PATH).</p>
+</div></details>
+
+<h3 id="ch53-5"><span class="num">53.5</span>Hidden files: names that start with a dot</h3>
+<p>On macOS and Linux, any file or folder whose name begins with <code>.</code> is a <a class="gl" href="#g-hidden-file">hidden file</a>. Finder and <code>ls</code> don't show it by default. It isn't secret or protected; it's just kept out of the way. Most hidden files are settings ("dotfiles").</p>
+<div class="code"><span class="cap">Terminal (macOS, real output)</span><pre>ls                     <span class="c"># normal listing</span>
+logs
+notes.txt
+reports
+test-plan.md
+ls -a                  <span class="c"># -a = all, including hidden</span>
+.
+..
+.secret-config
+logs
+notes.txt
+reports
+test-plan.md</pre></div>
+<p>With <code>-a</code> you see three extra lines: <code>.</code> and <code>..</code> (53.4) and the hidden file <code>.secret-config</code>. Hidden files you'll meet constantly:</p>
+<div class="tbl"><table>
+<tr><th>Name</th><th>What it is</th></tr>
+<tr><td><code>~/.zshrc</code></td><td>Your zsh settings, run each time a terminal opens (<a href="#ch56">Chapter 56</a>)</td></tr>
+<tr><td><code>.git/</code></td><td>The folder where Git stores a project's entire history (<a href="#ch61">Chapter 61</a>)</td></tr>
+<tr><td><code>.gitignore</code></td><td>The list of files Git should not track</td></tr>
+<tr><td><code>.env</code></td><td>Environment settings, often containing passwords and API keys. Never commit or share it (<a href="#ch98">Chapter 98</a>)</td></tr>
+<tr><td><code>.claude/</code>, <code>~/.claude/</code></td><td>Claude Code's project and personal settings, skills and agents (<a href="#ch78">Chapter 78</a>)</td></tr>
+<tr><td><code>.github/</code></td><td>GitHub settings, including CI workflows</td></tr>
+<tr><td><code>.DS_Store</code></td><td>macOS's record of how Finder displays a folder; harmless clutter</td></tr>
+</table></div>
+<div class="box note"><span class="tag">Seeing hidden files outside the terminal</span><p>In a Mac Finder window, press <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>.</kbd> to show or hide them. On Windows, hidden is a file property rather than a naming rule: in File Explorer use View → Show → Hidden items, and in PowerShell use <code>Get-ChildItem -Force</code>. Windows tools still respect dot-names like <code>.gitignore</code> and <code>.env</code> because the programs that use them were written for Unix first.</p></div>
+<div class="box warn"><span class="tag">Hidden is not safe</span><p>A <code>.env</code> file full of credentials is "hidden" only from casual listings. Any program you run, including an AI agent, can read it. Keeping secrets out of the folders you hand to tools is covered in <a href="#ch98">Chapter 98</a>.</p></div>
+
+<h3 id="ch53-6"><span class="num">53.6</span>File extensions: the bit after the last dot</h3>
+<p>A <a class="gl" href="#g-file-extension">file extension</a> is the ending after the final dot in a file name: <code>report.pdf</code>, <code>login.spec.ts</code>, <code>results.xml</code>. It's a label that tells you and the system which kind of content to expect and which app should open it. In <code>login.spec.ts</code> the extension is <code>.ts</code> (TypeScript); <code>.spec</code> is part of the name, a testing convention for "this is a test file".</p>
+<div class="tbl"><table>
+<tr><th>Extension</th><th>Kind of content</th><th>Where you meet it in QA</th></tr>
+<tr><td><code>.txt</code>, <code>.log</code></td><td>Plain text</td><td>Notes, server and test-runner logs</td></tr>
+<tr><td><code>.md</code></td><td>Markdown: text with light formatting</td><td>READMEs, <code>CLAUDE.md</code>, test plans</td></tr>
+<tr><td><code>.csv</code></td><td>Comma-separated table</td><td>Test data, exported results</td></tr>
+<tr><td><code>.json</code></td><td>Structured data (<a href="#ch85">Chapter 85</a>)</td><td>API responses, <code>package.json</code>, settings</td></tr>
+<tr><td><code>.yml</code> / <code>.yaml</code></td><td>Structured settings</td><td>CI pipelines (GitHub Actions)</td></tr>
+<tr><td><code>.xml</code></td><td>Structured data</td><td>JUnit test reports, Maven <code>pom.xml</code></td></tr>
+<tr><td><code>.js</code>, <code>.ts</code>, <code>.py</code>, <code>.java</code></td><td>Source code</td><td>Test scripts and automation</td></tr>
+<tr><td><code>.sh</code></td><td>Shell script (<a href="#ch57">Chapter 57</a>)</td><td>Helper scripts to run suites</td></tr>
+<tr><td><code>.html</code></td><td>Web page</td><td>Playwright and Allure reports</td></tr>
+</table></div>
+<p>The extension is a convention, not a guarantee. Renaming <code>photo.jpg</code> to <code>photo.txt</code> doesn't turn the picture into text. The <code>file</code> command looks at the content itself:</p>
+<div class="code"><span class="cap">Terminal (macOS, real output)</span><pre>file notes.txt reports
+notes.txt: ASCII text
+reports:   directory</pre></div>
+<p>Here <code>file</code> was given two names (you can give many). It reports that <code>notes.txt</code> really contains plain text (ASCII is the basic English character set), and that <code>reports</code>, which has no extension at all, is a directory. Folders rarely have extensions; plenty of files don't either (<code>Makefile</code>, <code>Dockerfile</code>, <code>LICENSE</code>).</p>
+<div class="box warn"><span class="tag">Show extensions on your desktop</span><p>Both Finder and File Explorer can hide extensions, which is how <code>invoice.pdf.exe</code> can masquerade as a PDF. Turn them on: Finder → Settings → Advanced → "Show all filename extensions"; Windows File Explorer → View → Show → "File name extensions". The terminal always shows full names.</p></div>
+
+<h3 id="ch53-7"><span class="num">53.7</span>Upper and lower case</h3>
+<p>Is <code>Readme.txt</code> the same file as <code>readme.txt</code>? It depends on the system, and the difference is a classic source of "works on my machine" bugs.</p>
+<div class="tbl"><table>
+<tr><th>System</th><th>Case-sensitive?</th><th>What that means</th></tr>
+<tr><td>Linux (and therefore most CI runners and Docker containers)</td><td><b>Yes</b></td><td><code>Readme.txt</code> and <code>readme.txt</code> are two different files that can sit side by side</td></tr>
+<tr><td>macOS (default APFS format)</td><td>No, but case-preserving</td><td>It remembers how you typed the name, but treats both spellings as the same file</td></tr>
+<tr><td>Windows (NTFS)</td><td>No, but case-preserving</td><td>Same as macOS by default</td></tr>
+</table></div>
+<p>Real output from a Mac shows the "same file" behaviour:</p>
+<div class="code"><span class="cap">Terminal (macOS, real output)</span><pre>touch Readme.txt        <span class="c"># create an empty file called Readme.txt</span>
+ls readme.txt           <span class="c"># ask for it in lower case</span>
+readme.txt
+touch README.TXT        <span class="c"># try to create a third spelling</span>
+ls
+Readme.txt
+...</pre></div>
+<p>On the Mac, <code>ls readme.txt</code> finds the file even though it's spelled differently, and <code>touch README.TXT</code> doesn't create a new file: there's still only <code>Readme.txt</code>. On Linux the same <code>ls readme.txt</code> would fail with "No such file or directory", and <code>touch README.TXT</code> would create a second file. Commands themselves are case-sensitive everywhere in Unix shells: <code>LS</code> is not <code>ls</code>.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>A developer renames <code>loginPage.ts</code> to <code>LoginPage.ts</code> but a test still says <code>import { LoginPage } from './pages/loginPage'</code>. Every test passes on their Mac, because the Mac treats the two names as the same file. The Linux CI runner can't find <code>loginPage.ts</code> and the whole suite fails to start. The lesson for testers: when something passes locally but fails only in CI with "not found", check the capitals.</p></div>
+<div class="box note"><span class="tag">Safe naming habit</span><p>Use lower case, digits and hyphens for anything you create in projects: <code>login-tests</code>, <code>run-2026-11-09.log</code>. No spaces, no capitals that could be mistyped, no special characters. Many teams write this into their conventions, and it avoids every problem in this section and the next.</p></div>
+
+<h3 id="ch53-8"><span class="num">53.8</span>Spaces and special characters: quoting</h3>
+<p>The shell splits what you type into words at every space. That's how it tells a command from its arguments (<a href="#ch54">Chapter 54</a>). So a name with a space in it looks like two names:</p>
+<div class="code"><span class="cap">Terminal (macOS, real output)</span><pre>ls -l test plan.md
+ls: plan.md: No such file or directory
+ls: test: No such file or directory</pre></div>
+<p>The shell gave <code>ls</code> two separate names, <code>test</code> and <code>plan.md</code>, and neither exists. There are three ways to keep a space inside one name:</p>
+<div class="code"><span class="cap">Terminal (macOS, real output)</span><pre>ls -l "test plan.md"     <span class="c"># double quotes</span>
+-rw-r--r--@ 1 alex  staff  0 Nov  9 14:45 test plan.md
+ls -l 'test plan.md'     <span class="c"># single quotes</span>
+-rw-r--r--@ 1 alex  staff  0 Nov  9 14:45 test plan.md
+ls -l test\ plan.md      <span class="c"># backslash before the space</span>
+-rw-r--r--@ 1 alex  staff  0 Nov  9 14:45 test plan.md</pre></div>
+<p>All three work. (The long line of output is the detailed listing from <code>ls -l</code>, explained in <a href="#ch54">Chapter 54</a>.)</p>
+<div class="tbl"><table>
+<tr><th>Form</th><th>What it does</th><th>Use it when</th></tr>
+<tr><td><code>"…"</code> double quotes</td><td>Keeps spaces together; still expands <code>$VARIABLES</code></td><td>Most of the time</td></tr>
+<tr><td><code>'…'</code> single quotes</td><td>Keeps everything exactly as typed; no expansion at all</td><td>Text containing <code>$</code> or other special characters you want left alone</td></tr>
+<tr><td><code>\</code> backslash</td><td>"Treat the next character as ordinary"</td><td>One or two awkward characters; Tab completion adds these for you</td></tr>
+</table></div>
+<p>The mistake can also <em>create</em> a mess. <code>mkdir My Reports</code> without quotes makes two folders, <code>My</code> and <code>Reports</code> (real result, checked while writing this chapter). And zsh's reply to <code>cd My Reports</code> is the puzzling <code>cd: string not in pwd: My</code>, because zsh's <code>cd</code> has a special meaning for two words; bash says <code>cd: My: No such file or directory</code>. Both mean "you forgot the quotes".</p>
+<div class="box note"><span class="tag">Two shortcuts that quote for you</span><p><strong>Tab completion:</strong> type <code>cd My</code> and press Tab; the shell writes <code>My\ Reports/</code> with the backslash in place. <strong>Drag and drop:</strong> drag a file or folder from Finder into the Terminal window and its full, correctly escaped path is typed for you. Both are faster and safer than typing long paths by hand.</p></div>
+<p>Characters that cause trouble in names: spaces, <code>* ? [ ] $ &amp; ; | &lt; &gt; ( ) ' " \ !</code> and <code>#</code> all have special meanings to the shell (Chapters 55–57). <code>/</code> can never be part of a name on macOS or Linux because it separates folders. Windows additionally forbids <code>\ : * ? " &lt; &gt; |</code> in names.</p>
+
+<div class="lab"><div class="lab-h"><b>Walk the tree</b><span>25 min · your own computer, Terminal</span></div><ol>
+<li>Open a terminal and type <code>pwd</code>.<span class="expect"><code>/Users/yourname</code> on a Mac, <code>/home/yourname</code> on Linux or WSL.</span></li>
+<li>Type <code>echo ~</code>.<span class="expect">the same path as step 1: <code>~</code> is your home.</span></li>
+<li>Type <code>ls /</code>, then <code>ls /Users</code> (Linux/WSL: <code>ls /home</code>).<span class="expect">the root folders listed in 53.1; then your own user name plus <code>Shared</code> on a Mac (and any other accounts on the machine).</span></li>
+<li>Type <code>cd /tmp</code>, then <code>pwd</code>.<span class="expect"><code>/tmp</code>. The prompt now shows <code>tmp</code> instead of <code>~</code>.</span></li>
+<li>Type <code>cd ~/Documents</code> (absolute, via the tilde), then <code>pwd</code>.<span class="expect"><code>/Users/yourname/Documents</code>.</span></li>
+<li>Type <code>cd ..</code>, then <code>pwd</code>.<span class="expect">you're back in your home folder.</span></li>
+<li>Type <code>cd Documents</code> (relative this time), then <code>cd ../Downloads</code>, then <code>pwd</code>.<span class="expect"><code>/Users/yourname/Downloads</code>: up one, then across into a sibling.</span></li>
+<li>Type <code>cd</code> on its own, then <code>ls</code>, then <code>ls -a</code>.<span class="expect">a few normal folders, then a longer list beginning <code>.</code> and <code>..</code> and including hidden names such as <code>.zshrc</code> (if present) and <code>.Trash</code>.</span></li>
+<li>Type <code>file ~/.zshrc</code> (if <code>ls -a</code> showed it) or <code>file /bin/ls</code>.<span class="expect"><code>ASCII text</code> for your settings file, or a description of a "Mach-O" executable (Mac program) for <code>/bin/ls</code>.</span></li>
+<li>Make a test folder with a space: <code>mkdir "/tmp/My Reports"</code>. Then type <code>cd /tmp/My</code> and press Tab, then Enter, then <code>pwd</code>.<span class="expect">Tab completes to <code>/tmp/My\ Reports/</code>; <code>pwd</code> prints <code>/tmp/My Reports</code>.</span></li>
+<li>Go back and try it wrong: <code>cd</code>, then <code>cd /tmp/My Reports</code>.<span class="expect">zsh: <code>cd: string not in pwd: /tmp/My</code>; bash: <code>cd: /tmp/My: No such file or directory</code>. Add quotes and it works.</span></li>
+<li>In Finder, open your home folder and press <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>.</kbd> twice.<span class="expect">the hidden files appear, then disappear again.</span></li>
+</ol>
+<p><b>Troubleshooting:</b> <code>No such file or directory</code> → check spelling, capitals and spaces; press Tab to let the shell complete it. <code>Operation not permitted</code> when listing Desktop, Documents or Downloads on a Mac → macOS privacy controls; allow Terminal in System Settings → Privacy &amp; Security → Files and Folders (or Full Disk Access) if you trust it. Windows PowerShell: <code>pwd</code>, <code>cd</code> and <code>ls</code> work there too, but paths look like <code>C:\Users\yourname</code>, and <code>ls -a</code> must be <code>Get-ChildItem -Force</code>. The <code>/tmp/My Reports</code> folder is harmless; temporary files in <code>/tmp</code> are cleared automatically over time.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"A path starting with a folder name is the same wherever I run it."</dt><dd>Only absolute paths (starting with <code>/</code> or <code>~</code>) mean the same everywhere. Relative paths depend on your working directory.</dd>
+<dt>"Hidden files are protected or encrypted."</dt><dd>A leading dot only hides a file from normal listings. Any program can read it.</dd>
+<dt>"The extension decides what a file is."</dt><dd>It's a label. The content decides. <code>file</code> shows what's really inside.</dd>
+<dt>"If it works on my Mac, file names are fine."</dt><dd>macOS ignores case by default; Linux CI doesn't. A wrong capital can pass locally and fail in the pipeline.</dd>
+<dt>"Folder and directory are different things."</dt><dd>Same thing, two words. Terminals and documentation tend to say directory.</dd>
+</dl></div>
+
+<h3 id="ch53-r"><span class="num">53.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>All files form one tree starting at the root <code>/</code> (each drive letter on Windows). A path is the route through the tree.</li>
+<li><code>~</code> is your home folder: <code>/Users/you</code> on macOS, <code>/home/you</code> on Linux, <code>C:\Users\you</code> on Windows.</li>
+<li>Absolute paths start at the root and work from anywhere; relative paths start from your working directory (<code>pwd</code>).</li>
+<li><code>.</code> is here, <code>..</code> is the parent folder.</li>
+<li>Names starting with a dot are hidden (<code>ls -a</code> shows them); <code>.env</code>, <code>.git</code> and <code>.claude</code> matter a lot.</li>
+<li>Linux is case-sensitive; macOS and Windows normally aren't. Use quotes or Tab completion for names with spaces, and prefer lower-case-with-hyphens names.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">You're in <code>/Users/alex/projects</code>. Which absolute path does <code>../Documents</code> point to?</p><div class="opts"><button><code>/Users/alex/projects/Documents</code></button><button data-ok><code>/Users/alex/Documents</code></button><button><code>/Documents</code></button></div><p class="why" hidden><code>..</code> goes up from projects to <code>/Users/alex</code>, then into Documents.</p></div>
+<div class="qz"><p class="q">Which of these is an absolute path?</p><div class="opts"><button><code>tests/login.spec.ts</code></button><button><code>../tests</code></button><button data-ok><code>~/projects/shop-tests</code></button></div><p class="why" hidden><code>~</code> expands to the full home path, so it starts from the root. The others depend on where you are.</p></div>
+<div class="qz"><p class="q">Why doesn't <code>ls</code> show your project's <code>.env</code> file?</p><div class="opts"><button>It's encrypted</button><button data-ok>Names starting with a dot are hidden from normal listings; <code>ls -a</code> shows them</button><button>Only administrators can see it</button></div><p class="why" hidden>The leading dot is purely a display convention. The file is still readable by any program.</p></div>
+<div class="qz"><p class="q">Tests pass on a Mac but fail in Linux CI with "Cannot find module './pages/loginPage'". The file is called <code>LoginPage.ts</code>. What's the likely cause?</p><div class="opts"><button>Linux can't run TypeScript</button><button data-ok>Linux file names are case-sensitive; macOS ignored the wrong capital</button><button>The file is hidden</button></div><p class="why" hidden>The Mac's default filesystem treats both spellings as one file; Linux treats them as different.</p></div>
+<div class="qz"><p class="q">What does <code>mkdir My Reports</code> (no quotes) do?</p><div class="opts"><button>Creates one folder called "My Reports"</button><button data-ok>Creates two folders, "My" and "Reports"</button><button>Shows an error and creates nothing</button></div><p class="why" hidden>The shell splits at the space, so <code>mkdir</code> receives two names. Quote the name or use a backslash.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick one test project you work with (or any folder of documents). In the terminal, <code>cd</code> into it and draw its top three levels as a tree, like the one in 53.1, using <code>ls</code> and <code>ls -a</code>. Mark every hidden file and write one line on what you think it does. Then find one relative path in the project, such as a fixture or a config reference in a test, and write down which folder it must be run from to work.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Every file has an address called a path. On a Mac they all start from slash, the root, and each slash means 'go inside'. Squiggle, the tilde, is your home folder. A path that starts with slash or tilde is absolute and works from anywhere; anything else is relative to the folder you're standing in, which pwd shows. Dot means here, dot-dot means up one. Names that start with a dot are hidden but not protected. Watch capitals, because Linux treats them as different names, and put quotes around anything with a space."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Apple, <a href="https://support.apple.com/guide/terminal/welcome/mac" target="_blank" rel="noopener">Terminal User Guide for Mac</a> (including dragging files into Terminal to insert their paths).</li>
+<li>Apple, <a href="https://support.apple.com/guide/disk-utility/file-system-formats-dsku19ed921c/mac" target="_blank" rel="noopener">File system formats available in Disk Utility on Mac</a> (APFS, case-sensitive and case-insensitive variants).</li>
+<li>The Linux Foundation, <a href="https://refspecs.linuxfoundation.org/FHS_3.0/fhs/index.html" target="_blank" rel="noopener">Filesystem Hierarchy Standard 3.0</a> (what <code>/etc</code>, <code>/usr</code>, <code>/tmp</code> and <code>/home</code> are for).</li>
+<li>GNU, <a href="https://www.gnu.org/software/bash/manual/html_node/Quoting.html" target="_blank" rel="noopener">Bash manual: Quoting</a> and <a href="https://www.gnu.org/software/bash/manual/html_node/Tilde-Expansion.html" target="_blank" rel="noopener">Tilde Expansion</a>.</li>
+<li>Microsoft, <a href="https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file" target="_blank" rel="noopener">Naming files, paths and namespaces</a> (Windows paths, reserved characters, case).</li>
+<li>Microsoft, <a href="https://learn.microsoft.com/en-us/windows/wsl/filesystems" target="_blank" rel="noopener">Working across Windows and Linux file systems (WSL)</a>.</li>
+</ol>
+<p class="verified">Verified 9 November 2026: all commands run on macOS 26.6.2 (APFS, zsh 5.9; user name changed), bash error forms checked with bash 3.2; vendor documentation as linked.</p></div>

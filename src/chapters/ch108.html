@@ -1,0 +1,223 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>The building block behind every pattern: a model with tools, retrieval and memory</li>
+<li>Five workflow patterns from Anthropic's guidance: prompt chaining, routing, parallelisation, orchestrator-workers and evaluator-optimiser</li>
+<li>Two widely used agent patterns from research and practice: plan-and-execute and reflection</li>
+<li>How to choose a pattern, combine patterns, and estimate what each costs</li>
+<li>How to build and test the patterns in plain Python, offline</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch107">Chapter 107</a> (what makes an agent, workflows versus agents). <a href="#ch45">Chapter 45</a> introduces prompt chaining in a chat setting; this chapter does it in code. The lab needs Python 3.10 or newer and runs offline.</div>
+
+<div class="bigidea"><p>Most useful AI systems aren't one big clever agent. They're a few simple patterns joined together: do steps in order (chaining), send each input to the right handler (routing), do several things at once (parallelisation), let one model hand out work (orchestrator-workers), and let one step check another (evaluator-optimiser). Agents add two more habits: plan first, then act, and look back at mistakes before trying again. Each pattern buys something specific (accuracy, speed, flexibility) and costs something specific (latency, tokens, complexity). Pick the simplest one that solves the problem.</p></div>
+
+<h3 id="ch108-1"><span class="num">108.1</span>The building block and the menu</h3>
+<p>Anthropic's article "Building effective agents" (December 2024) starts from one building block, which it calls the <strong>augmented LLM</strong>: "an LLM enhanced with augmentations such as retrieval, tools, and memory". Every pattern in this chapter is a way of connecting several calls to that block, with ordinary code in between.</p>
+<p>A design pattern is a named, reusable solution to a problem that keeps coming up. You already know some from testing: the Page Object pattern in UI automation, Arrange-Act-Assert in unit tests. Agent design patterns play the same role: a shared vocabulary so a team can say "let's add an evaluator step" and everyone knows what that means.</p>
+<div class="tbl"><table>
+<tr><th>Pattern</th><th>One-line idea</th><th>Who decides the steps?</th><th>Source</th></tr>
+<tr><td><a class="gl" href="#g-prompt-chaining">Prompt chaining</a></td><td>Fixed steps in order, each using the last one's output</td><td>Your code</td><td>Anthropic article</td></tr>
+<tr><td><a class="gl" href="#g-prompt-routing">Routing</a></td><td>Classify the input, then send it to a specialised handler</td><td>Your code (model picks the branch)</td><td>Anthropic article</td></tr>
+<tr><td><a class="gl" href="#g-parallelisation">Parallelisation</a></td><td>Run several calls at once: different parts, or the same task several times</td><td>Your code</td><td>Anthropic article</td></tr>
+<tr><td><a class="gl" href="#g-orchestrator-workers">Orchestrator-workers</a></td><td>One call splits the task at run time and hands parts to workers</td><td>The model</td><td>Anthropic article</td></tr>
+<tr><td><a class="gl" href="#g-evaluator-optimiser">Evaluator-optimiser</a></td><td>One call produces, another judges and gives feedback, in a loop</td><td>Your code (loop), model (feedback)</td><td>Anthropic article</td></tr>
+<tr><td><a class="gl" href="#g-plan-and-execute">Plan-and-execute</a></td><td>Write the whole plan first, then carry it out step by step</td><td>The model (plan), code or model (execution)</td><td>Common in agent frameworks</td></tr>
+<tr><td><a class="gl" href="#g-reflection">Reflection</a></td><td>Critique your own failed attempt, write down the lesson, retry</td><td>The model</td><td>Research (e.g. Reflexion, 2023)</td></tr>
+</table></div>
+<p>The running example for this chapter is one bug report:</p>
+<div class="code"><span class="cap">The example input</span><pre>BUG-131: Applying voucher SAVE10 at checkout shows total 100.00 instead of 90.00.
+No error shown. API returns 200.</pre></div>
+
+<h3 id="ch108-2"><span class="num">108.2</span>Prompt chaining</h3>
+<p>Split a task into fixed steps. Each step is its own model call that takes the previous step's output. Between steps, your code can run a <strong>gate</strong>: a programmatic check that stops the chain if the intermediate result looks wrong.</p>
+<div class="flow"><div><b>Call 1</b>Rewrite the bug as numbered reproduction steps</div><div class="hl"><b>Gate (code)</b>Does it start with "1."? If not, stop</div><div><b>Call 2</b>Write three test case titles from the steps</div><div><b>Output</b>Test titles for review</div></div>
+<p><b>When to use it:</b> the task splits cleanly into steps you know in advance, and each step is easier for the model than the whole. Anthropic's article describes the trade as accepting more latency for higher accuracy. Its examples: write marketing copy, then translate it; outline a document, check the outline against criteria, then write it.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>A QA team turns Jira stories into test cases in three calls: (1) extract the acceptance criteria as a numbered list, (2) gate: code checks there is at least one criterion and none is longer than 300 characters, (3) generate test cases per criterion in a fixed JSON shape (<a href="#ch89">Chapter 89</a>, structured outputs). When step 1 fails on a badly written story, the gate stops it, and the story goes back to the product owner instead of producing nonsense tests.</p></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>An assembly line with inspection points. Each station does one job well, and an inspector between stations pulls faulty parts off the line before more work is wasted on them.</p></div>
+
+<h3 id="ch108-3"><span class="num">108.3</span>Routing</h3>
+<p>A first step classifies the input. Your code then sends it to a handler built for that kind of input: a different prompt, different tools, a different model, or a person.</p>
+<div class="flow"><div><b>Classify</b>ui, api or performance?</div><div class="hl"><b>Route (code)</b>Look up the handler; unknown goes to a default</div><div><b>Handler</b>Specialised prompt, tools or team</div></div>
+<p><b>When to use it:</b> inputs fall into distinct categories that are better handled separately, and the classification can be done reliably. Anthropic's example is customer service: general questions, refund requests and technical support each go to a different process. It also notes that routing can send easy questions to smaller, cheaper models and hard ones to more capable models, which is <a class="gl" href="#g-model-routing">model routing</a> (<a href="#ch40">Chapter 40</a>).</p>
+<div class="box warn"><span class="tag">Test the router like a classifier</span><p>A router is a classifier, so test it like one: build a labelled set of 50–100 real inputs, measure how often it picks the right branch, and look closely at the mistakes (<a href="#ch125">Chapter 125</a>). Always have a safe default branch for "none of the above". A silent misroute is worse than an honest "I'm not sure".</p></div>
+
+<h3 id="ch108-4"><span class="num">108.4</span>Parallelisation: sectioning and voting</h3>
+<p>Run several model calls at the same time and combine the results in code. Anthropic's article describes two forms:</p>
+<div class="cols2">
+<div><h4>Sectioning</h4><p>Split a task into independent parts and run them side by side. Example: review a pull request for security, accessibility and test coverage as three separate calls, each with a focused prompt. The article's example is guardrails: one call handles the user's request while another screens it for inappropriate content.</p></div>
+<div><h4>Voting</h4><p>Run the <em>same</em> task several times and compare. Example: ask three times "is BUG-131 a duplicate of BUG-88?" and take the majority. The article's example is reviewing code for vulnerabilities with several prompts that each flag problems.</p></div>
+</div>
+<p><b>When to use it:</b> sectioning when parts are truly independent and you want speed, or when each concern deserves full attention. Voting when you want more confidence than one answer gives, and when disagreement itself is useful information ("the three votes split: send to a human").</p>
+<details class="deep"><summary>Under the hood: why votes differ, and what voting can't fix</summary><div class="body">
+<p>A model's output is sampled (<a href="#ch16">Chapter 16</a>), so the same prompt can give different answers. Voting turns that variation into a signal: unanimous answers are more trustworthy than split ones. But voting can't fix a <em>systematic</em> error. If the prompt is missing the context needed to spot the duplicate, all three votes can be confidently wrong together. Voting also multiplies cost by the number of votes. Use it where a wrong answer is expensive, not everywhere.</p>
+</div></details>
+
+<h3 id="ch108-5"><span class="num">108.5</span>Orchestrator-workers</h3>
+<p>One model call, the orchestrator, looks at the task and decides what subtasks are needed. It hands each to a worker call, then combines what comes back. The article names the key difference from parallelisation as flexibility: the "subtasks aren't pre-defined, but determined by the orchestrator based on the specific input".</p>
+<div class="flow"><div><b>Orchestrator</b>"This failure touches login, cart and payments"</div><div class="hl"><b>Workers</b>One investigation per area, often in parallel</div><div><b>Orchestrator</b>Combines findings into one report</div></div>
+<p><b>When to use it:</b> you can't predict the subtasks in advance. The article's examples: coding changes that touch an unknown number of files, and research that gathers information from several sources.</p>
+<div class="box example"><span class="tag">Real-world example: Anthropic's Research feature</span><p>Anthropic described its own Research system (June 2025) as an orchestrator-worker design: a lead agent plans the research and starts subagents that search in parallel. It reported that a version with a Claude Opus 4 lead and Claude Sonnet 4 subagents outperformed a single Claude Opus 4 agent by 90.2% on its internal research evaluation, and that multi-agent systems used about 15 times more tokens than chat. Both figures are Anthropic's own measurements on its own task. The lesson for your team: the pattern can help on broad tasks, but check the gain is worth the cost on <em>your</em> task. <a href="#ch111">Chapter 111</a> covers multi-agent systems in depth.</p></div>
+
+<h3 id="ch108-6"><span class="num">108.6</span>Evaluator-optimiser</h3>
+<p>One call produces an answer. A second call (or code) evaluates it against clear criteria and gives specific feedback. The producer tries again using the feedback. The loop ends when the evaluator approves or a round limit is reached.</p>
+<div class="flow"><div><b>Generate</b>Draft three test titles</div><div class="hl"><b>Evaluate</b>All start with "Verify" and mention the voucher? If not, say what's wrong</div><div><b>Revise</b>Draft again with the feedback</div><div><b>Stop</b>On "OK", or after 3 rounds: hand to a human</div></div>
+<p><b>When to use it:</b> the article gives two signs: you have clear evaluation criteria, and iterating measurably improves the result. Its examples are literary translation and complex searches that need several rounds.</p>
+<div class="box note"><span class="tag">Prefer code checks where you can</span><p>If a criterion can be checked by code (valid JSON, every title starts with "Verify", the test file compiles, the test actually fails on the old build), check it with code. It's free, fast and never wrong about the rule. Use a model as the evaluator (<a class="gl" href="#g-llm-as-judge">LLM-as-judge</a>) only for qualities code can't measure, such as clarity, and test the judge itself (<a href="#ch125">Chapter 125</a>).</p></div>
+<div class="box warn"><span class="tag">Always cap the rounds</span><p>Without a round limit, a strict evaluator and a stubborn generator can loop forever, spending money each time. The article lists stopping conditions "such as a maximum number of iterations" as a standard control. When the cap is hit, the honest output is "couldn't satisfy the criteria; needs a person", not the last failed draft presented as finished.</p></div>
+
+<h3 id="ch108-7"><span class="num">108.7</span>Agent patterns: plan-and-execute and reflection</h3>
+<p>The five patterns above are mostly workflows: your code holds the structure. Two further patterns are common inside agents, where the model holds it. They are not among the patterns named in Anthropic's article, so treat them as widely used practice rather than official guidance.</p>
+<h4>Plan-and-execute</h4>
+<p>The agent first writes a complete plan as a list of steps. Then it carries the steps out, one at a time, checking results as it goes and re-planning only if something unexpected happens. Writing the plan down first makes the agent's intentions visible before it acts, which supports the transparency principle in <a href="#ch107">Chapter 107</a>, and gives a person a natural moment to approve or edit the plan.</p>
+<p>Claude Code's plan mode (<a href="#ch67">Chapter 67</a>) is a human-supervised version: Claude explores and proposes a plan, you review it, and only then does it edit files.</p>
+<h4>Reflection</h4>
+<p>After an attempt fails (a test still fails, an evaluator rejects the output), the model is asked to explain <em>why</em> in words and write down a lesson, then retry with that lesson in view. In March 2023, Noah Shinn and colleagues published <strong>Reflexion</strong>, in which language agents improve across attempts by writing out lessons from feedback and keeping them in memory, without retraining the model.</p>
+<div class="tbl"><table>
+<tr><th></th><th>Plan-and-execute</th><th>Reflection</th><th>Evaluator-optimiser</th></tr>
+<tr><td>Main question</td><td>"What are all the steps?"</td><td>"Why did that fail, and what will I do differently?"</td><td>"Does this output meet the criteria?"</td></tr>
+<tr><td>When it helps</td><td>Long tasks where a bad first step is costly</td><td>Tasks with clear failure signals (failing tests, errors)</td><td>Outputs with checkable criteria</td></tr>
+<tr><td>Main risk</td><td>Plan goes stale as facts change</td><td>Model "reflects" its way to a plausible but wrong cause</td><td>Judge and generator share the same blind spot</td></tr>
+<tr><td>QA example</td><td>"Plan: 1 read failing test, 2 read log, 3 reproduce, 4 propose fix"</td><td>"The locator was stale because the button text changed; use the test ID"</td><td>Generated test is rejected until it fails on the buggy build</td></tr>
+</table></div>
+<details class="deep"><summary>Under the hood: why reflection needs a real signal</summary><div class="body">
+<p>Reflection works best when the feedback comes from the world, not from the model's own opinion: a test result, a compiler error, a measured value. A model asked "was your answer good?" with no new evidence will often just agree with itself. So pair reflection with a real check: run the test, call the API, compare with the expected output. Then the "lesson" is grounded in something observed.</p>
+</div></details>
+
+<h3 id="ch108-8"><span class="num">108.8</span>Choosing and combining patterns</h3>
+<p>Start with the simplest thing that could work, then add a pattern only when you can name the problem it solves.</p>
+<div class="tbl"><table>
+<tr><th>If your problem is…</th><th>Try…</th><th>Cost you add</th></tr>
+<tr><td>One big prompt gives patchy results on a multi-part task</td><td>Prompt chaining with gates</td><td>More calls in sequence (latency)</td></tr>
+<tr><td>Different kinds of input need different handling</td><td>Routing, with a safe default</td><td>One extra (cheap) call per input</td></tr>
+<tr><td>Independent checks take too long one after another</td><td>Parallel sectioning</td><td>Same tokens, less waiting; more concurrent requests (rate limits, <a href="#ch90">Chapter 90</a>)</td></tr>
+<tr><td>You need more confidence in a yes/no decision</td><td>Parallel voting</td><td>Tokens × number of votes</td></tr>
+<tr><td>You can't know the subtasks until you see the input</td><td>Orchestrator-workers</td><td>Much higher token use; harder to debug</td></tr>
+<tr><td>Output must meet clear criteria and often doesn't first time</td><td>Evaluator-optimiser with a round cap</td><td>Up to rounds × 2 calls</td></tr>
+<tr><td>The agent dives in and wastes steps</td><td>Plan-and-execute, with plan review</td><td>One planning call; a human checkpoint</td></tr>
+<tr><td>The agent repeats the same mistake on retry</td><td>Reflection grounded in a real failure signal</td><td>One extra call per failed attempt</td></tr>
+</table></div>
+<p>Patterns compose. A realistic QA pipeline might <em>route</em> each nightly failure (product bug, test bug, environment), run a <em>chain</em> for product bugs (summarise, find similar, draft a Jira ticket), use <em>voting</em> for the "is it a duplicate?" decision, and finish with an <em>evaluator</em> that checks the draft has steps, expected and actual results. Only the investigation step for unknown failures needs a true agent.</p>
+<div class="box opinion"><span class="tag">Opinion · Anthropic ("Building effective agents")</span><p>The article argues that success comes from building the right system for your needs rather than the most sophisticated one, and that you should add complexity only when it demonstrably improves outcomes. In testing terms: every pattern you add is more behaviour to verify. Measure before and after (<a href="#ch125">Chapter 125</a>).</p></div>
+
+<div class="lab"><div class="lab-h"><b>Four patterns in one file (offline, no API key)</b><span>25 min · Python 3.10+ · terminal</span></div><ol>
+<li>Save the program below as <code>patterns.py</code>. Like the lab in <a href="#ch107">Chapter 107</a>, it has a <code>--fake</code> mode: canned, rule-based answers so the patterns run without an API key. The fake doesn't understand anything; it just lets you watch the plumbing.<span class="expect">one file, about 95 lines.</span></li>
+<li>Run <code>python3 patterns.py --fake</code>.<span class="expect"><code>ROUTING: ('ui', 'front-end squad')</code>, then three chained test titles, then a vote such as <code>VOTING: ('yes', ['yes', 'yes', 'no'])</code> (the order of votes may vary), then the evaluator loop: round 1 gives feedback, round 2 says <code>OK</code>, followed by three titles that each start with "Verify".</span></li>
+<li>Look at the chained titles. Two of the three don't start with "Verify". Chaining alone didn't enforce the format; the evaluator-optimiser did.<span class="expect">you can explain why the last section's output is better than the chaining section's.</span></li>
+<li>Break the gate: in <code>fake_llm</code>, change the <code>"steps"</code> answer so it starts with <code>"Steps:"</code> instead of <code>"1."</code>. Run again.<span class="expect">the program stops with <code>ValueError: step 1 output failed the gate</code>. The bad output never reached step 2. Change it back.</span></li>
+<li>Cap the loop: call <code>evaluator_optimiser(BUG, max_rounds=1)</code> in the last line.<span class="expect">one round of feedback, then the draft with <code>(stopped after max rounds: needs a human)</code>. That's the honest failure mode.</span></li>
+<li>Test the router: change <code>BUG</code> to include <code>API returns 500</code>.<span class="expect"><code>ROUTING: ('api', 'platform squad')</code>. Then imagine 100 real bugs: how would you measure the router's accuracy?</span></li>
+<li>Optional, with an API key: <code>pip install anthropic</code>, set <code>ANTHROPIC_API_KEY</code>, run <code>python3 patterns.py</code>.<span class="expect">real answers from Claude. Routing may differ from the fake (the real model reads the meaning, and may call this a ui or api issue). Votes are more likely to agree. The evaluator may pass on round 1.</span></li>
+</ol></div>
+<div class="code"><span class="cap">patterns.py</span><pre>"""Four workflow patterns on one bug report.
+Offline: python3 patterns.py --fake      Real: python3 patterns.py (needs ANTHROPIC_API_KEY)"""
+import os, sys
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
+
+PROMPTS = {
+    "classify": "Classify this bug report as exactly one word: ui, api or performance.\n\n{x}",
+    "steps":    "Rewrite this bug report as numbered reproduction steps only.\n\n{x}",
+    "tests":    "Write three test case titles, one per line, each starting 'Verify', for:\n\n{x}",
+    "dupe":     "Is this a duplicate of 'BUG-88 Voucher not applied at checkout'? Answer yes or no.\n\n{x}",
+    "review":   "Review these test titles. Reply OK if all three start with 'Verify' and mention "
+                "the voucher; otherwise give one line of feedback.\n\n{x}",
+}
+
+def fake_llm(task, x):
+    """Canned answers so the patterns run without an API key."""
+    if task == "classify":
+        return "api" if "500" in x else "ui"
+    if task == "steps":
+        return "1. Add item (100.00)\n2. Apply voucher SAVE10\n3. Check total"
+    if task == "tests":
+        if "Feedback" in x:
+            return ("Verify SAVE10 voucher reduces total by 10%\nVerify expired voucher is rejected\n"
+                    "Verify voucher total is recalculated after removing an item")
+        return "Check discount\nVerify SAVE10 voucher reduces total\nTest expired codes"
+    if task == "dupe":
+        fake_llm.n = getattr(fake_llm, "n", 0) + 1
+        return "no" if fake_llm.n % 3 == 0 else "yes"     # vary, like real sampling
+    if task == "review":
+        lines = x.strip().splitlines()[-3:]
+        ok = all(l.startswith("Verify") and "voucher" in l.lower() for l in lines)
+        return "OK" if ok else "Every title must start with 'Verify' and mention the voucher."
+
+def real_llm(task, x):
+    import anthropic
+    r = anthropic.Anthropic().messages.create(model="claude-opus-5-5", max_tokens=500,
+        messages=[{"role": "user", "content": PROMPTS[task].format(x=x)}])
+    return "".join(b.text for b in r.content if b.type == "text").strip()
+
+llm = fake_llm if "--fake" in sys.argv else real_llm
+
+BUG = ("BUG-131: Applying voucher SAVE10 at checkout shows total 100.00 instead of 90.00. "
+       "No error shown. API returns 200.")
+
+def routing(bug):
+    category = llm("classify", bug).lower()
+    handlers = {"ui": "front-end squad", "api": "platform squad", "performance": "perf team"}
+    return category, handlers.get(category, "triage lead")       # safe default route
+
+def chaining(bug):
+    steps = llm("steps", bug)
+    if not steps.lstrip().startswith("1."):                       # gate: check before continuing
+        raise ValueError("step 1 output failed the gate")
+    return llm("tests", steps)
+
+def voting(bug, n=3):
+    with ThreadPoolExecutor(max_workers=n) as pool:
+        votes = list(pool.map(lambda _: llm("dupe", bug).lower(), range(n)))
+    return Counter(votes).most_common(1)[0][0], votes
+
+def evaluator_optimiser(bug, max_rounds=3):
+    draft = llm("tests", bug)
+    for round_no in range(1, max_rounds + 1):
+        verdict = llm("review", draft)
+        print(f"  round {round_no}: {verdict}")
+        if verdict.strip().upper().startswith("OK"):
+            return draft
+        draft = llm("tests", f"{bug}\n\nPrevious attempt:\n{draft}\n\nFeedback: {verdict}")
+    return draft + "\n(stopped after max rounds: needs a human)"
+
+if __name__ == "__main__":
+    if llm is real_llm and not os.environ.get("ANTHROPIC_API_KEY"):
+        sys.exit("No ANTHROPIC_API_KEY set. Run with --fake to use the offline stand-in.")
+    print("ROUTING:", routing(BUG))
+    print("CHAINING:\n" + chaining(BUG))
+    print("VOTING:", voting(BUG))
+    print("EVALUATOR-OPTIMISER:")
+    print(evaluator_optimiser(BUG))</pre></div>
+<p><b>Troubleshooting.</b> <code>ModuleNotFoundError: anthropic</code> in real mode: run <code>pip install anthropic</code> in the same environment, or use <code>--fake</code>. Votes come out in a different order each run: expected, because the three calls run in parallel threads. Real-mode answers don't match the fake's: expected; the fake is rule-based. If the real router returns a word outside <code>ui</code>, <code>api</code>, <code>performance</code>, the safe default sends it to <code>triage lead</code>. The fake mode was tested on Python 3.11; the real mode follows Anthropic's documented request format but was not run for this chapter because no API key was available.</p>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"More agents and more patterns mean better results."</dt><dd>Each pattern adds cost, latency and behaviour to test. Add one only when you can name the problem it solves, and measure the improvement.</dd>
+<dt>"Parallelisation and orchestrator-workers are the same."</dt><dd>In parallelisation your code fixes the subtasks in advance. In orchestrator-workers the model decides them from the input.</dd>
+<dt>"Voting fixes hallucinations."</dt><dd>It reduces random errors. If every call lacks the same information, all votes can be wrong together.</dd>
+<dt>"An evaluator loop will always converge."</dt><dd>It may not. Cap the rounds and escalate to a person when the cap is reached.</dd>
+<dt>"Reflection means the model learns."</dt><dd>The model's weights don't change. The lesson is text kept in the conversation or memory and sent with the next attempt.</dd>
+</dl></div>
+
+<h3 id="ch108-r"><span class="num">108.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Every pattern connects calls to the same building block: a model augmented with retrieval, tools and memory.</li>
+<li>Prompt chaining: fixed steps with gates between them; trades latency for accuracy.</li>
+<li>Routing: classify, then send to a specialised handler; test the router as a classifier and keep a safe default.</li>
+<li>Parallelisation: sectioning for independent parts, voting for confidence; voting multiplies cost.</li>
+<li>Orchestrator-workers: the model chooses subtasks at run time; flexible, expensive and harder to debug.</li>
+<li>Evaluator-optimiser: produce, judge, revise; prefer code checks and always cap the rounds.</li>
+<li>Plan-and-execute and reflection are common agent habits; ground reflection in real failure signals.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">In prompt chaining, what is a "gate"?</p><div class="opts"><button>A model call that writes the final answer</button><button data-ok>A programmatic check between steps that stops the chain if the intermediate output is wrong</button><button>A rate limit on the API</button></div><p class="why" hidden>Gates catch bad intermediate results before more work is built on them.</p></div>
+<div class="qz"><p class="q">You must review a pull request for security, accessibility and test coverage, and want it fast. Which pattern fits?</p><div class="opts"><button data-ok>Parallel sectioning: three focused calls at once</button><button>Evaluator-optimiser</button><button>Routing</button></div><p class="why" hidden>The three concerns are independent, so they can run side by side, each with a focused prompt.</p></div>
+<div class="qz"><p class="q">What distinguishes orchestrator-workers from parallelisation?</p><div class="opts"><button>Orchestrator-workers always uses cheaper models</button><button data-ok>The orchestrator decides the subtasks from the input at run time instead of them being fixed in code</button><button>Parallelisation can't run calls at the same time</button></div><p class="why" hidden>Anthropic's article names this flexibility as the key difference.</p></div>
+<div class="qz"><p class="q">Your evaluator-optimiser loop sometimes never reaches "OK". What should the system do?</p><div class="opts"><button>Keep looping until it passes</button><button>Return the last draft as if it passed</button><button data-ok>Stop at a round limit and flag the output for a person</button></div><p class="why" hidden>Stopping conditions keep cost bounded; honest escalation beats a silently failed draft.</p></div>
+<div class="qz"><p class="q">Three votes on "is this a duplicate?" all say yes, but it isn't. What's the most likely cause?</p><div class="opts"><button>Too few votes</button><button data-ok>A systematic problem, such as missing context, that affects every call the same way</button><button>The calls ran in parallel</button></div><p class="why" hidden>Voting reduces random variation, not shared blind spots.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Take one AI-assisted process your team runs or wants (for example: story to test cases, failure triage, release-notes drafting). Draw it as a pipeline using the patterns in this chapter, with a <code>.flow</code>-style box diagram on paper or in a doc. For each pattern you use, write one sentence on the problem it solves and one on what it costs. Mark every gate and every round limit. Then remove one pattern and argue whether the pipeline would still be good enough.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"There are a handful of standard ways to wire AI calls together. Chaining does steps in order with checks in between. Routing sorts inputs and sends each to the right handler. Parallelisation runs several calls at once, either splitting the work or voting on the same question. Orchestrator-workers lets one model hand out jobs it decides on the fly. Evaluator-optimiser has one step check another and send it back with feedback, with a cap on rounds. Each adds cost and things to test, so we start simple and add a pattern only when we can name the problem it fixes."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://www.anthropic.com/engineering/building-effective-agents" target="_blank" rel="noopener">Building effective agents</a> (19 December 2024): augmented LLM, the five workflow patterns, examples, stopping conditions.</li>
+<li>Anthropic, <a href="https://www.anthropic.com/engineering/multi-agent-research-system" target="_blank" rel="noopener">How we built our multi-agent research system</a> (13 June 2025): orchestrator-worker design, 90.2% internal result, token multiples.</li>
+<li>Shinn et al., <a href="https://arxiv.org/abs/2303.11366" target="_blank" rel="noopener">Reflexion: Language Agents with Verbal Reinforcement Learning</a> (arXiv, March 2023).</li>
+<li>Yao et al., <a href="https://arxiv.org/abs/2210.03629" target="_blank" rel="noopener">ReAct: Synergizing Reasoning and Acting in Language Models</a> (arXiv, October 2022).</li>
+<li>Claude Docs, <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview" target="_blank" rel="noopener">Tool use with Claude</a>.</li>
+</ol><p class="verified">Verified 9 November 2026 against the sources listed. Plan-and-execute is described as common practice; it is not a pattern named in Anthropic's article.</p></div>

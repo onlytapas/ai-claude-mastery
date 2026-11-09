@@ -1,0 +1,281 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>A systematic debugging method that works with or without AI, and how Claude Code fits each step</li>
+<li>How to give Claude the right evidence: reproductions, stack traces, logs and traces</li>
+<li>How to automate <code>git bisect</code> so the first bad commit is found for you</li>
+<li>How to find a root cause rather than a symptom, and write a blameless RCA that people act on</li>
+<li>How to use <code>/code-review</code> and ultrareview findings well, and how to review AI-written code</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch62">Chapter 62</a> (reading errors), <a href="#ch71">Chapter 71</a> (git workflows, including <code>/code-review</code> syntax and manual <code>git bisect</code>) and <a href="#ch124">Chapter 124</a> (bug investigation). The labs need Claude Code, git and Python 3.</div>
+
+<div class="bigidea"><p>Debugging is detective work: reproduce the problem, collect evidence, form a guess about the cause, test the guess, and only then fix. Claude Code is an excellent assistant detective. It reads stack traces, logs and code fast, proposes hypotheses and runs experiments. But it is just as capable as a human of fixing a symptom and calling it solved. Root-cause analysis asks "why did this really happen, and why didn't we catch it?", and a good write-up turns one bug into lasting improvements. Code review, by people and by AI, is how you stop the next one; AI-written code needs that review as much as any other code.</p></div>
+
+<h3 id="ch115-1"><span class="num">115.1</span>Debugging is a method, not a guess</h3>
+<p>Under pressure, people (and AI models) jump to a fix: "it's probably the cache, let's clear it". Sometimes that works, and nobody learns why. A method is slower for the first five minutes and much faster overall.</p>
+<div class="flow">
+<div><b>1. Reproduce</b>Make it fail on demand, ideally with one command</div>
+<div><b>2. Observe</b>Collect evidence: error, stack trace, logs, what changed</div>
+<div class="hl"><b>3. Hypothesise</b>List possible causes; rank by evidence</div>
+<div><b>4. Experiment</b>Test one hypothesis at a time</div>
+<div><b>5. Fix</b>Smallest change that addresses the cause</div>
+<div><b>6. Verify</b>Reproduction now passes; add a regression test</div>
+</div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A good doctor doesn't prescribe antibiotics because you said "I feel unwell". They ask questions, examine you, maybe order a test, and treat the cause. A painkiller (a symptom fix) can make you feel better while the infection continues. Software bugs are the same: a retry that hides a timeout is a painkiller.</p></div>
+<p>The most valuable step is the first. A <a class="gl" href="#g-minimal-reproduction">minimal reproduction</a>, the smallest set of steps or code that still shows the bug, makes every later step easier, for you and for Claude. Testers are often the best people in the team at producing one.</p>
+
+<h3 id="ch115-2"><span class="num">115.2</span>Debugging with Claude Code</h3>
+<p>Claude Code can do every step of the method: run the failing command, read the code, search history, add temporary logging, run experiments and propose a fix. Your job is to keep it on the method rather than letting it leap to a fix.</p>
+<h4>Give it evidence, not just a complaint</h4>
+<div class="cols2">
+<div><h4>Weak</h4><pre>Checkout is broken, fix it.</pre></div>
+<div><h4>Strong</h4><pre>Since yesterday's deploy, checkout fails for baskets
+with SAVE25. Reproduce: python3 -m pytest
+tests/test_checkout.py::test_save25 (fails, trace
+below). It passed on tag v4.1.0. Don't change code yet:
+reproduce it, list three hypotheses with the evidence
+for each, and propose an experiment for the top one.
+
+&lt;paste the stack trace&gt;</pre></div>
+</div>
+<p>The "don't change code yet" instruction matters. It keeps Claude in investigation mode. Plan mode (<a href="#ch67">Chapter 67</a>) enforces the same thing: Claude can read and run read-only checks, but can't edit until you approve a plan.</p>
+<h4>Useful Claude Code features while debugging</h4>
+<div class="tbl"><table>
+<tr><th>Feature</th><th>How it helps</th></tr>
+<tr><td><code>!</code> at the start of a prompt</td><td>Shell mode: runs a command directly and adds its output to the conversation, for example <code>! npm test</code>. A quick way to give Claude fresh evidence</td></tr>
+<tr><td>Plan mode (<code>/plan</code> or Shift+Tab)</td><td>Investigate without edits; approve a plan before any fix</td></tr>
+<tr><td><code>/rewind</code> (or <code>Esc Esc</code> on an empty prompt)</td><td>Restore code and/or conversation to a checkpoint after a failed experiment. It doesn't track files changed only by shell commands, so commit or stash before big experiments</td></tr>
+<tr><td>Subagents (<a href="#ch81">Chapter 81</a>)</td><td>Send a long log search to a subagent so your main conversation stays focused</td></tr>
+<tr><td><code>Ctrl+B</code></td><td>Send a slow command (a long test run) to the background while you keep talking</td></tr>
+</table></div>
+<div class="box note"><span class="tag">Not that kind of debug</span><p>Claude Code has a <code>/debug</code> skill and a <code>--debug</code> flag. They turn on debug logging for <em>Claude Code itself</em>, for when the tool misbehaves (an MCP server not starting, a hook not firing). They're not for debugging your application.</p></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A tester reported that the order-history page showed the wrong order count for some users. Asked to investigate without fixing, Claude reproduced it with a seeded test user, then proposed three hypotheses: a timezone boundary, pagination, and cancelled orders being counted. Its experiment (create an order at 23:30 UTC) confirmed the timezone one. The developer's first instinct had been pagination. Thirty minutes of method saved a day of guessing.</p></div>
+<div class="box warn"><span class="tag">Watch for "fixes" that remove the evidence</span><p>An AI under instruction to "make the test pass" may loosen the assertion, add a broad <code>try/except</code>, increase a timeout or skip the test. Each makes the symptom vanish and leaves the bug. Say explicitly: "Don't change tests or timeouts to make this pass; find the cause."</p></div>
+
+<h3 id="ch115-3"><span class="num">115.3</span>Evidence: stack traces, logs and traces</h3>
+<p>Three kinds of evidence answer different questions:</p>
+<div class="tbl"><table>
+<tr><th>Evidence</th><th>Answers</th><th>Tips</th></tr>
+<tr><td><a class="gl" href="#g-stack-trace">Stack trace</a></td><td>Where in the code did it fail, and through which calls?</td><td>Read from the line that names your own code; the top or bottom depends on the language (Python puts the failing line last)</td></tr>
+<tr><td>Logs</td><td>What was the system doing before and after?</td><td>Filter by time window and request; compare with a time it worked</td></tr>
+<tr><td>Distributed <a class="gl" href="#g-trace">trace</a></td><td>Which service in a chain was slow or failed?</td><td>Follow one request across services; find the longest or failing span</td></tr>
+</table></div>
+<p>In systems with many services, a <a class="gl" href="#g-correlation-id">correlation ID</a> (a request ID passed from service to service and written in every log line) lets you pull together everything that happened to one request. If your logs lack one, that's a finding for the RCA.</p>
+<h4>Summarise before you send</h4>
+<p>Pasting a 50,000-line log into a conversation wastes tokens and buries the signal (<a href="#ch20">Chapter 20</a>). Summarise first with a small script, or ask Claude to write one and run it, so it reads the summary rather than the raw file. Save this as <code>error_summary.py</code>:</p>
+<div class="code"><span class="cap">error_summary.py</span><pre>#!/usr/bin/env python3
+"""Group ERROR lines in a log by error type: count, first and last time, sample request."""
+import re, sys
+from collections import OrderedDict
+
+LINE = re.compile(r"^(\S+)\s+(\w+)\s+req=(\S+)\s+(\S+)\s+(\S+)\s+(.*)$")
+
+groups = OrderedDict()
+for raw in open(sys.argv[1] if len(sys.argv) &gt; 1 else "app.log", encoding="utf-8"):
+    m = LINE.match(raw.strip())
+    if not m or m.group(2) != "ERROR":
+        continue
+    time, _, req, method, path, message = m.groups()
+    error_type = message.split(":")[0]
+    key = (error_type, method, path)
+    g = groups.setdefault(key, {"count": 0, "first": time, "last": time, "req": req})
+    g["count"] += 1
+    g["last"] = time
+
+for (error_type, method, path), g in sorted(groups.items(), key=lambda kv: -kv[1]["count"]):
+    print(f"{g['count']:&gt;3}  {error_type:&lt;16}{method} {path}")
+    print(f"     first {g['first']}  last {g['last']}  e.g. req={g['req']}")</pre></div>
+<p>And a small sample log, <code>app.log</code> (illustrative):</p>
+<div class="code"><span class="cap">app.log</span><pre>2026-11-09T10:00:01Z INFO  req=a1 GET /api/basket 200 45ms
+2026-11-09T10:00:02Z INFO  req=a2 POST /api/checkout 200 310ms
+2026-11-09T10:02:10Z WARN  req=a3 POST /api/checkout slow response 2900ms
+2026-11-09T10:02:11Z ERROR req=a3 POST /api/checkout PaymentTimeout: provider did not answer in 3000ms
+2026-11-09T10:02:15Z ERROR req=a4 POST /api/checkout PaymentTimeout: provider did not answer in 3000ms
+2026-11-09T10:02:16Z ERROR req=a5 GET /api/coupons/SAVE25 KeyError: 'min_spend'
+2026-11-09T10:02:20Z ERROR req=a6 POST /api/checkout PaymentTimeout: provider did not answer in 3000ms
+2026-11-09T10:03:01Z INFO  req=a7 GET /api/basket 200 51ms
+2026-11-09T10:03:05Z ERROR req=a8 GET /api/coupons/SAVE25 KeyError: 'min_spend'</pre></div>
+<div class="code"><span class="cap">Terminal: python3 error_summary.py app.log</span><pre>  3  PaymentTimeout  POST /api/checkout
+     first 2026-11-09T10:02:11Z  last 2026-11-09T10:02:20Z  e.g. req=a3
+  2  KeyError        GET /api/coupons/SAVE25
+     first 2026-11-09T10:02:16Z  last 2026-11-09T10:03:05Z  e.g. req=a5</pre></div>
+<p>Two separate problems, not one: a payment-provider timeout (possibly outside your code) and a <code>KeyError</code> in coupon handling (almost certainly a code bug, perhaps a new <code>min_spend</code> field missing from older coupons). Now Claude can investigate each with focus.</p>
+<div class="box warn"><span class="tag">Logs contain personal data</span><p>Production logs can contain names, emails, addresses and tokens. Use approved tools only, redact before sharing, and follow your data rules (<a href="#ch132">Chapter 132</a>).</p></div>
+
+<h3 id="ch115-4"><span class="num">115.4</span>Finding the guilty commit: automated bisect</h3>
+<p><a href="#ch71">Chapter 71</a> showed manual <a class="gl" href="#g-git-bisect">git bisect</a>: git picks a commit halfway between a good and a bad one, you test it and say <code>good</code> or <code>bad</code>, and it narrows down. When a command can detect the bug, git can do all the testing itself with <code>git bisect run</code>:</p>
+<div class="code"><span class="cap">Terminal</span><pre>git bisect start HEAD v1.0               <span class="c"># bad commit first, then a known good one</span>
+git bisect run python3 check_shipping.py <span class="c"># git runs it at each step</span>
+git bisect reset                          <span class="c"># go back to where you started</span></pre></div>
+<p>The command's exit code tells git the answer:</p>
+<div class="tbl"><table>
+<tr><th>Exit code</th><th>Meaning to git bisect</th></tr>
+<tr><td>0</td><td>This commit is good</td></tr>
+<tr><td>125</td><td>Can't test this commit (for example, it doesn't build): skip it</td></tr>
+<tr><td>1 to 127, except 125</td><td>This commit is bad</td></tr>
+<tr><td>Anything else (above 127)</td><td>Stop the bisect: something went wrong</td></tr>
+</table></div>
+<p>A good check script is quick, tests only the bug in question, and exits 125 when it can't run. Claude is good at writing these: "Write a script that exits 0 if the SAVE25 bug is absent, 1 if present, and 125 if the project doesn't build. Then run git bisect between v4.1.0 and HEAD with it." Watch the first step or two to confirm the script really detects the bug: a script that always fails points at the wrong commit with complete confidence.</p>
+<details class="deep"><summary>Under the hood: why bisect is so fast</summary><div class="body">
+<p>Each test halves the number of suspect commits. With <i>n</i> commits you need about log<sub>2</sub>(<i>n</i>) tests: 10 for about 1,000 commits, 20 for about a million. Linear checking (one commit at a time) would need up to <i>n</i>. The catch is that bisect assumes the bug appeared once and stayed. If it came and went (for example, a flaky test, <a class="gl" href="#g-flaky-test">flaky tests</a> being common in UI suites), bisect can blame an innocent commit. Make the check deterministic, or run it several times inside the script and fail only if it fails consistently.</p>
+</div></details>
+
+<h3 id="ch115-5"><span class="num">115.5</span>Root-cause analysis: past the symptom</h3>
+<p><a class="gl" href="#g-root-cause-analysis">Root-cause analysis</a> (RCA) asks why a problem really happened, so that the fix prevents the whole class of problem rather than one instance. A useful distinction:</p>
+<div class="tbl"><table>
+<tr><th>Level</th><th>Example (the shipping bug from the lab)</th></tr>
+<tr><td>Symptom</td><td>Customers with light parcels were charged £3.00 instead of £4.50</td></tr>
+<tr><td>Direct cause</td><td><code>math.ceil</code> was replaced with <code>round</code>, so 0.2 kg rounded to 0</td></tr>
+<tr><td>Contributing factors</td><td>The commit was labelled "tidy" and had no review; no test covered parcels under 0.5 kg; the business rule "per started kg" lived only in a comment</td></tr>
+<tr><td>Root causes (systemic)</td><td>No required review for small changes; no boundary-value tests for pricing rules; requirements not captured as tests</td></tr>
+</table></div>
+<h4>Five whys</h4>
+<p>The <a class="gl" href="#g-five-whys">five whys</a> technique keeps asking "why?" until you reach something you can change in the process, not just the code. Five is a rule of thumb, not a law.</p>
+<div class="code"><span class="cap">Five whys (illustrative)</span><pre>Why were light parcels undercharged? -&gt; shipping_cost(0.2) returned 300.
+Why?  -&gt; round() replaced math.ceil() in a "tidy" commit.
+Why wasn't it caught in review? -&gt; Small commits could merge without review.
+Why didn't tests catch it?      -&gt; No test below 1 kg; boundaries weren't in the test design.
+Why not?  -&gt; The "per started kg" rule was never written as an acceptance criterion.</pre></div>
+<p>Notice the answer is rarely one thing. Real incidents usually have several contributing causes, which is why some teams prefer a causal diagram (a "fishbone" listing causes under headings such as code, tests, process, people, environment) over a single chain.</p>
+<h4>Where Claude helps, and where it doesn't</h4>
+<ul>
+<li><b>Helps:</b> building a timeline from commits, tickets, chat exports and alerts; asking the next "why"; suggesting contributing factors you missed; drafting the write-up.</li>
+<li><b>Doesn't replace:</b> talking to the people involved, and the team's judgement about which actions are worth their cost.</li>
+</ul>
+<div class="box opinion"><span class="tag">Opinion · from the site reliability engineering community</span><p>Many reliability practitioners argue that "root cause" in the singular is misleading for complex systems, because incidents come from several factors combining, and that the search for one cause tends to end at "human error". They prefer the phrase "contributing factors". This chapter uses RCA because it's the common term, but the advice is the same: look for several causes, and look at the system.</p></div>
+
+<h3 id="ch115-6"><span class="num">115.6</span>Writing an RCA people act on</h3>
+<p>An RCA document that nobody reads fixes nothing. Keep it short, factual and <a class="gl" href="#g-blameless-postmortem">blameless</a>: it describes what the system allowed to happen, not who to blame. People share more honestly when they won't be punished, and the honest details are where the learning is.</p>
+<div class="code"><span class="cap">RCA template</span><pre>Title:     Light parcels undercharged for shipping (INC-2041)
+Severity:  (your scale)     Status: actions in progress
+Summary:   Two or three sentences a manager can read in 20 seconds.
+Impact:    Who was affected, how many, for how long, cost if known.
+Timeline:  UTC times: introduced, deployed, detected, mitigated, resolved.
+Detection: How we found out. How we SHOULD have found out.
+Causes:    Direct cause; contributing factors (code, tests, process, tooling).
+What went well: Things to keep.
+Actions:   Each one: owner, due date, ticket link. Prefer prevention and
+           detection over "be more careful".
+           e.g. add boundary tests for all pricing rules (QA, 2 weeks, QA-881)
+Evidence:  Links to commits, logs, dashboards, the bisect output.</pre></div>
+<div class="code"><span class="cap">Prompt: draft the RCA from evidence</span><pre>Using the bisect output, the diff of the bad commit, the Jira ticket and
+the Slack export in incident/ , draft an RCA using the template in
+docs/rca-template.md. Blameless language. Mark every statement you
+inferred rather than read from the evidence with [check]. Propose
+actions, but don't assign owners; we'll do that in the review.</pre></div>
+<p>The <code>[check]</code> marker is the important part: it separates evidence from Claude's inference, so the review meeting checks exactly the right sentences.</p>
+
+<h3 id="ch115-7"><span class="num">115.7</span>Using AI code review well</h3>
+<p>The best bug is the one that never merges. <a href="#ch71">Chapter 71</a> introduced the tools and their syntax: <code>/code-review</code> (alias <code>/review</code>) with effort levels from <code>low</code> to <code>max</code>, <code>ultra</code> for a deep multi-agent review in the cloud, <code>--fix</code> and <code>--comment</code>; and <code>claude ultrareview</code> from the shell. Here the question is how to use them well.</p>
+<h4>Choosing the right review</h4>
+<div class="tbl"><table>
+<tr><th>Situation</th><th>Choice</th><th>Why</th></tr>
+<tr><td>Checking your own work before committing</td><td><code>/code-review</code> at <code>low</code> or <code>medium</code></td><td>Few, high-confidence findings; quick</td></tr>
+<tr><td>A risky PR (payments, auth, data migration)</td><td><code>/code-review high</code> or <code>ultra</code></td><td>More findings, including uncertain ones worth a look</td></tr>
+<tr><td>A big change before release, from a script or CI</td><td><code>claude ultrareview &lt;PR&gt;</code></td><td>Deep cloud review; prints findings unless you add <code>--post</code>. Free runs are limited, then it uses usage credits</td></tr>
+<tr><td>Security-sensitive changes</td><td><code>/security-review</code></td><td>Focused on vulnerabilities in your branch's diff</td></tr>
+<tr><td>Code works but is messy</td><td><code>/simplify</code></td><td>Reuse, simplification and efficiency; it doesn't hunt bugs</td></tr>
+</table></div>
+<h4>Triage every finding</h4>
+<p>A review finding is a hypothesis, not a verdict. Sort each one:</p>
+<div class="tbl"><table>
+<tr><th>Decision</th><th>When</th><th>What to do</th></tr>
+<tr><td>Accept</td><td>You can see the bug, or write a test that shows it</td><td>Write the failing test first, then fix</td></tr>
+<tr><td>Question</td><td>Plausible but unclear</td><td>Ask Claude for a concrete input that triggers it; if it can't give one, downgrade</td></tr>
+<tr><td>Reject</td><td>Wrong, or based on a misunderstanding of requirements</td><td>Note why; if the misunderstanding is common, add the rule to CLAUDE.md</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Careful with --fix</span><p><code>--fix</code> applies the findings to your working tree. That's convenient, but it can apply a wrong finding too. Use it on a clean branch, read the diff, and run the tests afterwards. For anything you'd struggle to review, prefer accepting findings one by one.</p></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A high-effort review of a refund PR produced seven findings. Triage took ten minutes: two accepted (a missing currency check, and an off-by-one in a date range, each proven with a new test), three questioned (two downgraded when no failing input could be found), and two rejected because they assumed refunds could exceed the order total, which the business rules forbid. The team added that rule to CLAUDE.md, and later reviews stopped raising it.</p></div>
+
+<h3 id="ch115-8"><span class="num">115.8</span>Reviewing AI-written code</h3>
+<p>AI-written code tends to look clean, well named and confident. That makes it easy to approve and sometimes hard to doubt. It fails in some characteristic ways that are worth checking deliberately:</p>
+<div class="tbl"><table>
+<tr><th>Check</th><th>What to look for</th></tr>
+<tr><td>Does it do what was asked, and only that?</td><td>Extra "improvements" in unrelated files; scope creep hides risk</td></tr>
+<tr><td>Do the APIs and packages exist?</td><td>Invented functions, options or package names (<a class="gl" href="#g-hallucination">hallucinations</a>); a package name that doesn't exist could later be registered by an attacker</td></tr>
+<tr><td>Were tests weakened?</td><td>Loosened assertions, skipped tests, raised timeouts, deleted cases (<a href="#ch71">Chapter 71</a>, 71.3)</td></tr>
+<tr><td>Are errors handled or hidden?</td><td>Broad <code>try/except</code> or empty <code>catch</code> blocks that swallow failures</td></tr>
+<tr><td>Edge cases</td><td>Empty input, zero, boundaries, time zones, rounding, concurrency: as in the shipping bug</td></tr>
+<tr><td>Security</td><td>String-built SQL, unescaped output, secrets in code, over-wide permissions</td></tr>
+<tr><td>Fits the codebase?</td><td>Duplicates an existing helper; ignores team conventions</td></tr>
+<tr><td>Can you explain it?</td><td>If you couldn't explain the change to a colleague, you're not ready to approve it</td></tr>
+</table></div>
+<div class="box note"><span class="tag">Same standard, different blind spots</span><p>Hold AI-written code to exactly the same standard as human code: same review, same tests, same approval. What changes is where you look hardest. People make typos and forget things; AI makes confident, plausible mistakes and over-reaches. A tester's habit of asking "how could this be wrong?" is the right instinct for both.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Find, explain and review a regression</b><span>40 min · Claude Code + git + Python 3</span></div>
+<p><b>Setup.</b> Save this script as <code>make_bisect_lab.sh</code> in an empty folder and run <code>bash make_bisect_lab.sh</code>. It builds a practice repository with twelve commits, one of which quietly breaks the shipping calculation.</p>
+<div class="code"><span class="cap">make_bisect_lab.sh</span><pre>#!/usr/bin/env bash
+# Creates a practice repo with 12 commits; one of them quietly breaks rounding.
+set -e
+mkdir bisect-lab &amp;&amp; cd bisect-lab
+git init -q
+git config user.email "lab@example.com"
+git config user.name "Lab"
+cat &gt; shipping.py &lt;&lt;'PY'
+def shipping_cost(weight_kg):
+    """Return shipping cost in pence: 300 base + 150 per started kg."""
+    import math
+    return 300 + 150 * math.ceil(weight_kg)
+PY
+cat &gt; check_shipping.py &lt;&lt;'PY'
+from shipping import shipping_cost
+assert shipping_cost(0.2) == 450, shipping_cost(0.2)
+assert shipping_cost(1.0) == 450, shipping_cost(1.0)
+assert shipping_cost(1.1) == 600, shipping_cost(1.1)
+print("shipping OK")
+PY
+git add . &amp;&amp; git commit -qm "Add shipping cost" &amp;&amp; git tag v1.0
+for i in $(seq 1 11); do
+  echo "# note $i" &gt;&gt; NOTES.md
+  if [ "$i" -eq 7 ]; then
+    sed -i.bak 's/math.ceil(weight_kg)/round(weight_kg)/' shipping.py &amp;&amp; rm shipping.py.bak
+    git add . &amp;&amp; git commit -qm "Tidy shipping calculation"
+  else
+    git add . &amp;&amp; git commit -qm "Update notes $i"
+  fi
+done
+echo "Created bisect-lab with $(git rev-list --count HEAD) commits"</pre></div>
+<ol>
+<li>Run the script, then <code>cd bisect-lab</code> and <code>python3 check_shipping.py</code>.<span class="expect"><code>Created bisect-lab with 12 commits</code>, then an <code>AssertionError: 300</code>: a 0.2 kg parcel costs 300 instead of 450.</span></li>
+<li>Bisect it yourself: <code>git bisect start HEAD v1.0</code>, then <code>git bisect run python3 check_shipping.py</code>.<span class="expect">git tests a few commits and prints <code>... is the first bad commit</code> with the message "Tidy shipping calculation", then <code>bisect found first bad commit</code>.</span></li>
+<li>Run <code>git bisect reset</code>, then <code>git show</code> with the commit ID git printed.<span class="expect">the diff replacing <code>math.ceil(weight_kg)</code> with <code>round(weight_kg)</code>.</span></li>
+<li>Start <code>claude</code> in <code>bisect-lab</code>. Ask: "check_shipping.py fails. Don't change any code yet. Reproduce it, find which commit introduced it using git bisect run, and explain the cause and why the commit message hid it."<span class="expect">Claude runs the same bisect, names the same commit, and explains that <code>round</code> rounds 0.2 down to 0 while the rule is "per started kg".</span></li>
+<li>Ask: "Write a five-whys analysis and a blameless RCA using the template in section 114.6 of my notes: [paste the template]. Mark inferences with [check]."<span class="expect">an RCA naming the direct cause, contributing factors (no review, no boundary tests, rule only in a comment) and concrete actions.</span></li>
+<li>Ask Claude to fix it with a test first: "Add boundary tests (0.0, 0.2, 1.0, 1.01, 2.5 kg) to check_shipping.py, show them failing, then fix shipping.py."<span class="expect">new assertions fail first, then pass after <code>math.ceil</code> is restored. Note: 0.0 kg gives 300 with <code>ceil</code>; decide whether that's correct, which is a requirements question.</span></li>
+<li>Run <code>/code-review</code> on the uncommitted fix and triage each finding as accept, question or reject.<span class="expect">few or no findings, possibly a question about zero or negative weights. Record your decision for each.</span></li>
+</ol>
+<p><b>Troubleshooting.</b> <code>mkdir: bisect-lab: File exists</code>: delete the old folder or run the script elsewhere. Bisect names a "notes" commit: the check script was edited; recreate the lab. <code>python3: command not found</code>: use <code>python</code> or install Python 3 (<a href="#ch58">Chapter 58</a>). Stuck mid-bisect: <code>git bisect reset</code> always returns you to where you started.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"The test passes now, so it's fixed."</dt><dd>Check how it passes. A loosened assertion or a longer timeout hides the bug. Verify against the original reproduction and the requirement.</dd>
+<dt>"Root cause means finding who made the mistake."</dt><dd>It means finding what in the system allowed the mistake through. Blameless write-ups get honest details and better fixes.</dd>
+<dt>"An AI review found nothing, so the code is fine."</dt><dd>It found nothing it was confident about. It can't judge whether the change matches intent; a human still approves.</dd>
+<dt>"/debug will help me debug my app."</dt><dd><code>/debug</code> troubleshoots Claude Code itself using its debug log. For your app, use the method in this chapter.</dd>
+<dt>"Bisect can't help without a test."</dt><dd>Any command that exits 0 for good and non-zero for bad will do: a curl check, a grep on output, a short script Claude writes.</dd>
+</dl></div>
+
+<h3 id="ch115-r"><span class="num">115.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Debug by method: reproduce, observe, hypothesise, experiment, fix, verify. A minimal reproduction is the most valuable step.</li>
+<li>Give Claude evidence and say "don't change code yet"; plan mode, <code>!</code> shell mode and <code>/rewind</code> support careful investigation.</li>
+<li>Summarise large logs before sharing; use stack traces for "where", logs for "what", traces and correlation IDs for "which service".</li>
+<li><code>git bisect run &lt;command&gt;</code> finds the first bad commit automatically: exit 0 good, 125 skip, other codes up to 127 bad.</li>
+<li>RCA separates symptom, direct cause, contributing factors and systemic causes; write it blameless, with owned and dated actions.</li>
+<li>Triage every <code>/code-review</code> or ultrareview finding as accept (prove with a test), question or reject; use <code>--fix</code> carefully.</li>
+<li>Review AI-written code to the same standard, looking hardest at scope creep, invented APIs, weakened tests, swallowed errors and edge cases.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Claude proposes increasing a test's timeout from 5 to 30 seconds to fix an intermittent failure. What's the best response?</p><div class="opts"><button>Accept: the test passes now</button><button data-ok>Ask it to find why the operation is slow first; a longer timeout may hide the real problem</button><button>Delete the test</button></div><p class="why" hidden>Raising a timeout treats the symptom. Find the cause, then decide whether the timeout was really wrong.</p></div>
+<div class="qz"><p class="q">During <code>git bisect run</code>, your check script exits with code 125. What does git do?</p><div class="opts"><button>Marks the commit bad</button><button data-ok>Skips that commit as untestable</button><button>Stops the bisect with an error</button></div><p class="why" hidden>125 means "can't test this one", for example because it doesn't build.</p></div>
+<div class="qz"><p class="q">Which of these is a contributing factor rather than the direct cause of the shipping bug?</p><div class="opts"><button><code>round</code> replaced <code>math.ceil</code></button><button data-ok>No test covered parcels under 1 kg</button><button>Light parcels were undercharged</button></div><p class="why" hidden>The code change is the direct cause, undercharging is the symptom, and the missing test is a contributing factor that let it through.</p></div>
+<div class="qz"><p class="q">A review finding says a function "may fail on some inputs", but Claude can't give a concrete failing input. What should you do?</p><div class="opts"><button>Apply it with <code>--fix</code> anyway</button><button data-ok>Mark it "question" and downgrade it unless a failing input or test can be found</button><button>Turn off code review</button></div><p class="why" hidden>Findings are hypotheses. Accept those you can demonstrate; downgrade those you can't.</p></div>
+<div class="qz"><p class="q">What is <code>/debug</code> in Claude Code for?</p><div class="opts"><button>Stepping through your application line by line</button><button data-ok>Turning on debug logging and troubleshooting Claude Code itself</button><button>Running your test suite in debug mode</button></div><p class="why" hidden>It's for problems with Claude Code (hooks, MCP servers, start-up), not for your application's bugs.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Take a real bug your team fixed in the last three months. Using its ticket, commits and any chat history, write a blameless RCA with the template in 114.6: timeline, direct cause, at least three contributing factors, and actions with owners and dates. Use Claude to draft it with <code>[check]</code> markers, then verify every marked sentence yourself. Finally, write the regression test that would have caught the bug, and prove it fails on the old code (bisect or checkout can help).</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Debugging is detective work: make the bug happen on demand, collect evidence, guess the cause, test the guess, then fix and add a test. Claude is a great assistant detective if you give it the evidence and tell it not to change code until it's found the cause. git bisect run can find the commit that broke things automatically. Then ask why it got through, not who did it, and write that down with real actions. AI code review helps, but treat each finding as a hypothesis, and review AI-written code just as hard as anyone else's."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Git, <a href="https://git-scm.com/docs/git-bisect" target="_blank" rel="noopener">git-bisect documentation</a> (<code>bisect run</code> and exit codes).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/commands" target="_blank" rel="noopener">Claude Code commands</a> (<code>/code-review</code>, <code>/ultrareview</code>, <code>/security-review</code>, <code>/simplify</code>, <code>/debug</code>, <code>/rewind</code>) and <a href="https://code.claude.com/docs/en/cli-reference" target="_blank" rel="noopener">CLI reference</a> (<code>claude ultrareview</code>).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/interactive-mode" target="_blank" rel="noopener">Interactive mode</a> (<code>!</code> shell mode, <code>Ctrl+B</code>, <code>Esc Esc</code>) and <a href="https://code.claude.com/docs/en/checkpointing" target="_blank" rel="noopener">checkpointing</a>.</li>
+<li>Google, <a href="https://sre.google/sre-book/postmortem-culture/" target="_blank" rel="noopener">Site Reliability Engineering: Postmortem culture</a> (blameless postmortems).</li>
+</ol><p class="verified">Verified 9 November 2026 against Claude Code 2.1.319 documentation and the git documentation. Lab scripts tested with git and Python 3.</p></div>

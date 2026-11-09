@@ -1,0 +1,307 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>The full Claude timeline, from the first Claude in March 2023 to the 5.5 family in autumn 2026</li>
+<li>What actually changed in each generation: tiers, context size, thinking, tools, agents and price</li>
+<li>How Claude's names and model IDs work, and why the naming style has changed three times</li>
+<li>The difference between deprecated, retired and legacy models, and which ones have gone</li>
+<li>How to scan a test project for outdated model IDs with a small Python script</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch37">Chapter 37</a> (Anthropic's history). <a href="#ch31">Chapter 31</a> explains why there are model tiers and what deprecation means in general. For the lab you need Python 3 (<code>python3 --version</code>; see <a href="#ch58">Chapter 58</a>) and a terminal (<a href="#ch54">Chapter 54</a>).</div>
+
+<div class="bigidea"><p>Claude has gone through about two dozen releases in under four years. The first Claude (March 2023) was a single chat model with a cheaper "Instant" sibling. Claude 3 (March 2024) introduced the three tiers you still see today: Haiku (fast), Sonnet (balanced) and Opus (most capable). Later generations added visible thinking, tool use, computer use and coding agents, grew the context window to a million tokens, and in June 2026 added a new top tier, Fable. Old models are retired on a published schedule, so anything you build on Claude must track model versions the way you track library versions.</p></div>
+
+<h3 id="ch39-1"><span class="num">39.1</span>Reading Claude's names</h3>
+<p>Before the timeline, learn to read the names. Since Claude 3, every model name has two parts: a <a class="gl" href="#g-model-tier">tier</a> and a generation number.</p>
+<div class="tbl"><table>
+<tr><th>Tier</th><th>Since</th><th>Meaning</th></tr>
+<tr><td><b>Haiku</b></td><td>Claude 3 (Mar 2024)</td><td>Smallest and fastest; cheapest; good for high-volume, simple tasks</td></tr>
+<tr><td><b>Sonnet</b></td><td>Claude 3 (Mar 2024)</td><td>The balance of speed, cost and intelligence</td></tr>
+<tr><td><b>Opus</b></td><td>Claude 3 (Mar 2024)</td><td>The most capable generally available tier until 2026</td></tr>
+<tr><td><b>Fable</b></td><td>Claude Fable 5 (Jun 2026)</td><td>A new top tier above Opus, for demanding reasoning and long-horizon agent work</td></tr>
+<tr><td><b>Mythos</b></td><td>Mythos Preview (Apr 2026)</td><td>The same underlying model as Fable with some safeguards lifted; verified organisations only (<a href="#ch38">Chapter 38</a>)</td></tr>
+</table></div>
+<p>The number is the generation: 3, 3.5, 3.7, 4, 4.1 … 5, 5.1, 5.5. A higher number within a tier is newer. Different tiers do not always share a number at the same moment: in mid-October 2026 the newest models were Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 5.5.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a car maker. The tier is the model line (city car, family car, executive car, and now a flagship above them); the number is the model year. "2026 family car" and "2024 executive car" are both real cars you can still buy for a while, but the dealer will eventually stop servicing the old ones. That last part is deprecation, covered in 39.5.</p></div>
+<h4>Three naming styles for model IDs</h4>
+<p>When you call the API, you use a <strong>model ID</strong>, an exact string. Its format has changed over time, which matters when you search old code:</p>
+<div class="tbl"><table>
+<tr><th>Era</th><th>Style</th><th>Example</th></tr>
+<tr><td>Claude 1 and 2 (2023)</td><td>Name and version number with a dot</td><td><code>claude-2.1</code></td></tr>
+<tr><td>Claude 3 to 3.7 (2024 to early 2025)</td><td>Generation first, then tier, then a date</td><td><code>claude-3-5-sonnet-20240620</code></td></tr>
+<tr><td>Claude 4 onward</td><td>Tier first, then generation; dated IDs until 4.5, undated from 4.6</td><td><code>claude-opus-5-5</code></td></tr>
+</table></div>
+<p>From the 4.6 generation onward, model IDs carry no date and each one is a pinned <a class="gl" href="#g-model-snapshot">snapshot</a>: <code>claude-opus-5-5</code> always means the same model, and the ID doubles as its <a class="gl" href="#g-alias">alias</a>.</p>
+
+<h3 id="ch39-2"><span class="num">39.2</span>2023: the first Claudes</h3>
+<ol class="timeline">
+<li class="key"><span class="yr">14 Mar 2023</span><span class="ev"><b>Claude and Claude Instant.</b> Claude Instant was "a lighter, less expensive, and much faster option".</span></li>
+<li class="key"><span class="yr">11 Jul 2023</span><span class="ev"><b>Claude 2</b>, together with a public beta of the claude.ai chat website. This is when individuals could first sign up and chat with Claude directly.</span></li>
+<li><span class="yr">21 Nov 2023</span><span class="ev"><b>Claude 2.1</b>, with a 200K-token <a class="gl" href="#g-context-window">context window</a>, roughly a long novel's worth of text in one conversation.</span></li>
+</ol>
+<p>These early models were text-only chat models. What made them stand out at the time was long context and Anthropic's focus on harmlessness from Constitutional AI training (<a href="#ch38">Chapter 38</a>).</p>
+
+<h3 id="ch39-3"><span class="num">39.3</span>2024: three tiers, Artifacts and computer use</h3>
+<ol class="timeline">
+<li class="key"><span class="yr">4 Mar 2024</span><span class="ev"><b>Claude 3 Opus and Claude 3 Sonnet.</b> The three-tier family is born; the launch post said "Haiku will be available soon". 200K context.</span></li>
+<li><span class="yr">13 Mar 2024</span><span class="ev"><b>Claude 3 Haiku</b> available through the API and to Claude Pro subscribers.</span></li>
+<li class="key"><span class="yr">June 2024</span><span class="ev"><b>Claude 3.5 Sonnet</b>, launched with <a class="gl" href="#g-artifact">Artifacts</a> in claude.ai.</span></li>
+<li class="key"><span class="yr">22 Oct 2024</span><span class="ev"><b>Upgraded Claude 3.5 Sonnet</b>, <b>Claude 3.5 Haiku</b> announced, and <b>computer use</b> in public beta: Claude controlling a computer through screenshots, mouse and keyboard.</span></li>
+</ol>
+<div class="box warn"><span class="tag">Two dates to treat with care</span><p><b>Claude 3.5 Sonnet:</b> the announcement page as fetched shows 21 June 2024, but the model ID is <code>claude-3-5-sonnet-20240620</code>, which implies 20 June. This book says "June 2024". <b>Claude 3.5 Haiku:</b> the October post said it would arrive "later this month"; the exact availability date was not confirmed.</p></div>
+<p>Two things changed the way people worked. First, the mid-tier Sonnet became the everyday workhorse because it was good enough for most jobs at a fraction of Opus's cost. Second, the upgraded 3.5 Sonnet in October was the same name with a new ID, which confused many teams: "Claude 3.5 Sonnet" meant two different models depending on the date suffix. This is one reason undated, pinned IDs arrived later.</p>
+<div class="box example"><span class="tag">Real-world example: the silent upgrade question</span><p>A QA team's nightly job used an alias pointing at "the latest 3.5 Sonnet". In October 2024 the alias moved to the upgraded model, and a set of snapshot-style tests that compared Claude's bug summaries word for word started failing. Nothing was broken: the model had changed. The fix was to pin the exact ID in CI and update it on purpose, with a review of the differences (<a href="#ch36">Chapter 36</a>).</p></div>
+
+<h3 id="ch39-4"><span class="num">39.4</span>2025 to 2026: thinking, agents and the 5 family</h3>
+<ol class="timeline">
+<li class="key"><span class="yr">24 Feb 2025</span><span class="ev"><b>Claude 3.7 Sonnet</b>, called "the first <a class="gl" href="#g-hybrid-reasoning-model">hybrid reasoning model</a> on the market": one model that could answer quickly or think step by step first. <b>Claude Code</b> appeared alongside it as a research preview.</span></li>
+<li class="key"><span class="yr">22 May 2025</span><span class="ev"><b>Claude Opus 4 and Claude Sonnet 4.</b> Claude Code became generally available. ASL-3 protections activated with Opus 4 (<a href="#ch38">Chapter 38</a>).</span></li>
+<li><span class="yr">5 Aug 2025</span><span class="ev"><b>Claude Opus 4.1.</b></span></li>
+<li><span class="yr">29 Sep 2025</span><span class="ev"><b>Claude Sonnet 4.5.</b></span></li>
+<li><span class="yr">15 Oct 2025</span><span class="ev"><b>Claude Haiku 4.5.</b></span></li>
+<li><span class="yr">24 Nov 2025</span><span class="ev"><b>Claude Opus 4.5.</b> The effort parameter entered beta the same day.</span></li>
+<li><span class="yr">5 Feb 2026</span><span class="ev"><b>Claude Opus 4.6.</b> First generation with undated, pinned IDs. 1M-token context for the 4.6 Opus and Sonnet models.</span></li>
+<li><span class="yr">17 Feb 2026</span><span class="ev"><b>Claude Sonnet 4.6.</b></span></li>
+<li><span class="yr">7 Apr 2026</span><span class="ev"><b>Claude Mythos Preview</b>, invitation-only through Project Glasswing. Deprecated 9 June 2026.</span></li>
+<li><span class="yr">16 Apr 2026</span><span class="ev"><b>Claude Opus 4.7</b>, which introduced a newer <a class="gl" href="#g-tokenizer">tokenizer</a>.</span></li>
+<li><span class="yr">28 May 2026</span><span class="ev"><b>Claude Opus 4.8.</b></span></li>
+<li class="key"><span class="yr">9 Jun 2026</span><span class="ev"><b>Claude Fable 5 and Claude Mythos 5.</b> Fable is a new tier above Opus: "a Mythos-class model that we've made safe for general use".</span></li>
+<li><span class="yr">30 Jun 2026</span><span class="ev"><b>Claude Sonnet 5.</b></span></li>
+<li><span class="yr">24 Jul 2026</span><span class="ev"><b>Claude Opus 5.</b></span></li>
+<li><span class="yr">1 Sep 2026</span><span class="ev"><b>Claude Fable 5.1 and Claude Mythos 5.1.</b></span></li>
+<li class="key"><span class="yr">22 Sep 2026</span><span class="ev"><b>Claude Opus 5.5</b>, Anthropic's recommended starting point for most workloads.</span></li>
+<li><span class="yr">28 Sep 2026</span><span class="ev"><b>Claude Sonnet 5.5.</b></span></li>
+<li class="key"><span class="yr">7 Oct 2026</span><span class="ev"><b>Claude Haiku 5.5.</b> The 5.5 family is complete.</span></li>
+</ol>
+<p>Release dates from the 4.5 generation onward come from each model's documentation page; earlier ones from Anthropic's announcement posts.</p>
+
+<h4>What changed, theme by theme</h4>
+<div class="tbl"><table>
+<tr><th>Theme</th><th>Then</th><th>Now (Nov 2026)</th></tr>
+<tr><td>Tiers</td><td>One model plus Instant (2023)</td><td>Haiku, Sonnet, Opus and Fable, plus restricted Mythos</td></tr>
+<tr><td>Context window</td><td>200K tokens with Claude 2.1 and Claude 3</td><td>1M tokens on all four current models</td></tr>
+<tr><td>Thinking</td><td>None visible; then 3.7 Sonnet's hybrid mode; then "extended thinking" with a manual <code>budget_tokens</code> setting</td><td><a class="gl" href="#g-adaptive-thinking">Adaptive thinking</a>: the model decides how much to think. Manual extended thinking is deprecated on 4.6 models and not accepted on later ones. An <a class="gl" href="#g-effort-level">effort</a> setting (GA 5 Feb 2026) steers how hard it works</td></tr>
+<tr><td>Doing things</td><td>Text in, text out</td><td>Tool use, computer use, web search, code execution, MCP, Claude Code and the Agent SDK</td></tr>
+<tr><td>Tokenizer</td><td>Older tokenizer</td><td>Since Opus 4.7, a newer tokenizer producing "approximately 30% more tokens for the same text"</td></tr>
+<tr><td>Model IDs</td><td>Dated IDs plus moving aliases</td><td>Undated, pinned IDs from 4.6 onward</td></tr>
+</table></div>
+<details class="deep"><summary>Under the hood: why a tokenizer change matters for cost tests</summary><div class="body">
+<p>Prices are per token (<a href="#ch14">Chapter 14</a>). If a newer tokenizer splits the same text into about 30% more tokens, the same prompt costs more tokens on Opus 4.7 and later than on Opus 4.6, even at the same price per token. It also changes how much text fits in a context window and how close you get to <code>max_tokens</code>.</p>
+<p>So when you compare generations in a cost test, compare <em>cost per task</em> (from the usage the API reports), not token counts or list prices alone. A model with a lower price per token can still cost more per task if it uses more tokens, and vice versa.</p>
+</div></details>
+
+<h4>Price trend</h4>
+<p>Prices per million tokens (MTok) have generally fallen within each tier, as the official pricing page shows for recent models:</p>
+<div class="tbl"><table>
+<tr><th>Tier</th><th>Earlier model (input / output per MTok)</th><th>Current 5.5 model</th></tr>
+<tr><td>Opus</td><td>Opus 4.5 to Opus 5: $5 / $25</td><td>Opus 5.5: $4 / $20</td></tr>
+<tr><td>Sonnet</td><td>Sonnet 4.6: $3 / $15; Sonnet 5: $2 / $10</td><td>Sonnet 5.5: $2 / $10</td></tr>
+<tr><td>Haiku</td><td>Haiku 4.5: $1 / $5</td><td>Haiku 5.5: $0.10 / $0.50 for prompts up to 100K tokens; $0.50 / $2.50 above that</td></tr>
+<tr><td>Fable</td><td>Fable 5: $10 / $50</td><td>Fable 5.1: $10 / $50</td></tr>
+</table></div>
+<p>Prices change: check the pricing page before quoting them, and remember that cloud platforms (Bedrock, Vertex) set their own prices. <a href="#ch40">Chapter 40</a> covers the current models in detail.</p>
+
+<h3 id="ch39-5"><span class="num">39.5</span>Deprecation and retirement</h3>
+<p>Anthropic does not keep every model running forever. A model moves through stages:</p>
+<div class="flow">
+<div><b>Active</b>Current and recommended</div>
+<div><b>Legacy</b>Still available, but newer models exist</div>
+<div class="hl"><b>Deprecated</b>A retirement date is announced; migrate now</div>
+<div><b>Retired</b>API requests to it no longer work</div>
+</div>
+<p><a class="gl" href="#g-deprecation">Deprecation</a> is the warning; <a class="gl" href="#g-model-retirement">retirement</a> is the switch-off. Each current model's documentation also states an earliest retirement date: for the 5.5 family and Fable 5.1, "not before" one year after release (for example, Opus 5.5 not before 22 September 2027).</p>
+<p>Use the filter to search the status of every model in this chapter.</p>
+<input class="filter" data-filter="#ch39Models" data-empty="#ch39Empty" type="search" placeholder="Filter models, e.g. sonnet or retired" aria-label="Filter models">
+<div class="tbl"><table id="ch39Models">
+<tr><th>Model</th><th>Released</th><th>Status (9 Nov 2026)</th></tr>
+<tr class="group"><td colspan="3">Current</td></tr>
+<tr><td>Claude Fable 5.1</td><td>1 Sep 2026</td><td>Active; not retired before 1 Sep 2027</td></tr>
+<tr><td>Claude Opus 5.5</td><td>22 Sep 2026</td><td>Active; not retired before 22 Sep 2027</td></tr>
+<tr><td>Claude Sonnet 5.5</td><td>28 Sep 2026</td><td>Active; not retired before 28 Sep 2027</td></tr>
+<tr><td>Claude Haiku 5.5</td><td>7 Oct 2026</td><td>Active; not retired before 7 Oct 2027</td></tr>
+<tr><td>Claude Mythos 5.1</td><td>1 Sep 2026</td><td>Restricted to verified organisations</td></tr>
+<tr class="group"><td colspan="3">Legacy (still available)</td></tr>
+<tr><td>Claude Fable 5</td><td>9 Jun 2026</td><td>Legacy</td></tr>
+<tr><td>Claude Opus 5</td><td>24 Jul 2026</td><td>Legacy</td></tr>
+<tr><td>Claude Sonnet 5</td><td>30 Jun 2026</td><td>Legacy</td></tr>
+<tr><td>Claude Opus 4.8</td><td>28 May 2026</td><td>Legacy</td></tr>
+<tr><td>Claude Opus 4.7</td><td>16 Apr 2026</td><td>Legacy</td></tr>
+<tr><td>Claude Opus 4.6</td><td>5 Feb 2026</td><td>Legacy</td></tr>
+<tr><td>Claude Sonnet 4.6</td><td>17 Feb 2026</td><td>Legacy</td></tr>
+<tr><td>Claude Opus 4.5</td><td>24 Nov 2025</td><td>Legacy</td></tr>
+<tr><td>Claude Haiku 4.5</td><td>15 Oct 2025</td><td>Legacy</td></tr>
+<tr class="group"><td colspan="3">Deprecated</td></tr>
+<tr><td>Claude Sonnet 4.5</td><td>29 Sep 2025</td><td>Deprecated; retires 30 Nov 2026</td></tr>
+<tr><td>Claude Mythos Preview</td><td>7 Apr 2026</td><td>Deprecated 9 Jun 2026</td></tr>
+<tr class="group"><td colspan="3">Retired</td></tr>
+<tr><td>Claude Opus 4.1</td><td>5 Aug 2025</td><td>Retired 5 Aug 2026</td></tr>
+<tr><td>Claude Opus 4 and Sonnet 4</td><td>22 May 2025</td><td>Retired 15 Jun 2026</td></tr>
+<tr><td>Claude 3 Haiku</td><td>13 Mar 2024</td><td>Retired 20 Apr 2026</td></tr>
+<tr><td>Claude 3.7 Sonnet</td><td>24 Feb 2025</td><td>Retired 19 Feb 2026</td></tr>
+<tr><td>Claude 3.5 Haiku</td><td>Late Oct 2024 (unconfirmed)</td><td>Retired 19 Feb 2026</td></tr>
+<tr><td>Claude 3 Opus</td><td>4 Mar 2024</td><td>Retired 5 Jan 2026</td></tr>
+<tr><td>Claude 3.5 Sonnet (both versions)</td><td>Jun and Oct 2024</td><td>Retired 28 Oct 2025</td></tr>
+<tr><td>Claude 2.0, Claude 2.1 and Claude 3 Sonnet</td><td>2023 to 2024</td><td>Retired 21 Jul 2025</td></tr>
+<tr><td>Claude 1.x and Claude Instant 1.x</td><td>14 Mar 2023</td><td>Retired 6 Nov 2024</td></tr>
+</table></div>
+<p id="ch39Empty" hidden>No models match.</p>
+<div class="box warn"><span class="tag">Act now if you use Sonnet 4.5</span><p>Claude Sonnet 4.5 retires on 30 November 2026, three weeks after this chapter's review date. Any script, CI job or integration still calling it will start failing then. The lab below finds such references.</p></div>
+<div class="box note"><span class="tag">Retired is not deleted</span><p>Anthropic has committed to preserve the weights of publicly released models for at least the lifetime of the company (<a href="#ch38">Chapter 38</a>). A retired model is switched off for API use, not destroyed. That does not help your code, though: requests to a retired model ID still fail.</p></div>
+<details class="deep"><summary>Under the hood: why models get retired at all</summary><div class="body">
+<p>Every model available through the API needs dedicated hardware capacity, monitoring, safety classifiers and support. Keeping dozens of old models running ties up chips that could serve newer, usually cheaper and better models. Published deprecation dates are a compromise: customers get warning and time to migrate, and Anthropic can free up capacity.</p>
+<p>For testers, the important consequence is that a model version is a <strong>dependency with an expiry date</strong>, just like a browser version or an operating system. Your test plan for any AI feature should include "what happens when we change model?" (<a href="#ch36">Chapter 36</a> covers regression testing across models).</p>
+</div></details>
+
+<div class="lab"><div class="lab-h"><b>Audit a project for outdated Claude model IDs</b><span>25 min · Python 3 on your computer, no API key needed</span></div>
+<p><b>Setup.</b> Make a practice folder with a small demo project, then save the script below as <code>model_audit.py</code> in the practice folder (not inside <code>demo</code>).</p>
+<div class="code"><span class="cap">Terminal</span><pre>mkdir -p model-audit/demo &amp;&amp; cd model-audit
+printf 'triage_model: claude-3-5-sonnet-20240620\nsummary_model: claude-sonnet-4-5\n' &gt; demo/config.yml
+printf 'JUDGE_MODEL = "claude-opus-5-5"\nCHEAP_MODEL = "claude-haiku-4-5"\nOLD_BOT = "claude-2.1"\n' &gt; demo/judge.py</pre></div>
+<div class="code"><span class="cap">model_audit.py</span><pre>"""model_audit.py - find Claude model IDs in a project and report their status.
+
+Status table: Anthropic model deprecations page, checked 9 November 2026.
+Re-check https://platform.claude.com/docs/en/about-claude/model-deprecations
+before you rely on it: this table will go out of date.
+"""
+import re
+import sys
+from pathlib import Path
+
+# (family, version) -&gt; (status, note)
+STATUS = {
+    ("instant", "1"): ("RETIRED", "retired 6 Nov 2024"),
+    ("claude", "1"): ("RETIRED", "retired 6 Nov 2024"),
+    ("claude", "2"): ("RETIRED", "retired 21 Jul 2025"),
+    ("claude", "2.1"): ("RETIRED", "retired 21 Jul 2025"),
+    ("sonnet", "3"): ("RETIRED", "retired 21 Jul 2025"),
+    ("opus", "3"): ("RETIRED", "retired 5 Jan 2026"),
+    ("haiku", "3"): ("RETIRED", "retired 20 Apr 2026"),
+    ("sonnet", "3.5"): ("RETIRED", "retired 28 Oct 2025"),
+    ("haiku", "3.5"): ("RETIRED", "retired 19 Feb 2026"),
+    ("sonnet", "3.7"): ("RETIRED", "retired 19 Feb 2026"),
+    ("opus", "4"): ("RETIRED", "retired 15 Jun 2026"),
+    ("sonnet", "4"): ("RETIRED", "retired 15 Jun 2026"),
+    ("opus", "4.1"): ("RETIRED", "retired 5 Aug 2026"),
+    ("sonnet", "4.5"): ("DEPRECATED", "retires 30 Nov 2026 - migrate now"),
+    ("haiku", "4.5"): ("LEGACY", "still available; plan a move"),
+    ("opus", "4.5"): ("LEGACY", "still available; plan a move"),
+    ("opus", "4.6"): ("LEGACY", "still available; plan a move"),
+    ("sonnet", "4.6"): ("LEGACY", "still available; plan a move"),
+    ("opus", "4.7"): ("LEGACY", "still available; plan a move"),
+    ("opus", "4.8"): ("LEGACY", "still available; plan a move"),
+    ("fable", "5"): ("LEGACY", "still available; plan a move"),
+    ("sonnet", "5"): ("LEGACY", "still available; plan a move"),
+    ("opus", "5"): ("LEGACY", "still available; plan a move"),
+    ("fable", "5.1"): ("CURRENT", "not retired before 1 Sep 2027"),
+    ("opus", "5.5"): ("CURRENT", "not retired before 22 Sep 2027"),
+    ("sonnet", "5.5"): ("CURRENT", "not retired before 28 Sep 2027"),
+    ("haiku", "5.5"): ("CURRENT", "not retired before 7 Oct 2027"),
+}
+
+# Three naming styles Anthropic has used over the years:
+#   claude-2.1, claude-instant-1.2            (2023)
+#   claude-3-5-sonnet-20240620                (Claude 3 to 3.7: number first, then family)
+#   claude-opus-4-1-20250805, claude-opus-5-5 (Claude 4 onward: family first)
+OLD = re.compile(r"\bclaude-(instant-)?(\d)(?:\.(\d))?(?![-.\w])")
+MID = re.compile(r"\bclaude-(\d)(?:-(\d))?-(opus|sonnet|haiku)\b")
+NEW = re.compile(r"\bclaude-(opus|sonnet|haiku|fable|mythos)-(\d)(?:-(\d)(?!\d))?")
+
+
+def find_ids(text):
+    """Yield (matched_text, family, version) for every model ID in text."""
+    for m in MID.finditer(text):
+        version = m.group(1) + ("." + m.group(2) if m.group(2) else "")
+        yield m.group(0), m.group(3), version
+    for m in NEW.finditer(text):
+        version = m.group(2) + ("." + m.group(3) if m.group(3) else "")
+        yield m.group(0), m.group(1), version
+    for m in OLD.finditer(text):
+        family = "instant" if m.group(1) else "claude"
+        version = m.group(2)
+        if m.group(3) and not (family == "claude" and m.group(2) == "2" and m.group(3) == "0"):
+            version += "." + m.group(3)
+        if family == "instant":
+            version = m.group(2)  # all Instant 1.x share one status
+        yield m.group(0), family, version
+
+
+def main(folder):
+    suffixes = {".py", ".js", ".ts", ".json", ".yml", ".yaml", ".env", ".toml", ".md", ".txt"}
+    worst = 0
+    found = 0
+    for path in sorted(Path(folder).rglob("*")):
+        if not path.is_file() or path.suffix not in suffixes:
+            continue
+        if any(part in {"node_modules", ".git", ".venv"} for part in path.parts):
+            continue
+        lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        for n, line in enumerate(lines, start=1):
+            for text, family, version in find_ids(line):
+                found += 1
+                status, note = STATUS.get((family, version), ("UNKNOWN", "check the models overview page"))
+                if family == "mythos":
+                    status, note = "RESTRICTED", "verified organisations only"
+                print(f"{status:&lt;11} {path}:{n}  {text}  ({note})")
+                if status in {"RETIRED", "DEPRECATED"}:
+                    worst = 1
+    print(f"\n{found} model ID(s) found.", "Action needed." if worst else "Nothing retired or deprecated.")
+    return worst
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1] if len(sys.argv) &gt; 1 else "."))</pre></div>
+<ol>
+<li>Run the audit on the demo folder: <code>python3 model_audit.py demo</code>.<span class="expect">five lines and a summary:</span>
+<div class="code"><span class="cap">Expected output</span><pre>RETIRED     demo/config.yml:1  claude-3-5-sonnet  (retired 28 Oct 2025)
+DEPRECATED  demo/config.yml:2  claude-sonnet-4-5  (retires 30 Nov 2026 - migrate now)
+CURRENT     demo/judge.py:1  claude-opus-5-5  (not retired before 22 Sep 2027)
+LEGACY      demo/judge.py:2  claude-haiku-4-5  (still available; plan a move)
+RETIRED     demo/judge.py:3  claude-2.1  (retired 21 Jul 2025)
+
+5 model ID(s) found. Action needed.</pre></div></li>
+<li>Check the exit code: <code>echo $?</code>.<span class="expect"><code>1</code>, because something is retired or deprecated. A CI job can fail on this, just like a failing test (<a href="#ch55">Chapter 55</a> explains exit codes).</span></li>
+<li>Edit <code>demo/config.yml</code> so both lines use <code>claude-sonnet-5-5</code>, and change <code>OLD_BOT</code> in <code>demo/judge.py</code> to <code>claude-haiku-5-5</code>. Run the audit again.<span class="expect">only CURRENT and LEGACY lines, the summary "Nothing retired or deprecated." and exit code <code>0</code>.</span></li>
+<li>Run it on a real project you are allowed to read: <code>python3 model_audit.py ~/path/to/your/repo</code>.<span class="expect">a list of every model ID in code and config. "0 model ID(s) found" is a valid result if the project does not call Claude.</span></li>
+<li>Optional: add the script to CI as a weekly job and open a ticket for every DEPRECATED line.<span class="expect">an early warning before the next retirement date.</span></li>
+</ol>
+<p><b>Troubleshooting.</b> <code>python3: command not found</code>: install Python (<a href="#ch58">Chapter 58</a>) or try <code>python</code>. Nothing found in a real repo: the IDs may be in a file type not listed in <code>suffixes</code> (add it) or built from variables at runtime (search manually). UNKNOWN status: a newer model than this table knows; check the models overview page and add a line to <code>STATUS</code>. The script reads files only; it never changes them and needs no API key.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Opus is always the most capable Claude."</dt><dd>Since June 2026, Fable sits above Opus. Anthropic still recommends starting with Opus 5.5 for most workloads (<a href="#ch40">Chapter 40</a>).</dd>
+<dt>"A bigger version number is always better at everything."</dt><dd>Usually newer is better overall, but behaviour, cost per task and token counts change. Test your own tasks when you upgrade.</dd>
+<dt>"Claude 3.5 Sonnet is one model."</dt><dd>There were two, from June and October 2024, with different IDs. Both are now retired.</dd>
+<dt>"Deprecated means it has stopped working."</dt><dd>Deprecated means a retirement date is set. It stops working at retirement.</dd>
+<dt>"Fable is just Opus renamed."</dt><dd>Fable is a separate tier above Opus, with its own price and behaviour, and the same underlying model as Mythos.</dd>
+</dl></div>
+
+<h3 id="ch39-r"><span class="num">39.6</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Claude launched on 14 March 2023; Claude 2 (July 2023) opened claude.ai to the public; Claude 2.1 brought 200K context.</li>
+<li>Claude 3 (March 2024) introduced Haiku, Sonnet and Opus. Fable became a new top tier in June 2026.</li>
+<li>3.5 Sonnet brought Artifacts; the October 2024 release added computer use; 3.7 Sonnet (Feb 2025) was the first hybrid reasoning model and arrived with Claude Code.</li>
+<li>The current models (Nov 2026) are Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 5.5, all with 1M-token context and adaptive thinking.</li>
+<li>Model IDs changed style three times; from 4.6 they are undated, pinned snapshots.</li>
+<li>Models go active, legacy, deprecated, retired. Sonnet 4.5 retires on 30 November 2026.</li>
+<li>Treat model versions as dependencies with expiry dates: pin them, scan for them, and retest when you change them.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Which generation introduced the Haiku, Sonnet and Opus tiers?</p><div class="opts"><button>Claude 2</button><button data-ok>Claude 3</button><button>Claude 4</button></div><p class="why" hidden>Claude 3 Opus and Sonnet launched on 4 March 2024, with Haiku following on 13 March.</p></div>
+<div class="qz"><p class="q">What did Anthropic call Claude 3.7 Sonnet at launch?</p><div class="opts"><button data-ok>The first hybrid reasoning model on the market</button><button>The first multimodal model</button><button>The first open-weight Claude</button></div><p class="why" hidden>One model that could answer instantly or think step by step first.</p></div>
+<div class="qz"><p class="q">Your CI job calls a model that is "deprecated". What does that mean today?</p><div class="opts"><button>Requests already fail</button><button data-ok>It still works, but a retirement date is set and you should migrate</button><button>It has been made cheaper</button></div><p class="why" hidden>Deprecation is the warning; retirement is when requests stop working.</p></div>
+<div class="qz"><p class="q">Why can the same prompt cost more tokens on Opus 4.7 than on Opus 4.6?</p><div class="opts"><button>Opus 4.7 always thinks longer</button><button>Opus 4.7 has a smaller context window</button><button data-ok>Opus 4.7 introduced a newer tokenizer that produces about 30% more tokens for the same text</button></div><p class="why" hidden>Compare cost per task, not list price, when comparing generations.</p></div>
+<div class="qz"><p class="q">Which of these model IDs is in the style used from the 4.6 generation onward?</p><div class="opts"><button><code>claude-3-5-sonnet-20240620</code></button><button data-ok><code>claude-opus-5-5</code></button><button><code>claude-2.1</code></button></div><p class="why" hidden>Tier first, then generation, and no date: each ID is a pinned snapshot.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Run <code>model_audit.py</code> on every repository your team owns that might call Claude (test tools, bots, CI scripts). Produce a short "model inventory": repository, file, model ID, status, owner and migration deadline. For each DEPRECATED or LEGACY entry, propose the replacement model and list the tests you would rerun before switching. Share it with your team lead and add a calendar reminder to rerun the audit monthly.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Claude started in March 2023 as one chat model. Claude 3 in 2024 gave us the three sizes, Haiku, Sonnet and Opus, from fast and cheap to most capable, and in 2026 a new top tier called Fable appeared. Along the way Claude learned to think before answering, use tools, control a computer and write code as an agent, and its memory per conversation grew to a million tokens. The catch for us is that old models are retired on a schedule: Sonnet 4.5 switches off at the end of November 2026. So we treat model IDs like any dependency: pin them, scan for them, and retest before we upgrade."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, "Introducing Claude" (14 Mar 2023): <a href="https://www.anthropic.com/news/introducing-claude" target="_blank" rel="noopener">anthropic.com/news/introducing-claude</a></li>
+<li>Anthropic, "Claude 2" (11 Jul 2023): <a href="https://www.anthropic.com/news/claude-2" target="_blank" rel="noopener">anthropic.com/news/claude-2</a>; "Claude 2.1" (21 Nov 2023): <a href="https://www.anthropic.com/news/claude-2-1" target="_blank" rel="noopener">anthropic.com/news/claude-2-1</a></li>
+<li>Anthropic, "Introducing the next generation of Claude" (Claude 3, 4 Mar 2024): <a href="https://www.anthropic.com/news/claude-3-family" target="_blank" rel="noopener">anthropic.com/news/claude-3-family</a>; "Claude 3 Haiku" (13 Mar 2024): <a href="https://www.anthropic.com/news/claude-3-haiku" target="_blank" rel="noopener">anthropic.com/news/claude-3-haiku</a></li>
+<li>Anthropic, "Claude 3.5 Sonnet" (June 2024): <a href="https://www.anthropic.com/news/claude-3-5-sonnet" target="_blank" rel="noopener">anthropic.com/news/claude-3-5-sonnet</a>; "Introducing computer use, a new Claude 3.5 Sonnet, and Claude 3.5 Haiku" (22 Oct 2024): <a href="https://www.anthropic.com/news/3-5-models-and-computer-use" target="_blank" rel="noopener">anthropic.com/news/3-5-models-and-computer-use</a></li>
+<li>Anthropic, "Claude 3.7 Sonnet and Claude Code" (24 Feb 2025): <a href="https://www.anthropic.com/news/claude-3-7-sonnet" target="_blank" rel="noopener">anthropic.com/news/claude-3-7-sonnet</a>; "Introducing Claude 4" (22 May 2025): <a href="https://www.anthropic.com/news/claude-4" target="_blank" rel="noopener">anthropic.com/news/claude-4</a></li>
+<li>Anthropic, "Claude Opus 4.1": <a href="https://www.anthropic.com/news/claude-opus-4-1" target="_blank" rel="noopener">anthropic.com/news/claude-opus-4-1</a>; "Claude Sonnet 4.5": <a href="https://www.anthropic.com/news/claude-sonnet-4-5" target="_blank" rel="noopener">anthropic.com/news/claude-sonnet-4-5</a></li>
+<li>Claude Docs, model pages for Haiku 4.5, Opus 4.5, 4.6, 4.7, 4.8, Sonnet 4.6, Fable 5, Sonnet 5, Opus 5, Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 5.5, e.g. <a href="https://platform.claude.com/docs/en/models/opus-5-5/overview" target="_blank" rel="noopener">platform.claude.com/docs/en/models/opus-5-5/overview</a></li>
+<li>Anthropic, "Claude Fable 5 and Claude Mythos 5" (9 Jun 2026): <a href="https://www.anthropic.com/news/claude-fable-5-mythos-5" target="_blank" rel="noopener">anthropic.com/news/claude-fable-5-mythos-5</a>; Project Glasswing: <a href="https://www.anthropic.com/glasswing" target="_blank" rel="noopener">anthropic.com/glasswing</a></li>
+<li>Claude Docs, "Models overview": <a href="https://platform.claude.com/docs/en/about-claude/models/overview" target="_blank" rel="noopener">platform.claude.com/docs/en/about-claude/models/overview</a>; "Pricing": <a href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">platform.claude.com/docs/en/about-claude/pricing</a></li>
+<li>Claude Docs, "Model deprecations": <a href="https://platform.claude.com/docs/en/about-claude/model-deprecations" target="_blank" rel="noopener">platform.claude.com/docs/en/about-claude/model-deprecations</a></li>
+<li>Anthropic, "Commitments on model deprecation and preservation" (4 Nov 2025): <a href="https://www.anthropic.com/research/deprecation-commitments" target="_blank" rel="noopener">anthropic.com/research/deprecation-commitments</a></li>
+</ol>
+<p class="verified">Verified 9 November 2026 against Anthropic announcement posts and Claude Docs model, pricing and deprecation pages (via research/anthropic-claude-facts.md). Unverified: the exact Claude 3.5 Sonnet date (20 or 21 June 2024) and Claude 3.5 Haiku's availability date. The lab script was run on Python 3 with the output shown.</p></div>

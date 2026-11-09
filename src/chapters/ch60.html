@@ -1,0 +1,572 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How to call web APIs from Python with <code>requests</code> and <code>httpx</code>, and when to use which</li>
+<li>How to send and receive JSON, query parameters and authentication headers, keeping tokens in environment variables</li>
+<li>How to handle errors properly: status codes, network failures and timeouts</li>
+<li>How to retry with exponential backoff without hammering a struggling server</li>
+<li>How to fetch every page of a paginated API</li>
+<li>Why async code matters for AI calls, and how to run requests concurrently with <code>async</code>/<code>await</code></li>
+<li>How to build, run and test a small reusable API client, with offline tests</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch59">Chapter 59</a> (Python fundamentals), <a href="#ch58">Chapter 58</a> (virtual environments) and <a href="#ch85">Chapter 85</a> (what APIs, HTTP methods, headers, status codes and JSON are). This chapter puts Chapter 85's ideas into Python code. You need Python 3.11 or newer and internet access; the examples use free public test APIs, so no account or key is required.</div>
+
+<div class="bigidea"><p>Every AI service, every test-management tool and most of the systems you test speak HTTP and JSON. In Python, a request is a few lines with the <code>requests</code> or <code>httpx</code> library. The hard part isn't the happy path. It's everything around it: never waiting forever, telling a "try again" error from a "you're wrong" error, retrying politely, collecting every page, keeping secrets out of code, and running many slow calls at once. This chapter builds each of those habits with small runnable scripts, then combines them into a reusable client with its own tests. The same patterns apply directly when you call the Claude API (<a href="#ch86">Chapter 86</a>).</p></div>
+
+<h3 id="ch60-1"><span class="num">60.1</span>Two libraries and a setup</h3>
+<p>Python's standard library can make HTTP requests, but it's clumsy. Almost everyone uses one of two well-established third-party libraries:</p>
+<div class="tbl"><table>
+<tr><th></th><th><code>requests</code></th><th><code>httpx</code></th></tr>
+<tr><td>What it is</td><td>The long-standing, best-known HTTP library for Python</td><td>A newer library with a very similar interface</td></tr>
+<tr><td>Async support</td><td>No</td><td>Yes: <code>httpx.AsyncClient</code></td></tr>
+<tr><td>Default timeout</td><td><b>None: waits forever unless you set one</b></td><td>5 seconds</td></tr>
+<tr><td>Built-in test double</td><td>No (use third-party mocking libraries)</td><td>Yes: <code>httpx.MockTransport</code></td></tr>
+<tr><td>Choose it when</td><td>Simple scripts; your team already uses it; most online examples</td><td>You need async, or want one library for sync and async code</td></tr>
+</table></div>
+<p>Anthropic's Python SDK is itself built on httpx, which is one reason it's worth knowing. Set up a project folder with a virtual environment:</p>
+<div class="code"><span class="cap">Terminal (macOS / Linux; Windows: see Chapter 58)</span><pre>mkdir -p ~/qa-api &amp;&amp; cd ~/qa-api
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install requests httpx pytest
+python -c "import requests, httpx; print(requests.__version__, httpx.__version__)"</pre></div>
+<p>The last line prints two version numbers (tested here with requests 2.34.2 and httpx 0.28.1; newer versions work the same way for everything in this chapter). Two free public APIs stand in for "the system under test": <a href="https://jsonplaceholder.typicode.com/" target="_blank" rel="noopener">JSONPlaceholder</a>, a fake REST API with users, posts and todos, and <a href="https://httpbin.org/" target="_blank" rel="noopener">httpbin.org</a>, which returns whatever status code or delay you ask for. Both are community services: occasionally slow or down, which is itself good practice for error handling.</p>
+
+<h3 id="ch60-2"><span class="num">60.2</span>Your first request, and what comes back</h3>
+<div class="code"><span class="cap">first_get.py</span><pre># first_get.py - one GET request with requests
+import requests
+
+response = requests.get("https://jsonplaceholder.typicode.com/todos/1", timeout=10)
+print("Status:", response.status_code)
+print("Content-Type:", response.headers["Content-Type"])
+
+todo = response.json()          # parse the JSON body into a dict
+print("Title:", todo["title"])
+print("Done?", todo["completed"])</pre></div>
+<div class="code"><span class="cap">Expected output of python first_get.py</span><pre>Status: 200
+Content-Type: application/json; charset=utf-8
+Title: delectus aut autem
+Done? False</pre></div>
+<p><code>requests.get</code> returns a <b>response object</b>. These are the parts you'll use most:</p>
+<div class="tbl"><table>
+<tr><th>Attribute or method</th><th>What it gives you</th></tr>
+<tr><td><code>response.status_code</code></td><td>The <a class="gl" href="#g-status-code">status code</a> as a number, such as 200 or 404</td></tr>
+<tr><td><code>response.ok</code></td><td><code>True</code> for status codes below 400</td></tr>
+<tr><td><code>response.headers["Content-Type"]</code></td><td>A response <a class="gl" href="#g-header">header</a> (names aren't case-sensitive)</td></tr>
+<tr><td><code>response.json()</code></td><td>The body parsed from JSON into dictionaries and lists</td></tr>
+<tr><td><code>response.text</code></td><td>The raw body as text: look at this when <code>.json()</code> fails</td></tr>
+<tr><td><code>response.raise_for_status()</code></td><td>Raises an error if the status is 4xx or 5xx; does nothing otherwise</td></tr>
+<tr><td><code>response.elapsed</code></td><td>How long the server took to respond</td></tr>
+<tr><td><code>response.request</code></td><td>The request actually sent: method, URL and headers. Invaluable for debugging</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">A 404 is not an exception</span><p>By default, <code>requests</code> and <code>httpx</code> happily return a response with status 404 or 500; only network failures raise errors. If you go straight to <code>response.json()</code> without checking, you'll get a confusing <code>KeyError</code> or <code>JSONDecodeError</code> three lines later. Call <code>raise_for_status()</code>, or check <code>status_code</code>, every time.</p></div>
+
+<h3 id="ch60-3"><span class="num">60.3</span>Sending data: query parameters and JSON bodies</h3>
+<p>Two ways to send information, matching the parts of a request from <a href="#ch85">Chapter 85</a>:</p>
+<ul>
+<li><b>Query parameters</b> (the <code>?key=value</code> part of the URL): pass a dictionary as <code>params=</code>. The library handles encoding spaces and special characters. <code>requests.get(url, params={"userId": 1, "completed": "false"}, timeout=10)</code>.</li>
+<li><b>A JSON body</b> (for POST, PUT and PATCH): pass a dictionary as <code>json=</code>. The library converts it to JSON text and sets <code>Content-Type: application/json</code> for you.</li>
+</ul>
+<div class="code"><span class="cap">create_bug.py</span><pre># create_bug.py - send JSON with POST and check the result
+import requests
+
+new_bug = {"title": "Discount applied twice", "body": "Steps: add SAVE10 twice", "userId": 1}
+response = requests.post(
+    "https://jsonplaceholder.typicode.com/posts",
+    json=new_bug,               # requests turns the dict into JSON and sets Content-Type
+    timeout=10,
+)
+response.raise_for_status()     # raise an error for 4xx/5xx instead of carrying on
+created = response.json()
+print(response.status_code, "created id", created["id"])
+assert created["title"] == new_bug["title"], "title was not echoed back"
+print("Check passed: title echoed back")</pre></div>
+<div class="code"><span class="cap">Expected output</span><pre>201 created id 101
+Check passed: title echoed back</pre></div>
+<p>JSONPlaceholder pretends to save the post and returns it with a new id (always 101, since nothing is really stored). Note the habit: after a create, <b>check the response echoes what you sent</b>. That's an API test in miniature. Don't confuse <code>json=</code> with <code>data=</code>: <code>data=</code> sends form-encoded data, the format of an HTML form, which most JSON APIs reject or misread.</p>
+
+<h3 id="ch60-4"><span class="num">60.4</span>Authentication headers from environment variables</h3>
+<p>Real APIs need you to prove who you are, usually with an <a class="gl" href="#g-api-key">API key</a> or a <a class="gl" href="#g-bearer-token">bearer token</a> in a header (<a href="#ch98">Chapter 98</a> covers the kinds of credentials). The rule is absolute: <b>the token never appears in your code</b>. Code is shared, committed, pasted into chats and shown on screen. Read the token from an <a class="gl" href="#g-environment-variable">environment variable</a> instead (<a href="#ch56">Chapter 56</a>).</p>
+<div class="code"><span class="cap">auth_demo.py</span><pre># auth_demo.py - read a token from an environment variable, send it as a header
+import os
+import sys
+
+import requests
+
+token = os.environ.get("DEMO_TOKEN")
+if not token:
+    sys.exit("Set DEMO_TOKEN first, for example: export DEMO_TOKEN=test-123")
+
+headers = {"Authorization": f"Bearer {token}"}
+response = requests.get("https://httpbin.org/bearer", headers=headers, timeout=10)
+print("Status:", response.status_code)
+print("Authenticated:", response.json()["authenticated"])</pre></div>
+<div class="code"><span class="cap">Terminal</span><pre>python auth_demo.py
+<span class="c"># Set DEMO_TOKEN first, for example: export DEMO_TOKEN=test-123</span>
+export DEMO_TOKEN=test-123
+python auth_demo.py</pre></div>
+<div class="code"><span class="cap">Expected output (second run)</span><pre>Status: 200
+Authenticated: True</pre></div>
+<p>httpbin's <code>/bearer</code> endpoint returns 200 if an <code>Authorization: Bearer …</code> header is present and 401 if not, so you can try auth handling with a made-up token. The script stops with a helpful message when the variable is missing, rather than sending an empty header and getting a puzzling 401.</p>
+<div class="tbl"><table>
+<tr><th>Service</th><th>Header it expects</th><th>Conventional variable</th></tr>
+<tr><td>Claude API</td><td><code>x-api-key: …</code> plus <code>anthropic-version</code> (<a href="#ch86">Chapter 86</a>)</td><td><code>ANTHROPIC_API_KEY</code></td></tr>
+<tr><td>Most OAuth or token APIs</td><td><code>Authorization: Bearer …</code></td><td>Your choice, e.g. <code>API_TOKEN</code></td></tr>
+<tr><td>Jira Cloud (basic auth with an API token)</td><td><code>Authorization: Basic …</code>; pass <code>auth=(email, token)</code> and the library builds it</td><td>e.g. <code>JIRA_EMAIL</code>, <code>JIRA_API_TOKEN</code></td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Keep tokens out of logs too</span><p>Printing <code>response.request.headers</code> while debugging prints your token. Mask it (<code>token[:4] + "…"</code>) before logging anything. If a token ever lands in a commit, chat or ticket, revoke it and create a new one. Deleting the message isn't enough. If you keep tokens in a <code>.env</code> file for convenience, add <code>.env</code> to <code>.gitignore</code> before creating it.</p></div>
+
+<h3 id="ch60-5"><span class="num">60.5</span>Errors and timeouts</h3>
+<p>Things go wrong in two different ways, and your code must handle both:</p>
+<div class="cols2">
+<div><h4>The server answered, with an error</h4><p>You get a response with a 4xx or 5xx status. <code>raise_for_status()</code> turns it into <code>requests.HTTPError</code> (httpx: <code>httpx.HTTPStatusError</code>). The body often explains what was wrong: read <code>response.text</code>.</p></div>
+<div><h4>No usable answer at all</h4><p>DNS failure, connection refused, TLS problems, or no reply in time. These raise exceptions directly: <code>requests.ConnectionError</code> and <code>requests.Timeout</code> (httpx: subclasses of <code>httpx.TransportError</code>, such as <code>ConnectError</code> and <code>ReadTimeout</code>).</p></div>
+</div>
+<p>A <a class="gl" href="#g-timeout">timeout</a> is how long you're willing to wait. With <code>requests</code>, <b>always pass <code>timeout=</code></b>: its default is to wait indefinitely, so one hung server can freeze a CI job until the job's own limit kills it, with no useful error. A single number applies to connecting and to each wait for data. For AI calls, which can legitimately take a minute or more for long answers, set a generous read timeout rather than none.</p>
+<div class="tbl"><table>
+<tr><th>Situation</th><th>Retry?</th><th>Why</th></tr>
+<tr><td>Connection error, timeout</td><td>Yes, a few times</td><td>Often a brief network or server blip</td></tr>
+<tr><td>429 Too Many Requests</td><td>Yes, after waiting (respect <code>Retry-After</code>)</td><td>You hit a <a class="gl" href="#g-rate-limit">rate limit</a>; it resets</td></tr>
+<tr><td>500, 502, 503, 504</td><td>Yes, with backoff</td><td>Server-side or gateway problems, often temporary. (The Claude API also uses 529 for "overloaded".)</td></tr>
+<tr><td>400, 401, 403, 404, 422</td><td>No</td><td>Your request is wrong or unauthorised; sending it again gives the same answer</td></tr>
+</table></div>
+
+<h3 id="ch60-6"><span class="num">60.6</span>Retries with exponential backoff</h3>
+<p>If a server is struggling, retrying instantly makes things worse. <a class="gl" href="#g-exponential-backoff">Exponential backoff</a> means waiting longer after each failure: 0.5 seconds, then 1, then 2, then 4. Adding a little random <b>jitter</b> stops a crowd of clients from retrying in lockstep. If the server sends a <code>Retry-After</code> header, use its number instead. And stop after a few attempts: an endless retry loop is just a slower hang.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>You ring a busy GP surgery at 8 a.m. and get the engaged tone. Redialling every second just keeps the line jammed for everyone. Sensible people wait a minute, then two, then five. If the recorded message says "call back after 10 o'clock", you do exactly that. And after a few tries you stop and book online instead.</p></div>
+<div class="code"><span class="cap">retry_demo.py</span><pre># retry_demo.py - timeouts, error handling and retries with exponential backoff
+import random
+import time
+
+import requests
+
+RETRY_STATUSES = {429, 500, 502, 503, 504}
+
+
+def get_with_retry(url, max_attempts=4, base_delay=0.5, timeout=5):
+    """GET a URL, retrying network errors and retryable status codes."""
+    for attempt in range(1, max_attempts + 1):
+        # Exponential backoff: 0.5s, 1s, 2s, 4s... plus a little random "jitter"
+        wait = base_delay * 2 ** (attempt - 1) + random.uniform(0, 0.1)
+        try:
+            response = requests.get(url, timeout=timeout)
+        except (requests.ConnectionError, requests.Timeout) as err:
+            reason = type(err).__name__
+        else:
+            if response.status_code not in RETRY_STATUSES:
+                response.raise_for_status()   # 4xx such as 404 or 401: retrying won't help
+                return response
+            reason = f"HTTP {response.status_code}"
+            retry_after = response.headers.get("Retry-After", "")
+            if retry_after.isdigit():         # the server told us how long to wait
+                wait = float(retry_after)
+
+        if attempt == max_attempts:
+            raise RuntimeError(f"Gave up on {url} after {attempt} attempts ({reason})")
+        print(f"  attempt {attempt} failed ({reason}); waiting {wait:.1f}s")
+        time.sleep(wait)
+
+
+if __name__ == "__main__":
+    print("1. A healthy endpoint")
+    r = get_with_retry("https://httpbin.org/status/200")
+    print("  -&gt;", r.status_code)
+
+    print("2. An endpoint that always returns 503")
+    try:
+        get_with_retry("https://httpbin.org/status/503", max_attempts=3)
+    except RuntimeError as err:
+        print("  -&gt;", err)
+
+    print("3. A slow endpoint with a 1-second timeout")
+    try:
+        get_with_retry("https://httpbin.org/delay/3", max_attempts=2, timeout=1)
+    except RuntimeError as err:
+        print("  -&gt;", err)
+
+    print("4. A 404, which is not retried")
+    try:
+        get_with_retry("https://httpbin.org/status/404")
+    except requests.HTTPError as err:
+        print("  -&gt;", err)</pre></div>
+<div class="code"><span class="cap">Expected output (takes about 10 seconds; wait times vary slightly because of jitter)</span><pre>1. A healthy endpoint
+  -&gt; 200
+2. An endpoint that always returns 503
+  attempt 1 failed (HTTP 503); waiting 0.5s
+  attempt 2 failed (HTTP 503); waiting 1.0s
+  -&gt; Gave up on https://httpbin.org/status/503 after 3 attempts (HTTP 503)
+3. A slow endpoint with a 1-second timeout
+  attempt 1 failed (ReadTimeout); waiting 0.5s
+  -&gt; Gave up on https://httpbin.org/delay/3 after 2 attempts (ReadTimeout)
+4. A 404, which is not retried
+  -&gt; 404 Client Error: Not Found for url: https://httpbin.org/status/404</pre></div>
+<p>The <code>try</code> / <code>except</code> / <code>else</code> shape is worth learning: <code>except</code> handles "no answer", <code>else</code> runs only when an answer arrived, and there we decide whether the status is worth retrying. A 404 goes straight to <code>raise_for_status()</code> and fails on the first attempt, as it should.</p>
+<details class="deep"><summary>Under the hood: retries, idempotency and library helpers</summary><div class="body">
+<p>Retrying is only safe when sending a request twice has the same effect as sending it once. That property is called <b>idempotency</b>. GET, PUT and DELETE are meant to be idempotent; POST usually isn't. If a "create order" POST times out, the server may have created the order before the reply was lost, and a blind retry creates a second one. Well-designed APIs accept an idempotency key header so retries are safe; otherwise, check whether the first attempt succeeded before retrying a POST. Retrying an AI request is generally safe in this sense (nothing is created), but each retry may cost tokens.</p>
+<p>You don't always have to write retries by hand. <code>requests</code> can use urllib3's <code>Retry</code> class through an <code>HTTPAdapter</code>; httpx transports accept a <code>retries</code> setting for connection failures only; and the Anthropic SDKs retry certain errors twice by default, configurable with <code>max_retries</code> (<a href="#ch86">Chapter 86</a>). Writing it once yourself, as here, is how you learn what those settings mean.</p>
+</div></details>
+
+<h3 id="ch60-7"><span class="num">60.7</span>Pagination: getting every page</h3>
+<p>APIs rarely return thousands of records at once. They split long lists into pages, and the client asks for one page at a time. This is <a class="gl" href="#g-pagination">pagination</a>. You'll meet three styles:</p>
+<div class="tbl"><table>
+<tr><th>Style</th><th>Looks like</th><th>How you know you're done</th></tr>
+<tr><td>Page number</td><td><code>?page=2&amp;per_page=50</code></td><td>An empty page, or a total count in the body or a header</td></tr>
+<tr><td>Offset</td><td><code>?startAt=100&amp;maxResults=50</code> (Jira's older search style)</td><td><code>startAt + maxResults &gt;= total</code></td></tr>
+<tr><td>Cursor or next link</td><td>Body field such as <code>"next_cursor"</code>, or a <code>Link: &lt;…&gt;; rel="next"</code> header</td><td>No next cursor or link</td></tr>
+</table></div>
+<p>Cursor and link styles are the most robust, because records added while you're paging don't shift everything along. JSONPlaceholder supports <code>_page</code> and <code>_limit</code> and sends a standard <code>Link</code> header, which <code>requests</code> parses for you into <code>response.links</code>:</p>
+<div class="code"><span class="cap">paginate.py</span><pre># paginate.py - follow "next" links until there are no more pages
+import requests
+
+url = "https://jsonplaceholder.typicode.com/todos?_page=1&amp;_limit=50"
+all_todos = []
+pages = 0
+
+while url:
+    response = requests.get(url, timeout=10)
+    response.raise_for_status()
+    all_todos.extend(response.json())
+    pages += 1
+    url = response.links.get("next", {}).get("url")   # None on the last page
+
+print(f"Fetched {len(all_todos)} todos in {pages} pages")
+print("Server says total is", response.headers.get("X-Total-Count"))</pre></div>
+<div class="code"><span class="cap">Expected output</span><pre>Fetched 200 todos in 4 pages
+Server says total is 200</pre></div>
+<div class="box note"><span class="tag">Always add a brake</span><p>A buggy API that always returns a "next" link would keep a <code>while url:</code> loop running forever. In production code, add a maximum page count and stop with an error if you reach it. A tester's instinct helps here: ask what happens if the server misbehaves.</p></div>
+
+<h3 id="ch60-8"><span class="num">60.8</span>Async: many slow calls at once</h3>
+<p>A normal (synchronous) script sends a request and does nothing until the answer arrives. For one call that's fine. For a hundred, the waiting adds up. AI calls make this acute: a model response can take several seconds to a minute, so evaluating 200 prompts one at a time can take an hour while your computer sits idle.</p>
+<p><a class="gl" href="#g-async">Async</a> code lets one program start many requests and wait for all of them together. In Python you write <code>async def</code> for a function that can pause, and <code>await</code> at each point where it waits on the network. <code>asyncio.run()</code> starts the whole thing, and <code>asyncio.gather()</code> runs several tasks at the same time and returns their results in the original order.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Synchronous code is a waiter who takes one table's order, walks to the kitchen, waits for the food, serves it, and only then greets the next table. Async code is a normal waiter: take an order, pass it to the kitchen, take the next order while the first is cooking, and serve each dish when it's ready. The kitchen isn't faster; the waiting simply overlaps.</p></div>
+<div class="code"><span class="cap">async_compare.py</span><pre># async_compare.py - the same 10 requests, one after another vs at the same time
+import asyncio
+import time
+
+import httpx
+
+URLS = [f"https://jsonplaceholder.typicode.com/posts/{n}" for n in range(1, 11)]
+
+
+def fetch_all_sync():
+    with httpx.Client(timeout=10) as client:
+        return [client.get(url).json() for url in URLS]
+
+
+async def fetch_one(client, limit, url):
+    async with limit:                       # at most 5 requests in flight at once
+        response = await client.get(url)
+        response.raise_for_status()
+        return response.json()
+
+
+async def fetch_all_async():
+    limit = asyncio.Semaphore(5)
+    async with httpx.AsyncClient(timeout=10) as client:
+        tasks = [fetch_one(client, limit, url) for url in URLS]
+        return await asyncio.gather(*tasks)   # results come back in the same order
+
+
+start = time.perf_counter()
+posts = fetch_all_sync()
+print(f"sync : {len(posts)} posts in {time.perf_counter() - start:.2f}s")
+
+start = time.perf_counter()
+posts = asyncio.run(fetch_all_async())
+print(f"async: {len(posts)} posts in {time.perf_counter() - start:.2f}s")
+print("First title:", posts[0]["title"][:40])</pre></div>
+<div class="code"><span class="cap">Example output (your timings will differ)</span><pre>sync : 10 posts in 2.17s
+async: 10 posts in 3.10s
+First title: sunt aut facere repellat provident occae</pre></div>
+<p>Same ten requests, roughly three times faster, because the waits overlap. The <code>Semaphore(5)</code> is the important line for AI work: it caps how many requests are in flight at once. Without a cap, 500 concurrent calls will hit the provider's rate limit and come back as 429s. Size the cap to your rate limit (<a href="#ch90">Chapter 90</a>), and keep retries with backoff for the 429s you still get.</p>
+<div class="box note"><span class="tag">Async in the Claude SDK</span><p>Anthropic's Python SDK offers an async client, <code>AsyncAnthropic</code>, used with <code>await client.messages.create(...)</code> in exactly this pattern. For large offline jobs where you don't need answers immediately, the Message Batches API is often cheaper than many concurrent calls (<a href="#ch90">Chapter 90</a>).</p></div>
+<details class="deep"><summary>Under the hood: what the event loop actually does</summary><div class="body">
+<p>Async Python isn't multi-threaded. A single <b>event loop</b> runs one piece of code at a time. When a task reaches <code>await</code> on a network read, it hands control back to the loop, which runs another task that's ready. When data arrives on the first task's connection, the loop resumes it. This makes async ideal for <b>I/O-bound</b> work (waiting on networks, disks or APIs) and useless for <b>CPU-bound</b> work (heavy calculation), which never pauses to let others run. Two practical consequences: calling a blocking function such as <code>time.sleep()</code> or <code>requests.get()</code> inside async code freezes every task (use <code>await asyncio.sleep()</code> and httpx's <code>AsyncClient</code>), and a forgotten <code>await</code> gives you a "coroutine" object instead of a result, with a <code>RuntimeWarning: coroutine … was never awaited</code>.</p>
+</div></details>
+
+<h3 id="ch60-9"><span class="num">60.9</span>Project: a small reusable API client</h3>
+<p>Copy-pasting retry loops into every script doesn't scale. The professional move is a small <b>client class</b> that wraps all the habits above once: base URL and token from environment variables, timeouts, retries with backoff, error handling and pagination. Your scripts then contain only the business logic. The project has three files: the client, a report script that uses it, and offline tests.</p>
+<div class="flow">
+<div><b>todo_report.py</b>Business logic: what to fetch and what to report</div>
+<div class="hl"><b>api_client.py</b>Config, auth header, timeout, retries, errors, pagination</div>
+<div><b>httpx</b>Connections and HTTP</div>
+<div><b>The API</b>JSONPlaceholder (or your own system)</div>
+</div>
+<div class="code"><span class="cap">api_client.py</span><pre>"""api_client.py - a small, reusable client for a JSON REST API.
+
+Configuration comes from environment variables, never from the code:
+  API_BASE_URL  (default: https://jsonplaceholder.typicode.com)
+  API_TOKEN     (optional; sent as "Authorization: Bearer ..." when set)
+"""
+import os
+import random
+import time
+
+import httpx
+
+RETRY_STATUSES = {429, 500, 502, 503, 504}
+
+
+class ApiError(Exception):
+    """Raised when the API cannot give us a usable answer."""
+
+
+class ApiClient:
+    def __init__(self, base_url=None, token=None, timeout=10.0, max_attempts=4,
+                 base_delay=0.5, transport=None):
+        base_url = base_url or os.environ.get("API_BASE_URL", "https://jsonplaceholder.typicode.com")
+        token = token or os.environ.get("API_TOKEN")
+        headers = {"Accept": "application/json", "User-Agent": "qa-api-client/1.0"}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        self.max_attempts = max_attempts
+        self.base_delay = base_delay
+        # transport lets tests swap the network for a fake (see test_api_client.py)
+        self.http = httpx.Client(base_url=base_url, headers=headers,
+                                 timeout=timeout, transport=transport)
+
+    def close(self):
+        self.http.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+
+    def request(self, method, path, **kwargs):
+        """Send one request, retrying network errors and 429/5xx with backoff."""
+        for attempt in range(1, self.max_attempts + 1):
+            wait = self.base_delay * 2 ** (attempt - 1) + random.uniform(0, 0.1)
+            try:
+                response = self.http.request(method, path, **kwargs)
+            except httpx.TransportError as err:          # DNS, refused, timeouts
+                reason = f"{type(err).__name__}"
+            else:
+                if response.status_code not in RETRY_STATUSES:
+                    if response.is_error:
+                        raise ApiError(f"{method} {path} -&gt; {response.status_code}: {response.text[:200]}")
+                    return response
+                reason = f"HTTP {response.status_code}"
+                retry_after = response.headers.get("Retry-After", "")
+                if retry_after.isdigit():
+                    wait = float(retry_after)
+            if attempt == self.max_attempts:
+                raise ApiError(f"{method} {path} failed after {attempt} attempts ({reason})")
+            time.sleep(wait)
+
+    def get_json(self, path, **params):
+        return self.request("GET", path, params=params).json()
+
+    def get_all(self, path, page_size=50):
+        """Collect every item from a paged list endpoint (json-server style _page/_limit)."""
+        items, page = [], 1
+        while True:
+            response = self.request("GET", path, params={"_page": page, "_limit": page_size})
+            batch = response.json()
+            items.extend(batch)
+            if "next" not in response.links or not batch:
+                return items
+            page += 1</pre></div>
+<p>The <code>__enter__</code> and <code>__exit__</code> methods let you write <code>with ApiClient() as client:</code>, which closes connections automatically. The <code>transport</code> parameter exists purely for testing, as you'll see below.</p>
+<div class="code"><span class="cap">todo_report.py</span><pre>"""todo_report.py - use ApiClient to build a small completion report.
+
+Run:  python todo_report.py            (report for all users)
+      python todo_report.py --min 50   (flag users below 50% complete)
+"""
+import argparse
+import json
+import sys
+
+from api_client import ApiClient, ApiError
+
+
+def build_report(client, min_percent):
+    users = {u["id"]: u["name"] for u in client.get_json("/users")}
+    todos = client.get_all("/todos")
+
+    rows = []
+    for user_id, name in sorted(users.items()):
+        mine = [t for t in todos if t["userId"] == user_id]
+        done = sum(1 for t in mine if t["completed"])
+        percent = round(100 * done / len(mine)) if mine else 0
+        rows.append({"user": name, "done": done, "total": len(mine),
+                     "percent": percent, "flag": percent &lt; min_percent})
+    return {"todos": len(todos), "users": len(users), "rows": rows}
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Todo completion report")
+    parser.add_argument("--min", type=int, default=50, help="flag users below this percent")
+    args = parser.parse_args()
+
+    try:
+        with ApiClient() as client:
+            report = build_report(client, args.min)
+    except ApiError as err:
+        print(f"API problem: {err}", file=sys.stderr)
+        return 2
+
+    print(f"{report['todos']} todos across {report['users']} users")
+    for row in report["rows"]:
+        marker = "  &lt;-- below target" if row["flag"] else ""
+        print(f"  {row['user']:26} {row['done']:2}/{row['total']} ({row['percent']}%){marker}")
+
+    with open("report.json", "w", encoding="utf-8") as f:
+        json.dump(report, f, indent=2)
+    print("Wrote report.json")
+    return 1 if any(r["flag"] for r in report["rows"]) else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())</pre></div>
+<div class="code"><span class="cap">Expected output of python todo_report.py</span><pre>200 todos across 10 users
+  Leanne Graham              11/20 (55%)
+  Ervin Howell                8/20 (40%)  &lt;-- below target
+  Clementine Bauch            7/20 (35%)  &lt;-- below target
+  Patricia Lebsack            6/20 (30%)  &lt;-- below target
+  Chelsey Dietrich           12/20 (60%)
+  Mrs. Dennis Schulist        6/20 (30%)  &lt;-- below target
+  Kurtis Weissnat             9/20 (45%)  &lt;-- below target
+  Nicholas Runolfsdottir V   11/20 (55%)
+  Glenna Reichert             8/20 (40%)  &lt;-- below target
+  Clementina DuBuque         12/20 (60%)
+Wrote report.json</pre></div>
+<p>It exits with code 1 because some users are below the target, and code 2 if the API can't be reached, so a CI job can tell "the data is bad" from "the check couldn't run". Point it at a different server without touching code: <code>API_BASE_URL=https://your-test-env.example.com API_TOKEN=… python todo_report.py</code> (with your own endpoints, of course).</p>
+<h4>Testing the client without a network</h4>
+<p>Tests that call a real public API are slow and fail when that API is down. httpx's <code>MockTransport</code> replaces the network with a Python function that plays the server, so you can test exactly the hard cases: a 503 followed by success, a 404, the auth header, multi-page results.</p>
+<div class="code"><span class="cap">test_api_client.py</span><pre>"""test_api_client.py - offline tests: a fake transport plays the server."""
+import httpx
+import pytest
+
+from api_client import ApiClient, ApiError
+
+
+def make_client(handler, **kwargs):
+    return ApiClient(base_url="https://api.test", transport=httpx.MockTransport(handler),
+                     base_delay=0, **kwargs)
+
+
+def test_retries_503_then_succeeds():
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        if len(calls) &lt; 3:
+            return httpx.Response(503)
+        return httpx.Response(200, json={"ok": True})
+
+    with make_client(handler) as client:
+        assert client.get_json("/health") == {"ok": True}
+    assert len(calls) == 3
+
+
+def test_404_is_not_retried():
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(404, json={"error": "not found"})
+
+    with make_client(handler) as client, pytest.raises(ApiError, match="404"):
+        client.get_json("/missing")
+    assert len(calls) == 1
+
+
+def test_token_sent_as_bearer_header():
+    def handler(request):
+        assert request.headers["Authorization"] == "Bearer secret-for-tests"
+        return httpx.Response(200, json=[])
+
+    with make_client(handler, token="secret-for-tests") as client:
+        assert client.get_json("/users") == []
+
+
+def test_get_all_follows_pages():
+    data = list(range(5))
+
+    def handler(request):
+        page = int(request.url.params["_page"])
+        limit = int(request.url.params["_limit"])
+        chunk = data[(page - 1) * limit: page * limit]
+        headers = {}
+        if page * limit &lt; len(data):
+            headers["Link"] = f'&lt;https://api.test/items?_page={page + 1}&gt;; rel="next"'
+        return httpx.Response(200, json=chunk, headers=headers)
+
+    with make_client(handler) as client:
+        assert client.get_all("/items", page_size=2) == [0, 1, 2, 3, 4]</pre></div>
+<div class="code"><span class="cap">Terminal: python -m pytest -v test_api_client.py</span><pre>test_api_client.py::test_retries_503_then_succeeds PASSED                [ 25%]
+test_api_client.py::test_404_is_not_retried PASSED                       [ 50%]
+test_api_client.py::test_token_sent_as_bearer_header PASSED              [ 75%]
+test_api_client.py::test_get_all_follows_pages PASSED                    [100%]
+============================== 4 passed in 0.16s ===============================</pre></div>
+<p>Notice <code>base_delay=0</code> in the tests, so retries don't actually sleep and the whole suite runs in a fraction of a second. Also notice that the tests never touch a real token: they use an obviously fake value.</p>
+
+<div class="lab"><div class="lab-h"><b>Lab: build, run and break the API client</b><span>45 min · your machine, internet access for steps 3–5</span></div><ol>
+<li>In <code>~/qa-api</code> with the virtual environment active (60.1), create <code>api_client.py</code>, <code>todo_report.py</code> and <code>test_api_client.py</code> from 60.9.<span class="expect"><code>ls</code> shows the three files plus <code>.venv</code>.</span></li>
+<li>Run the offline tests first: <code>python -m pytest -v test_api_client.py</code>.<span class="expect">Four tests, all PASSED, in well under a second. No network was used.</span></li>
+<li>Prove a test can fail: in <code>api_client.py</code>, temporarily remove <code>503</code> from <code>RETRY_STATUSES</code> and rerun the tests.<span class="expect"><code>test_retries_503_then_succeeds</code> fails with an <code>ApiError</code> mentioning 503. Put the 503 back and the suite goes green again.</span></li>
+<li>Run the real report: <code>python todo_report.py</code>, then <code>echo $?</code>.<span class="expect">The ten-user table shown in 60.9, "Wrote report.json", and exit code 1. Open <code>report.json</code> to see the same data as JSON.</span></li>
+<li>Change the threshold: <code>python todo_report.py --min 30</code>, then <code>echo $?</code>.<span class="expect">No user is flagged (the lowest is 30%) and the exit code is 0.</span></li>
+<li>Break the network on purpose: <code>API_BASE_URL=https://no-such-host.invalid python todo_report.py</code>.<span class="expect">After a few seconds of retries: <code>API problem: GET /users failed after 4 attempts (ConnectError)</code>, exit code 2. No traceback.</span></li>
+<li>Run the async comparison (<code>async_compare.py</code> from 60.8) twice.<span class="expect">The async line is consistently faster than the sync line; exact times depend on your network.</span></li>
+<li>Stretch: add a <code>max_pages</code> brake to <code>get_all</code> that raises <code>ApiError</code> when exceeded, and a test for it using <code>MockTransport</code> with a server that always sends a "next" link.<span class="expect">Five tests pass, and the new one fails if you remove the brake.</span></li>
+</ol>
+<p><b>Troubleshooting</b></p>
+<ul>
+<li><b><code>ModuleNotFoundError: No module named 'httpx'</code>:</b> the virtual environment isn't active in this terminal. Run <code>source .venv/bin/activate</code>; the prompt should show <code>(.venv)</code>.</li>
+<li><b><code>ModuleNotFoundError: No module named 'api_client'</code>:</b> run the scripts from the folder that contains <code>api_client.py</code>.</li>
+<li><b><code>ConnectError</code> or <code>SSL: CERTIFICATE_VERIFY_FAILED</code> on a company network:</b> a proxy is intercepting traffic. Ask IT for the proxy settings and certificate bundle; httpx and requests read the <code>HTTPS_PROXY</code> environment variable. Never "fix" it with <code>verify=False</code> in real code.</li>
+<li><b>httpbin.org is slow or returns 502/503 unexpectedly:</b> it's a free shared service. Rerun later; for the retry demo, the behaviour you see is exactly what the code is for.</li>
+<li><b><code>JSONDecodeError</code>:</b> the body wasn't JSON, often an HTML error page from a proxy or gateway. Print <code>response.status_code</code> and <code>response.text[:200]</code>.</li>
+<li><b>Windows PowerShell:</b> set variables with <code>$env:API_BASE_URL = "https://no-such-host.invalid"</code>, and read exit codes with <code>$LASTEXITCODE</code>.</li>
+</ul></div>
+
+<h3 id="ch60-10"><span class="num">60.10</span>Debugging API code</h3>
+<p>When an API call misbehaves, find out <b>what was actually sent and what actually came back</b>, rather than what you think your code sent.</p>
+<div class="tbl"><table>
+<tr><th>Technique</th><th>How</th></tr>
+<tr><td>Print the real request</td><td><code>print(response.request.method, response.request.url)</code>; headers via <code>response.request.headers</code> (mask tokens)</td></tr>
+<tr><td>Print the raw body</td><td><code>print(response.status_code, response.text[:500])</code> before calling <code>.json()</code></td></tr>
+<tr><td>Turn on library logging</td><td><code>import logging; logging.basicConfig(level=logging.INFO)</code> makes httpx log every request and status; <code>level=logging.DEBUG</code> makes requests (through urllib3) log connections</td></tr>
+<tr><td>Reproduce with curl</td><td>If <code>curl</code> (<a href="#ch85">Chapter 85</a>) works and Python doesn't, compare headers and body. If both fail, it's not your code</td></tr>
+<tr><td>Check the environment</td><td><code>echo $API_BASE_URL</code>; a missing or stale variable explains many 401s and 404s</td></tr>
+<tr><td>Ask Claude well</td><td>Paste the code, the full traceback, the status code and the first lines of the response body (with secrets removed)</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A tester's script that creates Jira test issues starts failing with <code>KeyError: 'id'</code>. The traceback points at <code>response.json()["id"]</code>. Printing the status and body shows <code>400</code> and <code>{"errors": {"priority": "Field 'priority' cannot be set..."}}</code>: an admin had removed the priority field from the create screen. The bug was never in the Python. A <code>raise_for_status()</code> call after the POST, printing the body, would have put the real error on the first line of the output. (Illustrative scenario.)</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"If the request didn't raise an error, it worked."</dt><dd>4xx and 5xx responses don't raise by themselves. Call <code>raise_for_status()</code> or check the status code.</dd>
+<dt>"Timeouts are optional."</dt><dd>With <code>requests</code>, no timeout means a hung server can stall your script indefinitely. Always set one.</dd>
+<dt>"Retry everything until it works."</dt><dd>Retry only temporary failures (network errors, 429, 5xx), with backoff and a limit. A 401 or 404 won't change on the next attempt.</dd>
+<dt>"Async makes each request faster."</dt><dd>Each request takes as long as before. Async overlaps the waiting, so many requests finish sooner in total.</dd>
+<dt>"It's fine to paste the token in for a quick test."</dt><dd>Quick tests get committed and shared. Use an environment variable from the start.</dd>
+</dl></div>
+
+<h3 id="ch60-r"><span class="num">60.11</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li><code>requests</code> is the simple classic; <code>httpx</code> has the same feel plus async support, a 5-second default timeout and a mock transport for tests.</li>
+<li>Use <code>params=</code> for query strings and <code>json=</code> for JSON bodies; read results with <code>.json()</code> after checking the status.</li>
+<li>Tokens come from environment variables and never appear in code or logs.</li>
+<li>Always set timeouts; retry only network errors, 429 and 5xx, with exponential backoff, jitter, <code>Retry-After</code> and a maximum.</li>
+<li>Follow pages until there's no next link or cursor, with a safety brake.</li>
+<li>Async (<code>async</code>/<code>await</code>, <code>asyncio.gather</code>, a <code>Semaphore</code>) overlaps slow calls such as AI requests, within your rate limit.</li>
+<li>Wrap these habits once in a client class, and test it offline with fake responses.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Your script calls <code>requests.get(url)</code> with no other arguments, and the server never replies. What happens?</p><div class="opts"><button>It raises Timeout after 5 seconds</button><button data-ok>It can wait indefinitely, because requests has no default timeout</button><button>It retries three times automatically</button></div><p class="why" hidden>Always pass <code>timeout=</code> to requests. httpx is different: it defaults to 5 seconds.</p></div>
+<div class="qz"><p class="q">Which response should your code retry?</p><div class="opts"><button>401 Unauthorized</button><button>404 Not Found</button><button data-ok>503 Service Unavailable</button></div><p class="why" hidden>503 is usually temporary. 401 and 404 will give the same answer however many times you ask.</p></div>
+<div class="qz"><p class="q">Where should an API token live?</p><div class="opts"><button>In a constant at the top of the script, so it's easy to change</button><button data-ok>In an environment variable that the script reads with <code>os.environ</code></button><button>In the URL as a query parameter</button></div><p class="why" hidden>Code and URLs get committed, logged and shared. Environment variables keep secrets out of both.</p></div>
+<div class="qz"><p class="q">Why does <code>async_compare.py</code> use <code>asyncio.Semaphore(5)</code>?</p><div class="opts"><button>To make each request five times faster</button><button data-ok>To cap concurrent requests so you stay within the server's rate limits</button><button>Because asyncio.gather needs it to work</button></div><p class="why" hidden>Without a cap, a large batch fires every request at once and triggers 429s. gather works without it.</p></div>
+<div class="qz"><p class="q">What lets <code>test_api_client.py</code> test retries without any network?</p><div class="opts"><button>Setting <code>timeout=0</code></button><button>Running pytest in offline mode</button><button data-ok>httpx.MockTransport, which replaces the network with a function that returns fake responses</button></div><p class="why" hidden>The client accepts a transport, so tests can inject a fake server that returns 503, 404 or paged data on demand.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Choose an API you use at work that offers a test environment and a personal token: your test-management tool, Jira's REST API (<a href="#ch101">Chapter 101</a> shows the MCP route), or an internal service. Adapt <code>api_client.py</code> to it: correct auth header, base URL and token from environment variables, and its real pagination style. Write a script that answers one real question, such as "how many open bugs per component were created this sprint?", and at least four offline tests with <code>MockTransport</code>: success, a retryable error, a non-retryable error, and two pages of results. Hand in the code (with no secrets), the test run, and one paragraph on anything about the real API that surprised you.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Calling an API from Python is three lines; doing it properly is a handful of habits. Always set a timeout. Check the status code before trusting the body. Read tokens from environment variables, never from code. Retry only temporary failures, such as network errors, 429s and 5xx, waiting longer each time, and give up after a few tries. Follow 'next' links until there aren't any. When you have many slow calls, like AI requests, run them concurrently with async but cap how many at once. Put all of that in one small client class and test it with fake responses, so your scripts only contain the actual question you're asking."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Requests documentation, <a href="https://requests.readthedocs.io/en/latest/user/quickstart/" target="_blank" rel="noopener">Quickstart</a> (parameters, JSON, status codes, timeouts, errors) and <a href="https://requests.readthedocs.io/en/latest/user/advanced/" target="_blank" rel="noopener">Advanced usage</a> (sessions, link headers, timeouts, transport adapters).</li>
+<li>HTTPX documentation, <a href="https://www.python-httpx.org/quickstart/" target="_blank" rel="noopener">Quickstart</a>, <a href="https://www.python-httpx.org/async/" target="_blank" rel="noopener">Async support</a>, <a href="https://www.python-httpx.org/advanced/timeouts/" target="_blank" rel="noopener">Timeouts</a> and <a href="https://www.python-httpx.org/advanced/transports/" target="_blank" rel="noopener">Transports (including MockTransport)</a>.</li>
+<li>Python docs, <a href="https://docs.python.org/3/library/asyncio.html" target="_blank" rel="noopener">asyncio</a> (<code>asyncio.run</code>, <code>gather</code>, <code>Semaphore</code>).</li>
+<li>MDN Web Docs, <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After" target="_blank" rel="noopener">Retry-After</a>, <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Link" target="_blank" rel="noopener">Link</a> and <a href="https://developer.mozilla.org/en-US/docs/Glossary/Idempotent" target="_blank" rel="noopener">Idempotent</a>.</li>
+<li><a href="https://jsonplaceholder.typicode.com/" target="_blank" rel="noopener">JSONPlaceholder</a> and <a href="https://httpbin.org/" target="_blank" rel="noopener">httpbin.org</a> (free public test APIs).</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/cli-sdks-libraries/sdks/python" target="_blank" rel="noopener">Python SDK</a> (async client, retries, timeouts); see also <a href="#ch86">Chapter 86</a>.</li>
+</ol><p class="verified">Verified 9 November 2026. All code tested on Python 3.11.9 with requests 2.34.2, httpx 0.28.1 and pytest against the live JSONPlaceholder and httpbin.org services; outputs shown are from those runs.</p></div>

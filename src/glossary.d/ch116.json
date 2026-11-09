@@ -1,0 +1,54 @@
+{
+ "Total cost of ownership": {
+  "d": "Everything a tool or system costs over its life, not just the price: licences or usage, setup and integration, training, support, maintenance and the cost of switching away later.",
+  "see": "ch117"
+ },
+ "Data processing agreement": {
+  "d": "A contract between an organisation and a supplier that processes personal data on its behalf. It sets out what the supplier may do with the data, its security duties and which sub-processors it uses. Often called a DPA.",
+  "see": "ch117"
+ },
+ "Data residency": {
+  "d": "Control over the country or region where data is processed and stored. For AI services, where the model runs (inference) and where data is stored at rest can be separate settings.",
+  "see": "ch117"
+ },
+ "AI gateway": {
+  "d": "A shared layer between an organisation's people and applications and its AI model providers. It applies policy, logs usage, enforces budgets and can route requests to different models. Also called an LLM gateway or proxy.",
+  "see": "ch117"
+ },
+ "Vendor scorecard": {
+  "d": "A table for comparing suppliers: must-have requirements scored pass or fail, then weighted criteria scored (often 1 to 5) and combined into one total, with evidence for each score.",
+  "see": "ch117"
+ },
+ "Trust boundary": {
+  "d": "A point in a system where data passes between parts trusted to different degrees, such as user input entering an application or a model calling a tool. Attacks usually happen at trust boundaries.",
+  "see": "ch130"
+ },
+ "Threat model": {
+  "d": "A structured look at a system to find what could go wrong before attackers or accidents do. It usually answers four questions: what are we working on, what can go wrong, what will we do about it, and did we do a good job.",
+  "see": "ch130"
+ },
+ "STRIDE": {
+  "d": "A mnemonic from Microsoft for kinds of security threat: Spoofing, Tampering, Repudiation, Information disclosure, Denial of service and Elevation of privilege. Used to brainstorm threats in a threat model.",
+  "see": "ch130"
+ },
+ "OWASP Top 10 for LLM Applications": {
+  "d": "A ranked list of the ten most important security risks for applications built on large language models, published by the OWASP GenAI Security Project. The current edition is 2026; always cite the edition.",
+  "see": "ch130"
+ },
+ "MITRE ATLAS": {
+  "d": "Adversarial Threat Landscape for AI Systems: MITRE's public knowledge base of how attackers target AI systems, organised as tactics and techniques with mitigations and real case studies. Modelled on MITRE ATT&CK.",
+  "see": "ch130"
+ },
+ "Excessive agency": {
+  "d": "A security risk where an AI system has more tools, permissions or autonomy than its task needs, so a mistake or manipulation can do real damage. Entry LLM03 in the OWASP 2026 list.",
+  "see": "ch130"
+ },
+ "Data poisoning": {
+  "d": "Tampering with the data a model learns from or retrieves (training data, fine-tuning data or documents in a RAG index) so it behaves wrongly or maliciously.",
+  "see": "ch130"
+ },
+ "Improper output handling": {
+  "d": "Passing AI-generated output to a browser, shell, database or other system without validating or escaping it, so the output can cause harm there. Entry LLM10 in the OWASP 2026 list.",
+  "see": "ch130"
+ }
+}

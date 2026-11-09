@@ -1,0 +1,231 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What actually happens, physically, when you send a prompt to a model like Claude</li>
+<li>What GPUs, TPUs and Trainium chips are, and why memory speed matters as much as raw calculating power</li>
+<li>Why data centres, electricity and cooling have become central to the AI story</li>
+<li>How an answer is priced per token, and why output tokens cost more than input tokens</li>
+<li>The difference between latency and throughput, and how batching trades one for the other</li>
+<li>Why prices differ so much between models, and how to use that knowledge to cut your own AI bill</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch14">Chapter 14</a> (tokens) and ideally <a href="#ch16">Chapter 16</a> (the Transformer) and <a href="#ch17">Chapter 17</a> (pre-training). You need Python 3 for the lab; no account or API key is required.</div>
+
+<div class="bigidea"><p>Every answer an AI gives is produced by real chips, in real buildings, using real electricity. Training a model happens once; serving it (called <a class="gl" href="#g-inference">inference</a>) happens billions of times, so the running cost of answers matters enormously. The model writes its reply one token at a time, and for each token the chip has to read the model's huge set of numbers from memory, so memory speed often limits how fast answers come. Providers group many users' requests together to keep chips busy, which makes each answer cheaper but can make it slower. All of this shows up as the price per token you pay, and understanding it helps you choose the right model and settings for each job.</p></div>
+
+<h3 id="ch25-1"><span class="num">25.1</span>From your prompt to a data centre and back</h3>
+<p>When you press Enter in Claude, ChatGPT or any AI app, your words don't stay on your laptop. They travel over the internet to a <a class="gl" href="#g-data-centre">data centre</a>: a large building full of servers, network equipment, power supplies and cooling. There, a copy of the model is already loaded onto specialised chips, waiting for work.</p>
+<div class="flow">
+<div><b>1. Your app</b>Sends your prompt (and the conversation so far) as text</div>
+<div><b>2. Front door</b>The provider checks your account, limits and safety rules</div>
+<div><b>3. Scheduler</b>Puts your request in a queue and picks a group of chips</div>
+<div class="hl"><b>4. Inference</b>Chips read the whole prompt, then generate the reply token by token</div>
+<div><b>5. Streaming</b>Tokens flow back to you as they are produced</div>
+</div>
+<p>Two words are worth getting straight from the start:</p>
+<ul>
+<li><a class="gl" href="#g-training">Training</a> is how the model is made. It happens once (per model version), takes weeks or months, and uses enormous clusters of chips. <a href="#ch17">Chapter 17</a> covers it, and the optional <a href="#ch138">Chapter 138</a> goes deep on training hardware.</li>
+<li><a class="gl" href="#g-inference">Inference</a> is using the finished model to answer. It happens every time anyone sends a prompt. This chapter is about inference, also called <strong>serving</strong>.</li>
+</ul>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Training is like writing and printing a recipe book: expensive, slow, done once. Inference is like a restaurant kitchen cooking from that book every evening. The kitchen's rent, staff and gas bill never stop, and the busier the restaurant, the more those running costs matter. For a popular AI service, the kitchen bill (inference) can end up larger than the book (training).</p></div>
+
+<h3 id="ch25-2"><span class="num">25.2</span>The chips: GPUs, TPUs and Trainium</h3>
+<p>A language model is, underneath, a very large collection of numbers (its <a class="gl" href="#g-weight">weights</a> or <a class="gl" href="#g-parameter">parameters</a>). Producing each token means multiplying your input by those numbers, billions of times over. Ordinary computer processors (CPUs) are built to do a few complicated things quickly, one after another. AI needs the opposite: millions of simple multiplications at the same time.</p>
+<div class="tbl"><table>
+<tr><th>Chip family</th><th>Who makes it</th><th>Plain description</th><th>Who uses it (examples)</th></tr>
+<tr><td><a class="gl" href="#g-gpu">GPU</a> (graphics processing unit)</td><td>NVIDIA (main supplier), also AMD</td><td>Originally built to draw video-game graphics, which also needs many simple sums in parallel. NVIDIA's CUDA software made them usable for general computing, and so for deep learning. Recent data-centre generations: Hopper (H100), Blackwell, and Vera Rubin.</td><td>Almost every AI lab and cloud</td></tr>
+<tr><td><a class="gl" href="#g-tpu">TPU</a> (tensor processing unit)</td><td>Google</td><td>A chip Google designed specifically for the maths of neural networks. Used for Google's own Gemini models and rented out through Google Cloud.</td><td>Google DeepMind; Anthropic (a deal for up to one million TPUs, Oct 2025)</td></tr>
+<tr><td>Trainium (and Inferentia)</td><td>Amazon Web Services</td><td>Amazon's own AI chips, offered on AWS to lower cost. Trainium3 is Amazon's first 3&nbsp;nm AI chip. Project Rainier is a very large Trainium2 cluster built for Anthropic.</td><td>Anthropic (AWS is its primary cloud), AWS customers</td></tr>
+</table></div>
+<p>Anthropic is unusual in using all three: AWS Trainium, Google TPUs, and NVIDIA GPUs through Microsoft Azure. Spreading across suppliers gives more capacity and more bargaining power, at the cost of engineering work to make the models run well on each.</p>
+<div class="box note"><span class="tag">Why "accelerator"?</span><p>You'll often see GPUs, TPUs and Trainium grouped together as <strong>AI accelerators</strong>: chips that accelerate the specific maths AI needs. When someone says a lab has "100,000 accelerators", they mean chips of this kind, whoever made them.</p></div>
+
+<h3 id="ch25-3"><span class="num">25.3</span>Memory bandwidth: the hidden bottleneck</h3>
+<p>Here's the surprising part. For chat-style answers, the chip's calculating speed is often <em>not</em> what holds things back. The limit is how fast it can move the model's numbers from memory into the calculating units. That speed is called <a class="gl" href="#g-memory-bandwidth">memory bandwidth</a>.</p>
+<p>Why? Because the model writes one token at a time, and to produce each token it needs to use (almost) all of its weights. A large model's weights take up a great deal of memory. So for every single token, the chip has to stream that whole mountain of numbers past its calculators. The calculators finish their sums quickly, then sit waiting for the next delivery.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Imagine a brilliant chef who can chop anything in a second, but the ingredients arrive from a basement store along one narrow staircase. However fast the chef is, dinner comes out at the speed of the staircase. Memory bandwidth is the width of that staircase. AI chips use special stacked memory called HBM (high-bandwidth memory), which is like replacing the staircase with a wide lift, but it's still often the limiting factor.</p></div>
+<h4>Two phases of every answer: prefill and decode</h4>
+<div class="cols2">
+<div><h4>Prefill (reading your prompt)</h4><p>The model processes all your input tokens at once, in parallel. This keeps the calculators busy and is relatively efficient per token. A long prompt still takes time: this phase is what you wait through before the first word appears.</p></div>
+<div><h4>Decode (writing the reply)</h4><p>The model generates output tokens one after another, each depending on the last. Each step re-reads the weights from memory for just one new token per request. This is the memory-bound, slower-per-token phase.</p></div>
+</div>
+<p>This split explains a pattern you'll see in every price list: <strong>output tokens cost more than input tokens</strong>, typically about five times more for Claude models. Reading is done in bulk; writing is done one careful step at a time.</p>
+<details class="deep"><summary>Under the hood: the KV cache</summary><div class="body">
+<p>During decode, each new token needs to "attend" to every earlier token (<a href="#ch16">Chapter 16</a>). Recomputing everything from scratch for every new token would be hugely wasteful. Instead, the server stores intermediate results for earlier tokens, the attention "keys" and "values", in a <a class="gl" href="#g-kv-cache">KV cache</a> held in chip memory.</p>
+<p>The KV cache grows with the length of the conversation. With very long contexts (current Claude models accept up to 1 million tokens), it can take up a large share of the chip's memory. That limits how many requests fit on a chip at once, which is one reason long-context requests are more expensive to serve, and why some providers price very long prompts differently. Claude Haiku 5.5, for example, has one price for prompts up to 100K tokens and a higher one above that.</p>
+<p>A related idea is <a class="gl" href="#g-prompt-caching">prompt caching</a>: if many requests start with the same long text (a system prompt, a big document, a test-suite description), the provider can keep the processed version and reuse it. Anthropic charges a small fraction of the normal input price for these "cache reads" (for example $0.20 per million tokens on Opus 5.5 instead of $4), with a surcharge to write to the cache in the first place. <a href="#ch89">Chapter 89</a> shows how to use it.</p>
+</div></details>
+<details class="deep"><summary>Under the hood: other tricks providers use</summary><div class="body">
+<ul>
+<li><strong>Quantisation:</strong> storing weights with fewer bits (for example 8 instead of 16), so there's less to move from memory. It can cost a little quality if done carelessly.</li>
+<li><strong>Mixture of Experts (MoE):</strong> the model is split into many "expert" sub-networks and only some are used for each token. Several 2026 models describe themselves this way, for example Microsoft's MAI-Thinking-1 (about 35B active out of about 1T total parameters) and Mistral Large 4 (about 52B active out of about 1T). Fewer active weights per token means less to read per step.</li>
+<li><strong>Speculative decoding:</strong> a small, fast model guesses several tokens ahead and the big model checks them in one go, accepting the ones it agrees with.</li>
+<li><strong>Splitting a model across chips:</strong> a large model rarely fits on one chip, so it is spread across several connected by very fast links. <a href="#ch138">Chapter 138</a> covers how.</li>
+</ul>
+<p>Which of these any particular provider uses for any particular model is usually not published. Treat claims about a specific closed model's internals as guesses unless the provider has said so.</p>
+</div></details>
+
+<h3 id="ch25-4"><span class="num">25.4</span>Data centres, electricity and cooling</h3>
+<p>Thousands of accelerators running flat out produce a great deal of heat and use a great deal of electricity. That's why AI news is now full of power stations, grid connections and cooling systems, and why AI companies describe their computing deals in <strong>gigawatts</strong> (a large power station produces roughly one gigawatt).</p>
+<ul>
+<li>Anthropic's Google Cloud deal (Oct 2025) was described as "well over a gigawatt" of capacity in 2026.</li>
+<li>Its Microsoft Azure commitment (Nov 2025) is up to 1 GW.</li>
+<li>OpenAI's AMD deal (Oct 2025) was for 6 GW of chips.</li>
+</ul>
+<div class="figure" role="img" aria-label="Bar chart: data centre electricity use about 415 TWh in 2024, projected about 945 TWh in 2030"><div class="bars"><div class="bt">Global data-centre electricity use (IEA estimate and projection)</div>
+<div class="bar-row"><span>2024 (estimate)</span><span class="track"><span class="fill" style="width:44%">~415 TWh</span></span></div>
+<div class="bar-row"><span>2030 (projection)</span><span class="track"><span class="fill hl" style="width:100%">~945 TWh</span></span></div></div>
+<div class="cap">The International Energy Agency's <i>Energy and AI</i> report (April 2025) estimated data centres used about 415 TWh in 2024, around 1.5% of the world's electricity, and projected about 945 TWh by 2030 in its base case, with AI the biggest driver of growth. This covers all data centres, not just AI. Source: IEA.</div></div>
+<p>Cooling matters too. Chips are cooled by air or, increasingly, by liquid pumped close to the chips. Some cooling systems use water, which is why water use near new data centres is a local political issue in several places.</p>
+<div class="box opinion"><span class="tag">Opinion · a live debate</span><p>People disagree sharply on how worrying AI's energy use is. The IEA itself notes that data centres are a modest share of total electricity demand growth to 2030, smaller than air conditioning or electric vehicles. Environmental groups and many local communities focus on the rapid local growth, grid strain and water use around specific sites. AI companies argue efficiency gains and AI-enabled science will offset the cost. These are positions held by those groups, not settled facts. As a user, the practical point is simple: smaller models and fewer wasted tokens use less energy as well as less money.</p></div>
+
+<h3 id="ch25-5"><span class="num">25.5</span>Latency versus throughput, and the batching trade-off</h3>
+<p>Two measures describe how fast an AI service is, and they pull in different directions.</p>
+<div class="tbl"><table>
+<tr><th>Measure</th><th>Plain meaning</th><th>Who cares most</th></tr>
+<tr><td><a class="gl" href="#g-latency">Latency</a></td><td>How long one user waits. Often split into <a class="gl" href="#g-time-to-first-token">time to first token</a> (how long before anything appears) and tokens per second while the reply streams.</td><td>Someone chatting, a live support bot, an IDE autocomplete</td></tr>
+<tr><td><a class="gl" href="#g-throughput">Throughput</a></td><td>How much total work the system gets through: tokens or requests per second across all users.</td><td>The provider paying for the chips; a team processing 50,000 test logs overnight</td></tr>
+</table></div>
+<p>Because decode is limited by reading weights from memory (25.3), a chip serving one user wastes most of its calculating power. If it serves 64 users at once, it reads the weights once per step and uses them for all 64. That's <strong>batching</strong>: grouping requests so one trip to memory serves many. Throughput rises dramatically. But each step now takes a little longer, so each individual user sees their tokens arrive a bit more slowly.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A taxi takes you straight to your door: low latency, but one passenger per trip. A bus carries 60 people along the same route: far cheaper per person and far more people moved per hour, but it stops more often and you may wait for it. AI providers run something like a very clever bus service, constantly adding and dropping passengers mid-route (this is called <em>continuous batching</em>).</p></div>
+<p>The provider's choices about batch sizes are why the same model can be offered at different speeds and prices:</p>
+<ul>
+<li><strong>Anthropic's Message Batches API</strong> charges 50% less. You hand over a large set of requests and accept that results come back later (most batches finish within an hour). The provider can fit your work into quiet moments and large batches.</li>
+<li><strong>Fast mode</strong> is offered for Claude Opus 5.5 on the Claude API: the reverse trade, aiming for quicker output. Check the pricing page for its current terms before relying on it.</li>
+<li><strong>Smaller models</strong> such as Claude Haiku 5.5 have fewer weights to read per token, so they're both faster ("Fastest" in Anthropic's own comparison) and cheaper.</li>
+</ul>
+<div class="box example"><span class="tag">Real-world example</span><p>A QA team wants Claude to tag 20,000 historical bug reports by component and root-cause category for a quality dashboard. Nobody is waiting on any single answer. This is a perfect batch job: send it through the Batch API overnight and pay half price. The same team's in-IDE assistant, which a developer waits on while typing, is the opposite case: latency matters more than price, so batching delays would be unacceptable.</p></div>
+
+<h3 id="ch25-6"><span class="num">25.6</span>The cost of an answer, and why prices differ</h3>
+<p>AI APIs charge per token, quoted per million tokens (often written <strong>MTok</strong>), with separate prices for input and output. These are Anthropic's list prices on the Claude API, verified 9 November 2026:</p>
+<div class="tbl"><table>
+<tr><th>Model</th><th>Input / MTok</th><th>Output / MTok</th><th>Cache read / MTok</th><th>Anthropic's latency label</th></tr>
+<tr><td>Claude Fable 5.1</td><td>$10</td><td>$50</td><td>$0.25</td><td>Slower</td></tr>
+<tr><td>Claude Opus 5.5</td><td>$4</td><td>$20</td><td>$0.20</td><td>Moderate</td></tr>
+<tr><td>Claude Sonnet 5.5</td><td>$2</td><td>$10</td><td>$0.10</td><td>Fast</td></tr>
+<tr><td>Claude Haiku 5.5</td><td>$0.10 (prompts up to 100K tokens); $0.50 above</td><td>$0.50; $2.50 above 100K</td><td>$0.01 / $0.05</td><td>Fastest</td></tr>
+</table></div>
+<p>Batch requests are 50% off. Amazon Bedrock and Google Cloud set their own prices for the same models. Prices change: check the official pricing page before budgeting.</p>
+<h4>Why one model costs 100 times another</h4>
+<ol>
+<li><strong>Size.</strong> Bigger models have more weights to read for every token and need more chips to hold them. More hardware per token means more cost.</li>
+<li><strong>Thinking.</strong> <a class="gl" href="#g-reasoning-model">Reasoning models</a> generate hidden "thinking" tokens before answering (<a href="#ch19">Chapter 19</a>). You usually pay for those as output tokens, so a harder <a class="gl" href="#g-effort-level">effort level</a> can multiply the real cost of an answer even at the same price per token.</li>
+<li><strong>Context length.</strong> Long prompts use more memory (the KV cache) and more prefill work.</li>
+<li><strong>Speed promises.</strong> Faster service usually means smaller batches and more chips per user.</li>
+<li><strong>Business strategy.</strong> Prices are also set by competition, the cost of training (which must be recovered somehow), and how much customers will pay. A low price does not prove a model is cheap to run, and a high one does not prove it's expensive. Providers don't publish their actual serving costs.</li>
+</ol>
+<div class="box warn"><span class="tag">Tokens are not words, and tokenizers differ</span><p>Price per token only compares fairly if the models count tokens the same way. Anthropic says Claude 4.7 and later use a newer <a class="gl" href="#g-tokenizer">tokenizer</a> that produces "approximately 30% more tokens for the same text". When comparing providers, measure the token count of your own real prompts on each (<a href="#ch14">Chapter 14</a>), rather than comparing list prices alone.</p></div>
+
+<h3 id="ch25-7"><span class="num">25.7</span>What this means for you</h3>
+<p>You don't need to buy chips to benefit from understanding them. Most of the practical advice follows directly from the sections above:</p>
+<div class="tbl"><table>
+<tr><th>If your task is…</th><th>Then…</th><th>Because…</th></tr>
+<tr><td>High volume and simple (classify, extract, route)</td><td>Try the smallest model first, measured against an eval</td><td>Fewer weights per token: faster and much cheaper</td></tr>
+<tr><td>Not time-sensitive (nightly reports, back-filling labels)</td><td>Use the Batch API</td><td>The provider fills its quiet capacity: 50% off</td></tr>
+<tr><td>Reusing the same long instructions or document</td><td>Put the fixed part first and use prompt caching</td><td>Cache reads cost a small fraction of fresh input</td></tr>
+<tr><td>Producing long output</td><td>Ask for the format you need, nothing more ("JSON only, no explanation")</td><td>Output tokens cost about five times input on Claude</td></tr>
+<tr><td>Interactive (a person is waiting)</td><td>Favour lower latency; stream the reply</td><td>Time to first token is what people feel</td></tr>
+<tr><td>Genuinely hard (complex debugging, long agentic work)</td><td>Use a stronger model or higher effort, deliberately</td><td>Cheap wrong answers are not cheap once someone has to fix them</td></tr>
+</table></div>
+<p>Subscription plans (Pro, Max, Team and so on) hide per-token prices behind usage limits, but the same physics applies: heavier models and longer contexts use up your allowance faster. <a href="#ch42">Chapter 42</a> covers plans, and <a href="#ch126">Chapter 126</a> covers measuring whether AI is worth what you pay.</p>
+
+<div class="lab"><div class="lab-h"><b>Price a real QA job and see the batching trade-off</b><span>25 min · your computer, Python 3, no API key</span></div><ol>
+<li>Create a folder called <code>serving-lab</code> and save this as <code>cost_of_answer.py</code>:
+<div class="code"><span class="cap">cost_of_answer.py</span><pre><span class="c"># cost_of_answer.py - what does one AI job cost? (prices verified 9 Nov 2026)</span>
+<span class="c"># Prices are US dollars per million tokens (MTok): (input, output).</span>
+PRICES = {
+    "Haiku 5.5":  (0.10, 0.50),   <span class="c"># prompts up to 100K tokens</span>
+    "Sonnet 5.5": (2.00, 10.00),
+    "Opus 5.5":   (4.00, 20.00),
+    "Fable 5.1":  (10.00, 50.00),
+}
+BATCH_DISCOUNT = 0.5   <span class="c"># Message Batches API: 50% off</span>
+
+def cost(model, input_tokens, output_tokens, batch=False):
+    price_in, price_out = PRICES[model]
+    dollars = (input_tokens * price_in + output_tokens * price_out) / 1_000_000
+    return dollars * (BATCH_DISCOUNT if batch else 1)
+
+<span class="c"># Illustrative workload: triage 2,000 bug reports.</span>
+<span class="c"># Each call sends about 1,500 tokens (instructions + report)</span>
+<span class="c"># and gets back about 300 tokens (labels + short reason).</span>
+JOBS, IN_TOK, OUT_TOK = 2000, 1500, 300
+
+print(f"Workload: {JOBS} calls x {IN_TOK} in / {OUT_TOK} out tokens (illustrative)")
+print(f"{'Model':&lt;12}{'Per call':&gt;12}{'All calls':&gt;12}{'Batched':&gt;12}")
+for model in PRICES:
+    one = cost(model, IN_TOK, OUT_TOK)
+    print(f"{model:&lt;12}{one:&gt;12.5f}{one*JOBS:&gt;12.2f}{cost(model, IN_TOK, OUT_TOK, True)*JOBS:&gt;12.2f}")
+
+share = (OUT_TOK * PRICES['Opus 5.5'][1]) / (IN_TOK * PRICES['Opus 5.5'][0] + OUT_TOK * PRICES['Opus 5.5'][1])
+print(f"\nOn Opus 5.5, output is {OUT_TOK/(IN_TOK+OUT_TOK):.0%} of the tokens but {share:.0%} of the cost.")</pre></div></li>
+<li>Run it with <code>python3 cost_of_answer.py</code>.<span class="expect">a table of dollar costs:</span>
+<div class="code"><span class="cap">Expected output</span><pre>Workload: 2000 calls x 1500 in / 300 out tokens (illustrative)
+Model           Per call   All calls     Batched
+Haiku 5.5        0.00030        0.60        0.30
+Sonnet 5.5       0.00600       12.00        6.00
+Opus 5.5         0.01200       24.00       12.00
+Fable 5.1        0.03000       60.00       30.00
+
+On Opus 5.5, output is 17% of the tokens but 50% of the cost.</pre></div></li>
+<li>Change <code>OUT_TOK</code> to <code>1500</code> (as if you'd forgotten to ask for a short answer) and run again.<span class="expect">every cost rises sharply, and output becomes over 80% of the Opus cost. Asking for concise output is one of the cheapest optimisations there is.</span></li>
+<li>Now save this as <code>batching_toy.py</code>. It's a deliberately simple model with illustrative numbers, not measurements of any real chip:
+<div class="code"><span class="cap">batching_toy.py</span><pre><span class="c"># batching_toy.py - why batching raises throughput but can slow each user.</span>
+<span class="c"># A toy model with ILLUSTRATIVE numbers, not measurements of any real chip.</span>
+<span class="c"># Each decode step, the chip must read all model weights from memory once</span>
+<span class="c"># (a fixed cost), plus a little extra work for every request in the batch.</span>
+WEIGHT_READ_MS = 20.0   <span class="c"># fixed cost per step (illustrative)</span>
+PER_REQUEST_MS = 0.5    <span class="c"># extra cost per request per step (illustrative)</span>
+
+print(f"{'Batch':&gt;6}{'Step ms':&gt;9}{'Tokens/s per user':&gt;19}{'Tokens/s total':&gt;16}")
+for batch in (1, 4, 16, 64, 256):
+    step_ms = WEIGHT_READ_MS + PER_REQUEST_MS * batch
+    per_user = 1000 / step_ms          <span class="c"># each user gets one token per step</span>
+    total = per_user * batch           <span class="c"># one token per user per step</span>
+    print(f"{batch:&gt;6}{step_ms:&gt;9.1f}{per_user:&gt;19.1f}{total:&gt;16.0f}")</pre></div></li>
+<li>Run <code>python3 batching_toy.py</code>.<span class="expect">total throughput climbs from about 49 to about 1,730 tokens per second, while each user's speed falls from about 49 to about 7:</span>
+<div class="code"><span class="cap">Expected output</span><pre> Batch  Step ms  Tokens/s per user  Tokens/s total
+     1     20.5               48.8              49
+     4     22.0               45.5             182
+    16     28.0               35.7             571
+    64     52.0               19.2            1231
+   256    148.0                6.8            1730</pre></div></li>
+<li>Replace the workload numbers in <code>cost_of_answer.py</code> with a real job from your team (count tokens for one sample prompt as in <a href="#ch14">Chapter 14</a>). Write one sentence recommending a model and whether to batch.<span class="expect">a short, costed recommendation you could put in a Jira comment or a team chat.</span></li>
+</ol></div>
+<div class="box note"><span class="tag">Troubleshooting</span><p><b><code>python3: command not found</code></b>: on Windows try <code>py</code> or <code>python</code>. <b>SyntaxError near <code>f"</code></b>: you need Python 3.6 or newer (<code>python3 --version</code>). <b>Numbers look ten times off</b>: check you kept <code>1_000_000</code> (one million) in the cost formula. <b>Your real bill differs</b>: the script ignores thinking tokens, caching, tool-use overhead and the Haiku price step above 100K tokens; use it for comparisons, then check against the usage page in your console.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Once a model is trained, answers are basically free."</dt><dd>Every answer uses chips, electricity and cooling. At large scale, serving can cost more in total than training did.</dd>
+<dt>"A faster chip always means faster answers."</dt><dd>For token-by-token output, memory bandwidth is often the limit, not calculating speed.</dd>
+<dt>"Input and output tokens cost the same."</dt><dd>Output is typically about five times the input price for Claude, because it's generated one step at a time.</dd>
+<dt>"The cheapest price per token is the cheapest model."</dt><dd>Tokenizers count differently, reasoning models add thinking tokens, and a wrong answer has a cost of its own. Compare total cost for the same real task.</dd>
+<dt>"Batching makes my answer slower, so it's bad."</dt><dd>It's a trade-off. For work nobody waits on, accepting slower results for half the price is the right choice.</dd>
+</dl></div>
+
+<h3 id="ch25-r"><span class="num">25.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Inference (serving answers) runs on accelerators in data centres, and it happens for every single prompt.</li>
+<li>GPUs (mainly NVIDIA), Google TPUs and Amazon Trainium are the main accelerator families; Anthropic uses all three.</li>
+<li>Generation has two phases: prefill reads the prompt in parallel; decode writes one token at a time and is often limited by memory bandwidth.</li>
+<li>Data centres consume large and growing amounts of electricity (IEA: about 415 TWh in 2024, projected about 945 TWh by 2030).</li>
+<li>Latency is how long one user waits; throughput is total work done. Batching raises throughput and lowers cost but can slow each user.</li>
+<li>Prices differ by model size, thinking, context length, speed and business strategy. Output costs more than input.</li>
+<li>Use small models, batching, caching and concise output where they fit; pay for capability deliberately where it matters.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">During decode (writing the reply), what most often limits speed for a large model?</p><div class="opts"><button>The speed of your internet connection</button><button data-ok>How fast the chip can read the model's weights from memory</button><button>The number of words in the dictionary</button></div><p class="why" hidden>Each output token needs almost all the weights, so memory bandwidth, not calculating power, is usually the bottleneck.</p></div>
+<div class="qz"><p class="q">Why do output tokens cost more than input tokens?</p><div class="opts"><button>Because output contains more facts</button><button>Because providers want to discourage long answers</button><button data-ok>Because input is processed in parallel, while output is generated one token at a time</button></div><p class="why" hidden>Prefill handles the whole prompt at once; decode needs a full pass through the weights for every new token.</p></div>
+<div class="qz"><p class="q">Your team needs 30,000 old test logs summarised by Monday. Nobody waits on any single summary. What's the best fit?</p><div class="opts"><button data-ok>The Batch API, for a 50% discount</button><button>Fast mode on the largest model</button><button>Sending them one by one in the chat app</button></div><p class="why" hidden>When latency doesn't matter, let the provider batch your work and take the discount.</p></div>
+<div class="qz"><p class="q">What does batching do to a serving system?</p><div class="opts"><button>Lowers throughput and lowers latency</button><button data-ok>Raises throughput, and can increase each user's latency</button><button>Has no effect on cost</button></div><p class="why" hidden>One trip to memory serves many requests, so total work rises, but each step takes a little longer.</p></div>
+<div class="qz"><p class="q">Model A is cheaper per token than model B. Which statement is safest?</p><div class="opts"><button>A will always be cheaper for your task</button><button>A must be smaller than B</button><button data-ok>You need to measure total cost on your real task, because tokenizers, thinking tokens and quality differ</button></div><p class="why" hidden>List prices are only one input; measure tokens and accuracy on your own prompts.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick two AI jobs your team does or plans to do: one interactive (for example, a developer asking for test ideas in their IDE) and one bulk (for example, labelling last year's bug reports). For each, write half a page covering: expected volume, rough input and output tokens per call (illustrative estimates are fine, labelled as such), whether latency or throughput matters more, which model tier you'd start with and why, whether batching or caching applies, and the estimated monthly cost using the lab script. Finish with how you'd check quality before committing (link to <a href="#ch125">Chapter 125</a> on evals).</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Every AI answer runs on real chips in a data centre: NVIDIA GPUs, Google TPUs or Amazon's Trainium. The model reads your prompt all at once, then writes its answer one token at a time, and for each token the chip has to pull the whole model out of memory. That's why output costs more than input and why bigger models are slower and pricier. Providers group many requests together to keep chips busy, which is cheaper but slower per person, and that's exactly the deal the Batch API offers at half price. So use small models and batching for bulk work, and pay for the big ones only where quality really matters."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/models/overview" target="_blank" rel="noopener">Claude models overview</a> and <a href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Pricing</a>: prices, cache-read prices, latency labels, batch discount, tokenizer note, fast mode.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/batch-processing" target="_blank" rel="noopener">Message Batches API</a> and <a href="https://platform.claude.com/docs/en/build-with-claude/prompt-caching" target="_blank" rel="noopener">Prompt caching</a>.</li>
+<li>Anthropic, <a href="https://www.anthropic.com/news/expanding-our-use-of-google-cloud-tpus-and-services" target="_blank" rel="noopener">Expanding our use of Google Cloud TPUs</a> (Oct 2025), <a href="https://www.anthropic.com/news/anthropic-amazon" target="_blank" rel="noopener">Anthropic and Amazon</a>, and <a href="https://www.anthropic.com/news/microsoft-nvidia-anthropic-announce-strategic-partnerships" target="_blank" rel="noopener">Microsoft, NVIDIA and Anthropic partnerships</a> (Nov 2025).</li>
+<li>International Energy Agency, <a href="https://www.iea.org/reports/energy-and-ai/executive-summary" target="_blank" rel="noopener">Energy and AI: executive summary</a> (April 2025).</li>
+<li>Wikipedia, <a href="https://en.wikipedia.org/wiki/Nvidia" target="_blank" rel="noopener">Nvidia</a> (GPU generations, CUDA) and <a href="https://en.wikipedia.org/wiki/OpenAI" target="_blank" rel="noopener">OpenAI</a> (AMD 6 GW deal).</li>
+<li>TechRepublic, <a href="https://www.techrepublic.com/article/news-aws-reinvent-day-2-2025/" target="_blank" rel="noopener">AWS re:Invent 2025 day 2</a> (Trainium3).</li>
+<li>microsoft.ai, <a href="https://microsoft.ai/news/introducing-mai-thinking-1/" target="_blank" rel="noopener">Introducing MAI-Thinking-1</a>; TechCrunch, <a href="https://techcrunch.com/2026/10/06/mistrals-new-1t-model-aims-to-leapfrog-closed-and-open-rivals/" target="_blank" rel="noopener">Mistral Large 4</a> (Mixture-of-Experts sizes).</li>
+</ol><p class="verified">Verified 9 November 2026 against Anthropic's models and pricing documentation, the IEA <i>Energy and AI</i> report and the project's research fact sheets. Prices change: recheck before budgeting.</p></div>

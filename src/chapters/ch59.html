@@ -1,0 +1,512 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How to run Python three ways: the interactive prompt, a script file, and inside a virtual environment</li>
+<li>The building blocks: variables, numbers, strings, lists, dictionaries, if statements, loops and functions</li>
+<li>How to split code into modules and use Python's built-in standard library</li>
+<li>How to read and write text, CSV and JSON files</li>
+<li>How exceptions work, how to catch them, and how to read a traceback from the bottom up</li>
+<li>Two practical QA scripts you'll build and run: a CSV test-results summary and a JUnit XML report parser</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch54">Chapter 54</a> (terminal commands) and <a href="#ch58">Chapter 58</a> (installing Python and virtual environments). You need Python 3.11 or newer (<code>python3 --version</code>) and a plain-text editor. VS Code is a good free choice; TextEdit and Word are not, because they add formatting. No programming experience is assumed.</div>
+
+<div class="bigidea"><p>Python is the most common language for working with AI: the official SDKs, data tools, evaluation scripts and most examples are written in it. You don't need to become a software engineer to use it. A few dozen ideas cover most of what a tester or analyst needs: storing values in variables, grouping them in lists and dictionaries, repeating work with loops, packaging steps into functions, reading and writing files, and handling errors. This chapter teaches those ideas through small programs you run yourself, ending with two scripts that do real QA work. Once you can read Python, you can also check and adjust the Python that Claude writes for you.</p></div>
+
+<h3 id="ch59-1"><span class="num">59.1</span>Why Python, and three ways to run it</h3>
+<p><a class="gl" href="#g-python">Python</a> is a programming language designed to be readable. It uses plain English words (<code>if</code>, <code>for</code>, <code>in</code>, <code>not</code>) and indentation instead of lots of brackets. For AI work it has the biggest set of ready-made libraries: Anthropic's own <code>anthropic</code> SDK, HTTP clients, data analysis, and test tools such as <code>pytest</code>.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A Python script is a recipe written for a very literal cook. The cook follows each line exactly, top to bottom, and never guesses what you meant. If a step says "add the sugar" and there's no sugar, the cook stops and tells you precisely which line failed and why. That's a traceback, and by the end of this chapter you'll read them calmly.</p></div>
+<div class="tbl"><table>
+<tr><th>Way to run</th><th>How</th><th>Good for</th></tr>
+<tr><td>Interactive prompt (REPL)</td><td>Type <code>python3</code>; you get a <code>&gt;&gt;&gt;</code> prompt. Type <code>exit()</code> or press Ctrl+D to leave</td><td>Trying one line at a time, checking what something does</td></tr>
+<tr><td>Script file</td><td>Save code in <code>name.py</code>, run <code>python3 name.py</code></td><td>Anything you want to keep, rerun or share</td></tr>
+<tr><td>Inside a virtual environment</td><td><code>source .venv/bin/activate</code>, then <code>python name.py</code></td><td>Scripts that need installed packages such as <code>requests</code> (<a href="#ch58">Chapter 58</a>)</td></tr>
+</table></div>
+<p>REPL stands for Read, Evaluate, Print, Loop: it reads what you type, runs it, prints the result and waits for more. Start one now with <code>python3</code> and try these. The lines starting with <code>&gt;&gt;&gt;</code> are what you type; the others are Python's replies.</p>
+<div class="code"><span class="cap">Python REPL</span><pre>&gt;&gt;&gt; 2 + 3
+5
+&gt;&gt;&gt; 10 / 4
+2.5
+&gt;&gt;&gt; 10 // 4
+2
+&gt;&gt;&gt; "QA-" + str(101)
+'QA-101'
+&gt;&gt;&gt; title = "  Login fails on Safari  "
+&gt;&gt;&gt; title.strip().lower()
+'login fails on safari'
+&gt;&gt;&gt; "safari" in title.lower()
+True
+&gt;&gt;&gt; title.strip().split(" ")
+['Login', 'fails', 'on', 'Safari']
+&gt;&gt;&gt; len("Discount")
+8
+&gt;&gt;&gt; int("42") + 1
+43
+&gt;&gt;&gt; round(94.666, 1)
+94.7
+&gt;&gt;&gt; type(3.5)
+&lt;class 'float'&gt;</pre></div>
+<p>Notice: <code>/</code> always gives a decimal (2.5), and <code>//</code> divides and drops the remainder. Text and numbers don't mix automatically, so <code>str(101)</code> turns a number into text and <code>int("42")</code> turns text into a number.</p>
+<div class="box note"><span class="tag">python or python3?</span><p>On macOS and Linux, type <code>python3</code> unless you're inside an activated virtual environment, where plain <code>python</code> works too. On Windows, the python.org installer provides <code>py</code> and usually <code>python</code>. This chapter writes <code>python3</code>; substitute whichever works on your machine.</p></div>
+
+<h3 id="ch59-2"><span class="num">59.2</span>Values, variables and strings</h3>
+<p>A <a class="gl" href="#g-variable">variable</a> is a name that points to a value. You create one with <code>=</code>, which means "make this name refer to this value", not "is equal to". Python works out the type of value for you.</p>
+<div class="tbl"><table>
+<tr><th>Type</th><th>Example</th><th>What it holds</th></tr>
+<tr><td><code>str</code> (string)</td><td><code>"Login fails on Safari"</code></td><td>Text, in single or double quotes</td></tr>
+<tr><td><code>int</code> (integer)</td><td><code>47</code></td><td>Whole numbers</td></tr>
+<tr><td><code>float</code></td><td><code>94.7</code></td><td>Numbers with a decimal point</td></tr>
+<tr><td><code>bool</code> (Boolean)</td><td><code>True</code>, <code>False</code></td><td>Yes or no; note the capital letters</td></tr>
+<tr><td><code>None</code></td><td><code>None</code></td><td>"No value"; JSON's <code>null</code> becomes <code>None</code></td></tr>
+<tr><td><code>list</code></td><td><code>["chromium", "firefox"]</code></td><td>An ordered collection</td></tr>
+<tr><td><code>dict</code> (dictionary)</td><td><code>{"id": "QA-7", "severity": "high"}</code></td><td>Named fields: key → value</td></tr>
+</table></div>
+<p>The most useful string feature is the <b>f-string</b>: put <code>f</code> before the opening quote, and anything in <code>{braces}</code> is replaced with its value. <code>{rate:.1f}</code> means "show this number with one decimal place". Other string tools you'll use constantly: <code>.strip()</code> removes spaces at both ends, <code>.lower()</code> makes text lower-case for comparisons, <code>.split(",")</code> breaks text into a list, <code>.startswith("ERR")</code> checks the beginning, and <code>"x" in text</code> checks whether one string contains another.</p>
+<details class="deep"><summary>Under the hood: names point to values</summary><div class="body">
+<p>In Python a variable isn't a box that holds a value; it's a label stuck on a value. <code>a = [1, 2]</code> then <code>b = a</code> sticks a second label on the <em>same</em> list, so <code>b.append(3)</code> changes what <code>a</code> shows too. Numbers and strings can't be changed in place (they're <em>immutable</em>), so this surprise only appears with lists and dictionaries, which can (<em>mutable</em>). If you need an independent copy, use <code>b = a.copy()</code>. This matters when you pass a list into a function and the function modifies it.</p>
+</div></details>
+
+<h3 id="ch59-3"><span class="num">59.3</span>Lists and dictionaries</h3>
+<p>Almost every piece of data you'll handle in AI and API work is a combination of two shapes: a <b>list</b> (an ordered sequence, written with square brackets) and a <a class="gl" href="#g-dictionary">dictionary</a> (named fields, written with braces). They map directly onto JSON arrays and objects (<a href="#ch85">Chapter 85</a>), so a JSON test report or an API response becomes lists and dictionaries the moment Python reads it.</p>
+<div class="code"><span class="cap">Python REPL</span><pre>&gt;&gt;&gt; tags = ["ui", "checkout"]
+&gt;&gt;&gt; tags.append("regression")
+&gt;&gt;&gt; tags
+['ui', 'checkout', 'regression']
+&gt;&gt;&gt; tags[0]
+'ui'
+&gt;&gt;&gt; tags[-1]
+'regression'
+&gt;&gt;&gt; len(tags)
+3
+&gt;&gt;&gt; "ui" in tags
+True
+&gt;&gt;&gt; bug = {"id": "QA-7", "severity": "high"}
+&gt;&gt;&gt; bug["severity"]
+'high'
+&gt;&gt;&gt; bug["owner"] = "Priya"
+&gt;&gt;&gt; bug
+{'id': 'QA-7', 'severity': 'high', 'owner': 'Priya'}
+&gt;&gt;&gt; bug.get("component", "unknown")
+'unknown'
+&gt;&gt;&gt; list(bug.keys())
+['id', 'severity', 'owner']</pre></div>
+<div class="tbl"><table>
+<tr><th>You want to…</th><th>List</th><th>Dictionary</th></tr>
+<tr><td>Get one item</td><td><code>tags[0]</code> (first), <code>tags[-1]</code> (last)</td><td><code>bug["severity"]</code></td></tr>
+<tr><td>Get safely, with a fallback</td><td>Check <code>len(tags)</code> first</td><td><code>bug.get("owner", "nobody")</code></td></tr>
+<tr><td>Add</td><td><code>tags.append("smoke")</code></td><td><code>bug["owner"] = "Priya"</code></td></tr>
+<tr><td>Check membership</td><td><code>"ui" in tags</code></td><td><code>"owner" in bug</code> (checks keys)</td></tr>
+<tr><td>Count</td><td><code>len(tags)</code></td><td><code>len(bug)</code></td></tr>
+<tr><td>Loop over</td><td><code>for tag in tags:</code></td><td><code>for key, value in bug.items():</code></td></tr>
+</table></div>
+<p>Positions start at 0, not 1. <code>tags[0]</code> is the first item. It trips up everyone once.</p>
+
+<h3 id="ch59-4"><span class="num">59.4</span>Decisions, loops and functions</h3>
+<p>Now let's put it together in a script. Make a folder, open it in your editor, and save this as <code>basics.py</code>:</p>
+<div class="code"><span class="cap">basics.py</span><pre># basics.py - variables, strings, lists, dicts, loops and functions
+suite = "checkout"
+passed = 47
+failed = 3
+total = passed + failed
+pass_rate = passed / total * 100
+
+print(f"Suite {suite}: {passed}/{total} passed ({pass_rate:.1f}%)")
+
+browsers = ["chromium", "firefox", "webkit"]
+browsers.append("mobile-safari")
+print("Browsers:", len(browsers), "-&gt;", ", ".join(browsers))
+
+bug = {"id": "QA-101", "severity": "high", "title": "Discount applied twice"}
+print(bug["id"], "is", bug["severity"])
+bug["status"] = "open"
+
+for name in browsers:
+    if name.startswith("mobile"):
+        print(f"  {name}: run on device farm")
+    else:
+        print(f"  {name}: run locally")
+
+
+def is_release_ready(pass_rate, open_blockers):
+    """Return True when the pass rate is high enough and nothing blocks."""
+    return pass_rate &gt;= 95 and open_blockers == 0
+
+
+print("Release ready?", is_release_ready(pass_rate, open_blockers=0))
+print("Release ready?", is_release_ready(99.0, open_blockers=0))</pre></div>
+<div class="code"><span class="cap">Terminal</span><pre>mkdir -p ~/qa-python &amp;&amp; cd ~/qa-python
+python3 basics.py</pre></div>
+<div class="code"><span class="cap">Expected output</span><pre>Suite checkout: 47/50 passed (94.0%)
+Browsers: 4 -&gt; chromium, firefox, webkit, mobile-safari
+QA-101 is high
+  chromium: run locally
+  firefox: run locally
+  webkit: run locally
+  mobile-safari: run on device farm
+Release ready? False
+Release ready? True</pre></div>
+<p>Read the script again with these four ideas in mind:</p>
+<ul>
+<li><b>Indentation is part of the language.</b> The lines indented under <code>for</code>, <code>if</code> and <code>def</code> belong to them. Use four spaces, consistently. A line ending in a colon <code>:</code> always starts an indented block.</li>
+<li><b><code>if</code> / <code>elif</code> / <code>else</code></b> choose between paths. Comparisons are <code>==</code> (equal), <code>!=</code>, <code>&lt;</code>, <code>&gt;=</code> and so on, combined with <code>and</code>, <code>or</code>, <code>not</code>.</li>
+<li><b><code>for name in browsers:</code></b> repeats the indented block once per item. <code>for i in range(3):</code> repeats with i = 0, 1, 2. A <code>while</code> loop repeats as long as a condition is true; you'll use one for pagination in <a href="#ch60">Chapter 60</a>.</li>
+<li><b><code>def</code></b> defines a <a class="gl" href="#g-function">function</a>: a named, reusable step. Values go in as <b>parameters</b>, and <code>return</code> sends a result back. The text in triple quotes is a <b>docstring</b>, a short description of what the function does. Calling with a name, as in <code>open_blockers=0</code>, makes the call easier to read.</li>
+</ul>
+<div class="box example"><span class="tag">Real-world example</span><p>A release gate is just a function: "go" when the pass rate is at least 95% and there are no open blockers. Writing it as a function means the rule lives in one place. When the team changes the threshold to 98%, you change one number, and every script that calls the function follows. (The thresholds here are illustrative.)</p></div>
+
+<h3 id="ch59-5"><span class="num">59.5</span>Modules and the standard library</h3>
+<p>A <b>module</b> is simply a <code>.py</code> file whose functions other files can <code>import</code>. Split your helpers into one file and reuse them everywhere. Save these two files side by side:</p>
+<div class="code"><span class="cap">qa_utils.py</span><pre># qa_utils.py - helpers we want to reuse in several scripts
+def pass_rate(passed, total):
+    """Percentage of tests that passed, rounded to one decimal place."""
+    if total == 0:
+        return 0.0
+    return round(passed / total * 100, 1)
+
+
+def is_release_ready(rate, open_blockers, threshold=95):
+    return rate &gt;= threshold and open_blockers == 0
+
+
+if __name__ == "__main__":
+    # Runs only when you execute this file directly, not when it is imported
+    print(pass_rate(47, 50), is_release_ready(94.0, 0))</pre></div>
+<div class="code"><span class="cap">gate.py</span><pre># gate.py - uses the functions from qa_utils.py
+import sys
+
+from qa_utils import is_release_ready, pass_rate
+
+rate = pass_rate(passed=196, total=200)
+blockers = 0
+print(f"Pass rate {rate}% with {blockers} open blockers")
+
+if is_release_ready(rate, blockers):
+    print("GO")
+    sys.exit(0)
+else:
+    print("NO GO")
+    sys.exit(1)</pre></div>
+<div class="code"><span class="cap">Terminal and expected output</span><pre>$ python3 gate.py
+Pass rate 98.0% with 0 open blockers
+GO
+$ echo $?
+0</pre></div>
+<p><code>sys.exit(1)</code> ends the program with a non-zero <a class="gl" href="#g-exit-code">exit code</a>, which tells a shell script or CI pipeline that the check failed (<a href="#ch55">Chapter 55</a>). The <code>if __name__ == "__main__":</code> line in <code>qa_utils.py</code> means "only run this part when the file is executed directly": it lets a module contain a quick self-test without that test running every time someone imports it.</p>
+<p>Python ships with a large <b>standard library</b>, ready to import with no installation. The modules used in this chapter and the next:</p>
+<div class="tbl"><table>
+<tr><th>Module</th><th>Use it for</th></tr>
+<tr><td><code>json</code></td><td>Reading and writing JSON</td></tr>
+<tr><td><code>csv</code></td><td>Reading and writing spreadsheet-style CSV files</td></tr>
+<tr><td><code>xml.etree.ElementTree</code></td><td>Reading XML such as JUnit reports</td></tr>
+<tr><td><code>pathlib</code>, <code>os</code></td><td>File paths; <code>os.environ</code> reads environment variables</td></tr>
+<tr><td><code>sys</code></td><td>Command-line arguments (<code>sys.argv</code>) and exit codes</td></tr>
+<tr><td><code>collections.Counter</code></td><td>Counting things: statuses, log levels, error types</td></tr>
+<tr><td><code>datetime</code>, <code>time</code></td><td>Dates, timestamps, measuring how long something took</td></tr>
+<tr><td><code>argparse</code></td><td>Proper command-line options such as <code>--min 50</code></td></tr>
+</table></div>
+<p>Anything else, such as <code>requests</code>, <code>httpx</code> or <code>anthropic</code>, is a third-party package: install it into a virtual environment first, or you'll see <code>ModuleNotFoundError</code>.</p>
+
+<h3 id="ch59-6"><span class="num">59.6</span>Reading and writing files</h3>
+<p>Testers live in files: logs, CSV exports, reports. The pattern is always the same: <code>with open(...) as f:</code>. The <code>with</code> block closes the file for you, even if an error happens. Open mode <code>"r"</code> (the default) reads, <code>"w"</code> writes (replacing what was there) and <code>"a"</code> appends. Always say <code>encoding="utf-8"</code>, so accented names and symbols behave the same on every operating system.</p>
+<p>Save this sample log as <code>app.log</code>:</p>
+<div class="code"><span class="cap">app.log</span><pre>2026-11-09 09:00:01 INFO  Server started on port 8080
+2026-11-09 09:00:07 INFO  GET /api/basket 200
+2026-11-09 09:00:09 WARN  Slow response: GET /api/search took 2300ms
+2026-11-09 09:00:12 ERROR POST /api/basket/apply-code 500 NullPointerException
+2026-11-09 09:00:15 INFO  GET /api/basket 200
+2026-11-09 09:00:21 ERROR POST /api/payments 502 Upstream timeout</pre></div>
+<div class="code"><span class="cap">log_scan.py</span><pre># log_scan.py - count log levels and list the errors
+from collections import Counter
+
+levels = Counter()
+errors = []
+
+with open("app.log", encoding="utf-8") as log:
+    for line in log:
+        parts = line.split()
+        if len(parts) &lt; 3:
+            continue                    # skip blank or odd lines
+        level = parts[2]
+        levels[level] += 1
+        if level == "ERROR":
+            errors.append(line.strip())
+
+print("Lines per level:", dict(levels))
+print(f"{len(errors)} errors:")
+for e in errors:
+    print("  " + e)
+
+with open("errors.txt", "w", encoding="utf-8") as out:
+    out.write("\n".join(errors) + "\n")
+print("Saved errors.txt")</pre></div>
+<div class="code"><span class="cap">Expected output of python3 log_scan.py</span><pre>Lines per level: {'INFO': 3, 'WARN': 1, 'ERROR': 2}
+2 errors:
+  2026-11-09 09:00:12 ERROR POST /api/basket/apply-code 500 NullPointerException
+  2026-11-09 09:00:21 ERROR POST /api/payments 502 Upstream timeout
+Saved errors.txt</pre></div>
+<p>Looping over an open file gives you one line at a time, which works even for logs far too big to load at once. <code>line.split()</code> with no argument splits on any run of spaces, so <code>parts[2]</code> is the third word: the level. <code>Counter</code> counts without you having to set each total to zero first.</p>
+
+<h3 id="ch59-7"><span class="num">59.7</span>JSON: the format AI tools speak</h3>
+<p>APIs, Claude's structured outputs, Playwright's JSON reporter and most configuration files use <a class="gl" href="#g-json">JSON</a>. Python's <code>json</code> module converts in both directions:</p>
+<div class="tbl"><table>
+<tr><th>Direction</th><th>From text / string</th><th>From / to a file</th></tr>
+<tr><td>JSON → Python</td><td><code>json.loads(text)</code></td><td><code>json.load(f)</code></td></tr>
+<tr><td>Python → JSON</td><td><code>json.dumps(data)</code></td><td><code>json.dump(data, f, indent=2)</code></td></tr>
+</table></div>
+<p>The "s" in <code>loads</code> and <code>dumps</code> stands for "string". JSON objects become dictionaries, arrays become lists, <code>true</code>/<code>false</code> become <code>True</code>/<code>False</code>, and <code>null</code> becomes <code>None</code>.</p>
+<div class="code"><span class="cap">json_demo.py</span><pre>import json
+
+text = '{"id": "QA-101", "labels": ["checkout", "regression"], "estimate": null, "blocker": true}'
+bug = json.loads(text)          # JSON text -&gt; Python dict
+print(type(bug).__name__, bug["labels"][0], bug["estimate"], bug["blocker"])
+
+bug["labels"].append("ai-triaged")
+print(json.dumps(bug))          # Python dict -&gt; JSON text
+print(bug.get("assignee", "unassigned"))</pre></div>
+<div class="code"><span class="cap">Expected output</span><pre>dict checkout None True
+{"id": "QA-101", "labels": ["checkout", "regression", "ai-triaged"], "estimate": null, "blocker": true}
+unassigned</pre></div>
+<div class="box warn"><span class="tag">AI output isn't guaranteed JSON</span><p>When you ask a model to "reply in JSON", it usually does, but it may add a sentence before it or wrap it in a code fence, and <code>json.loads</code> will raise <code>json.JSONDecodeError</code>. Always wrap the parse in <code>try</code>/<code>except</code> and treat a failure as a test result, not a crash. For guaranteed shapes, use the API's structured-output features (<a href="#ch89">Chapter 89</a>).</p></div>
+
+<h3 id="ch59-8"><span class="num">59.8</span>Errors, exceptions and reading tracebacks</h3>
+<p>When something goes wrong while Python runs, it raises an <a class="gl" href="#g-exception">exception</a>. If nothing catches it, the program stops and prints a <a class="gl" href="#g-traceback">traceback</a>. Save this deliberately broken script as <code>broken.py</code> and run it:</p>
+<div class="code"><span class="cap">broken.py</span><pre>def severity_of(bug):
+    return bug["severity"]
+
+bugs = [{"id": "QA-1", "severity": "high"}, {"id": "QA-2", "priority": "P2"}]
+for b in bugs:
+    print(b["id"], severity_of(b))</pre></div>
+<div class="code"><span class="cap">Output</span><pre>QA-1 high
+Traceback (most recent call last):
+  File "/Users/you/qa-python/broken.py", line 6, in &lt;module&gt;
+    print(b["id"], severity_of(b))
+                   ^^^^^^^^^^^^^^
+  File "/Users/you/qa-python/broken.py", line 2, in severity_of
+    return bug["severity"]
+           ~~~^^^^^^^^^^^^
+KeyError: 'severity'</pre></div>
+<div class="flow">
+<div class="hl"><b>1 · Read the last line first</b><code>KeyError: 'severity'</code>: the error type and its message</div>
+<div><b>2 · Find the deepest frame</b>Line 2, in <code>severity_of</code>: where it actually failed</div>
+<div><b>3 · Walk up</b>Line 6 called it, in the loop</div>
+<div><b>4 · Ask why</b>The second bug has no "severity" key: it's the data, not the code</div>
+</div>
+<p>A traceback reads top to bottom as "who called whom", so the most useful information is at the <b>bottom</b>. The <code>^^^^</code> markers point at the exact expression that failed. Here the fix is a design decision: use <code>bug.get("severity", "unknown")</code> if missing severities are acceptable, or report the bad record if they're not.</p>
+<input class="filter" data-filter="#ch59Errors" data-empty="#ch59ErrorsEmpty" type="search" placeholder="Filter errors…" aria-label="Filter common Python errors">
+<div class="tbl"><table id="ch59Errors">
+<tr><th>Error (last line)</th><th>Usually means</th><th>Typical fix</th></tr>
+<tr class="group"><td colspan="3">Before the code even runs</td></tr>
+<tr><td><code>SyntaxError: invalid syntax</code></td><td>A typo: a missing colon, bracket or quote</td><td>Look at the marked line and the one above it</td></tr>
+<tr><td><code>IndentationError: expected an indented block</code></td><td>The line after an <code>if</code>/<code>for</code>/<code>def</code> isn't indented</td><td>Indent the block with four spaces</td></tr>
+<tr class="group"><td colspan="3">While it runs</td></tr>
+<tr><td><code>NameError: name 'x' is not defined</code></td><td>A misspelt variable, or used before it was set</td><td>Check spelling and capitals</td></tr>
+<tr><td><code>KeyError: 'severity'</code></td><td>A dictionary doesn't have that key</td><td>Use <code>.get()</code> with a default, or check the data</td></tr>
+<tr><td><code>IndexError: list index out of range</code></td><td>Asked for position 5 of a shorter list</td><td>Check <code>len()</code> first; remember positions start at 0</td></tr>
+<tr><td><code>TypeError: can only concatenate str (not "int") to str</code></td><td>Mixed text and a number with <code>+</code></td><td>Use an f-string or <code>str()</code></td></tr>
+<tr><td><code>ValueError: invalid literal for int() with base 10: 'abc'</code></td><td>Converting text that isn't a number</td><td>Validate the input, or catch the error</td></tr>
+<tr><td><code>AttributeError: 'NoneType' object has no attribute …</code></td><td>Something you expected to exist came back as <code>None</code></td><td>Find where it became None; check before use</td></tr>
+<tr class="group"><td colspan="3">Environment and files</td></tr>
+<tr><td><code>FileNotFoundError: [Errno 2] No such file or directory</code></td><td>Wrong path, or running from a different folder</td><td><code>pwd</code>, then use the right relative or absolute path</td></tr>
+<tr><td><code>ModuleNotFoundError: No module named 'requests'</code></td><td>Package not installed in the Python you're running</td><td>Activate the virtual environment; <code>python -m pip install requests</code></td></tr>
+<tr><td><code>json.decoder.JSONDecodeError</code></td><td>The text isn't valid JSON (often an HTML error page)</td><td>Print the first 200 characters of the text to see what arrived</td></tr>
+</table></div>
+<p id="ch59ErrorsEmpty" hidden>No errors match.</p>
+<h4>Catching exceptions</h4>
+<p><code>try</code> runs code that might fail; <code>except SomeError</code> runs only if that error happens. Catch specific errors you can do something useful about, such as a missing file, and let everything else surface:</p>
+<div class="code"><span class="cap">Pattern</span><pre>try:
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+except FileNotFoundError:
+    print(f"No such file: {path}")
+    sys.exit(2)
+except json.JSONDecodeError as err:
+    print(f"{path} is not valid JSON: {err}")
+    sys.exit(2)</pre></div>
+<div class="box warn"><span class="tag">Never write a bare except</span><p><code>except:</code> or <code>except Exception: pass</code> swallows every error, including your own typos, and the script carries on with wrong data. In test tooling that's the worst outcome: a report that says "all passed" because the parser silently failed. AI-written code sometimes does this to "make it work". Ask Claude to catch only specific exceptions.</p></div>
+
+<h3 id="ch59-9"><span class="num">59.9</span>Working with Claude on Python</h3>
+<p>Claude writes Python well, and with this chapter you can now review what it produces. A practical routine:</p>
+<ul>
+<li><b>Give it a sample of the real input</b> (a few anonymised rows of the CSV, a trimmed JUnit file) and the exact output you want. Inputs and outputs specify a script better than prose does.</li>
+<li><b>Ask for standard-library only</b> unless you need a package, so the script runs anywhere without installs.</li>
+<li><b>Run it yourself</b>, then feed it awkward input: an empty file, a missing column, an unexpected status such as "error". Those are the cases AI-written scripts most often get wrong.</li>
+<li><b>When it fails, paste the full traceback</b>, not "it doesn't work". The last line plus the deepest frame is usually enough for Claude to fix it in one step. <a href="#ch62">Chapter 62</a> covers asking for help with errors effectively.</li>
+</ul>
+<div class="box opinion"><span class="tag">Opinion · this book's authors</span><p>For testers, the goal of learning Python isn't to write large programs from memory. It's to be able to read a 50-line script, predict what it will do, spot the line that's wrong and judge whether a fix is right. That skill is what makes AI coding help safe to use, and it comes faster than most people expect.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Lab 1: summarise a CSV of test results</b><span>20 min · any machine with Python 3</span></div><ol>
+<li>In <code>~/qa-python</code>, save this as <code>results.csv</code> (an export like many test tools produce):
+<div class="code"><span class="cap">results.csv</span><pre>test_name,suite,status,duration_s
+login_valid_user,auth,passed,1.2
+login_wrong_password,auth,passed,0.9
+login_locked_account,auth,failed,2.4
+add_to_basket,checkout,passed,1.8
+apply_discount_code,checkout,failed,3.1
+pay_by_card,checkout,passed,4.0
+search_by_name,search,passed,0.7
+search_no_results,search,skipped,0.0</pre></div>
+<span class="expect">A plain-text file with a header row and eight data rows.</span></li>
+<li>Save the script as <code>summarise_csv.py</code>:
+<div class="code"><span class="cap">summarise_csv.py</span><pre># summarise_csv.py - count results per suite from a CSV export
+import csv
+import sys
+from collections import Counter
+
+path = sys.argv[1] if len(sys.argv) &gt; 1 else "results.csv"
+
+status_counts = Counter()
+per_suite = {}
+failures = []
+total_time = 0.0
+
+with open(path, newline="", encoding="utf-8") as f:
+    for row in csv.DictReader(f):
+        status = row["status"]
+        suite = row["suite"]
+        status_counts[status] += 1
+        per_suite.setdefault(suite, Counter())[status] += 1
+        total_time += float(row["duration_s"])
+        if status == "failed":
+            failures.append(row["test_name"])
+
+total = sum(status_counts.values())
+print(f"{total} tests in {total_time:.1f}s")
+for status, count in status_counts.most_common():
+    print(f"  {status:8} {count}")
+
+print("Per suite:")
+for suite, counts in sorted(per_suite.items()):
+    print(f"  {suite:9} passed={counts['passed']} failed={counts['failed']} skipped={counts['skipped']}")
+
+if failures:
+    print("Failed:", ", ".join(failures))</pre></div>
+<span class="expect">The file is saved next to results.csv.</span></li>
+<li>Run <code>python3 summarise_csv.py</code>.
+<div class="code"><span class="cap">Expected output</span><pre>8 tests in 14.1s
+  passed   5
+  failed   2
+  skipped  1
+Per suite:
+  auth      passed=2 failed=1 skipped=0
+  checkout  passed=2 failed=1 skipped=0
+  search    passed=1 failed=0 skipped=1
+Failed: login_locked_account, apply_discount_code</pre></div>
+<span class="expect">Exactly these lines. <code>csv.DictReader</code> turned each row into a dictionary keyed by the header names.</span></li>
+<li>Change one row's status to <code>error</code> and run again.<span class="expect">A new <code>error 1</code> line appears in the totals, but the per-suite line hides it, because it only prints passed, failed and skipped. That's a real bug of the kind AI-written scripts often have. Fix it so unknown statuses are visible (hint: print the whole counter for each suite).</span></li>
+</ol></div>
+
+<div class="lab"><div class="lab-h"><b>Lab 2: parse a JUnit XML report</b><span>25 min · any machine with Python 3</span></div><ol>
+<li>Most test frameworks (pytest, Playwright, JUnit, Jest with a reporter) can write <a class="gl" href="#g-junit-xml">JUnit XML</a>. Save this sample as <code>junit.xml</code>:
+<div class="code"><span class="cap">junit.xml</span><pre>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;testsuites&gt;
+  &lt;testsuite name="auth" tests="3" failures="1" skipped="0" time="4.5"&gt;
+    &lt;testcase classname="auth" name="login_valid_user" time="1.2"/&gt;
+    &lt;testcase classname="auth" name="login_wrong_password" time="0.9"/&gt;
+    &lt;testcase classname="auth" name="login_locked_account" time="2.4"&gt;
+      &lt;failure message="Expected 'Account locked' but got 'Welcome back'"&gt;AssertionError&lt;/failure&gt;
+    &lt;/testcase&gt;
+  &lt;/testsuite&gt;
+  &lt;testsuite name="checkout" tests="2" failures="0" skipped="1" time="1.8"&gt;
+    &lt;testcase classname="checkout" name="add_to_basket" time="1.8"/&gt;
+    &lt;testcase classname="checkout" name="gift_wrap" time="0.0"&gt;
+      &lt;skipped message="Feature flag off"/&gt;
+    &lt;/testcase&gt;
+  &lt;/testsuite&gt;
+&lt;/testsuites&gt;</pre></div>
+<span class="expect">Two test suites with five test cases: one failure and one skip.</span></li>
+<li>Save the parser as <code>parse_junit.py</code>:
+<div class="code"><span class="cap">parse_junit.py</span><pre># parse_junit.py - read a JUnit XML report and write a JSON summary
+import json
+import sys
+import xml.etree.ElementTree as ET
+
+
+def summarise(path):
+    root = ET.parse(path).getroot()
+    summary = {"passed": 0, "failed": 0, "skipped": 0, "failures": []}
+    for case in root.iter("testcase"):
+        problem = case.find("failure")
+        if problem is None:
+            problem = case.find("error")
+        if problem is not None:
+            summary["failed"] += 1
+            summary["failures"].append({
+                "test": f"{case.get('classname')}.{case.get('name')}",
+                "message": problem.get("message", "").strip(),
+            })
+        elif case.find("skipped") is not None:
+            summary["skipped"] += 1
+        else:
+            summary["passed"] += 1
+    return summary
+
+
+if __name__ == "__main__":
+    report = sys.argv[1] if len(sys.argv) &gt; 1 else "junit.xml"
+    try:
+        result = summarise(report)
+    except FileNotFoundError:
+        print(f"No such file: {report}. Check the path and try again.")
+        sys.exit(2)
+    except ET.ParseError as err:
+        print(f"{report} is not valid XML: {err}")
+        sys.exit(2)
+
+    print(f"passed={result['passed']} failed={result['failed']} skipped={result['skipped']}")
+    for f in result["failures"]:
+        print(f"  FAIL {f['test']}: {f['message']}")
+
+    with open("summary.json", "w", encoding="utf-8") as out:
+        json.dump(result, out, indent=2)
+    print("Wrote summary.json")
+    sys.exit(1 if result["failed"] else 0)</pre></div>
+<span class="expect">Saved. Note it uses only the standard library.</span></li>
+<li>Run <code>python3 parse_junit.py</code>, then <code>echo $?</code>.
+<div class="code"><span class="cap">Expected output</span><pre>passed=3 failed=1 skipped=1
+  FAIL auth.login_locked_account: Expected 'Account locked' but got 'Welcome back'
+Wrote summary.json</pre></div>
+<span class="expect">The exit code is <code>1</code> because there's a failure, so a CI step running this script would go red. A new <code>summary.json</code> contains the same numbers as structured data.</span></li>
+<li>Test the error handling: run <code>python3 parse_junit.py nope.xml</code>, then create a broken file with <code>echo "&lt;bad" &gt; bad.xml</code> and run <code>python3 parse_junit.py bad.xml</code>.<span class="expect"><code>No such file: nope.xml. Check the path and try again.</code> and <code>bad.xml is not valid XML: unclosed token: line 1, column 0</code>, both with exit code 2. A clear message instead of a traceback.</span></li>
+<li>Point it at a real report. With pytest, <code>pytest --junitxml=report.xml</code> writes one; Playwright has a <code>junit</code> reporter. Run <code>python3 parse_junit.py report.xml</code>.<span class="expect">Real counts from your own suite. If your report uses <code>&lt;error&gt;</code> elements, they're counted as failures, as the code shows.</span></li>
+</ol>
+<p><b>Troubleshooting</b></p>
+<ul>
+<li><b><code>python3: can't open file '…/parse_junit.py': [Errno 2] No such file or directory</code>:</b> you're in a different folder. Run <code>cd ~/qa-python</code>, then <code>ls</code> to check the file is there.</li>
+<li><b><code>IndentationError</code> or <code>TabError</code> after copying:</b> your editor mixed tabs and spaces. In VS Code, use "Convert Indentation to Spaces" from the Command Palette.</li>
+<li><b>Output differs slightly:</b> check that you saved the sample files exactly; one changed status changes every count.</li>
+<li><b><code>SyntaxError</code> on an f-string:</b> very old Python. Check <code>python3 --version</code> is 3.11 or newer.</li>
+<li><b>Windows:</b> use <code>py parse_junit.py</code>, and <code>echo $LASTEXITCODE</code> in PowerShell instead of <code>echo $?</code>.</li>
+</ul></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"<code>=</code> means equals."</dt><dd><code>=</code> assigns a value to a name; <code>==</code> compares two values.</dd>
+<dt>"The first item is <code>items[1]</code>."</dt><dd>Positions start at 0. <code>items[0]</code> is the first, and <code>items[-1]</code> the last.</dd>
+<dt>"Indentation is just style."</dt><dd>In Python it defines which lines belong to an <code>if</code>, loop or function. Wrong indentation changes what the program does.</dd>
+<dt>"The top of a traceback shows the problem."</dt><dd>Start at the bottom: the last line names the error, and the frame just above it shows where it happened.</dd>
+<dt>"Catching every exception makes a script robust."</dt><dd>It makes failures silent. Catch the specific errors you can handle and let the rest stop the script loudly.</dd>
+</dl></div>
+
+<h3 id="ch59-r"><span class="num">59.10</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Run Python interactively with <code>python3</code> to experiment, and as <code>python3 script.py</code> for anything you keep; use a virtual environment when you need packages.</li>
+<li>Most data is lists and dictionaries; JSON maps straight onto them through <code>json.loads</code>/<code>json.load</code> and <code>json.dumps</code>/<code>json.dump</code>.</li>
+<li>Indentation defines blocks; <code>if</code>, <code>for</code> and <code>def</code> lines end in a colon.</li>
+<li>Functions package one rule in one place; modules let several scripts share them; the standard library covers files, CSV, XML, JSON and more with no installs.</li>
+<li>Open files with <code>with open(..., encoding="utf-8")</code>.</li>
+<li>Read tracebacks bottom up, catch only specific exceptions, and use exit codes so CI can act on your scripts.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What does <code>bug.get("owner", "nobody")</code> return when <code>bug</code> has no "owner" key?</p><div class="opts"><button>It raises KeyError</button><button data-ok>"nobody"</button><button>None, always</button></div><p class="why" hidden><code>.get()</code> returns the default you supply when the key is missing; <code>bug["owner"]</code> would raise KeyError.</p></div>
+<div class="qz"><p class="q">A traceback ends with <code>ModuleNotFoundError: No module named 'httpx'</code>. What is the most likely fix?</p><div class="opts"><button>Rename your script to httpx.py</button><button data-ok>Activate the project's virtual environment and install httpx into it</button><button>Add <code>try</code>/<code>except</code> around the import</button></div><p class="why" hidden>The package isn't installed in the Python that's running. Naming your own file httpx.py would make things worse, because it would hide the real package.</p></div>
+<div class="qz"><p class="q">Which is the right way to turn a JSON file into Python data?</p><div class="opts"><button><code>json.loads("results.json")</code></button><button data-ok><code>with open("results.json", encoding="utf-8") as f: data = json.load(f)</code></button><button><code>json.dumps(open("results.json"))</code></button></div><p class="why" hidden><code>load</code> reads from a file; <code>loads</code> parses a string (passing a filename would try to parse the name itself); <code>dump(s)</code> goes the other way.</p></div>
+<div class="qz"><p class="q">Where in a traceback should you look first?</p><div class="opts"><button>The first line, "Traceback (most recent call last)"</button><button data-ok>The last line, then the frame just above it</button><button>The middle frame</button></div><p class="why" hidden>The last line names the error and its message; the frame just above it is where it actually happened.</p></div>
+<div class="qz"><p class="q">Why does <code>parse_junit.py</code> call <code>sys.exit(1)</code> when there are failures?</p><div class="opts"><button>To delete summary.json</button><button>Because Python requires it at the end of every script</button><button data-ok>So a shell script or CI pipeline can see the check failed</button></div><p class="why" hidden>A non-zero exit code is the universal "this step failed" signal for shells and CI systems.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Take a real (anonymised) export from your work: a test-run CSV, a JUnit report or an application log. Write, or have Claude write, a script of 30 to 80 lines that produces a summary you'd actually paste into a stand-up or release note. Then review it: list every line you don't fully understand and find out what it does; test it with an empty file, a missing column and one unexpected value; make sure it exits non-zero when something is wrong. Hand in the script, the sample input, the output, and a short list of the bugs you found in the first version.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Python is a recipe for a very literal cook. Values live in variables; collections are lists, in order, or dictionaries, with named fields. JSON turns straight into those. Indented blocks under if, for and def say which lines belong together. Functions keep one rule in one place. Open files with 'with open', and when it breaks, read the traceback from the bottom: the last line says what went wrong, and the line above says where. Catch only errors you can actually handle, and exit with a non-zero code so CI notices."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Python Software Foundation, <a href="https://docs.python.org/3/tutorial/index.html" target="_blank" rel="noopener">The Python Tutorial</a>: sections on data structures, control flow, modules, input and output, and errors and exceptions.</li>
+<li>Python docs, <a href="https://docs.python.org/3/library/json.html" target="_blank" rel="noopener">json</a>, <a href="https://docs.python.org/3/library/csv.html" target="_blank" rel="noopener">csv</a>, <a href="https://docs.python.org/3/library/xml.etree.elementtree.html" target="_blank" rel="noopener">xml.etree.ElementTree</a> and <a href="https://docs.python.org/3/library/collections.html#collections.Counter" target="_blank" rel="noopener">collections.Counter</a>.</li>
+<li>Python docs, <a href="https://docs.python.org/3/library/exceptions.html" target="_blank" rel="noopener">Built-in exceptions</a>.</li>
+<li>Python docs, <a href="https://docs.python.org/3/library/xml.html#xml-vulnerabilities" target="_blank" rel="noopener">XML vulnerabilities</a>: read this before parsing XML from untrusted sources.</li>
+<li>pytest, <a href="https://docs.pytest.org/en/stable/how-to/output.html#creating-junitxml-format-files" target="_blank" rel="noopener">Creating JUnit XML format files</a>; Playwright, <a href="https://playwright.dev/docs/test-reporters#junit-reporter" target="_blank" rel="noopener">JUnit reporter</a>.</li>
+</ol><p class="verified">Content type: established programming fundamentals · Last reviewed 9 November 2026. All code and outputs tested on Python 3.11.9 (macOS); nothing used is newer than Python 3.11.</p></div>

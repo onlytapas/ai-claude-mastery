@@ -1,0 +1,300 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How a basic request looks on the Claude Messages API, OpenAI's Responses API and Google's Gemini Interactions API, side by side</li>
+<li>The official Python SDKs for each, and how they read their keys</li>
+<li>How tool calling and structured output differ between the three</li>
+<li>How the pricing models compare, including caching and batch discounts, and why per-token prices aren't directly comparable</li>
+<li>What compatibility layers are for, and how to keep your own code portable with a small tested adapter</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch86">Chapter 86</a> (the Claude request format). <a href="#ch89">Chapter 89</a> (tool use and structured outputs on Claude) and <a href="#ch90">Chapter 90</a> (caching and cost) give the Claude side in depth. <a href="#ch26">Chapter 26</a> covers the AI companies themselves; this chapter is only about their developer APIs.</div>
+
+<div class="bigidea"><p>Claude, OpenAI's GPT models and Google's Gemini models are all reached the same basic way: an HTTPS <code>POST</code> with an API key, a model name, some instructions and the user's input, and a JSON reply with text and token counts. The details differ: field names, where the system prompt goes, how tool calls and results are shaped, whether the server remembers the conversation, and how caching is priced. Knowing those differences lets you compare models fairly, read anyone's sample code, and keep your own code from being locked to one vendor. All facts here were checked against each vendor's documentation in November 2026, and all three change often.</p></div>
+
+<h3 id="ch91-1"><span class="num">91.1</span>Why a QA team should know all three</h3>
+<p>You may work only with Claude, and still meet the others:</p>
+<ul>
+<li><strong>Testing someone else's product.</strong> The chatbot you're testing may call OpenAI or Gemini. To read its logs, reproduce bugs and write mocks, you need to recognise their request and response shapes.</li>
+<li><strong>Fair comparisons.</strong> Managers ask "would another model be cheaper or better?" Answering that honestly means running the same eval set (<a href="#ch125">Chapter 125</a>) through each API.</li>
+<li><strong>Resilience and <a class="gl" href="#g-vendor-lock-in">vendor lock-in</a>.</strong> If all your tooling is written against one SDK's shapes, switching or adding a fallback is a rewrite. A thin adapter keeps that cost small.</li>
+</ul>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Three courier companies all deliver parcels, but each has its own form: one puts the recipient's name at the top, another at the bottom, a third asks you to tick a box for "signature required". The parcel and the job are the same. Once you've filled in all three forms you stop thinking "these are different services" and start thinking "these are different forms for the same service".</p></div>
+<div class="box note"><span class="tag">What this chapter isn't</span><p>It isn't a ranking. Which model is "best" depends on your task and changes with every release; measure it with your own evals. This chapter is about the <em>interfaces</em>, which is what your code depends on.</p></div>
+
+<h3 id="ch91-2"><span class="num">91.2</span>The same request three ways</h3>
+<p>Here is one task, "give boundary values for an age field", sent to each vendor's recommended API for new projects. <span class="vchip">Verified 9 Nov 2026</span></p>
+<div class="code"><span class="cap">Claude: Messages API</span><pre>curl https://api.anthropic.com/v1/messages \
+  -H "content-type: application/json" \
+  -H "Authorization: Bearer $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2026-10-21" \
+  -d '{
+    "model": "claude-sonnet-5-5",
+    "max_tokens": 1000,
+    "system": "You are a senior QA engineer. Reply concisely.",
+    "messages": [{"role": "user", "content": "Boundary values for an age field accepting 18 to 65?"}]
+  }'</pre></div>
+<div class="code"><span class="cap">OpenAI: Responses API</span><pre>curl https://api.openai.com/v1/responses \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -d '{
+    "model": "gpt-6.1-sol",
+    "instructions": "You are a senior QA engineer. Reply concisely.",
+    "input": "Boundary values for an age field accepting 18 to 65?"
+  }'</pre></div>
+<div class="code"><span class="cap">Gemini: Interactions API</span><pre>curl https://generativelanguage.googleapis.com/v1beta/interactions \
+  -H "Content-Type: application/json" \
+  -H "x-goog-api-key: $GEMINI_API_KEY" \
+  -H "Api-Revision: 2026-05-20" \
+  -d '{
+    "model": "gemini-3.8-flash",
+    "system_instruction": "You are a senior QA engineer. Reply concisely.",
+    "input": "Boundary values for an age field accepting 18 to 65?"
+  }'</pre></div>
+<div class="tbl"><table>
+<tr><th></th><th>Claude (Messages)</th><th>OpenAI (Responses)</th><th>Gemini (Interactions)</th></tr>
+<tr><td>Endpoint</td><td><code>POST /v1/messages</code></td><td><code>POST /v1/responses</code></td><td><code>POST /v1beta/interactions</code></td></tr>
+<tr><td>Key header</td><td><code>Authorization: Bearer</code> (or <code>x-api-key</code>)</td><td><code>Authorization: Bearer</code></td><td><code>x-goog-api-key</code></td></tr>
+<tr><td>Version header</td><td><code>anthropic-version</code> (required)</td><td>Not used in the basic examples</td><td><code>Api-Revision</code> appears in Google's REST examples</td></tr>
+<tr><td>Instructions</td><td><code>system</code></td><td><code>instructions</code>, or <code>developer</code>-role messages</td><td><code>system_instruction</code></td></tr>
+<tr><td>User input</td><td><code>messages</code> list of role/content turns</td><td><code>input</code>: a string or a list of items</td><td><code>input</code>: a string or a list of items</td></tr>
+<tr><td>Output length cap</td><td><code>max_tokens</code> (required)</td><td><code>max_output_tokens</code> (optional)</td><td>Not shown in the basic examples; see Google's API reference</td></tr>
+<tr><td>Reading the text</td><td>Join the <code>content</code> blocks whose type is <code>text</code></td><td>SDK helper <code>output_text</code>; the raw <code>output</code> array often has several items</td><td>SDK helper <code>output_text</code>; <code>steps</code> for mixed content</td></tr>
+<tr><td>Conversation state</td><td>Stateless: you resend the history each time</td><td>Responses stored by default; continue with <code>previous_response_id</code>, or set <code>store: false</code></td><td>Interactions stored by default; continue with <code>previous_interaction_id</code>, or set <code>store=false</code></td></tr>
+<tr><td>Older API still supported</td><td>(Messages is the only one)</td><td>Chat Completions (<code>/v1/chat/completions</code>)</td><td><code>generateContent</code> (<code>models/{model}:generateContent</code>)</td></tr>
+</table></div>
+<details class="deep"><summary>Under the hood: stateless versus stored conversations</summary><div class="body">
+<p>Claude's Messages API keeps nothing between calls: to continue a conversation you send all earlier turns again (<a href="#ch87">Chapter 87</a>). That's simple to reason about and easy to log and replay in tests.</p>
+<p>OpenAI's Responses API and Google's Interactions API both <strong>store</strong> each exchange by default and let you continue by passing the previous ID, so you don't resend history yourself. Two details from their docs catch people out:</p>
+<ul>
+<li>On OpenAI, top-level <code>instructions</code> are not carried over by <code>previous_response_id</code>; you resend them each turn. Earlier turns in the chain are still billed as input tokens.</li>
+<li>On Gemini, <code>tools</code>, <code>system_instruction</code> and <code>generation_config</code> apply to one interaction only and must be sent again each turn. Setting <code>store=false</code> means you can't use <code>previous_interaction_id</code>.</li>
+</ul>
+<p>Stored state also matters for data handling: check with your security team before relying on server-side storage for anything sensitive.</p>
+</div></details>
+<div class="box warn"><span class="tag">Older tutorials will mislead you</span><p>Most blog posts online use OpenAI's Chat Completions (<code>messages</code>, <code>choices[0].message.content</code>) or Gemini's <code>generateContent</code> (<code>contents</code>, <code>parts</code>). Both still work, but each vendor now recommends the newer API for new projects. OpenAI's Assistants API was shut down on 26 August 2026. And as Chapter 86 explained, Claude rejects <code>temperature</code>, <code>top_p</code> and <code>top_k</code> on API version 2026-10-21; Google's docs say Gemini 4 and Gemini 3.6+ ignore them and return deprecation warnings. Old "set temperature to 0 for consistency" advice no longer transfers.</p></div>
+
+<h3 id="ch91-3"><span class="num">91.3</span>The official Python SDKs</h3>
+<div class="tbl"><table>
+<tr><th></th><th>Claude</th><th>OpenAI</th><th>Gemini</th></tr>
+<tr><td>Install</td><td><code>pip install anthropic</code></td><td><code>pip install openai</code></td><td><code>pip install -U google-genai</code></td></tr>
+<tr><td>Import and client</td><td><code>anthropic.Anthropic()</code></td><td><code>from openai import OpenAI</code>; <code>OpenAI()</code></td><td><code>from google import genai</code>; <code>genai.Client()</code></td></tr>
+<tr><td>Key variable</td><td><code>ANTHROPIC_API_KEY</code></td><td><code>OPENAI_API_KEY</code></td><td><code>GEMINI_API_KEY</code></td></tr>
+<tr><td>Main call</td><td><code>client.messages.create(...)</code></td><td><code>client.responses.create(...)</code></td><td><code>client.interactions.create(...)</code></td></tr>
+</table></div>
+<div class="cols2">
+<div><h4>OpenAI</h4><div class="code"><pre>from openai import OpenAI
+
+client = OpenAI()      <span class="c"># reads OPENAI_API_KEY</span>
+response = client.responses.create(
+    model="gpt-6.1-sol",
+    instructions="You are a senior QA engineer.",
+    input="Boundary values for age 18 to 65?",
+)
+print(response.output_text)</pre></div></div>
+<div><h4>Gemini</h4><div class="code"><pre>from google import genai
+
+client = genai.Client()   <span class="c"># key from GEMINI_API_KEY</span>
+interaction = client.interactions.create(
+    model="gemini-3.8-flash",
+    system_instruction="You are a senior QA engineer.",
+    input="Boundary values for age 18 to 65?",
+)
+print(interaction.output_text)</pre></div></div>
+</div>
+<p>The Claude version is the <code>first_call.py</code> you wrote in Chapter 86. Notice the one structural difference: Claude's reply is a list of content blocks (text, thinking, tool use) and you pick the text blocks, while the other two SDKs offer an <code>output_text</code> shortcut.</p>
+<div class="box note"><span class="tag">Keys, as always</span><p>Each vendor's key goes in its own environment variable or secrets store, never in code (<a href="#ch98">Chapter 98</a>). Each has its own console for keys, billing and limits: the Claude Console, the OpenAI platform dashboard, and Google AI Studio.</p></div>
+
+<h3 id="ch91-4"><span class="num">91.4</span>Tool calling compared</h3>
+<p>All three let you describe functions with a JSON Schema; the model asks your code to run one; you send the result back. The loop is the same as Chapter 89. The names differ. <span class="vchip">Verified 9 Nov 2026</span></p>
+<div class="tbl"><table>
+<tr><th>Step</th><th>Claude</th><th>OpenAI Responses</th><th>Gemini Interactions</th></tr>
+<tr><td>Define a tool</td><td><code>{"name", "description", "input_schema"}</code>; optional <code>"strict": true</code></td><td><code>{"type": "function", "name", "description", "parameters", "strict"}</code></td><td><code>{"type": "function", "name", "description", "parameters"}</code></td></tr>
+<tr><td>Model asks for a call</td><td>A <code>tool_use</code> content block with <code>id</code>, <code>name</code> and <code>input</code> (an object); <code>stop_reason</code> is <code>tool_use</code></td><td>An <code>output</code> item of type <code>function_call</code> with <code>call_id</code>, <code>name</code> and <code>arguments</code> (a JSON <em>string</em>: parse it)</td><td>A step of type <code>function_call</code> with <code>id</code>, <code>name</code> and <code>arguments</code></td></tr>
+<tr><td>You send the result</td><td>A <code>tool_result</code> block with <code>tool_use_id</code> in the next user message</td><td>An input item <code>{"type": "function_call_output", "call_id", "output"}</code></td><td>An input item <code>{"type": "function_result", "name", "call_id", "result"}</code> plus <code>previous_interaction_id</code></td></tr>
+<tr><td>Force a tool</td><td>Not supported on Opus 5.5, Sonnet 5.5 or Fable 5.1 (400 error); use <code>auto</code></td><td><code>tool_choice: "required"</code> or a named function</td><td><code>tool_choice</code> modes <code>auto</code>, <code>any</code>, <code>none</code>, <code>validated</code></td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example: the string that wasn't an object</span><p>A team ported a "look up test results" tool from Claude to OpenAI. On Claude, <code>block.input["suite"]</code> worked. On OpenAI the same line failed, because <code>arguments</code> arrives as a JSON-encoded string that needs <code>json.loads()</code> first. A contract test that feeds a recorded tool call from each provider into your handler catches this in seconds.</p></div>
+
+<h3 id="ch91-5"><span class="num">91.5</span>Structured output compared</h3>
+<p>Structured output means "reply in JSON that matches this schema", so your code can parse it reliably (test cases with fixed fields, for example).</p>
+<div class="tbl"><table>
+<tr><th></th><th>Claude</th><th>OpenAI Responses</th><th>Gemini Interactions</th></tr>
+<tr><td>Raw request field</td><td><code>output_config: {"format": {"type": "json_schema", "schema": {...}}}</code></td><td><code>text: {"format": {"type": "json_schema", "name", "schema", "strict": true}}</code></td><td><code>response_format: {"type": "text", "mime_type": "application/json", "schema": {...}}</code></td></tr>
+<tr><td>Python helper with Pydantic</td><td><code>client.messages.parse(..., output_format=Model)</code> → <code>parsed_output</code></td><td><code>client.responses.parse(..., text_format=Model)</code> → <code>output_parsed</code></td><td>Pass <code>Model.model_json_schema()</code>, then <code>Model.model_validate_json(interaction.output_text)</code></td></tr>
+<tr><td>Things to know</td><td>Can't be combined with citations (400 error)</td><td>Check for a <code>refusal</code> item and for <code>status == "incomplete"</code> before parsing</td><td>Some constraints (such as <code>minLength</code>, <code>maxLength</code>) are ignored; validate them yourself</td></tr>
+</table></div>
+<p>Whatever the vendor, validate the parsed result in your own code too. "Schema-valid" isn't "correct": a test case can have every field and still test the wrong thing.</p>
+
+<h3 id="ch91-6"><span class="num">91.6</span>Pricing models compared</h3>
+<p>All three charge per million tokens, separately for input and output, with cheaper rates for cached input and a batch discount. <span class="vchip">Verified 9 Nov 2026</span></p>
+<div class="tbl"><table>
+<tr><th>Model (vendor)</th><th>Input / MTok</th><th>Cached input / MTok</th><th>Output / MTok</th></tr>
+<tr class="group"><td colspan="4">Anthropic (Claude API)</td></tr>
+<tr><td>Claude Fable 5.1</td><td>$10</td><td>$0.25 read; writes $12.50–$20</td><td>$50</td></tr>
+<tr><td>Claude Opus 5.5</td><td>$4</td><td>$0.20 read; writes $5–$8</td><td>$20</td></tr>
+<tr><td>Claude Sonnet 5.5</td><td>$2</td><td>$0.10 read; writes $2.50–$4</td><td>$10</td></tr>
+<tr><td>Claude Haiku 5.5 (prompts ≤100K)</td><td>$0.10</td><td>$0.01 read; writes $0.125–$0.20</td><td>$0.50</td></tr>
+<tr class="group"><td colspan="4">OpenAI (standard tier, prompts ≤272K tokens)</td></tr>
+<tr><td><code>gpt-6-astra</code></td><td>$10</td><td>$1</td><td>$50</td></tr>
+<tr><td><code>gpt-6.1-sol</code></td><td>$2</td><td>$0.10</td><td>$10</td></tr>
+<tr><td><code>gpt-6.1-terra</code></td><td>$1</td><td>$0.05</td><td>$5</td></tr>
+<tr><td><code>gpt-6-luna</code></td><td>$0.10</td><td>$0.01</td><td>$0.50</td></tr>
+<tr class="group"><td colspan="4">Google (Gemini API, paid tier)</td></tr>
+<tr><td>Gemini 4 Argon</td><td>$2 until 30 Nov 2026, then $4</td><td>$0.10, then $0.20</td><td>$10, then $20</td></tr>
+<tr><td>Gemini 3.8 Flash</td><td>$0.75 until 31 Dec 2026, then $1.50</td><td>$0.075, then $0.15 (plus storage)</td><td>$3.75, then $7.50</td></tr>
+</table></div>
+<p><em>US dollars. Sources: each vendor's pricing page, 9 November 2026. Output prices include thinking/reasoning tokens. Prices change often; check before quoting.</em></p>
+<div class="tbl"><table>
+<tr><th>Feature</th><th>Claude</th><th>OpenAI</th><th>Gemini</th></tr>
+<tr><td>How caching starts</td><td>You opt in with <code>cache_control</code> (automatic or explicit breakpoints)</td><td>On by default for supported models</td><td>Implicit caching on by default (Gemini 2.5 and newer)</td></tr>
+<tr><td>Minimum to cache</td><td>512 tokens (current models)</td><td>1,024 tokens (GPT-5.6 and later)</td><td>4,096 tokens (Gemini 4 Argon, 3.8 Flash)</td></tr>
+<tr><td>Cache write charge</td><td>1.25× (5 min) or 2× (1 hour)</td><td>GPT-5.6 and later: 1.25× (30 min) or 2.5× (12 hours); none on earlier models</td><td>Implicit caching: no separate write fee listed; explicit caching (not on Gemini 4 Argon) has storage charges</td></tr>
+<tr><td>Batch discount</td><td>50%</td><td>50% (Batch and Flex)</td><td>50%</td></tr>
+<tr><td>Free tier</td><td>No (pay per token)</td><td>Not covered here</td><td>Yes for some models, such as Gemini 3.8 Flash; not Gemini 4 Argon. Free-tier data may be used to improve Google's products.</td></tr>
+</table></div>
+<details class="deep"><summary>Why per-token prices can't be compared directly</summary><div class="body">
+<p>Each vendor uses its own <a class="gl" href="#g-tokenizer">tokenizer</a>, so the same user story can be a different number of tokens on each. Anthropic itself notes that Claude Opus 4.7 and later produce about 30% more tokens for the same text than earlier Claude models. Reasoning models also vary widely in how many thinking tokens they spend (billed as output) for the same task.</p>
+<p>So the only fair comparison is <strong>cost per completed task at acceptable quality</strong>: run the same eval set through each model, record the real <code>usage</code> from every response, multiply by that vendor's prices, and compare alongside the pass rate. A model that is cheaper per token but needs twice the output, or fails twice as often, isn't cheaper.</p>
+</div></details>
+
+<h3 id="ch91-7"><span class="num">91.7</span>Compatibility layers</h3>
+<p>A <a class="gl" href="#g-compatibility-layer">compatibility layer</a> lets you point one vendor's SDK at another vendor's models by changing the base URL, key and model name.</p>
+<div class="code"><span class="cap">Python: calling Claude through the OpenAI SDK (Chat Completions format)</span><pre>import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ.get("ANTHROPIC_API_KEY"),   <span class="c"># a Claude key, not an OpenAI key</span>
+    base_url="https://api.anthropic.com/v1/",
+)
+response = client.chat.completions.create(
+    model="claude-sonnet-5-5",
+    messages=[
+        {"role": "system", "content": "You are a senior QA engineer."},
+        {"role": "user", "content": "Boundary values for age 18 to 65?"},
+    ],
+)
+print(response.choices[0].message.content)</pre></div>
+<p>Google offers the same idea for Gemini at <code>https://generativelanguage.googleapis.com/v1beta/openai/</code> (chat completions, embeddings, batch and more), which its docs describe as still in beta.</p>
+<div class="box warn"><span class="tag">For testing, not for production</span><p>Anthropic says its OpenAI SDK compatibility is "primarily intended to test and compare model capabilities" and is not "a long-term or production-ready solution for most use cases". Documented limits include: prompt caching isn't supported; the <code>strict</code> flag on functions is ignored; system and developer messages are all hoisted into one system prompt; Claude's thinking isn't returned; most unsupported fields are <em>silently ignored</em> rather than rejected. That last point matters to testers: a request can "work" while quietly dropping a setting you rely on.</p></div>
+
+<h3 id="ch91-8"><span class="num">91.8</span>Portability: a thin adapter you can test</h3>
+<p>The cheapest protection against lock-in isn't a big framework; it's keeping vendor-specific code in one small, tested place. Your application calls <code>ask(...)</code>; only the adapter knows field names.</p>
+<div class="code"><span class="cap">adapter.py</span><pre>"""adapter.py - one function, three providers. Clients are passed in, so the
+logic can be tested offline with fakes (see test_adapter.py)."""
+
+def ask(provider, client, model, system, user, max_tokens=1000):
+    if provider == "claude":
+        msg = client.messages.create(
+            model=model, max_tokens=max_tokens, system=system,
+            messages=[{"role": "user", "content": user}])
+        if msg.stop_reason == "max_tokens":
+            raise RuntimeError("Claude reply was cut off at max_tokens")
+        return "".join(b.text for b in msg.content if b.type == "text")
+    if provider == "openai":
+        resp = client.responses.create(
+            model=model, instructions=system, input=user,
+            max_output_tokens=max_tokens)
+        return resp.output_text
+    if provider == "gemini":
+        inter = client.interactions.create(
+            model=model, system_instruction=system, input=user)
+        return inter.output_text
+    raise ValueError(f"unknown provider: {provider}")</pre></div>
+<div class="code"><span class="cap">test_adapter.py (runs offline: fake clients, no keys, no network)</span><pre>"""test_adapter.py - offline tests for adapter.py using fake clients."""
+from types import SimpleNamespace as NS
+from adapter import ask
+
+class Recorder:
+    """Records the keyword arguments a fake SDK method was called with."""
+    def __init__(self, reply):
+        self.reply, self.kwargs = reply, None
+    def create(self, **kwargs):
+        self.kwargs = kwargs
+        return self.reply
+
+def test_claude_joins_text_blocks_and_skips_thinking():
+    rec = Recorder(NS(stop_reason="end_turn", content=[
+        NS(type="thinking", thinking="..."), NS(type="text", text="17, 18, 65, 66")]))
+    out = ask("claude", NS(messages=rec), "claude-opus-5-5", "QA", "Boundaries?")
+    assert out == "17, 18, 65, 66"
+    assert rec.kwargs["system"] == "QA" and rec.kwargs["max_tokens"] == 1000
+
+def test_claude_truncation_is_an_error():
+    rec = Recorder(NS(stop_reason="max_tokens", content=[NS(type="text", text="17, 1")]))
+    try:
+        ask("claude", NS(messages=rec), "claude-opus-5-5", "QA", "Boundaries?")
+        assert False, "expected RuntimeError"
+    except RuntimeError:
+        pass
+
+def test_openai_uses_instructions_and_input():
+    rec = Recorder(NS(output_text="17, 18, 65, 66"))
+    out = ask("openai", NS(responses=rec), "gpt-6.1-sol", "QA", "Boundaries?")
+    assert out == "17, 18, 65, 66"
+    assert rec.kwargs["instructions"] == "QA" and rec.kwargs["input"] == "Boundaries?"
+
+def test_gemini_uses_system_instruction():
+    rec = Recorder(NS(output_text="17, 18, 65, 66"))
+    out = ask("gemini", NS(interactions=rec), "gemini-3.8-flash", "QA", "Boundaries?")
+    assert out == "17, 18, 65, 66"
+    assert rec.kwargs["system_instruction"] == "QA"
+
+if __name__ == "__main__":
+    for name, fn in list(globals().items()):
+        if name.startswith("test_"):
+            fn(); print("PASS", name)</pre></div>
+<div class="flow"><div><b>App code</b>calls <code>ask()</code> only</div><div class="hl"><b>Adapter</b>the one place that knows each vendor's fields</div><div><b>Contract tests</b>fake clients, recorded responses</div><div><b>Evals</b>same task set through each model</div></div>
+<h4>Portability habits that pay off</h4>
+<ul>
+<li><strong>Keep prompts in files, not code</strong>, with a version number (<a href="#ch88">Chapter 88</a>). Expect to tune them per model: Anthropic's own docs warn that a prompt tuned for OpenAI is probably not ideal for Claude, and the reverse is true too.</li>
+<li><strong>Normalise usage and cost</strong> into your own record (provider, model, input, cached input, output, cost) so dashboards don't care which vendor answered.</li>
+<li><strong>Use the lowest common denominator only where you need portability.</strong> Citations, Claude's cache breakpoints, OpenAI's stored responses and Gemini's built-in tools are genuinely useful. Use them inside the adapter, behind a clear option, not scattered through the app.</li>
+<li><strong>Pin model IDs</strong> and record which model produced each result. Every vendor retires models on its own schedule (<a href="#ch95">Chapter 95</a>).</li>
+</ul>
+<div class="box opinion"><span class="tag">Opinion · widely held among practitioners</span><p>Many engineers prefer a small home-made adapter like this over a large multi-provider framework for internal tools: it's easier to debug, and new vendor features arrive the day they ship. Others prefer an established open-source abstraction library to avoid maintaining their own. Both are defensible; what matters is that vendor-specific code isn't spread across your whole codebase.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Contract-test a three-provider adapter</b><span>25 min · terminal · Python 3 · no keys needed (optional live step needs one key)</span></div><ol>
+<li>Make a folder, <code>mkdir adapter-lab &amp;&amp; cd adapter-lab</code>, and save <code>adapter.py</code> and <code>test_adapter.py</code> from 91.8.<span class="expect">two files in the folder. No SDKs need installing: the tests use fakes.</span></li>
+<li>Run <code>python3 test_adapter.py</code>.<span class="expect">four lines, each starting <code>PASS</code>: test_claude_joins_text_blocks_and_skips_thinking, test_claude_truncation_is_an_error, test_openai_uses_instructions_and_input, test_gemini_uses_system_instruction.</span></li>
+<li>Break it on purpose: in <code>adapter.py</code>, change the OpenAI branch's <code>instructions=system</code> to <code>system=system</code>. Run the tests again.<span class="expect">a <code>KeyError: 'instructions'</code> from test_openai_uses_instructions_and_input. Your contract test caught a field-name mistake that would otherwise only appear as a 400 error in production. Change it back.</span></li>
+<li>Add a fifth test: a Claude reply with two text blocks, <code>"17, 18"</code> and <code>", 65, 66"</code>, should return <code>"17, 18, 65, 66"</code>.<span class="expect">five PASS lines.</span></li>
+<li>Add a <code>usage</code> normaliser: a function that returns <code>{"provider", "model", "input", "output"}</code> for a Claude message (from <code>message.usage.input_tokens</code> and <code>output_tokens</code>). Write its test with a fake.<span class="expect">a passing test. Look up the equivalent usage fields in the OpenAI and Gemini docs before adding those branches; don't guess them.</span></li>
+<li><em>Optional, needs one real key:</em> <code>pip install anthropic</code> (or <code>openai</code>, or <code>google-genai</code>), set the key variable, and call <code>ask()</code> with the real client, for example <code>ask("claude", anthropic.Anthropic(), "claude-haiku-5-5", "You are a QA engineer.", "Boundary values for age 18 to 65?")</code>.<span class="expect">a short list of boundary values such as 17, 18, 65, 66 printed by your adapter.</span></li>
+</ol>
+<p><b>Troubleshooting.</b> <code>ModuleNotFoundError: adapter</code>: run the tests from the same folder as <code>adapter.py</code>. A live call returning 400: check the model ID against the vendor's current model list. A 401: the wrong key variable is set for that vendor.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"All LLM APIs are OpenAI-compatible now, so the format doesn't matter."</dt><dd>Compatibility layers exist but are partial: they silently ignore fields and drop features like caching and thinking. Native APIs are the reference.</dd>
+<dt>"Cheaper per token means cheaper."</dt><dd>Tokenizers and thinking budgets differ. Compare cost per completed task at the quality you need.</dd>
+<dt>"Tool call arguments are always an object."</dt><dd>Claude gives an object (<code>input</code>); OpenAI gives a JSON string (<code>arguments</code>) that you must parse.</dd>
+<dt>"The server remembers my chat."</dt><dd>True by default on OpenAI Responses and Gemini Interactions (stored state), false on Claude Messages (you resend history).</dd>
+<dt>"A prompt that works on one model will work the same on another."</dt><dd>Prompts usually need tuning per model. Re-run your evals after switching.</dd>
+</dl></div>
+
+<h3 id="ch91-r"><span class="num">91.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Claude: <code>POST /v1/messages</code> with <code>system</code>, <code>messages</code> and required <code>max_tokens</code>; stateless.</li>
+<li>OpenAI: <code>POST /v1/responses</code> with <code>instructions</code> and <code>input</code>; <code>output_text</code> helper; stored by default; Chat Completions still supported.</li>
+<li>Gemini: <code>POST /v1beta/interactions</code> with <code>system_instruction</code> and <code>input</code>, key in <code>x-goog-api-key</code>; stored by default; <code>generateContent</code> still supported.</li>
+<li>Tool calls and structured output follow the same idea everywhere but with different field names; OpenAI's tool arguments arrive as a JSON string.</li>
+<li>All three price per million tokens with cached-input discounts and 50% batch discounts, but caching rules and minimums differ, and token counts aren't comparable across vendors.</li>
+<li>Compatibility layers are for quick comparisons; keep vendor-specific code in a small adapter with contract tests.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">On OpenAI's Responses API, where does the equivalent of Claude's <code>system</code> prompt go?</p><div class="opts"><button>In a <code>system</code> field at the top level</button><button data-ok>In <code>instructions</code> (or in <code>developer</code>-role messages)</button><button>In the <code>x-system</code> header</button></div><p class="why" hidden>The Responses API uses <code>instructions</code> for high-level guidance, and developer messages rank above user messages.</p></div>
+<div class="qz"><p class="q">Which header carries the API key for the Gemini API in Google's REST examples?</p><div class="opts"><button>Authorization: Bearer</button><button data-ok>x-goog-api-key</button><button>anthropic-version</button></div><p class="why" hidden>Gemini uses <code>x-goog-api-key</code>. Claude and OpenAI use <code>Authorization: Bearer</code>.</p></div>
+<div class="qz"><p class="q">Your tool handler works with Claude but crashes with OpenAI when reading the tool's arguments. What is the likely reason?</p><div class="opts"><button data-ok>OpenAI returns <code>arguments</code> as a JSON-encoded string that must be parsed first</button><button>OpenAI doesn't support tools</button><button>OpenAI requires forced tool choice</button></div><p class="why" hidden>Claude's <code>tool_use</code> block has <code>input</code> as an object; OpenAI's <code>function_call</code> item has <code>arguments</code> as a string.</p></div>
+<div class="qz"><p class="q">Why is Anthropic's OpenAI SDK compatibility layer a poor choice for a production feature?</p><div class="opts"><button>It only works with Haiku</button><button data-ok>It's intended for testing and comparison, lacks features such as prompt caching, and silently ignores many unsupported fields</button><button>It costs twice as much</button></div><p class="why" hidden>Anthropic describes it as primarily for testing and comparing capabilities; use the native API for production.</p></div>
+<div class="qz"><p class="q">Model A costs half as much per million tokens as model B. What's the fair way to decide which is cheaper for your test-case generator?</p><div class="opts"><button>Pick A: the price per token is lower</button><button data-ok>Run the same eval set on both, compute cost from real usage, and compare cost per task alongside the pass rate</button><button>Compare their context window sizes</button></div><p class="why" hidden>Different tokenizers, thinking budgets and failure rates mean per-token price alone doesn't predict cost per useful result.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Find one place in your organisation (or an open-source project) that calls an LLM API. Identify the vendor and API (for example Chat Completions or Responses), and write a short "portability note": the endpoint, where the instructions go, how the reply text is read, whether conversation state is stored server-side, and which vendor-specific features it relies on. Then sketch the adapter function you'd put in front of it and list three contract tests you'd write with recorded responses.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Claude, OpenAI and Gemini all work the same way underneath: POST a model name, instructions and input with an API key, get back text and token counts. The forms differ. Claude calls the instructions 'system', OpenAI calls them 'instructions', Gemini calls them 'system_instruction'. Claude makes you resend the conversation; the other two can store it for you. Tool calls and JSON output use different field names. Prices are all per token with cache and batch discounts, but tokens aren't the same size across vendors, so compare cost per task, not per token. Keep the vendor details in one small adapter with tests."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/api/overview" target="_blank" rel="noopener">API overview</a>, <a href="https://platform.claude.com/docs/en/build-with-claude/structured-outputs" target="_blank" rel="noopener">Structured outputs</a> and <a href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Pricing</a>.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/cli-sdks-libraries/libraries/openai-sdk" target="_blank" rel="noopener">OpenAI SDK compatibility</a>: base URL, intended use and limitations.</li>
+<li>OpenAI, <a href="https://developers.openai.com/api/docs/guides/text" target="_blank" rel="noopener">Text generation</a> and <a href="https://developers.openai.com/api/docs/guides/migrate-to-responses" target="_blank" rel="noopener">Migrate to the Responses API</a>: Responses vs Chat Completions, stored state, Assistants API sunset.</li>
+<li>OpenAI, <a href="https://developers.openai.com/api/docs/guides/function-calling" target="_blank" rel="noopener">Function calling</a>, <a href="https://developers.openai.com/api/docs/guides/structured-outputs" target="_blank" rel="noopener">Structured outputs</a>, <a href="https://developers.openai.com/api/docs/guides/prompt-caching" target="_blank" rel="noopener">Prompt caching</a> and <a href="https://developers.openai.com/api/docs/pricing" target="_blank" rel="noopener">Pricing</a>.</li>
+<li>Google, <a href="https://aistudio.google.com/docs/quickstart" target="_blank" rel="noopener">Gemini API quickstart</a>, <a href="https://aistudio.google.com/docs/text-generation" target="_blank" rel="noopener">Text generation</a> and <a href="https://aistudio.google.com/docs/interactions" target="_blank" rel="noopener">Interactions API</a>.</li>
+<li>Google, <a href="https://aistudio.google.com/docs/function-calling" target="_blank" rel="noopener">Function calling</a>, <a href="https://aistudio.google.com/docs/structured-output" target="_blank" rel="noopener">Structured output</a>, <a href="https://aistudio.google.com/docs/caching" target="_blank" rel="noopener">Context caching</a>, <a href="https://aistudio.google.com/docs/pricing" target="_blank" rel="noopener">Pricing</a> and <a href="https://aistudio.google.com/docs/openai" target="_blank" rel="noopener">OpenAI compatibility</a>.</li>
+<li>Google, <a href="https://aistudio.google.com/api-reference/generate-content" target="_blank" rel="noopener">generateContent API reference</a>.</li>
+</ol><p class="verified">Verified 9 November 2026 against platform.claude.com, developers.openai.com and aistudio.google.com documentation. The adapter tests were run offline with fake clients (Python 3.11); live API calls were not executed (no keys available). OpenAI and Gemini usage-field names were not verified and are deliberately left out.</p></div>

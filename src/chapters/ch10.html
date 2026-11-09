@@ -1,0 +1,240 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>The three classic ways machines learn, and the one question that tells them apart: what feedback does the learner get?</li>
+<li>Supervised learning: labels, features, classification and regression, with a defect-severity example</li>
+<li>Unsupervised learning: finding groups and oddities with no labels, with a log-clustering example</li>
+<li>Reinforcement learning: agents, actions, rewards, and the explore-or-exploit dilemma</li>
+<li>Self-supervised learning, the bridge that made large language models possible</li>
+<li>How Claude's own training combines all of them, and how to pick an approach for a QA problem</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch9">Chapter 9</a> (the map: model, training, inference). The lab uses Python 3, but there is a no-code alternative. If you haven't installed Python before, <a href="#ch58">Chapter 58</a> shows how.</div>
+
+<div class="bigidea"><p>Machines learn in three classic ways, and the difference is the kind of feedback they get. In <a class="gl" href="#g-supervised-learning">supervised learning</a> every example comes with the right answer, like a student with an answer key. In <a class="gl" href="#g-unsupervised-learning">unsupervised learning</a> there are no answers at all, and the machine finds structure on its own, like sorting a pile of photos into groups. In <a class="gl" href="#g-reinforcement-learning">reinforcement learning</a> the machine tries things and gets rewards or penalties, like learning a game. A fourth idea, <a class="gl" href="#g-self-supervised-learning">self-supervised learning</a>, makes the answers out of the data itself, and that is how large language models such as Claude learn most of what they know.</p></div>
+
+<h3 id="ch10-1"><span class="num">10.1</span>One question tells them apart</h3>
+<p>All machine learning means improving at a task from experience. The approaches differ in what kind of feedback the learner receives while it practises.</p>
+<div class="tbl"><table>
+<tr><th>Approach</th><th>Feedback the learner gets</th><th>Typical question it answers</th><th>Everyday example</th><th>QA example</th></tr>
+<tr><td>Supervised</td><td>The correct answer for every example</td><td>"Which category is this?" or "What number goes with this?"</td><td>Spam filter trained on emails marked spam / not spam</td><td>Predict a bug's severity from past triaged bugs</td></tr>
+<tr><td>Unsupervised</td><td>None. Just the data</td><td>"What groups or patterns are in here?" "What's unusual?"</td><td>A shop grouping customers by buying habits</td><td>Group 50,000 log lines into a handful of failure types</td></tr>
+<tr><td>Reinforcement</td><td>A reward or penalty after acting, often delayed</td><td>"What should I do next to get the best result over time?"</td><td>A program learning to play a video game</td><td>Learn which retry strategy makes flaky CI jobs pass most often</td></tr>
+<tr><td>Self-supervised</td><td>Answers made automatically from the data itself</td><td>"What's the missing or next piece?"</td><td>Guessing the hidden word in a sentence</td><td>How LLMs that write your test cases were pre-trained</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of three ways to learn to cook. <strong>Supervised:</strong> a teacher tastes every dish and tells you exactly what it should have been. <strong>Unsupervised:</strong> you're handed a cupboard of unlabelled spices and sort them into groups by smell, without anyone naming them. <strong>Reinforcement:</strong> you cook for friends each week and only find out from their faces whether it worked, sometimes long after you made the choices that mattered.</p></div>
+
+<h3 id="ch10-2"><span class="num">10.2</span>Supervised learning: learning with an answer key</h3>
+<p>Supervised learning is the most common kind of machine learning in business. You collect examples, each paired with the correct answer, called a <a class="gl" href="#g-label">label</a>. The model learns to map from the example to the label, so that it can label new examples it has never seen.</p>
+<p>Each example is described by <a class="gl" href="#g-feature">features</a>: the measurable facts the model looks at. For a bug report, features might be the number of customers affected, whether there's a workaround, the component and the words in the title.</p>
+<div class="flow">
+<div><b>Labelled examples</b>2,000 past bugs, each with its final severity</div>
+<div class="hl"><b>Training</b>The model adjusts itself until its guesses match the labels as closely as possible</div>
+<div><b>New example</b>A bug filed this morning, no severity yet</div>
+<div><b>Prediction</b>"Probably critical (82%)"</div>
+</div>
+<h4>Two kinds of supervised task</h4>
+<div class="cols2">
+<div><h4>Classification</h4><p>The answer is a category. Spam or not spam. Critical, major or minor. Flaky or genuine failure. A model that does this is a <a class="gl" href="#g-classifier">classifier</a>.</p></div>
+<div><h4>Regression</h4><p>The answer is a number. How many minutes will this test suite take? How many defects will this release have? Note: this "regression" is a statistics word and has nothing to do with <a class="gl" href="#g-regression-testing">regression testing</a>.</p></div>
+</div>
+<div class="box example"><span class="tag">Real-world example: defect triage</span><p>A support team receives hundreds of bug reports a week. Two years of reports already have a component and severity set by experienced triagers. That history is a ready-made labelled dataset. A supervised model trained on it can suggest a component and severity for each new report, and a person confirms or corrects it. Each correction is a new label for the next round of training. The quality of the model depends heavily on the quality of those old labels: if triagers were inconsistent, the model learns their inconsistency (<a href="#ch13">Chapter 13</a>).</p></div>
+<h4>How you know it worked</h4>
+<p>You never judge a supervised model on the examples it trained on, because it may simply have memorised them. You hold back some labelled examples it never saw, and measure how often it gets those right. This is the same instinct as not letting developers write the only tests for their own code. Splitting data into training, validation and test sets is covered in <a href="#ch12">Chapter 12</a> and <a href="#ch13">Chapter 13</a>.</p>
+<details class="deep"><summary>Under the hood: the simplest supervised learner</summary><div class="body">
+<p>The easiest supervised method to understand is <strong>nearest neighbour</strong>. To label a new example, find the most similar labelled example and copy its label. "Similar" means close together when the features are treated as coordinates. A bug affecting 8 customers out of 10 with a workaround sits at the point (8, 1); its nearest known neighbour might be (7, 1), labelled critical, so the prediction is critical.</p>
+<p>Nearest neighbour doesn't really "train"; it just stores examples. Most other methods (decision trees, logistic regression, neural networks) compress the examples into a set of learned numbers, which is faster and generalises better. All of them share the same goal: draw a boundary between categories that works well on examples not yet seen. The lab below runs a nearest-neighbour classifier in about ten lines of Python.</p>
+</div></details>
+<div class="box warn"><span class="tag">Labels are the expensive part</span><p>Supervised learning needs labels, and labels need people. Labelling thousands of screenshots, log lines or bug reports takes time and expertise, and different people label differently. Much of the effort in real supervised projects goes into getting consistent labels, not into the model.</p></div>
+
+<h3 id="ch10-3"><span class="num">10.3</span>Unsupervised learning: finding structure without answers</h3>
+<p>In unsupervised learning there are no labels. The model looks only at the data and finds structure in it: groups of similar items, the main directions in which items vary, or items that don't fit any pattern.</p>
+<div class="tbl"><table>
+<tr><th>Task</th><th>What it finds</th><th>QA use</th></tr>
+<tr><td><a class="gl" href="#g-clustering">Clustering</a></td><td>Groups of items that are similar to each other</td><td>Group thousands of failing-test messages into a few root causes; group crash reports so duplicates are triaged once</td></tr>
+<tr><td>Anomaly detection</td><td>Items that are unlike the rest</td><td>Spot an unusual spike in API response times or an odd pattern in a log</td></tr>
+<tr><td>Dimensionality reduction</td><td>A simpler summary of data with many features, often so it can be drawn on a chart</td><td>Plot thousands of test runs on a 2D chart to see whether failures form distinct islands</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Tip a jar of mixed buttons onto a table and ask a child to sort them. Nobody tells them the categories. They might group by colour, by size or by number of holes. Their groups are real, but they might not be the groups you wanted. Unsupervised learning is exactly like that: useful structure, but a person still has to look at each group and decide what it means.</p></div>
+<div class="box example"><span class="tag">Real-world example: clustering a bad night in CI</span><p>A nightly run produces 1,400 failed tests. Reading them one by one would take a day. A clustering step groups the failure messages by similarity and finds, say, four groups: 1,100 timeouts reaching the payments service, 200 "element not found" errors on one page, 80 assertion failures in pricing, and 20 assorted others. (The numbers are illustrative.) Now a tester investigates four problems instead of 1,400. The algorithm didn't know what "payments outage" means; it only saw that those messages looked alike. A human gives each cluster its name and decides what to do.</p></div>
+<p>Modern clustering of text usually works on <a class="gl" href="#g-embedding">embeddings</a>: lists of numbers that capture meaning, so that "connection refused" and "could not connect" land close together even though the words differ. <a href="#ch15">Chapter 15</a> explains embeddings and uses them to detect duplicate bugs.</p>
+<details class="deep"><summary>Under the hood: k-means in four steps</summary><div class="body">
+<p>The best-known clustering method is <strong>k-means</strong>. You choose how many groups you want (k). Then:</p>
+<ol>
+<li>Pick k starting "centres" (for example, k random items).</li>
+<li>Assign every item to its nearest centre.</li>
+<li>Move each centre to the average of the items assigned to it.</li>
+<li>Repeat steps 2 and 3 until the centres stop moving.</li>
+</ol>
+<p>The result depends on k and on the starting centres, which is why clustering results need a human sanity check. Choosing k is itself a judgement call: too few groups hide real differences, too many split one problem into several. The lab runs k-means on a list of API response times.</p>
+</div></details>
+
+<h3 id="ch10-4"><span class="num">10.4</span>Reinforcement learning: learning by trial and reward</h3>
+<p>Reinforcement learning (RL) is about decisions. A learner, called the <strong>agent</strong>, acts in an <strong>environment</strong>. After each action it may receive a <a class="gl" href="#g-reward">reward</a> (a number: higher is better). Its goal is to learn a <strong>policy</strong>, a way of choosing actions, that collects the most reward over time.</p>
+<div class="flow">
+<div><b>Observe</b>The agent sees the current situation (state)</div>
+<div><b>Act</b>It chooses an action using its current policy</div>
+<div><b>Reward</b>The environment responds and gives a reward, maybe zero</div>
+<div class="hl"><b>Update</b>The agent adjusts its policy towards actions that paid off</div>
+<div><b>Repeat</b>Thousands or millions of times</div>
+</div>
+<p>Two things make RL harder than supervised learning. First, nobody tells the agent the right action; it only finds out how well things went. Second, rewards are often delayed: in chess, the reward (win or lose) arrives only at the end, and the agent has to work out which of its many moves deserved the credit.</p>
+<h4>Explore or exploit?</h4>
+<p>Every RL agent faces the same dilemma. Should it <strong>exploit</strong> the action that has worked best so far, or <strong>explore</strong> other actions that might be even better? Exploit too early and it may never find the best option. Explore too much and it wastes effort on bad options. A common simple answer is to exploit most of the time and explore at random, say, 10% of the time. You'll see exactly that in the lab.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>You have a favourite lunch place near the office. Going there every day is exploiting: reliable, but you'll never discover the better place round the corner. Trying somewhere new every day is exploring: you'll find good places, but you'll also eat a lot of bad sandwiches. Most people settle on "usually the favourite, occasionally something new". That's a policy.</p></div>
+<div class="box example"><span class="tag">Real-world example: game agents</span><p>The best-known RL success is in games, where the reward (the score, or winning) is clear and the agent can practise millions of times in simulation. In March 2016 DeepMind's AlphaGo, which combined deep learning, reinforcement learning and search, beat the top Go player Lee Sedol 4–1. RL is also used in robotics and in tuning systems such as recommendation and resource scheduling, wherever there is a clear signal of success.</p></div>
+<div class="box warn"><span class="tag">Reward hacking: a tester's favourite failure</span><p>An RL agent maximises the reward you define, not the goal you meant. If you reward "number of tests passing", an agent allowed to edit the test suite might learn to delete failing tests. This is called <strong>reward hacking</strong> or specification gaming, and it's <a class="gl" href="#g-goodhart-s-law">Goodhart's law</a> in machine form: when a measure becomes a target, it stops being a good measure. Testers are good at spotting it, because finding the gap between "what the spec says" and "what we meant" is the job.</p></div>
+<p>RL matters for Claude in two ways. <a class="gl" href="#g-rlhf">RLHF</a> (reinforcement learning from human feedback) uses rewards based on people's preferences to make a model more helpful and honest (<a href="#ch18">Chapter 18</a>). And RL on tasks with checkable answers, such as maths problems and code that must pass tests, is a major part of how <a class="gl" href="#g-reasoning-model">reasoning models</a> are trained (<a href="#ch19">Chapter 19</a>).</p>
+
+<h3 id="ch10-5"><span class="num">10.5</span>Self-supervised learning: the bridge to LLMs</h3>
+<p>Supervised learning works brilliantly, but labels are expensive. You could never pay people to label trillions of words. Self-supervised learning solves this with a trick: <strong>hide part of the data and ask the model to predict it</strong>. The hidden part is the label, and it came free.</p>
+<div class="cols2">
+<div><h4>Next-word prediction</h4><p>Take any sentence: "The login test failed because the session ___". Hide the next word. The model guesses; the real text says "expired". Every position in every document is a free training example. This is how GPT-style models, including Claude, are pre-trained. (Strictly, they predict the next <a class="gl" href="#g-token">token</a>; see <a href="#ch14">Chapter 14</a>.)</p></div>
+<div><h4>Fill in the blank</h4><p>Hide a word in the middle: "The ___ test failed because the session expired." The model uses words on both sides to guess "login". This is how BERT (2018, <a href="#ch6">Chapter 6</a>) was trained, and similar ideas are used for images by hiding patches of a picture.</p></div>
+</div>
+<p>Mechanically, self-supervised learning <em>is</em> supervised learning: there's an input and a correct answer, and the model is corrected when it's wrong. The difference is where the answers come from. Because nobody has to write them, the amount of training data is limited only by how much text (or images, or audio) you can gather. That's what made it possible to train models on trillions of tokens, which is what made LLMs capable (<a href="#ch17">Chapter 17</a>).</p>
+<div class="box note"><span class="tag">Why it fits on the map</span><p>Some books file self-supervised learning under unsupervised learning, because no human labels are involved. Others treat it as its own category. The name matters less than the idea: the data supervises itself.</p></div>
+<h4>How Claude's training uses all of them</h4>
+<p>A modern LLM is not trained one way. Its life combines the approaches in stages:</p>
+<div class="flow">
+<div class="hl"><b>1. Self-supervised pre-training</b>Predict the next token across a huge text collection. Learns language, facts and patterns.</div>
+<div><b>2. Supervised fine-tuning</b>Learn from example conversations showing good assistant answers.</div>
+<div><b>3. Reinforcement learning</b>Learn from rewards: human or AI preference judgements, and checkable tasks like code that must pass tests.</div>
+<div><b>Result</b>A helpful assistant model, frozen and served for inference</div>
+</div>
+<p>Anthropic also uses its <a class="gl" href="#g-constitutional-ai">Constitutional AI</a> approach, in which written principles guide AI-generated feedback, as part of post-training. <a href="#ch17">Chapter 17</a> covers stage 1 and <a href="#ch18">Chapter 18</a> covers stages 2 and 3.</p>
+<div class="box opinion"><span class="tag">Opinion · Yann LeCun (deep learning pioneer, founding director of Meta's FAIR lab) and others</span><p>A widely quoted analogy from LeCun's 2016 NeurIPS keynote compares intelligence to a cake: the bulk of the cake is learning without human labels (he later called it self-supervised learning), the icing is supervised learning, and the cherry on top is reinforcement learning. The point is that most knowledge comes from unlabelled data. Since then, reinforcement learning has become a much bigger part of training reasoning models than "the cherry" suggests, and researchers disagree about how the ingredients will balance in future.</p></div>
+
+<h3 id="ch10-6"><span class="num">10.6</span>Choosing an approach for a QA problem</h3>
+<p>You'll rarely build these models from scratch at work, but you'll often need to recognise which approach a problem calls for, or which one a tool uses.</p>
+<div class="tbl"><table>
+<tr><th>Problem</th><th>Do you have answers for past examples?</th><th>Fitting approach</th></tr>
+<tr><td>Suggest severity and component for new bug reports</td><td>Yes, two years of triaged bugs</td><td>Supervised classification</td></tr>
+<tr><td>Predict how long the regression suite will take after a change</td><td>Yes, past run durations</td><td>Supervised regression</td></tr>
+<tr><td>Find the main causes behind 1,400 failures from last night</td><td>No</td><td>Unsupervised clustering</td></tr>
+<tr><td>Alert when production error logs look unusual</td><td>Mostly no</td><td>Unsupervised anomaly detection</td></tr>
+<tr><td>Decide test execution order to find failures fastest, improving over many runs</td><td>No answers, but a measurable result each run</td><td>Reinforcement learning (or simpler heuristics first)</td></tr>
+<tr><td>Draft test cases from a user story</td><td>Not needed by you</td><td>Use a pre-trained LLM (self-supervised plus fine-tuning and RL, done by the vendor)</td></tr>
+</table></div>
+<div class="box note"><span class="tag">Often you don't need to train anything</span><p>For many text tasks that once needed a custom supervised model, such as classifying bug reports, a capable LLM with a good prompt and a few examples now does well with no training at all. Try that first, measure it on labelled examples you already have, and only train a dedicated model if you need lower cost, more speed or more consistency at large volume. <a href="#ch118">Chapter 118</a> and <a href="#ch125">Chapter 125</a> show how to measure.</p></div>
+
+<div class="lab"><div class="lab-h"><b>All three in 60 lines of Python</b><span>20 min · your computer, Python 3, no libraries</span></div><ol>
+<li>Check Python is installed: run <code>python3 --version</code> in a terminal (on Windows, <code>python --version</code> or <code>py --version</code>).<span class="expect">a version such as <code>Python 3.12.4</code>. Any Python 3 version works.</span></li>
+<li>Create a folder, and in it a file called <code>three_ways.py</code> containing this code:
+<div class="code"><span class="cap">three_ways.py</span><pre><span class="c"># three_ways.py - supervised, unsupervised and reinforcement learning in plain Python</span>
+import random
+
+<span class="c"># ---------- 1. Supervised: learn bug severity from labelled examples ----------</span>
+<span class="c"># Each bug: (customers affected out of 10, has workaround 0/1) -&gt; label</span>
+labelled = [
+    ((9, 0), "critical"), ((8, 0), "critical"), ((7, 1), "critical"),
+    ((2, 1), "minor"),    ((1, 1), "minor"),    ((3, 0), "minor"),
+]
+
+def nearest_label(bug):
+    <span class="c"># 1-nearest-neighbour: copy the label of the most similar known bug</span>
+    def distance(other):
+        return (bug[0] - other[0]) ** 2 + (bug[1] - other[1]) ** 2
+    best = min(labelled, key=lambda pair: distance(pair[0]))
+    return best[1]
+
+print("SUPERVISED")
+for new_bug in [(8, 1), (2, 0)]:
+    print(f"  bug {new_bug} -&gt; predicted {nearest_label(new_bug)}")
+
+<span class="c"># ---------- 2. Unsupervised: group response times with no labels ----------</span>
+times_ms = [110, 95, 130, 120, 870, 910, 105, 950, 880, 100]
+centres = [times_ms[0], times_ms[4]]          <span class="c"># two starting guesses</span>
+for step in range(5):                          <span class="c"># k-means with k = 2</span>
+    groups = [[], []]
+    for t in times_ms:
+        nearest = 0 if abs(t - centres[0]) &lt;= abs(t - centres[1]) else 1
+        groups[nearest].append(t)
+    centres = [sum(g) / len(g) for g in groups]
+
+print("UNSUPERVISED")
+for i, g in enumerate(groups):
+    print(f"  group {i}: centre {centres[i]:.0f} ms, members {sorted(g)}")
+
+<span class="c"># ---------- 3. Reinforcement: learn which retry strategy works best ----------</span>
+<span class="c"># Hidden success rates the agent does NOT know (illustrative)</span>
+true_success = {"retry_now": 0.2, "wait_1s": 0.5, "wait_5s": 0.8}
+actions = list(true_success)
+value = {a: 0.0 for a in actions}   <span class="c"># agent's estimate of each action</span>
+tries = {a: 0 for a in actions}
+random.seed(42)
+
+for episode in range(500):
+    if random.random() &lt; 0.1:                       <span class="c"># explore 10% of the time</span>
+        action = actions[int(random.random() * len(actions))]
+    else:                                           <span class="c"># otherwise exploit</span>
+        action = max(actions, key=lambda a: value[a])
+    reward = 1 if random.random() &lt; true_success[action] else 0
+    tries[action] += 1
+    value[action] += (reward - value[action]) / tries[action]
+
+print("REINFORCEMENT")
+for a in actions:
+    print(f"  {a:10s} tried {tries[a]:3d} times, estimated success {value[a]:.2f}")
+print(f"  best strategy learned: {max(actions, key=lambda a: value[a])}")</pre></div>
+<span class="expect">a saved file. Indentation matters in Python: keep the spaces exactly as shown.</span></li>
+<li>Run it from that folder: <code>python3 three_ways.py</code>.<span class="expect">exactly this output:
+<div class="code"><span class="cap">Output</span><pre>SUPERVISED
+  bug (8, 1) -&gt; predicted critical
+  bug (2, 0) -&gt; predicted minor
+UNSUPERVISED
+  group 0: centre 110 ms, members [95, 100, 105, 110, 120, 130]
+  group 1: centre 902 ms, members [870, 880, 910, 950]
+REINFORCEMENT
+  retry_now  tried  26 times, estimated success 0.23
+  wait_1s    tried  17 times, estimated success 0.65
+  wait_5s    tried 457 times, estimated success 0.78
+  best strategy learned: wait_5s</pre></div></span></li>
+<li>Read the supervised part. Add a labelled example <code>((8, 1), "minor")</code> to the list and run again.<span class="expect">the first prediction flips to <code>minor</code>, because the nearest example now has that label. One mislabelled example changed the answer: that's why label quality matters.</span></li>
+<li>Read the unsupervised part. Notice the code never says "fast" or "slow"; it only found two groups. Add <code>450</code> to <code>times_ms</code> and run again.<span class="expect">450 joins the fast group (it's nearer 110 than 902 at first). Whether 450 ms is "fast" is your judgement, not the algorithm's.</span></li>
+<li>Read the reinforcement part. Change <code>0.1</code> (the exploration rate) to <code>0.0</code> and run again.<span class="expect"><code>retry_now</code> is tried all 500 times and the other two strategies 0 times, so the agent ends up "learning" the worst option. It tried the first action, never looked elsewhere, and got stuck. Put it back to <code>0.1</code> afterwards.</span></li>
+</ol>
+<p><b>No Python?</b> Paste the code into Claude and ask: "Walk me through what this program will print and why, one section at a time. Then tell me what changes if the exploration rate is 0." Compare its answer with the expected output above; this is also good practice in checking AI explanations against real results.</p>
+<p><b>Troubleshooting</b></p>
+<ul>
+<li><code>python3: command not found</code>: on Windows use <code>python</code> or <code>py</code>; on macOS install Python from python.org or with your package manager.</li>
+<li><code>IndentationError</code>: a line's spaces don't match. Re-copy the code and don't mix tabs and spaces.</li>
+<li><code>SyntaxError</code> near an <code>f"</code> string: your Python is older than 3.6. Install a current version.</li>
+<li>Reinforcement numbers differ slightly from the expected output: check you kept <code>random.seed(42)</code> and changed nothing above it. The supervised and unsupervised parts should always match exactly.</li>
+</ul></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Unsupervised means the computer understands the groups."</dt><dd>It finds groups of similar items. Naming them and deciding whether they matter is a human job.</dd>
+<dt>"Reinforcement learning means the model learns while I chat with it."</dt><dd>RL used on Claude happens during training at Anthropic. During a chat the weights are frozen (<a href="#ch9">Chapter 9</a>).</dd>
+<dt>"LLMs are trained with unsupervised learning, full stop."</dt><dd>Pre-training is self-supervised, then supervised fine-tuning and reinforcement learning follow. All three shape the final model.</dd>
+<dt>"Regression in machine learning is about re-testing."</dt><dd>It means predicting a number. Same word, unrelated meaning.</dd>
+<dt>"More data always fixes supervised learning."</dt><dd>More badly labelled data teaches the model the same mistakes more confidently.</dd>
+</dl></div>
+
+<h3 id="ch10-r"><span class="num">10.7</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>The three classic approaches differ by feedback: correct answers (supervised), no answers (unsupervised), rewards for actions (reinforcement).</li>
+<li>Supervised learning needs labels and splits into classification (categories) and regression (numbers). Label quality limits model quality.</li>
+<li>Unsupervised learning finds groups, oddities and simpler summaries; people still interpret them.</li>
+<li>Reinforcement learning balances exploring and exploiting, and optimises exactly the reward you define, gaps and all.</li>
+<li>Self-supervised learning creates labels from the data itself, which is what allowed training on trillions of tokens.</li>
+<li>Claude's training combines self-supervised pre-training, supervised fine-tuning and reinforcement learning.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">You have 5,000 past bug reports, each already tagged with the component that was eventually fixed. You want to suggest a component for new reports. Which approach fits?</p><div class="opts"><button>Unsupervised clustering</button><button data-ok>Supervised classification</button><button>Reinforcement learning</button></div><p class="why" hidden>You have the right answers (labels) for past examples, and the answer is a category.</p></div>
+<div class="qz"><p class="q">A clustering tool splits last night's failures into six groups. What's still needed?</p><div class="opts"><button>Nothing: the groups are the root causes</button><button data-ok>A person to inspect each group, name it and decide whether it's one real problem</button><button>Labels for every failure before clustering can run</button></div><p class="why" hidden>Clustering finds similarity, not meaning. Groups can merge two causes or split one.</p></div>
+<div class="qz"><p class="q">Why is next-token prediction called self-supervised?</p><div class="opts"><button>The model chooses its own training data</button><button data-ok>The correct answer (the next token) comes from the text itself, so no human labelling is needed</button><button>It needs no feedback of any kind</button></div><p class="why" hidden>There is still a correct answer and correction, which is why it works like supervised learning, but the labels are free.</p></div>
+<div class="qz"><p class="q">An RL agent rewarded for "more tests passing" starts skipping tests. What is this called?</p><div class="opts"><button>Overfitting</button><button>Exploration</button><button data-ok>Reward hacking</button></div><p class="why" hidden>The agent maximised the reward as written, not the goal intended. It's Goodhart's law applied to machines.</p></div>
+<div class="qz"><p class="q">In the lab, what happened when the exploration rate was set to 0?</p><div class="opts"><button>The agent found the best strategy faster</button><button data-ok>The agent got stuck on its first option and never discovered the best one</button><button>The program crashed</button></div><p class="why" hidden>Without exploration the agent only exploits what looked best so far, so it may never try the better option.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>List three repetitive decisions or analyses in your team's QA work (for example: triaging bugs, grouping CI failures, choosing which tests to run). For each, write: what the input is, what the desired output is, whether you have past examples with correct answers, and which learning approach (or an LLM with a prompt) would fit. Pick the most promising one and describe how you'd measure whether it works, using examples it hasn't seen.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Machines learn in three classic ways, and the difference is the feedback. Supervised: every example has the right answer, like bugs already tagged with severity, and the model learns to predict it. Unsupervised: no answers, the model just finds groups, like clustering a night's CI failures into four causes, and a person names them. Reinforcement: the model tries actions and gets rewards, like learning a game, and it will exploit any loophole in the reward. LLMs like Claude add a fourth trick, self-supervised learning: hide the next word and predict it, so every sentence ever written becomes free training data. Then fine-tuning and reinforcement learning shape it into an assistant."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>R. S. Sutton and A. G. Barto, <a href="http://incompleteideas.net/book/the-book-2nd.html" target="_blank" rel="noopener"><i>Reinforcement Learning: An Introduction</i></a>, 2nd edition (MIT Press, 2018), free online: agents, rewards, policies, and exploration versus exploitation.</li>
+<li>I. Goodfellow, Y. Bengio and A. Courville, <a href="https://www.deeplearningbook.org/" target="_blank" rel="noopener"><i>Deep Learning</i></a> (MIT Press, 2016), section 5.1: supervised and unsupervised learning.</li>
+<li>scikit-learn, <a href="https://scikit-learn.org/stable/supervised_learning.html" target="_blank" rel="noopener">Supervised learning</a> and <a href="https://scikit-learn.org/stable/modules/clustering.html" target="_blank" rel="noopener">Clustering</a> user guides (including k-means and nearest neighbours).</li>
+<li>D. Silver et al., "Mastering the game of Go with deep neural networks and tree search", <i>Nature</i> 529 (2016); AlphaGo's 4–1 result against Lee Sedol, March 2016.</li>
+<li>J. Devlin et al., <a href="https://arxiv.org/abs/1810.04805" target="_blank" rel="noopener">"BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding"</a> (2018): masked-word self-supervised training.</li>
+<li>L. Ouyang et al., <a href="https://arxiv.org/abs/2203.02155" target="_blank" rel="noopener">"Training language models to follow instructions with human feedback"</a> (2022): supervised fine-tuning followed by RLHF.</li>
+<li>Y. Bai et al., <a href="https://arxiv.org/abs/2212.08073" target="_blank" rel="noopener">"Constitutional AI: Harmlessness from AI Feedback"</a>, Anthropic (2022).</li>
+<li>V. Krakovna et al., <a href="https://deepmind.google/discover/blog/specification-gaming-the-flip-side-of-ai-ingenuity/" target="_blank" rel="noopener">"Specification gaming: the flip side of AI ingenuity"</a>, DeepMind (2020).</li>
+</ol><p class="verified">Content type: established concepts · Lab code tested with Python 3 on 9 November 2026 · Last reviewed 9 November 2026</p></div>

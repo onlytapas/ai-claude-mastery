@@ -1,0 +1,42 @@
+{
+ "JSON Schema": {
+  "d": "A standard way of describing what a piece of JSON data must look like: which fields exist, their types and which are required. MCP uses it to describe each tool's inputs.",
+  "see": "ch104"
+ },
+ "JUnit XML": {
+  "d": "A widely used file format for test results, written by most test frameworks. Each test is a testcase element; failures and errors are recorded inside it.",
+  "see": "ch104"
+ },
+ "stdio": {
+  "d": "Short for standard input and output: the text channels a program reads from and writes to. A local MCP server started by Claude Code talks to it over stdio.",
+  "see": "ch104"
+ },
+ "MCP Inspector": {
+  "d": "The official tool for trying out an MCP server by hand: it lists the server's tools, builds a form for each input and shows the messages exchanged.",
+  "see": "ch104"
+ },
+ "Path traversal": {
+  "d": "A security attack where a file name such as ../../secret is used to reach files outside the folder a program is supposed to stay in.",
+  "see": "ch104"
+ },
+ "Connection string": {
+  "d": "One line of text that tells a program how to reach a database: the type, user name, password, address, port and database name.",
+  "see": "ch103"
+ },
+ "Toolset": {
+  "d": "A named group of related tools on an MCP server, such as GitHub's 'issues' or 'actions'. Enabling only the toolsets you need keeps Claude focused and saves context.",
+  "see": "ch103"
+ },
+ "Read-only access": {
+  "d": "Permission to look at data without being able to change or delete it. The safest starting point when connecting AI to real systems.",
+  "see": "ch103"
+ },
+ "MCP Registry": {
+  "d": "The official public list of published MCP servers. Being listed does not mean a server has been checked for safety.",
+  "see": "ch103"
+ },
+ "Tool annotation": {
+  "d": "A label on an MCP tool that tells clients how it behaves, for example readOnlyHint (changes nothing) or idempotentHint (safe to repeat).",
+  "see": "ch104"
+ }
+}

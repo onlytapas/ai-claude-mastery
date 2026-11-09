@@ -1,0 +1,267 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How to pick a project that matches your level and your goal: to understand, to use, or to build</li>
+<li>What each project in the menu asks for: brief, requirements, deliverables and rubric</li>
+<li>How projects are graded on one shared scale, so results are comparable across a team</li>
+<li>How to choose and scope a capstone, including the end-to-end AI QA assistant in Chapter 143</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> any project can be started once you've finished the chapters it links to. Read <a href="#ch141">Chapter 141</a> first if you want to find your level. Projects that call the API need the setup in <a href="#ch86">Chapter 86</a>; Claude Code projects need <a href="#ch64">Chapter 64</a>.</div>
+
+<div class="bigidea"><p>Reading and quizzes build understanding; projects build ability. This chapter is a menu of graded projects arranged by level (beginner to advanced) and by goal (understand, use, build). Every project has the same four parts: a brief, requirements, deliverables and a rubric scored on one shared scale. Each links to the chapters that teach its skills. Finish with a capstone that combines many skills into one piece of work you can show.</p></div>
+
+<h3 id="ch142-1"><span class="num">142.1</span>Choosing a project</h3>
+<p>Ask two questions. First, <strong>what is your goal?</strong></p>
+<div class="cols2">
+<div><h4>Understand</h4><p>You want to explain AI accurately, judge claims and make decisions. Outputs are reports, comparisons and explainers. Good for managers, analysts and anyone advising others.</p></div>
+<div><h4>Use</h4><p>You want to get real work done with Claude and its tools. Outputs are configured setups, test artefacts and measured results. Good for testers and team leads.</p></div>
+</div>
+<div class="cols2">
+<div><h4>Build</h4><p>You want to create tools, apps and agents others can rely on. Outputs are code, tests and evals. Good for automation engineers and developers.</p></div>
+<div><h4>Second: what is your level?</h4><p>Use your exam result from <a href="#ch141">Chapter 141</a>, or the chapters you've finished. Pick a project one step above your comfort zone, not three.</p></div>
+</div>
+<div class="tbl"><table>
+<tr><th>Level</th><th>Understand</th><th>Use</th><th>Build</th></tr>
+<tr><td><b>Beginner</b></td><td>U1 · AI explainer for your team</td><td>S1 · A grounded team assistant (Project)</td><td>B1 · A log and report script with Claude's help</td></tr>
+<tr><td><b>Intermediate</b></td><td>U2 · Model comparison and decision record</td><td>S2 · AI-assisted test design and exploratory session<br>S3 · End-to-end QA workflow with MCP</td><td>B2 · A team toolkit: skill, subagent and hook</td></tr>
+<tr><td><b>Advanced</b></td><td>U3 · Red-team study: hallucination and injection</td><td>S4 · A 90-day adoption pilot with ROI</td><td>B3 · RAG assistant · B4 · QA helper app · B5 · Your own MCP server · B6 · An eval harness</td></tr>
+<tr><td><b>Capstone</b></td><td>C3 · AI adoption lead</td><td>C2 · AI-powered QA practitioner</td><td>C1 · AI QA assistant end to end (<a href="#ch143">Chapter 143</a>)</td></tr>
+</table></div>
+<p>The codes (U for understand, S for use, B for build, C for capstone) are used throughout this chapter. Time estimates are illustrative; your pace will differ.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Learning to cook works the same way. Reading recipes is understanding. Making dinner from a recipe is using. Writing a recipe others can follow is building. You need all three to run a kitchen, but you start where you are.</p></div>
+
+<h3 id="ch142-2"><span class="num">142.2</span>How every project is graded</h3>
+<p>Each project lists four to six criteria with weights. Every criterion is scored on the same four-level scale, so a "3" means the same thing in every project.</p>
+<div class="tbl"><table>
+<tr><th>Score</th><th>Level</th><th>What it looks like</th></tr>
+<tr><td>4</td><td>Exemplary</td><td>Exceeds requirements; another person could reuse it without asking you anything; limits stated honestly</td></tr>
+<tr><td>3</td><td>Proficient</td><td>Meets every requirement with evidence</td></tr>
+<tr><td>2</td><td>Developing</td><td>Most requirements met; some evidence missing or unchecked AI output</td></tr>
+<tr><td>1</td><td>Beginning</td><td>Incomplete, or relies on AI output nobody verified</td></tr>
+</table></div>
+<p>Final grade = the weighted average of the criteria, rounded to one decimal. <b>3.0 or above is a pass</b>; 3.5 or above is a distinction. Two rules override the arithmetic:</p>
+<div class="box warn"><span class="tag">Automatic fail conditions</span><p>A project fails, whatever its score, if it (1) puts a secret (API key, token, password) in any file, prompt or screenshot, or (2) uses real personal or customer data without written approval. Fix the problem, rotate any exposed secret, and resubmit.</p></div>
+<h4>Standard deliverables</h4>
+<p>Every project is submitted as a folder (or repository) containing:</p>
+<ul>
+<li><code>README.md</code>: what it is, how to run or read it, and what it does not do.</li>
+<li>The project's own deliverables, listed below.</li>
+<li><code>EVIDENCE.md</code>: screenshots, outputs, test runs and the record of what you checked and changed in Claude's work.</li>
+<li><code>REFLECTION.md</code>: half a page on what worked, what didn't, and what you'd do next.</li>
+</ul>
+<p>Over time these folders become your <a class="gl" href="#g-portfolio">portfolio</a>, which <a href="#ch144">Chapter 144</a> shows you how to present.</p>
+
+<h3 id="ch142-3"><span class="num">142.3</span>Understand projects</h3>
+
+<h4>U1 · AI explainer for your team (beginner, about 4 hours)</h4>
+<div class="tbl"><table>
+<tr><th>Brief</th><td>Your team has mixed views about AI. Produce a 10-minute explainer (slides or a one-page handout) that answers: what a large language model is, why it hallucinates, what Claude can and can't do at work, and the three rules your team should follow.</td></tr>
+<tr><th>Requirements</th><td>Plain language; at least one analogy; every factual claim with a source and date; one live or recorded demo of a hallucination being caught; a slide or section separating facts from opinions.</td></tr>
+<tr><th>Deliverables</th><td>The explainer; a source list; notes from presenting it to at least two people, including their questions.</td></tr>
+<tr><th>Rubric</th><td>Accuracy (30%) · Clarity for non-technical readers (25%) · Fact/opinion separation (15%) · Demo (15%) · Audience feedback used (15%)</td></tr>
+<tr><th>Chapters</th><td><a href="#ch9">9</a>, <a href="#ch14">14</a>, <a href="#ch20">20</a>, <a href="#ch22">22</a>, <a href="#ch41">41</a>, <a href="#ch145">144</a></td></tr>
+</table></div>
+
+<h4>U2 · Model comparison and decision record (intermediate, about 8 hours)</h4>
+<div class="tbl"><table>
+<tr><th>Brief</th><td>Your team must choose a model for one QA task (for example, drafting test cases from stories). Compare at least three models or configurations (such as Haiku, Sonnet and Opus, or one model at two effort levels) and write a decision record.</td></tr>
+<tr><th>Requirements</th><td>A dataset of at least 20 tasks including trap cases with the answer UNKNOWN; pass criteria written before running; each case run at least three times; accuracy, hallucination rate, latency and cost per 1,000 tasks reported; a review date.</td></tr>
+<tr><th>Deliverables</th><td>Dataset; scoring method; results table with model IDs, settings and dates; a one-page decision record.</td></tr>
+<tr><th>Rubric</th><td>Test design (25%) · Fair, fixed set-up (20%) · Metrics and repeats (20%) · Honest interpretation, including noise (20%) · Decision record (15%)</td></tr>
+<tr><th>Chapters</th><td><a href="#ch24">24</a>, <a href="#ch33">33</a>, <a href="#ch35">35</a>, <a href="#ch36">36</a>, <a href="#ch40">40</a></td></tr>
+</table></div>
+
+<h4>U3 · Red-team study: hallucination and prompt injection (advanced, about 12 hours)</h4>
+<div class="tbl"><table>
+<tr><th>Brief</th><td>Study how an AI feature your team uses (or a practice one you build) fails under adversarial input. Produce a short research report a security reviewer and a product owner can both read.</td></tr>
+<tr><th>Requirements</th><td>At least 30 test cases across false premises, unanswerable questions, planted facts, direct and indirect prompt injection; results scored as correct / abstained / failed; at least two mitigations tried and re-measured; only test systems you own or are authorised to test.</td></tr>
+<tr><th>Deliverables</th><td>Case list; results before and after mitigation; a report with threats, findings, mitigations and residual risk.</td></tr>
+<tr><th>Rubric</th><td>Case coverage (25%) · Method and scoring (20%) · Mitigation evidence (25%) · Risk communication (20%) · Ethics and authorisation (10%)</td></tr>
+<tr><th>Chapters</th><td><a href="#ch22">22</a>, <a href="#ch45">45</a>, <a href="#ch105">104</a>, <a href="#ch125">124</a>, <a href="#ch131">130</a>, <a href="#ch134">133</a></td></tr>
+</table></div>
+
+<h3 id="ch142-4"><span class="num">142.4</span>Use projects</h3>
+
+<h4>S1 · A grounded team assistant (beginner, about 4 hours)</h4>
+<div class="tbl"><table>
+<tr><th>Brief</th><td>Set up a Claude Project that answers your team's common questions (test conventions, environments, release checklist) only from approved documents.</td></tr>
+<tr><th>Requirements</th><td>Instructions of no more than ten lines requiring quotes and "Not in our docs" when unsure; dated, owned knowledge files with no secrets or customer data; a test set of 10 questions (7 answerable, 3 not); shared with at least two colleagues (Team/Enterprise) or demonstrated (individual plans).</td></tr>
+<tr><th>Deliverables</th><td>Instructions; knowledge file list with owners and dates; test questions and results; feedback from users.</td></tr>
+<tr><th>Rubric</th><td>Grounding (30%) · Knowledge hygiene (20%) · Test set and results (25%) · Usefulness to colleagues (25%)</td></tr>
+<tr><th>Chapters</th><td><a href="#ch44">44</a>, <a href="#ch46">46</a>, <a href="#ch47">47</a>, <a href="#ch50">50</a></td></tr>
+</table></div>
+
+<h4>S2 · AI-assisted test design and exploratory session (intermediate, about 6 hours)</h4>
+<div class="tbl"><table>
+<tr><th>Brief</th><td>Take one real or practice user story through refinement, test design and a time-boxed exploratory session with Claude's help, and report what AI added and what you added.</td></tr>
+<tr><th>Requirements</th><td>Ambiguity questions for the product owner; test cases using at least three named techniques; a traceability matrix; a 45-minute charter-based exploratory session (with Playwright MCP if available); bug reports drafted with Claude, reproduced by you before filing.</td></tr>
+<tr><th>Deliverables</th><td>Questions; test cases with your changes marked; matrix; session notes; bug drafts; a before/after comparison of your usual effort (illustrative or measured, labelled).</td></tr>
+<tr><th>Rubric</th><td>Requirement analysis (20%) · Test design quality (25%) · Exploration (20%) · Bug report quality (20%) · Honest effort comparison (15%)</td></tr>
+<tr><th>Chapters</th><td><a href="#ch120">119</a>, <a href="#ch124">123</a>, <a href="#ch102">101</a>, <a href="#ch129">128</a></td></tr>
+</table></div>
+
+<h4>S3 · End-to-end QA workflow with MCP (intermediate, about 2 hours plus setup)</h4>
+<p>This is the project in <a href="#ch106">Chapter 106</a>: a story goes through analysis, browser exploration, automated tests, failure investigation, an approved bug report, a pull request and a team summary, all from Claude Code with MCP servers. It works with local practice materials if you have no company access.</p>
+<div class="tbl"><table>
+<tr><th>Requirements</th><td>Follow Chapter 106's steps; shared <code>.mcp.json</code> without secrets; write tools on "ask"; tests proven to fail; every write approved by you.</td></tr>
+<tr><th>Deliverables</th><td>As listed in Chapter 106, plus EVIDENCE.md and REFLECTION.md.</td></tr>
+<tr><th>Rubric</th><td>Use Chapter 106's eight-row rubric (out of 24). Convert to this chapter's scale by dividing by 6 (so 18/24 = 3.0, a pass).</td></tr>
+<tr><th>Chapters</th><td><a href="#ch97">96</a>–<a href="#ch106">105</a>, <a href="#ch121">120</a></td></tr>
+</table></div>
+
+<h4>S4 · A 90-day adoption pilot with ROI (advanced, about 90 days part-time)</h4>
+<div class="tbl"><table>
+<tr><th>Brief</th><td>Run a real pilot of two to four AI use-cases in your QA team and report the measured result to management.</td></tr>
+<tr><th>Requirements</th><td>Security and management sign-off before starting; a baseline measured over one to two weeks; success criteria agreed up front; two or three measures per use-case, each with a counter-metric; review time counted as cost; a pessimistic case.</td></tr>
+<tr><th>Deliverables</th><td>Proposal and sign-off; baseline data; shared setup (CLAUDE.md, skills, permissions); results; a one-page ROI summary with a clear ask.</td></tr>
+<tr><th>Rubric</th><td>Governance and sign-off (15%) · Baseline and measurement (25%) · Use-case execution (20%) · ROI honesty (25%) · Communication (15%)</td></tr>
+<tr><th>Chapters</th><td><a href="#ch117">116</a>, <a href="#ch126">125</a>, <a href="#ch128">127</a>, <a href="#ch132">131</a>, <a href="#ch135">134</a></td></tr>
+</table></div>
+
+<h3 id="ch142-5"><span class="num">142.5</span>Build projects</h3>
+
+<h4>B1 · A log and report script with Claude's help (beginner, about 4 hours)</h4>
+<div class="tbl"><table>
+<tr><th>Brief</th><td>Write a Python script that reads a test results file (JUnit XML or CSV) and prints a summary: totals, failures by test, and the slowest five tests. Use Claude to help, but you must be able to explain every line.</td></tr>
+<tr><th>Requirements</th><td>Standard library only; a virtual environment if you add packages; clear error for a missing or malformed file; exit code 1 when any test failed; a sample input file you created.</td></tr>
+<tr><th>Deliverables</th><td>Script; sample input; sample output; a list of three things Claude suggested that you changed or rejected, and why.</td></tr>
+<tr><th>Rubric</th><td>Correctness (30%) · Error handling and exit codes (25%) · Readability (20%) · Your understanding, shown in the change list (25%)</td></tr>
+<tr><th>Chapters</th><td><a href="#ch55">55</a>, <a href="#ch57">57</a>, <a href="#ch59">59</a>, <a href="#ch62">62</a></td></tr>
+</table></div>
+
+<h4>B2 · A team toolkit: skill, subagent and hook (intermediate, about 8 hours)</h4>
+<div class="tbl"><table>
+<tr><th>Brief</th><td>Package one good team practice so Claude Code follows it automatically: a skill that drafts bug reports in your format, a read-only reviewer subagent for test code, and a hook that enforces one rule (for example, blocking edits to <code>.env</code> files).</td></tr>
+<tr><th>Requirements</th><td>Committed under <code>.claude/</code>; skill description written in the words people use; subagent restricted to read-only tools; hook tested with a case it must block and one it must allow; a with/without comparison for the skill.</td></tr>
+<tr><th>Deliverables</th><td>The <code>.claude/</code> files; test evidence for each piece; a short guide for teammates.</td></tr>
+<tr><th>Rubric</th><td>Skill quality (25%) · Subagent scope (20%) · Hook correctness and testing (25%) · Evidence of value (15%) · Team guide (15%)</td></tr>
+<tr><th>Chapters</th><td><a href="#ch80">80</a>, <a href="#ch81">81</a>, <a href="#ch82">82</a>, <a href="#ch84">84</a>, <a href="#ch127">126</a></td></tr>
+</table></div>
+
+<h4>B3 · RAG assistant (advanced, about 12 hours)</h4>
+<p>Build the retrieval assistant from <a href="#ch93">Chapter 93</a> on a document set you are allowed to use, then extend it.</p>
+<div class="tbl"><table>
+<tr><th>Requirements</th><td>Hybrid search; cited answers checked in code; "I don't know" when sources are missing; a dry-run fake model; a question set of at least 25 with recall@k and MRR for retrieval and faithfulness for answers; one extension (reranking, contextual retrieval, or access control at retrieval).</td></tr>
+<tr><th>Deliverables</th><td>Code and tests; evaluation results before and after the extension; README.</td></tr>
+<tr><th>Rubric</th><td>Retrieval quality (25%) · Answer grounding and abstention (25%) · Evaluation rigour (25%) · Extension (15%) · Code quality (10%)</td></tr>
+<tr><th>Chapters</th><td><a href="#ch23">23</a>, <a href="#ch88">88</a>, <a href="#ch92">92</a>, <a href="#ch93">93</a></td></tr>
+</table></div>
+
+<h4>B4 · QA helper app (advanced, about 10 hours)</h4>
+<p>Build the structured-output app from <a href="#ch94">Chapter 94</a> that turns stories into test scenarios, then make it team-ready.</p>
+<div class="tbl"><table>
+<tr><th>Requirements</th><td>Strict JSON Schema; structured outputs; validation in code; fake model for offline tests; injection-resistant handling of story text; an eval re-run after every prompt or model change with the score recorded against the version.</td></tr>
+<tr><th>Deliverables</th><td>App, tests, eval set and score history; a short security note.</td></tr>
+<tr><th>Rubric</th><td>Schema and validation (25%) · Eval and score history (25%) · Injection handling (20%) · Usability (15%) · Code quality (15%)</td></tr>
+<tr><th>Chapters</th><td><a href="#ch86">86</a>, <a href="#ch89">89</a>, <a href="#ch90">90</a>, <a href="#ch94">94</a>, <a href="#ch125">124</a></td></tr>
+</table></div>
+
+<h4>B5 · Your own MCP server (advanced, about 10 hours)</h4>
+<div class="tbl"><table>
+<tr><th>Brief</th><td>Build an MCP server that gives Claude safe access to one QA system with no official server: for example, a test-results folder, a test-management export or an internal status page.</td></tr>
+<tr><th>Requirements</th><td>Read-only tools first; clear names, descriptions and typed inputs; helpful errors; protection against path traversal, oversized output and leaked secrets; tested with the in-memory client and MCP Inspector; shared via project <code>.mcp.json</code> without secrets.</td></tr>
+<tr><th>Deliverables</th><td>Server code and tests; Inspector evidence; a Claude Code session using it; a security checklist.</td></tr>
+<tr><th>Rubric</th><td>Tool design (25%) · Security (25%) · Testing (20%) · Integration with Claude Code (15%) · Documentation (15%)</td></tr>
+<tr><th>Chapters</th><td><a href="#ch99">98</a>, <a href="#ch104">103</a>, <a href="#ch105">104</a></td></tr>
+</table></div>
+
+<h4>B6 · An eval harness for an AI feature (advanced, about 12 hours)</h4>
+<div class="tbl"><table>
+<tr><th>Brief</th><td>Build a reusable harness that runs an eval set against an AI feature, grades results and fails CI on regression.</td></tr>
+<tr><th>Requirements</th><td>Cases with golden answers, code checks or rubrics; code graders first, an LLM judge calibrated against at least 20 human-scored samples; repeated runs and pass rates; results saved with model and prompt versions; a CI job that fails below a threshold.</td></tr>
+<tr><th>Deliverables</th><td>Harness code; eval set; calibration results; CI configuration; a baseline report.</td></tr>
+<tr><th>Rubric</th><td>Case design (20%) · Grader design and calibration (30%) · Reproducibility (20%) · CI integration (15%) · Reporting (15%)</td></tr>
+<tr><th>Chapters</th><td><a href="#ch36">36</a>, <a href="#ch75">75</a>, <a href="#ch125">124</a>, <a href="#ch95">95</a></td></tr>
+</table></div>
+<div class="box note"><span class="tag">Agents as a stretch</span><p>Confident builders can turn B4 or B5 into an agent with the Claude Agent SDK (<a href="#ch110">Chapter 110</a>), adding approvals, budgets and traces (<a href="#ch109">Chapter 109</a>). Grade the extra work under "Exemplary" rather than adding criteria.</p></div>
+
+<h3 id="ch142-6"><span class="num">142.6</span>Capstones</h3>
+<p>A <a class="gl" href="#g-capstone-project">capstone</a> combines many skills into one substantial piece of work. Choose one track. Each is graded on the shared scale; the pass mark is 3.0 with no criterion below 2.</p>
+
+<h4>C1 · Build track: an AI QA assistant end to end</h4>
+<p>The full project is in <a href="#ch143">Chapter 143</a>: an assistant that reads requirements (a local story file, or Jira via MCP), retrieves relevant documents, generates structured test scenarios, runs selected checks with Playwright, analyses failures, produces an evidence report, and asks for human approval before any consequential action.</p>
+<div class="tbl"><table>
+<tr><th>Requirements</th><td>Chapter 143's milestones; runs locally without company access; approvals before filing bugs or posting; evals for scenario quality; a demo recording or live demo.</td></tr>
+<tr><th>Rubric</th><td>Architecture and design decisions (15%) · Retrieval and generation quality (20%) · Execution and evidence (20%) · Safety: approvals, secrets, injection (20%) · Evaluation (15%) · Presentation (10%)</td></tr>
+<tr><th>Builds on</th><td>B3, B4 and S3</td></tr>
+</table></div>
+
+<h4>C2 · Use track: AI-powered QA practitioner</h4>
+<div class="tbl"><table>
+<tr><th>Brief</th><td>Over four to six weeks, run your real QA work for one feature or release with Claude as a daily tool, and show the difference.</td></tr>
+<tr><th>Requirements</th><td>A shared project setup (CLAUDE.md, permission rules, at least one skill); requirement analysis, test design, automation and exploratory testing all AI-assisted; every AI output reviewed with a record of changes; measured effort and quality against a baseline; a release-readiness summary.</td></tr>
+<tr><th>Rubric</th><td>Setup quality (15%) · Breadth of use across the lifecycle (20%) · Review discipline (25%) · Measured outcome (25%) · Communication (15%)</td></tr>
+<tr><th>Builds on</th><td>S2, S3 and B2</td></tr>
+</table></div>
+
+<h4>C3 · Understand track: AI adoption lead</h4>
+<div class="tbl"><table>
+<tr><th>Brief</th><td>Prepare your organisation (or a realistic case study) to adopt AI in testing responsibly.</td></tr>
+<tr><th>Requirements</th><td>A vendor and route comparison with gates and weighted criteria; a data and privacy rule set referencing the relevant law and standards; a governance plan with owners; a training plan; a pilot design with metrics; a frontier-watch page reviewed quarterly.</td></tr>
+<tr><th>Rubric</th><td>Decision quality (20%) · Data and compliance (20%) · Governance (20%) · Measurement plan (20%) · Communication to leadership (20%)</td></tr>
+<tr><th>Builds on</th><td>U2, S4 and <a href="#ch117">Chapter 117</a>, <a href="#ch133">132</a>, <a href="#ch135">134</a>, <a href="#ch140">139</a></td></tr>
+</table></div>
+<div class="box opinion"><span class="tag">Opinion · This book's authors</span><p>If you can only do one capstone, choose the track closest to your next job, not the most technical one. A tester who completes C2 with honest measurements usually has a stronger story to tell than one who half-finishes C1.</p></div>
+
+<h3 id="ch142-7"><span class="num">142.7</span>Running projects as a team</h3>
+<div class="flow">
+<div><b>Charter</b>Brief, scope, data rules, deadline</div>
+<div><b>Build in steps</b>Weekly check-in, small commits</div>
+<div class="hl"><b>Peer review</b>Another person marks with the rubric</div>
+<div><b>Demo</b>10 minutes, live or recorded</div>
+<div><b>Reflect</b>What to reuse; what to retire</div>
+</div>
+<ul>
+<li><strong>Pair across goals.</strong> Put an "understand" person with a "build" person. The builder learns to explain; the explainer learns what's real.</li>
+<li><strong>Hold a demo day.</strong> Monthly is enough. Short demos with honest limits teach more than polished slides.</li>
+<li><strong>Keep the useful ones.</strong> A project that becomes a team tool needs an owner, a version and a re-test date (<a href="#ch127">Chapter 127</a>).</li>
+</ul>
+<div class="box example"><span class="tag">Real-world example</span><p>A QA team of six (illustrative) runs one quarter of projects. Two testers do S2, one does B2, and the lead does U2 to choose a model for story analysis. At demo day, B2's bug-report skill is adopted by the whole team, and U2's decision record becomes the team's model policy. Two projects end as learning only, which is fine: they're in the portfolio.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Charter and scaffold your first project</b><span>30 min · terminal, Git and claude.ai</span></div><ol>
+<li>Choose a project code from the table in 141.1. Write one sentence on why it fits your goal and level.<span class="expect">for example: "S2, because I want to use AI on real stories and I'm at intermediate level."</span></li>
+<li>Create the standard project folder and files in the terminal:
+<div class="code"><span class="cap">Terminal · macOS, Linux or Git Bash</span><pre>mkdir -p ai-project-s2 &amp;&amp; cd ai-project-s2
+git init
+printf '# Project S2\n\n## What it is\n\n## How to run or read it\n\n## What it does not do\n' &gt; README.md
+printf '# Evidence\n\n| Date | What I checked | Result | What I changed in Claude'"'"'s work |\n|---|---|---|---|\n' &gt; EVIDENCE.md
+printf '# Reflection\n' &gt; REFLECTION.md
+printf '.env\n*.key\n.venv/\nnode_modules/\n' &gt; .gitignore
+git add . &amp;&amp; git commit -m "Project scaffold"
+ls -a</pre></div>
+<span class="expect"><code>.  ..  .git  .gitignore  EVIDENCE.md  README.md  REFLECTION.md</code>, and a first commit.</span></li>
+<li>Write <code>CHARTER.md</code> by hand: brief (in your words), requirements copied from this chapter, deliverables, data rules (what data you may use), deadline, reviewer's name.<span class="expect">a one-page charter you could hand to a reviewer.</span></li>
+<li>Paste the charter into Claude and ask: "Act as the reviewer. Using this rubric, list what evidence I must collect to score 3 on each criterion. Flag any requirement my plan doesn't cover."<span class="expect">a checklist of evidence per criterion, and one or two gaps to fix.</span></li>
+<li>Add the checklist to <code>EVIDENCE.md</code>, then commit.<span class="expect"><code>git log --oneline</code> shows two commits.</span></li>
+</ol>
+<p><b>Troubleshooting:</b> on Windows without Git Bash, create the files in your editor instead. If <code>git commit</code> asks who you are, set <code>git config --global user.name</code> and <code>user.email</code> (<a href="#ch61">Chapter 61</a>). If <code>printf</code> prints odd characters, check that you copied the quotes exactly.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Bigger projects are better for my portfolio."</dt><dd>A finished, honest project beats an ambitious unfinished one. Scope down until you can finish.</dd>
+<dt>"If Claude wrote most of it, it isn't my work."</dt><dd>Your work is the design, the checking, the corrections and the evidence. Record them in EVIDENCE.md.</dd>
+<dt>"Build projects are for developers only."</dt><dd>B1 is designed for beginners, and every build project rewards understanding what you ship.</dd>
+<dt>"The rubric is just paperwork."</dt><dd>Writing it down first tells you what evidence to collect, which saves rework.</dd>
+</dl></div>
+
+<h3 id="ch142-r"><span class="num">142.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Pick projects by goal (understand, use, build) and level, one step beyond your comfort zone.</li>
+<li>Every project has a brief, requirements, deliverables and a weighted rubric on one shared 1–4 scale; 3.0 is a pass.</li>
+<li>Secrets in files or unapproved real data fail a project automatically.</li>
+<li>Submit README, EVIDENCE and REFLECTION files with every project; together they form your portfolio.</li>
+<li>S3 is Chapter 106's MCP workflow, B3 and B4 extend Chapters 93 and 94, and C1 is Chapter 143's AI QA assistant.</li>
+<li>Run projects with a charter, peer review and a demo, and keep the useful ones as owned team tools.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">You want to advise your manager on which model to buy. Which goal and project fit best?</p><div class="opts"><button>Build · B5</button><button data-ok>Understand · U2</button><button>Use · S1</button></div><p class="why" hidden>U2 produces a model comparison and decision record.</p></div>
+<div class="qz"><p class="q">A project scores 3.6 on the rubric but includes an API key in a config file. What is the result?</p><div class="opts"><button>Distinction</button><button>Pass</button><button data-ok>Fail until the secret is removed and rotated</button></div><p class="why" hidden>Secrets in files are an automatic fail condition.</p></div>
+<div class="qz"><p class="q">Which capstone extends Chapter 143?</p><div class="opts"><button data-ok>C1, the build track</button><button>C2, the use track</button><button>C3, the understand track</button></div><p class="why" hidden>C1 is the end-to-end AI QA assistant.</p></div>
+<div class="qz"><p class="q">What belongs in EVIDENCE.md?</p><div class="opts"><button>Only screenshots of the final result</button><button data-ok>What you checked, the results, and what you changed in Claude's work</button><button>Your API keys for the reviewer</button></div><p class="why" hidden>Evidence of judgement is what the rubrics reward.</p></div>
+<div class="qz"><p class="q">How do you convert Chapter 106's score of 18/24 to this chapter's scale?</p><div class="opts"><button>18 ÷ 4 = 4.5</button><button data-ok>18 ÷ 6 = 3.0, a pass</button><button>It can't be converted</button></div><p class="why" hidden>The 24-point rubric has eight rows of up to 3; dividing by 6 maps it to the 1–4 scale.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Choose one project and one capstone track. Complete the lab to charter and scaffold the project, agree a deadline and a reviewer, and finish it. Ask your reviewer to grade it with the rubric before you grade yourself, then compare. Add the folder to your portfolio with a one-paragraph summary at the top of the README.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"The book's projects come in three flavours: understand, use and build. Understand projects produce reports and decisions, use projects produce working setups and measured results, and build projects produce code with tests and evals. Each has a brief, requirements, deliverables and a rubric on a 1-to-4 scale, where 3 is a pass. Two things fail any project: a secret in a file, or real customer data without approval. Pick one a step above where you are, finish it, and keep the evidence of what you checked. That's your portfolio."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>This book: each project links to the chapters that teach its skills; see those chapters for primary sources.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/skills" target="_blank" rel="noopener">Claude Code skills</a>, <a href="https://code.claude.com/docs/en/sub-agents" target="_blank" rel="noopener">subagents</a>, <a href="https://code.claude.com/docs/en/hooks" target="_blank" rel="noopener">hooks</a> and <a href="https://code.claude.com/docs/en/mcp" target="_blank" rel="noopener">MCP</a> (for B2, B5 and S3).</li>
+<li>Model Context Protocol, <a href="https://modelcontextprotocol.io/" target="_blank" rel="noopener">official documentation</a> (for B5).</li>
+<li>J. Biggs, "Enhancing teaching through constructive alignment", <i>Higher Education</i> 32 (1996): aligning projects and rubrics with intended outcomes.</li>
+</ol><p class="verified">Content type: project guide · Last reviewed 9 November 2026 against the book's chapters.</p></div>

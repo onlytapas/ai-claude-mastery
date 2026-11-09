@@ -1,0 +1,181 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>All the places you can use Claude Code: terminal, VS Code, JetBrains IDEs, the Claude Desktop app, the web and your phone</li>
+<li>How to install and use the VS Code extension: panel, selections, @-mentions, diffs, permission modes and settings</li>
+<li>How the JetBrains plugin works and how to connect a terminal session to your editor with <code>/ide</code></li>
+<li>How the Desktop app's Code tab, Claude Code on the web and Chrome integration fit in</li>
+<li>What is shared between all these surfaces (settings, CLAUDE.md, skills, history), and what isn't</li>
+<li>Which surface to use for which job</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 64 (installing and signing in) and Chapter 65 (your first session). Chapter 67 explains the permission modes you'll see in each surface.</div>
+
+<div class="bigidea"><p>Claude Code is one engine with several dashboards. The same agent, with the same tools, settings and project instructions, can run in a terminal, in a panel inside VS Code, inside a JetBrains IDE, in the Claude Desktop app, or in a browser on cloud machines. Picking the right surface is about comfort and the job at hand: an editor panel for reviewing diffs line by line, the terminal for the full set of commands, the web for work that should keep running without your laptop. Your settings and CLAUDE.md follow you between most of them.</p></div>
+
+<h3 id="ch70-1"><span class="num">70.1</span>One engine, many dashboards</h3>
+<div class="flow">
+<div><b>Terminal (CLI)</b>Run <code>claude</code>; every command and flag</div>
+<div><b>VS Code extension</b>Graphical panel with inline diffs</div>
+<div><b>JetBrains plugin</b>CLI in the IDE terminal, with IDE diffs</div>
+<div><b>Desktop app</b>The "Code" tab, with panes and parallel sessions</div>
+<div class="hl"><b>Web and mobile</b>claude.ai/code and the Claude app, running in the cloud</div>
+</div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of your email. You can read the same mailbox in a browser, a desktop app or on your phone. Each looks different and has slightly different buttons, but it's the same mailbox and the same messages. Claude Code is similar: the "mailbox" is your project, settings and conversation history, and each surface is a different window onto it.</p></div>
+<p>All of them need a Claude account. Any paid Claude subscription (Pro, Max, Ultra, Team or Enterprise) or a Claude Console account works for the CLI, the VS Code extension and the JetBrains plugin. Some features, such as cloud sessions, Remote Control and Chrome integration, need a subscription and may be turned off by your organisation's admin.</p>
+
+<h3 id="ch70-2"><span class="num">70.2</span>The VS Code extension</h3>
+<p>VS Code is the editor many QA engineers already use for Playwright or Cypress tests. The Claude Code extension adds a chat panel right beside your code.</p>
+<h4>Install and sign in</h4>
+<ol>
+<li>You need VS Code 1.94.0 or later.</li>
+<li>Open the Extensions view (<kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> on Mac, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> on Windows/Linux), search for "Claude Code" (publisher Anthropic, extension ID <code>anthropic.claude-code</code>) and click <strong>Install</strong>. The same extension works in Cursor and other VS Code-based editors, and is also on the Open VSX Registry.</li>
+<li>Open the panel: click the Spark icon in the editor toolbar (top right, visible when a file is open), the Spark icon in the Activity Bar on the left, or <strong>✻ Claude Code</strong> in the status bar.</li>
+<li>Click <strong>Sign in</strong> and finish in your browser.</li>
+</ol>
+<div class="box note"><span class="tag">Extension and CLI are separate installs</span><p>The extension bundles its own private copy of Claude Code for its chat panel. That copy doesn't put <code>claude</code> on your PATH. To type <code>claude</code> in VS Code's integrated terminal, you also need the standalone install (Chapter 64). The extension's version number matches the Claude Code version it bundles.</p></div>
+<h4>Working in the panel</h4>
+<div class="tbl"><table>
+<tr><th>What you want</th><th>How (verified for 2.1.319; labels can change)</th></tr>
+<tr><td>Ask about code you're looking at</td><td>Select lines in the editor. Claude automatically sees the selected text and the open file (settings <code>attachSelection</code> and <code>attachOpenFile</code>)</td></tr>
+<tr><td>Point at an exact place</td><td><kbd>Option</kbd>+<kbd>K</kbd> (Mac) / <kbd>Alt</kbd>+<kbd>K</kbd> inserts an @-mention such as <code>@login.spec.ts#5-10</code></td></tr>
+<tr><td>Switch focus between editor and Claude</td><td><kbd>Cmd</kbd>+<kbd>Esc</kbd> / <kbd>Ctrl</kbd>+<kbd>Esc</kbd></td></tr>
+<tr><td>Start another conversation as a tab</td><td><kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Esc</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Esc</kbd>, or "Open in New Tab" from the Command Palette</td></tr>
+<tr><td>Reopen a closed session tab</td><td><kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd></td></tr>
+<tr><td>Hide tool activity and keep just the conversation</td><td>Toggle Focus view: <kbd>Ctrl</kbd>+<kbd>Option</kbd>+<kbd>F</kbd> / <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>F</kbd></td></tr>
+<tr><td>See every Claude command</td><td>Command Palette (<kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>), type "Claude Code"</td></tr>
+<tr><td>Check background work</td><td>Type <code>/tasks</code> in the prompt box to open the agent map</td></tr>
+</table></div>
+<p>You can drag the panel to the right sidebar, the left sidebar, or the editor area as a tab. When a tab has a small coloured dot on its Spark icon, blue means a permission request is waiting and orange means Claude finished while the tab was hidden.</p>
+<h4>Reviewing changes and permission modes</h4>
+<p>The current permission mode is shown at the bottom of the prompt box, and you can change it there. In <strong>Manual</strong> mode, every file edit opens a side-by-side diff of the original and the proposed change. You can accept, reject, or tell Claude what to do instead, and for smaller diffs you can accept or reject one change at a time. In <strong>Auto</strong> or <strong>Edit automatically</strong> mode, Claude edits most files without asking, so review the changes afterwards in source control.</p>
+<div class="box warn"><span class="tag">The default changed</span><p>Since Claude Code v2.1.283, new VS Code conversations start in <strong>Auto</strong> mode, where a background classifier reviews actions instead of asking you each time (if auto mode is available on your account). If you want to approve each edit while learning, set the extension setting <code>initialPermissionMode</code> to <code>manual</code> (an alias for <code>default</code>), or choose Manual in the mode selector. VS Code reads this setting from your <em>user</em> settings only.</p></div>
+<h4>Useful extension settings</h4>
+<p>Open VS Code settings (<kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>,</kbd>) → <strong>Extensions → Claude Code</strong>.</p>
+<div class="tbl"><table>
+<tr><th>Setting</th><th>Default</th><th>What it does</th></tr>
+<tr><td><code>initialPermissionMode</code></td><td>unset</td><td>Mode for new conversations: <code>default</code> (Manual), <code>plan</code>, <code>acceptEdits</code> or <code>bypassPermissions</code></td></tr>
+<tr><td><code>preferredLocation</code></td><td><code>panel</code></td><td>Open Claude as a new tab (<code>panel</code>) or in the right sidebar (<code>sidebar</code>)</td></tr>
+<tr><td><code>useTerminal</code></td><td><code>false</code></td><td>Use the terminal-style interface instead of the graphical panel</td></tr>
+<tr><td><code>autosave</code></td><td><code>true</code></td><td>Save files before Claude reads or writes them</td></tr>
+<tr><td><code>respectGitIgnore</code></td><td><code>true</code></td><td>Leave git-ignored files out of file searches</td></tr>
+<tr><td><code>environmentVariables</code></td><td><code>[]</code></td><td>Environment variables for the Claude process (use Claude Code settings for anything shared)</td></tr>
+</table></div>
+<details class="deep"><summary>Extension vs CLI: what's different, and how they connect</summary><div class="body">
+<p>The extension is a graphical front end to the same engine, but not everything is there. Per the documentation:</p>
+<div class="tbl"><table>
+<tr><th>Feature</th><th>CLI</th><th>VS Code extension</th></tr>
+<tr><td>Commands and skills</td><td>All</td><td>A subset: type <code>/</code> to see what's available</td></tr>
+<tr><td>MCP server configuration</td><td>Yes</td><td>Yes, with <code>/mcp</code> in the panel</td></tr>
+<tr><td>Checkpoints (rewind)</td><td>Yes</td><td>Yes</td></tr>
+<tr><td><code>!</code> shell shortcut</td><td>Yes</td><td>No</td></tr>
+<tr><td>Tab completion</td><td>Yes</td><td>No</td></tr>
+</table></div>
+<p>When you need a CLI-only feature, open the integrated terminal (<kbd>Ctrl</kbd>+<kbd>`</kbd>) and run <code>claude</code>. With the extension installed, a CLI session started there connects to VS Code automatically, so diffs open in the editor and diagnostics (lint and type errors) can be shared. From an <em>external</em> terminal, type <code>/ide</code> inside Claude Code to connect, or start with <code>claude --ide</code> to connect automatically when exactly one IDE is available.</p>
+<p>The extension and the CLI share conversation history: to continue an extension conversation in the terminal, run <code>claude --resume</code> and pick it.</p>
+</div></details>
+
+<h3 id="ch70-3"><span class="num">70.3</span>JetBrains IDEs</h3>
+<p>If your team writes tests in IntelliJ IDEA, PyCharm, WebStorm, GoLand, PhpStorm or Android Studio, use the JetBrains plugin. It works differently from the VS Code extension: it doesn't bundle Claude Code. It runs the <code>claude</code> command in the IDE's integrated terminal and connects to it.</p>
+<ol>
+<li>Install the Claude Code CLI first (Chapter 64). If the plugin shows "Cannot launch Claude Code", it can't find <code>claude</code> on your PATH; set the full path in the plugin's "Claude command" setting.</li>
+<li>Install the "Claude Code" plugin from the JetBrains Marketplace and restart the IDE.</li>
+<li>Open it with <kbd>Cmd</kbd>+<kbd>Esc</kbd> (Mac) / <kbd>Ctrl</kbd>+<kbd>Esc</kbd>, or the Claude Code button.</li>
+</ol>
+<div class="tbl"><table>
+<tr><th>Feature</th><th>What it gives you</th></tr>
+<tr><td>Diff viewing</td><td>Changes open in the IDE's own diff viewer (switch with the "Diff tool" setting in <code>/config</code>)</td></tr>
+<tr><td>Selection context</td><td>Your current selection or tab is shared with Claude automatically, except files blocked by Read deny rules</td></tr>
+<tr><td>File references</td><td><kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>K</kbd> / <kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>K</kbd> inserts a reference such as <code>@src/auth.ts#L1-99</code></td></tr>
+<tr><td>Diagnostics</td><td>Claude can read the IDE's inspection results (lint and syntax errors) through a built-in tool</td></tr>
+</table></div>
+<p>To connect a session running in a separate terminal, start <code>claude</code> in your project's root folder and type <code>/ide</code>. On success you'll see a message like "Connected to IntelliJ IDEA."</p>
+
+<h3 id="ch70-4"><span class="num">70.4</span>The Claude Desktop app's Code tab</h3>
+<p>In the Claude Desktop app (macOS, Windows, and Linux in beta), Claude Code is the <strong>Code</strong> tab, next to chat. It's a good choice for people who prefer windows and buttons to a terminal, and for running several sessions side by side.</p>
+<ul>
+<li><strong>Start a session</strong>: under the prompt box, pick the environment (local, cloud or SSH), the project folder, the permission mode and the model.</li>
+<li><strong>Parallel sessions</strong>: <strong>+ New</strong> in the sidebar (<kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>N</kbd>). In a git project, turn on <strong>Worktree</strong> before starting so each session gets its own copy of the files (Chapter 69).</li>
+<li><strong>Panes</strong>: arrange the chat, diff view, a browser preview of your running app, a terminal and a file editor side by side.</li>
+<li><strong>Diff review and PR monitoring</strong>: review and comment on changes, then watch the pull request through CI.</li>
+<li><strong>Move between surfaces</strong>: from the terminal, <code>/desktop</code> (alias <code>/app</code>) continues the current session in Desktop, and <code>claude --desktop</code> opens Desktop on the current folder (add <code>--continue</code> or <code>--resume &lt;id&gt;</code> to pick a session). These need macOS or x64 Windows and a subscription. In Desktop, <code>/resume</code> can pick up sessions started in the CLI.</li>
+</ul>
+<p>Desktop's permission selector shows the same modes with friendlier names: Manual (<code>default</code>), Accept edits, Plan, Auto and Bypass permissions. The <code>dontAsk</code> mode is CLI-only.</p>
+
+<h3 id="ch70-5"><span class="num">70.5</span>Claude Code on the web and on your phone</h3>
+<p><strong>Claude Code on the web</strong> lives at <a href="https://claude.ai/code" target="_blank" rel="noopener">claude.ai/code</a>. Sessions there are <a class="gl" href="#g-cloud-session">cloud sessions</a>: they run on Anthropic-managed machines (or your organisation's self-hosted environment), not your laptop. You can also start them from the <strong>Code</strong> tab in the Claude mobile app, from Desktop, or from the terminal with <code>claude --cloud "task"</code>.</p>
+<div class="cols2">
+<div><h4>Good for</h4><ul><li>Long tasks that shouldn't depend on your laptop being on</li><li>Kicking off work from your phone</li><li>Fixing a failing pull request: auto-fix watches a PR and responds to CI failures and review comments (needs the Claude GitHub App on the repository)</li></ul></div>
+<div><h4>Know the limits</h4><ul><li>The repository must be on GitHub to be cloned in Anthropic-hosted environments; push your branch first</li><li>The session works on a fresh clone, so it doesn't see files that exist only on your computer</li><li>Cloud usage shares your account's rate limits</li><li>Available on Pro, Max, Ultra and Team, and for Enterprise users with the right seat type; admins can restrict it</li></ul></div>
+</div>
+<p>To bring a cloud session down to your terminal, use <code>claude --teleport</code> or <code>/teleport</code>. To steer a session that runs on <em>your</em> computer from your phone, use Remote Control instead (Chapter 69).</p>
+
+<h3 id="ch70-6"><span class="num">70.6</span>Claude in Chrome</h3>
+<p>Chrome integration lets Claude Code use your real browser: open pages, click and read, sharing your browser's logged-in state. Start with <code>claude --chrome</code>; <code>/chrome</code> shows status, permissions and lets you reconnect; <code>--no-chrome</code> turns it off; and the <code>/claude-in-chrome [task]</code> skill hands Claude a browser task. Requirements: Chrome, Edge or another Chromium browser, the "Claude in Chrome" extension (v1.0.36 or later), a direct Anthropic plan and a <code>/login</code> sign-in. API keys and <code>setup-token</code> tokens keep it off. Claude pauses for logins and CAPTCHAs.</p>
+<div class="box example"><span class="tag">Real-world example: Chrome or Playwright?</span><p>For a quick look at a staging page while you're already signed in ("does the new banner overlap the menu on the pricing page?"), Chrome integration is handy because it uses your session. For repeatable, isolated testing that ends up as test code, use the Playwright MCP server and real Playwright tests (Chapter 102). Never point Chrome integration at production accounts or customer data you wouldn't let a script touch.</p></div>
+
+<h3 id="ch70-7"><span class="num">70.7</span>What's shared between surfaces, and what isn't</h3>
+<div class="tbl"><table>
+<tr><th>Thing</th><th>Terminal, VS Code, JetBrains, Desktop (local)</th><th>Cloud sessions (web, mobile, <code>--cloud</code>)</th></tr>
+<tr><td>Project CLAUDE.md, <code>.claude/</code> folder and <code>.mcp.json</code> committed to the repo</td><td>Shared: same files on disk</td><td>Available if committed and pushed, because the session clones the repo</td></tr>
+<tr><td>Your user settings <code>~/.claude/settings.json</code></td><td>Shared between CLI and extension (VS Code's own extension settings are separate)</td><td>Files only on your computer aren't in the clone; cloud sessions use their environment's configuration</td></tr>
+<tr><td>Conversation history</td><td>Shared locally: <code>claude --resume</code> picks up extension sessions; Desktop's <code>/resume</code> finds CLI sessions</td><td>Kept in the cloud; pull it down with <code>--teleport</code></td></tr>
+<tr><td>Git-ignored files such as <code>.env</code></td><td>Present on your machine</td><td>Not present (fresh clone)</td></tr>
+<tr><td>Commands</td><td>CLI has all; the extension has a subset</td><td>Cloud permission modes are Accept edits, Plan and Auto</td></tr>
+</table></div>
+<p>The practical rule: <strong>put team rules in files you commit</strong> (CLAUDE.md, <code>.claude/settings.json</code>, skills, agents, <code>.mcp.json</code> without secrets). Then every surface, including cloud sessions, follows them.</p>
+
+<h3 id="ch70-8"><span class="num">70.8</span>Which surface for which job?</h3>
+<div class="tbl"><table>
+<tr><th>Job</th><th>Best surface</th><th>Why</th></tr>
+<tr><td>Learning Claude Code, reviewing every change</td><td>VS Code extension, Manual mode</td><td>Side-by-side diffs and buttons</td></tr>
+<tr><td>Writing and fixing Playwright tests</td><td>VS Code or JetBrains with the CLI connected</td><td>Selection context, diffs in the editor, plus CLI-only features</td></tr>
+<tr><td>Scripts, CI, headless runs, every flag</td><td>Terminal</td><td>Full command set, <code>-p</code> print mode</td></tr>
+<tr><td>Several tasks at once, mostly by mouse</td><td>Desktop Code tab with Worktree on</td><td>Parallel sessions, panes, app preview</td></tr>
+<tr><td>Long task that must survive a closed laptop</td><td>Web (cloud session)</td><td>Runs on Anthropic's machines</td></tr>
+<tr><td>Checking on local work from your phone</td><td>Remote Control</td><td>Commands keep running on your computer</td></tr>
+<tr><td>Quick look at a page you're signed in to</td><td>Chrome integration</td><td>Uses your browser session</td></tr>
+</table></div>
+
+<div class="lab"><div class="lab-h"><b>One project, three surfaces</b><span>40 min · VS Code and a test repository</span></div><ol>
+<li>Install the Claude Code extension in VS Code, open your test project, click the Spark icon and sign in.<span class="expect">a Claude panel with a prompt box; the permission mode is shown below it.</span></li>
+<li>Switch the mode to <strong>Manual</strong>. Select a test function in the editor and ask: "Explain what this test checks and one way it could give a false pass."<span class="expect">an answer about exactly the lines you selected.</span></li>
+<li>Ask Claude to add one missing assertion. Review the side-by-side diff and accept it.<span class="expect">a diff view with Accept / Reject options, and the change applied after you accept.</span></li>
+<li>Open the integrated terminal (<kbd>Ctrl</kbd>+<kbd>`</kbd>) and run <code>claude --resume</code>.<span class="expect">the conversation you just had in the panel, listed in the picker.</span></li>
+<li>In that terminal session, type <code>/ide</code>.<span class="expect">a status message showing the connection to VS Code. If you see "No available IDEs detected", check that the extension is installed.</span></li>
+<li>Optional, with a subscription and a GitHub repository: push your branch and run <code>claude --cloud "list the three slowest tests in this repo and suggest why"</code>, then open claude.ai/code.<span class="expect">a new cloud session working on a fresh clone of your branch.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Installing the VS Code extension lets me type <code>claude</code> in any terminal."</dt><dd>The extension bundles a private copy. Install the standalone CLI for the terminal.</dd>
+<dt>"The JetBrains plugin works without the CLI."</dt><dd>It runs the <code>claude</code> command, so the CLI must be installed and on your PATH.</dd>
+<dt>"Every command works everywhere."</dt><dd>The extension has a subset, <code>dontAsk</code> is CLI-only, and cloud sessions offer only Accept edits, Plan and Auto.</dd>
+<dt>"Cloud sessions can see my local <code>.env</code> and test data."</dt><dd>They work on a fresh clone from GitHub. Anything not committed and pushed isn't there.</dd>
+<dt>"VS Code always asks before editing."</dt><dd>New conversations now start in Auto mode where available. Choose Manual if you want to approve each edit.</dd>
+</dl></div>
+
+<h3 id="ch70-r"><span class="num">70.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Claude Code is one engine with several front ends: terminal, VS Code, JetBrains, Desktop, web and mobile.</li>
+<li>The VS Code extension gives a chat panel with selection context, @-mentions (<kbd>Option</kbd>/<kbd>Alt</kbd>+<kbd>K</kbd>) and side-by-side diffs; it bundles its own copy, so install the CLI separately for the terminal.</li>
+<li>The JetBrains plugin runs the installed CLI and adds IDE diffs, selection sharing and diagnostics; <code>/ide</code> connects an external terminal session.</li>
+<li>The Desktop Code tab is good for parallel sessions with worktrees; <code>/desktop</code> and <code>--desktop</code> move sessions there.</li>
+<li>Web and mobile sessions run in the cloud on a fresh GitHub clone; Chrome integration uses your real browser.</li>
+<li>Commit team rules (CLAUDE.md, <code>.claude/</code>, <code>.mcp.json</code>) so every surface follows them.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">You installed the VS Code extension, but typing <code>claude</code> in the integrated terminal says "command not found". Why?</p><div class="opts"><button>The extension is broken</button><button data-ok>The extension bundles a private copy; the standalone CLI must be installed for the terminal</button><button>VS Code doesn't have a terminal</button></div><p class="why" hidden>The extension's copy isn't put on your PATH.</p></div>
+<div class="qz"><p class="q">How do you connect a Claude Code session in an external terminal to your JetBrains IDE?</p><div class="opts"><button data-ok>Type <code>/ide</code> inside the session</button><button>Run <code>claude --desktop</code></button><button>Restart the IDE</button></div><p class="why" hidden><code>/ide</code> connects; <code>claude --ide</code> auto-connects when exactly one IDE is available.</p></div>
+<div class="qz"><p class="q">A cloud session can't find the <code>.env</code> file your tests need. What's the most likely reason?</p><div class="opts"><button>Cloud sessions can't run tests</button><button data-ok>Cloud sessions work on a fresh clone, and the git-ignored <code>.env</code> was never in the repository</button><button>The model is too small</button></div><p class="why" hidden>Only what's committed and pushed is available in the clone.</p></div>
+<div class="qz"><p class="q">You want to approve every edit Claude makes in VS Code while you learn. What do you do?</p><div class="opts"><button>Nothing; VS Code always asks</button><button data-ok>Choose Manual in the mode selector or set <code>initialPermissionMode</code> to <code>manual</code></button><button>Turn on <code>useTerminal</code></button></div><p class="why" hidden>New conversations start in Auto mode where available, which doesn't ask for each edit.</p></div>
+<div class="qz"><p class="q">Which is the best way to make sure every surface follows your team's rules?</p><div class="opts"><button>Retype the rules in every session</button><button data-ok>Commit CLAUDE.md, <code>.claude/</code> settings, skills and <code>.mcp.json</code> to the repository</button><button>Only use the terminal</button></div><p class="why" hidden>Committed files are on disk locally and in every cloud clone.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Write a short "Claude Code setup guide" for a new tester joining your team. Say which surface the team uses by default and why, list the install steps (CLI plus extension or plugin), the recommended permission mode for beginners, which files in the repository hold the team's rules, and when to use cloud sessions or Remote Control. Ask a colleague to follow it on a fresh machine and note every step where they got stuck.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Claude Code is the same engine in many places: the terminal, a VS Code panel, a JetBrains plugin, the Desktop app's Code tab, and the web or phone. The VS Code extension gives you selections, @-mentions and side-by-side diffs, but install the CLI too for the terminal. JetBrains uses the CLI directly. Web sessions run in the cloud on a fresh copy from GitHub. Put team rules in committed files so every surface follows them."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/vs-code" target="_blank" rel="noopener">Use Claude Code in VS Code</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/jetbrains" target="_blank" rel="noopener">JetBrains IDEs</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/desktop" target="_blank" rel="noopener">Desktop application</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/claude-code-on-the-web" target="_blank" rel="noopener">Use Claude Code in the cloud</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/chrome" target="_blank" rel="noopener">Chrome integration</a> and <a href="https://code.claude.com/docs/en/remote-control" target="_blank" rel="noopener">Remote Control</a>.</li>
+<li>The installed <code>claude --help</code> output (version 2.1.319).</li>
+</ol><p class="verified">Verified 9 November 2026 against Claude Code 2.1.319. Menu labels and keyboard shortcuts in the apps can change between versions.</p></div>

@@ -1,0 +1,215 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What a benchmark is, and the difference between a benchmark and an eval</li>
+<li>The major benchmarks quoted in 2026 model launches, and what each one actually measures</li>
+<li>How a score is produced, and the settings that quietly change it</li>
+<li>Contamination, saturation and Goodhart's law: why good benchmarks stop being useful</li>
+<li>How leaderboards and human-preference rankings such as Arena work, and their limits</li>
+<li>Why small score differences are often noise, and why your own evals matter more than any leaderboard</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch22">Chapter 22</a> (hallucinations) helps. No maths beyond percentages is needed; the deeper sections are optional. The lab needs Python 3. Related: <a href="#ch33">Chapter 33</a> (reading model cards and benchmark claims), <a href="#ch36">Chapter 36</a> (comparing models yourself) and <a href="#ch125">Chapter 125</a> (evals for AI features).</div>
+
+<div class="bigidea"><p>A <a class="gl" href="#g-benchmark">benchmark</a> is a standard exam for AI: a fixed set of tasks, a fixed way of scoring, so different models can be compared. Benchmarks drive the field, and every model launch quotes them. But they age. Questions leak into training data (contamination), models reach the top score (saturation), and once a number becomes a target it stops measuring what it was meant to (Goodhart's law). Scores also depend heavily on settings, and small gaps are often within the noise. Benchmarks tell you roughly where a model stands in general; only your own <a class="gl" href="#g-eval">evals</a> tell you whether it works for your task.</p></div>
+
+<h3 id="ch24-1"><span class="num">24.1</span>What a benchmark is</h3>
+<p>A benchmark has three parts:</p>
+<ol>
+<li><strong>A dataset of tasks:</strong> questions, coding problems, puzzles or real-world jobs.</li>
+<li><strong>A scoring rule:</strong> exact match, unit tests passing, a human vote, a grading model.</li>
+<li><strong>A protocol:</strong> how the model is run (prompt format, number of attempts, tools allowed, time limits).</li>
+</ol>
+<p>Change any of the three and the score changes. That last part, the protocol, is the one launch announcements mention least.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A driving test is a benchmark for drivers. It's standard, so results are comparable, and passing tells you something real. But it doesn't tell you whether someone can drive a lorry through Mumbai at night, or whether they memorised the test route. And if driving schools teach only the test route, pass rates go up while road safety doesn't. Every problem in this chapter is a version of that.</p></div>
+<div class="cols2">
+<div><h4>Benchmark</h4><p>Public, standardised, shared across the industry. Answers "how does this model compare with others in general?" Example: SWE-bench Pro.</p></div>
+<div><h4>Eval</h4><p>Your own test set for your own task, often private. Answers "does this model do <em>our</em> job well enough?" Example: 50 of your team's Jira stories with expected test cases (<a href="#ch125">Chapter 125</a>).</p></div>
+</div>
+
+<h3 id="ch24-2"><span class="num">24.2</span>The major benchmarks in 2026</h3>
+<p>These are the names you'll see most often in model launch posts and comparison tables. Status notes are as of November 2026.</p>
+<input class="filter" data-filter="#ch24Bench" data-empty="#ch24BenchEmpty" type="search" placeholder="Filter benchmarks…" aria-label="Filter benchmarks">
+<div class="tbl"><table id="ch24Bench">
+<tr><th>Benchmark</th><th>What it measures</th><th>How it's scored</th><th>Status note</th></tr>
+<tr class="group"><td colspan="4">Knowledge and expert reasoning</td></tr>
+<tr><td><b>MMLU</b> (Hendrycks et al., 2020)</td><td>Multiple-choice knowledge across 57 subjects, from law to medicine to maths</td><td>Percentage correct</td><td>Largely saturated by frontier models; harder variants such as MMLU-Pro are used instead</td></tr>
+<tr><td><b>GPQA Diamond</b> (Rein et al., 2023)</td><td>Graduate-level science questions written by PhD experts, designed to be "Google-proof"</td><td>Percentage correct (multiple choice)</td><td>Diamond is the hardest subset and the one usually quoted</td></tr>
+<tr><td><b>Humanity's Last Exam</b> (Phan et al., 2025)</td><td>About 2,500 very hard expert-written questions across many fields</td><td>Percentage correct</td><td>Built to sit at the frontier of human knowledge</td></tr>
+<tr class="group"><td colspan="4">Coding and agents</td></tr>
+<tr><td><b>SWE-bench Verified</b></td><td>Can the model fix a real GitHub issue in a Python repository so the project's tests pass? Verified is a 500-task, human-checked subset (OpenAI, August 2024)</td><td>Percentage of issues resolved (hidden tests pass)</td><td>OpenAI stopped reporting it on 23 February 2026, citing contamination and flawed tasks, and recommends SWE-bench Pro</td></tr>
+<tr><td><b>SWE-bench Pro</b></td><td>A harder successor in the same style</td><td>Percentage resolved</td><td>Increasingly quoted in 2026 launches</td></tr>
+<tr><td><b>Terminal-Bench</b></td><td>Agents completing real tasks in a command-line terminal</td><td>Percentage of tasks completed</td><td>Newer versions (3.0 and 4.0) are cited in 2026 launches</td></tr>
+<tr class="group"><td colspan="4">Novel reasoning</td></tr>
+<tr><td><b>ARC-AGI</b> (1, 2 and 3; Chollet, 2019 onwards)</td><td>Solving new puzzles from a few examples: "fluid" intelligence rather than knowledge. ARC-AGI-3 (March 2026) uses interactive, game-like environments</td><td>Percentage of tasks solved</td><td>At ARC-AGI-3's launch humans solved 100% and the best AI about 0.37%. ARC Prize 2026 results are due 4 December 2026</td></tr>
+<tr class="group"><td colspan="4">Human preference</td></tr>
+<tr><td><b>Chatbot Arena / LMArena</b> (Chiang et al., 2024)</td><td>Which answer people prefer in blind head-to-head comparisons</td><td>Votes turned into Elo-style ratings</td><td>Reported to have rebranded as "Arena" in January 2026 (secondary sources; not independently verified)</td></tr>
+</table></div>
+<p id="ch24BenchEmpty" hidden>No rows match.</p>
+<div class="box note"><span class="tag">Why no scores here</span><p>This table deliberately gives no model scores. They change with every release, are often self-reported, and depend on settings (section 24.3). For current numbers, read the model's own system card or announcement and an independent leaderboard, and compare the two (<a href="#ch33">Chapter 33</a>).</p></div>
+<details class="deep"><summary>Under the hood: how SWE-bench grades a fix</summary><div class="body">
+<p>Each SWE-bench task is built from a real pull request in a public Python project. The task gives the model the repository as it was <em>before</em> the fix and the text of the GitHub issue. The model must produce a code change (a patch). The grader then applies the patch and runs the tests that the real developers added in that pull request, which the model never sees. The task counts as resolved only if those "fail-to-pass" tests now pass and the existing "pass-to-pass" tests still pass.</p>
+<p>For a tester this is familiar: it's a hidden acceptance test plus a regression suite. It's also why SWE-bench was so influential: grading is objective. Its weaknesses are just as familiar: if the hidden tests are too narrow, a wrong fix can pass; if they're too specific, a correct alternative fix can fail. Those flawed tasks, plus the public availability of the original fixes (contamination), are the reasons OpenAI gave for dropping the Verified subset.</p>
+</div></details>
+
+<h3 id="ch24-3"><span class="num">24.3</span>How a score is produced, and what changes it</h3>
+<p>"Model X scores 72% on benchmark Y" is incomplete without the protocol. These settings can each move a score by several points:</p>
+<div class="tbl"><table>
+<tr><th>Setting</th><th>Why it matters</th></tr>
+<tr><td><b>Attempts: pass@1 vs <a class="gl" href="#g-pass-k">pass@k</a></b></td><td>pass@1 counts only the first answer. pass@k counts a task as solved if <em>any</em> of k attempts succeeds. pass@10 is always at least as high as pass@1, and much less like real use.</td></tr>
+<tr><td><b>Thinking and effort</b></td><td>Reasoning models score higher with more thinking time (<a href="#ch19">Chapter 19</a>). Claude's effort setting is one such dial.</td></tr>
+<tr><td><b>Harness and tools</b></td><td>On agentic benchmarks, the surrounding program (which tools, how many steps, what instructions) matters as much as the model. A strong model in a weak harness scores poorly.</td></tr>
+<tr><td><b>Prompt format</b></td><td>Few examples vs none, answer format, chain-of-thought or not.</td></tr>
+<tr><td><b>Subset</b></td><td>Full set, a "verified" subset, or the vendor's own filtered version.</td></tr>
+<tr><td><b>Who ran it</b></td><td>Self-reported vendor numbers vs independent replication. The research notes for this book observe that they often differ.</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example</span><p>Anthropic's own model guidance (November 2026) recommends starting with Claude Opus 5.5 for most workloads, and moving to Fable 5.1 when "evals on Opus 5.5 at higher effort still fall short". Notice the shape of that advice: not "pick the model with the highest benchmark", but "test on your task, try more effort, then step up". It treats effort as part of the result, exactly as this section says.</p></div>
+
+<h3 id="ch24-4"><span class="num">24.4</span>Contamination: the leaked exam paper</h3>
+<p><a class="gl" href="#g-data-contamination">Data contamination</a> means benchmark questions, or their answers, were in the model's training data. Models are trained on huge web crawls (<a href="#ch17">Chapter 17</a>); benchmarks are published on the web, discussed on forums and copied into GitHub repositories. If a model has seen the answer, a high score measures memory, not ability.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A student who found last year's exam paper with answers will do brilliantly on a repeat of that paper and no better than before on a new one. The fix for exams is the same as for benchmarks: new questions, kept secret until the test.</p></div>
+<p>Signs of contamination include: a model can recite a benchmark question word for word; scores drop sharply on freshly written questions of the same difficulty; or performance is much higher on older tasks than on tasks created after the model's cutoff. Benchmark makers respond with private held-out test sets, regularly refreshed questions, and tasks dated after the models' cutoffs.</p>
+<details class="deep"><summary>Under the hood: checking for overlap with n-grams</summary><div class="body">
+<p>One simple contamination test compares <strong>n-grams</strong> (runs of n consecutive words) between a benchmark question and the training text. If many 8-word or 13-word runs from the question appear verbatim in the training data, the question was probably seen. Model developers with access to their training data run checks like this and report them in technical reports. Outsiders can't see training data, so they rely on indirect signs such as the ones above. The lab includes a small n-gram overlap check.</p>
+</div></details>
+
+<h3 id="ch24-5"><span class="num">24.5</span>Saturation and Goodhart's law</h3>
+<p>A benchmark is <a class="gl" href="#g-benchmark-saturation">saturated</a> when top models score near the maximum, so it can no longer tell them apart. A 1–2 point gap near the top may just be the few questions with disputed or wrong answer keys. MMLU is the standard example: once a stretch goal, it's now largely saturated, and attention has moved to harder sets.</p>
+<ol class="timeline">
+<li><span class="yr">Launch</span><span class="ev"><b>Hard and informative.</b> Models score low; differences are meaningful.</span></li>
+<li><span class="yr">Adoption</span><span class="ev"><b>Everyone reports it.</b> It becomes a target in training and marketing.</span></li>
+<li class="key"><span class="yr">Pressure</span><span class="ev"><b>Contamination and overfitting.</b> Questions leak; methods tuned to the benchmark's quirks.</span></li>
+<li><span class="yr">Saturation</span><span class="ev"><b>Scores near the ceiling.</b> Small gaps are noise or answer-key errors.</span></li>
+<li><span class="yr">Replacement</span><span class="ev"><b>A harder successor.</b> MMLU → MMLU-Pro; SWE-bench Verified → SWE-bench Pro; ARC-AGI-1 → 2 → 3.</span></li>
+</ol>
+<p>The underlying force is <a class="gl" href="#g-goodhart-s-law">Goodhart's law</a>, usually paraphrased as "when a measure becomes a target, it ceases to be a good measure". Testers know it from code coverage: set a 90% target and you get tests that execute lines without checking anything. AI benchmarks behave the same way. <a href="#ch22">Chapter 22</a> showed one costly example: right-or-wrong grading rewards guessing, which encourages hallucination.</p>
+
+<h3 id="ch24-6"><span class="num">24.6</span>Leaderboards and human-preference rankings</h3>
+<p>A <a class="gl" href="#g-leaderboard">leaderboard</a> ranks models on one or more benchmarks. Some are run by benchmark creators, some by independent groups, some by vendors.</p>
+<p>Arena-style leaderboards work differently. A user types a prompt, two anonymous models answer side by side, and the user votes for the better one. Hundreds of thousands of such votes are turned into a rating, in the spirit of the <a class="gl" href="#g-elo-rating">Elo rating</a> used in chess: beating a strong opponent raises your rating more than beating a weak one.</p>
+<div class="cols2">
+<div><h4>Strengths</h4><ul><li>Real prompts from real people, not a fixed exam</li><li>Hard to contaminate: the questions keep changing</li><li>Measures something benchmarks miss: whether people like the answer</li></ul></div>
+<div><h4>Limits</h4><ul><li>Voters reward style: length, formatting, confidence, friendliness</li><li>Prompts skew towards what Arena users ask, not your work</li><li>"Preferred" isn't "correct": a confident wrong answer can win a vote</li><li>Vendors can test many private variants and publish the best</li></ul></div>
+</div>
+<details class="deep"><summary>Under the hood: from votes to ratings</summary><div class="body">
+<p>The Chatbot Arena paper (Chiang et al., 2024) fits a <strong>Bradley–Terry model</strong>: each model gets a strength score, and the probability that model A beats model B depends on the difference between their scores. The scores that best explain all the votes become the ratings. The paper also reports confidence intervals, because a rating built from votes is an estimate. Two models whose intervals overlap are not reliably different, whatever their rank numbers say.</p>
+</div></details>
+<div class="box opinion"><span class="tag">Opinion · widely held among evaluation researchers</span><p>Many researchers argue that public benchmarks now matter more for marketing than for decisions, and that the most trustworthy signals are private, refreshed test sets and evaluations on real tasks. Others point out that public benchmarks remain the only shared yardstick the field has, and that dropping them would make claims harder to check. Both views appear in 2026 commentary; the practical answer for a team is to use both and trust your own.</p></div>
+
+<h3 id="ch24-7"><span class="num">24.7</span>Noise: when 2 points mean nothing</h3>
+<p>A score is a measurement, and measurements have error. Two sources matter:</p>
+<ul>
+<li><strong>Small test sets.</strong> On 100 questions, one question is a whole percentage point. On 20, it's five.</li>
+<li><strong>Run-to-run variation.</strong> Model outputs vary between runs (<a class="gl" href="#g-non-deterministic">non-deterministic</a>), so the same model can score differently on the same test.</li>
+</ul>
+<p>The fix is to report a <a class="gl" href="#g-confidence-interval">confidence interval</a> (a range the true score plausibly sits in) and to repeat runs. The lab script computes one. With 20 questions, a model scoring 85% has a 95% interval of roughly 64% to 95%: wide enough that a second model scoring 95% may not be genuinely better.</p>
+<div class="figure" role="img" aria-label="Illustrative scores for two models on a 20-question test: Model A 85% (interval 64 to 95), Model B 95% (interval 76 to 99)"><div class="bars"><div class="bt">20-question test (illustrative)</div>
+<div class="bar-row"><span>Model A: 85% (95% interval 64–95%)</span><span class="track"><span class="fill" style="width:85%">85%</span></span></div>
+<div class="bar-row"><span>Model B: 95% (95% interval 76–99%)</span><span class="track"><span class="fill hl" style="width:95%">95%</span></span></div></div>
+<div class="cap">Illustrative data from the lab script. The intervals overlap heavily, so this test can't confidently separate the models. More questions and repeated runs would.</div></div>
+
+<h3 id="ch24-8"><span class="num">24.8</span>Why your own evals matter more</h3>
+<p>No public benchmark contains your Jira stories, your API, your test conventions or your definition of a good bug report. A model that tops a coding leaderboard may still write Playwright tests that ignore your page objects. A cheaper model may be just as good for triaging your tickets.</p>
+<div class="flow">
+<div><b>Benchmarks</b>Shortlist two or three candidate models</div>
+<div class="hl"><b>Your eval</b>Run them on 30–100 real tasks from your work, graded your way</div>
+<div><b>Trade-offs</b>Weigh quality against cost and speed</div>
+<div><b>Re-run</b>Repeat when models or prompts change</div>
+</div>
+<p><a href="#ch36">Chapter 36</a> gives a complete, runnable harness for comparing models on your tasks, and <a href="#ch125">Chapter 125</a> shows how to build eval sets for AI features you ship, with code checks, <a class="gl" href="#g-llm-as-judge">LLM-as-judge</a> grading and regression runs.</p>
+<div class="box warn"><span class="tag">Your own evals can be contaminated too</span><p>If you keep tweaking your prompt until your 30 test cases pass, you've tuned to the test set, just like a benchmark target. Keep a separate held-out set that you only run occasionally, and add new real cases every month.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Score a benchmark honestly, and check for leaks</b><span>25 min · terminal and a browser</span></div>
+<div class="code"><span class="cap">minibench.py (Python 3, no packages; data is illustrative)</span><pre><span class="c"># minibench.py - score a tiny benchmark honestly (Python 3, no packages)</span>
+import math, re
+
+<span class="c"># Answer key for a 20-question multiple-choice test (illustrative)</span>
+KEY     = "BCADBBCADDABCCADBACD"
+<span class="c"># Letters each model chose, in the same order (illustrative)</span>
+MODEL_A = "ACADBBCADDABCCADBBCA"
+MODEL_B = "BCADBBCADDABCCDDBACD"
+
+def wilson(correct, n, z=1.96):
+    """95% interval for a pass rate: how far the true score could plausibly be."""
+    p = correct / n
+    centre = (p + z * z / (2 * n)) / (1 + z * z / n)
+    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
+    return centre - half, centre + half
+
+for name, answers in (("Model A", MODEL_A), ("Model B", MODEL_B)):
+    right = sum(a == k for a, k in zip(answers, KEY))
+    lo, hi = wilson(right, len(KEY))
+    print(f"{name}: {right}/{len(KEY)} = {right / len(KEY):.0%}   "
+          f"95% interval {lo:.0%} to {hi:.0%}")
+
+# Contamination check: do benchmark questions appear in "training" text?
+def ngrams(text, n=8):
+    w = re.findall(r"[a-z0-9]+", text.lower())
+    return {" ".join(w[i:i + n]) for i in range(len(w) - n + 1)}
+
+QUESTIONS = [
+    "Which HTTP status code means the client sent too many requests in a given amount of time",
+    "In boundary value analysis for an age field accepting 18 to 65 which values should you test first",
+]
+TRAINING_TEXT = """Forum post, 2024: Q: which HTTP status code means the client sent
+too many requests in a given amount of time? A: 429, everyone knows that."""
+
+seen = ngrams(TRAINING_TEXT)
+print()
+for q in QUESTIONS:
+    grams = ngrams(q)
+    overlap = len(grams &amp; seen) / len(grams)
+    flag = "LIKELY CONTAMINATED" if overlap &gt; 0.5 else "looks clean"
+    print(f"{overlap:4.0%} of 8-word sequences found  -&gt;  {flag}: {q[:45]}...")</pre></div>
+<div class="code"><span class="cap">Expected output</span><pre>Model A: 17/20 = 85%   95% interval 64% to 95%
+Model B: 19/20 = 95%   95% interval 76% to 99%
+
+100% of 8-word sequences found  -&gt;  LIKELY CONTAMINATED: Which HTTP status code means the client sent ...
+  0% of 8-word sequences found  -&gt;  looks clean: In boundary value analysis for an age field a...</pre></div>
+<ol>
+<li>Save the script as <code>minibench.py</code> and run <code>python3 minibench.py</code>.<span class="expect">the output above: Model A 85%, Model B 95%, with overlapping intervals; one question flagged as likely contaminated.</span></li>
+<li>Look at the intervals. Would you tell your manager Model B is better?<span class="expect">no, not on this evidence. The ranges overlap from 76% to 95%.</span></li>
+<li>Make the test bigger: repeat each of the three strings five times (for example <code>KEY = "BCADBBCADDABCCADBACD" * 5</code>, and the same for both models) and run again.<span class="expect">the same percentages (85% and 95%) but narrower intervals, roughly 77–91% and 89–98%, which no longer overlap. More questions mean more confidence.</span></li>
+<li>Edit <code>TRAINING_TEXT</code> to include the boundary-value question word for word, and run again.<span class="expect">both questions flagged "LIKELY CONTAMINATED".</span></li>
+<li>Open a recent model announcement or system card from any vendor. Find one benchmark claim and note: benchmark name, score, pass@1 or pass@k, effort or thinking setting, tools or harness, and whether it's self-reported.<span class="expect">at least one of these details is missing or in a footnote. Write down which.</span></li>
+<li>Find the same benchmark on an independent leaderboard (for SWE-bench, ARC-AGI or Arena, the links in Sources).<span class="expect">a score that may differ from the vendor's. Note the difference and one possible reason from section 24.3.</span></li>
+</ol>
+<p><b>Troubleshooting.</b> <code>ZeroDivisionError</code>: a model string is empty or the key is empty. Scores look wrong: the model strings must be the same length as <code>KEY</code>, one letter per question; <code>zip</code> silently stops at the shorter string. The contamination check flags nothing after your edit: the copied sentence must contain at least 8 consecutive words that match the question (punctuation and case are ignored).</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"The model at the top of the leaderboard is the best model."</dt><dd>It's the best on that measurement, under those settings. For your task, a different model may be better, cheaper or faster.</dd>
+<dt>"A 2-point lead is a clear win."</dt><dd>Often it's within the noise of the test set and run-to-run variation. Look for confidence intervals.</dd>
+<dt>"High benchmark scores mean the model understands the subject."</dt><dd>They may reflect contamination, format tricks or a narrow skill the benchmark rewards.</dd>
+<dt>"Arena measures correctness."</dt><dd>It measures which answer voters preferred. Style and confidence influence votes.</dd>
+<dt>"Benchmarks and evals are the same thing."</dt><dd>Benchmarks compare models in general; evals check fitness for your specific job. You need your own.</dd>
+</dl></div>
+
+<h3 id="ch24-r"><span class="num">24.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>A benchmark is a dataset, a scoring rule and a protocol. Change any of them and the score changes.</li>
+<li>Major 2026 names: MMLU (saturated), GPQA Diamond, Humanity's Last Exam, SWE-bench Verified (dropped by OpenAI in February 2026) and SWE-bench Pro, Terminal-Bench, ARC-AGI-3 and Arena.</li>
+<li>Scores depend on attempts (pass@1 vs pass@k), thinking effort, harness, prompt format and who ran the test.</li>
+<li>Contamination inflates scores; saturation hides differences; Goodhart's law turns targets into bad measures.</li>
+<li>Human-preference rankings are hard to contaminate but reward style as well as substance.</li>
+<li>Small gaps are often noise: ask for intervals and repeated runs.</li>
+<li>Use benchmarks to shortlist; use your own evals to decide (<a href="#ch36">Chapter 36</a>, <a href="#ch125">Chapter 125</a>).</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What is data contamination?</p><div class="opts"><button>Errors in a benchmark's answer key</button><button data-ok>Benchmark questions or answers appearing in a model's training data</button><button>Users submitting harmful prompts to a leaderboard</button></div><p class="why" hidden>If the model has seen the answers, the score measures memory rather than ability.</p></div>
+<div class="qz"><p class="q">Why did OpenAI stop reporting SWE-bench Verified in February 2026?</p><div class="opts"><button>It was too hard for any model</button><button data-ok>It cited contamination and flawed tasks, and recommended SWE-bench Pro instead</button><button>The benchmark was taken offline</button></div><p class="why" hidden>A typical end of a benchmark's life: leakage and task problems, followed by a harder successor.</p></div>
+<div class="qz"><p class="q">A launch post quotes a pass@10 score. Why should you be careful comparing it with another model's pass@1?</p><div class="opts"><button data-ok>pass@10 counts a task as solved if any of ten attempts works, so it's always at least as high as pass@1</button><button>pass@10 uses ten times fewer questions</button><button>pass@10 is graded by humans</button></div><p class="why" hidden>Different protocols give different numbers. Compare like with like.</p></div>
+<div class="qz"><p class="q">On a 20-question test, Model A scores 85% and Model B 95%, with 95% intervals of 64–95% and 76–99%. What's the right conclusion?</p><div class="opts"><button>Model B is clearly better</button><button>Model A is better because its interval is wider</button><button data-ok>The test is too small to separate them confidently; use more questions and repeated runs</button></div><p class="why" hidden>Overlapping intervals mean the difference could be noise.</p></div>
+<div class="qz"><p class="q">What is the main limitation of Arena-style human-preference rankings?</p><div class="opts"><button>They are easily contaminated</button><button data-ok>Votes reward style and confidence as well as correctness, and prompts may not resemble your work</button><button>They only test multiple-choice questions</button></div><p class="why" hidden>Fresh prompts make contamination hard, but "preferred" is not the same as "correct".</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Choose two current models your team might use. Collect three benchmark claims for each from official announcements or system cards, recording the protocol details from section 24.3 and whether each is self-reported. Then write 20 tasks from your own work (for example: generate test cases from five real stories, triage five real bug reports, explain five real failing tests, write five API checks), run both models, and score them with a simple rubric. Write a one-page decision record: what the benchmarks suggested, what your eval showed, the confidence you have given the test size, and your recommendation. Keep the tasks: they're the seed of the harness in <a href="#ch36">Chapter 36</a>.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"A benchmark is a standard exam for AI models, so we can compare them. Launch posts quote them constantly, but read them like a tester. Was the exam leaked into training data? Is it so easy everyone gets nearly full marks? Did they get one attempt or ten, and how much thinking time? Who ran it? And a 2-point lead on a small test can be pure noise. Leaderboards where people vote are harder to cheat but reward answers that look good. So we use benchmarks to make a shortlist, and then we test the shortlist on our own real tasks. Our eval decides, not the leaderboard."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>D. Hendrycks et al., <a href="https://arxiv.org/abs/2009.03300" target="_blank" rel="noopener">"Measuring Massive Multitask Language Understanding"</a> (MMLU, 2020), arXiv:2009.03300.</li>
+<li>D. Rein et al., <a href="https://arxiv.org/abs/2311.12022" target="_blank" rel="noopener">"GPQA: A Graduate-Level Google-Proof Q&amp;A Benchmark"</a> (2023), arXiv:2311.12022.</li>
+<li>L. Phan et al., <a href="https://arxiv.org/abs/2501.14249" target="_blank" rel="noopener">"Humanity's Last Exam"</a> (2025), arXiv:2501.14249; <a href="https://lastexam.ai" target="_blank" rel="noopener">lastexam.ai</a>.</li>
+<li>C. E. Jimenez et al., <a href="https://arxiv.org/abs/2310.06770" target="_blank" rel="noopener">"SWE-bench: Can Language Models Resolve Real-World GitHub Issues?"</a>, arXiv:2310.06770; OpenAI, <a href="https://openai.com/index/introducing-swe-bench-verified/" target="_blank" rel="noopener">Introducing SWE-bench Verified</a> and <a href="https://openai.com/index/why-we-no-longer-evaluate-swe-bench-verified/" target="_blank" rel="noopener">Why we no longer evaluate SWE-bench Verified</a>.</li>
+<li>ARC Prize, <a href="https://arcprize.org/competitions/2026/arc-agi-3" target="_blank" rel="noopener">ARC-AGI-3 and ARC Prize 2026</a>; <a href="https://arxiv.org/abs/2603.24621" target="_blank" rel="noopener">ARC-AGI-3 paper</a>, arXiv:2603.24621; F. Chollet, <a href="https://arxiv.org/abs/1911.01547" target="_blank" rel="noopener">"On the Measure of Intelligence"</a> (2019).</li>
+<li>W.-L. Chiang et al., <a href="https://arxiv.org/abs/2403.04132" target="_blank" rel="noopener">"Chatbot Arena: An Open Platform for Evaluating LLMs by Human Preference"</a> (2024), arXiv:2403.04132.</li>
+<li>Terminal-Bench versions as cited in 2026 launch coverage: <a href="https://www.cnbc.com/2026/09/03/open-ai-astra-gpt-6-cyber.html" target="_blank" rel="noopener">CNBC on GPT-6 Astra</a>, <a href="https://fortune.com/2026/10/29/mistral-releases-new-model-large-4-and-claims-top-open-model-for-agentic-coding-and-cyber-defense/" target="_blank" rel="noopener">Fortune on Mistral Large 4</a>.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/models/overview" target="_blank" rel="noopener">Models overview</a> (start with Opus 5.5; Fable 5.1 when evals fall short).</li>
+<li>A. T. Kalai et al., <a href="https://arxiv.org/abs/2509.04664" target="_blank" rel="noopener">"Why Language Models Hallucinate"</a> (2025): how binary grading rewards guessing.</li>
+</ol><p class="verified">Verified 9 November 2026 against research/ai-industry-facts.md (benchmark table) and Anthropic's models overview. The Arena rebrand is unverified. Lab script tested with Python 3.</p></div>

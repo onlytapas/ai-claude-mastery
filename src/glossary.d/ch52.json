@@ -1,0 +1,74 @@
+{
+ "Operating system": {
+  "d": "The software that runs a computer: it starts programs, stores files, talks to hardware and keeps users apart. macOS, Windows and Linux are operating systems.",
+  "see": "ch52"
+ },
+ "Kernel": {
+  "d": "The core of an operating system that manages the processor, memory, files and hardware. Other programs ask the kernel to do these things for them.",
+  "see": "ch52"
+ },
+ "GUI": {
+  "d": "Graphical user interface: using a computer through windows, icons, menus and a mouse, as opposed to typing commands.",
+  "see": "ch52"
+ },
+ "Command prompt": {
+  "d": "The short text a shell prints (for example ending in % or $) to show it is ready for your next command. Also the name of Windows' older shell, cmd.exe.",
+  "see": "ch52"
+ },
+ "Command": {
+  "d": "A line typed into a shell: a program name, usually followed by options that change how it works and arguments that say what to work on.",
+  "see": "ch54"
+ },
+ "zsh": {
+  "d": "The Z shell, the default shell on macOS since macOS 10.15 Catalina. Very similar to bash for everyday commands.",
+  "see": "ch52"
+ },
+ "bash": {
+  "d": "The Bourne Again Shell, the most common shell on Linux, in CI pipelines and in shell scripts.",
+  "see": "ch52"
+ },
+ "PowerShell": {
+  "d": "Microsoft's shell for Windows (also available on macOS and Linux). Its commands are named Verb-Noun, such as Get-ChildItem.",
+  "see": "ch52"
+ },
+ "File": {
+  "d": "A named piece of stored data, such as a document, image, script or log, kept in a folder on disk.",
+  "see": "ch53"
+ },
+ "Directory": {
+  "d": "Another word for a folder: a container for files and other directories.",
+  "see": "ch53"
+ },
+ "Filesystem": {
+  "d": "The way an operating system organises files and folders on a disk, as a tree of folders starting from a root.",
+  "see": "ch53"
+ },
+ "Root directory": {
+  "d": "The top folder of the filesystem tree, written / on macOS and Linux. Every absolute path starts there. On Windows each drive has its own root, such as C:\\.",
+  "see": "ch53"
+ },
+ "Home directory": {
+  "d": "Your personal folder: /Users/name on macOS, /home/name on Linux, C:\\Users\\name on Windows. The shell shorthand for it is ~.",
+  "see": "ch53"
+ },
+ "Absolute path": {
+  "d": "A file or folder address written in full from the root (starting with / or ~), so it means the same thing wherever you are.",
+  "see": "ch53"
+ },
+ "Relative path": {
+  "d": "A file or folder address written from the current working directory, such as tests/login.spec.ts or ../reports. Its meaning depends on where you are.",
+  "see": "ch53"
+ },
+ "Hidden file": {
+  "d": "On macOS and Linux, a file or folder whose name starts with a dot, such as .env or .gitignore. Normal listings skip it; it is not protected.",
+  "see": "ch53"
+ },
+ "File extension": {
+  "d": "The ending of a file name after the last dot, such as .json or .csv, that labels what kind of content to expect. It is a convention, not a guarantee.",
+  "see": "ch53"
+ },
+ "Argument": {
+  "d": "The part of a command that says what to work on, usually a file or folder name, such as notes.txt in cat notes.txt.",
+  "see": "ch54"
+ }
+}

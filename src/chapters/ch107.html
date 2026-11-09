@@ -1,0 +1,251 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What turns a language model into an <a class="gl" href="#g-agent">agent</a>, in plain words</li>
+<li>The agent loop: perceive, plan, act, observe, and how it looks in the Claude API</li>
+<li>Tools as the agent's hands, and why tool design matters as much as the prompt</li>
+<li>Short-term and long-term memory, and how agents remember between steps</li>
+<li>Autonomy levels, and how to pick the right one for a task</li>
+<li>Anthropic's distinction between workflows and agents, and when you need neither</li>
+<li>The predictable ways agents fail, so you can test for them</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch86">Chapter 86</a> (your first Claude API call) and <a href="#ch89">Chapter 89</a> (tool use) help with the code. <a href="#ch20">Chapter 20</a> (context windows and memory) helps with 106.4. You can follow the ideas without any code, and the lab runs offline with no API key.</div>
+
+<div class="bigidea"><p>A chatbot answers once and stops. An agent keeps going: it looks at the situation, decides on an action, uses a tool to do it, reads the result, and decides again, until the job is done or it hits a limit. The model supplies the judgement; ordinary code supplies the loop, the tools, the memory and the limits. Many tasks don't need an agent at all: a fixed sequence of steps (a workflow) is cheaper and more predictable. Agents earn their place when you can't know the steps in advance, and they fail in predictable ways that a tester can check for.</p></div>
+
+<h3 id="ch107-1"><span class="num">107.1</span>From chatbot to agent</h3>
+<p>When you ask Claude in a chat window "what are good boundary values for an age field?", it reads your message and writes one reply. Everything it needs is in the message. That is a single <strong>model call</strong>: text in, text out.</p>
+<p>Now ask: "Look through last night's test results, find the failures that are new since yesterday, and tell me which team owns each." One reply can't do that. Something has to open the results, compare two runs, look up owners, and only then answer. The steps depend on what it finds: if there are no new failures, there is nothing to look up.</p>
+<p>An <a class="gl" href="#g-agent">agent</a> is a system that handles this second kind of task. It works towards a goal by repeatedly choosing an action, carrying it out with a tool, and looking at the result. Three things make it work:</p>
+<div class="tbl"><table>
+<tr><th>Part</th><th>Plain meaning</th><th>In the test-results example</th></tr>
+<tr><td><b>A model</b></td><td>The "brain" that reads the situation and decides what to do next</td><td>Claude decides to open last night's results first</td></tr>
+<tr><td><b>Tools</b></td><td>Actions the program lets the model request: read a file, search, call an API, run a command</td><td><code>read_results</code>, <code>compare_runs</code>, <code>lookup_owner</code></td></tr>
+<tr><td><b>A loop with limits</b></td><td>Ordinary code that runs the requested tool, hands back the result, and repeats until the model says it's done or a limit is hit</td><td>Stop after 20 steps or when Claude gives its final answer</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A chatbot is like phoning an expert and asking a question: you get an answer, and the call ends. An agent is like giving a capable new colleague a task, a laptop and some access rights. They try something, look at what happened, try the next thing, and come back when they're done. How much access you give them, and how often they must check in, are decisions you make, not them.</p></div>
+<p>The model never runs anything itself. It only <em>asks</em>. Your program decides whether to carry the request out. That single fact is the basis of almost every safety control in this part of the book.</p>
+
+<h3 id="ch107-2"><span class="num">107.2</span>The agent loop</h3>
+<p>Every agent, from a small script to Claude Code, runs some version of the same cycle. It's usually described in four steps:</p>
+<div class="flow"><div><b>Perceive</b>Read the goal and everything learned so far</div><div class="hl"><b>Plan</b>The model decides the next action, or that it's finished</div><div><b>Act</b>The program runs the chosen tool</div><div><b>Observe</b>The tool's result is added to what the model can see</div></div>
+<p>Then it goes round again. The loop ends when the model replies without asking for a tool (it thinks the job is done), or when your code stops it: too many steps, too much money spent, too much time taken, or a person says stop.</p>
+<p>This idea has a well-known research ancestor. In October 2022, Shunyu Yao and colleagues published <a class="gl" href="#g-react">ReAct</a> ("Reasoning and Acting"), which had a language model alternate between writing down its reasoning and taking actions such as a Wikipedia search, reading each result before reasoning again. Interleaving thought and action helped the model correct itself and reduced made-up answers. Modern agent loops are direct descendants.</p>
+<h4>What the loop looks like in the Claude API</h4>
+<p>In <a href="#ch89">Chapter 89</a> you met <a class="gl" href="#g-tool-use">tool use</a>. An agent is tool use in a loop. Here is the shape of one turn, using the field names from Anthropic's documentation:</p>
+<div class="code"><span class="cap">One turn of the loop (simplified)</span><pre><span class="c"># 1. You send: the goal, the conversation so far, and the tool definitions</span>
+{"model": "claude-opus-5-5", "max_tokens": 1000,
+ "tools": [{"name": "read_bug", "description": "Read one bug file by name.",
+            "input_schema": {"type": "object",
+                             "properties": {"name": {"type": "string"}},
+                             "required": ["name"]}}],
+ "messages": [{"role": "user", "content": "How many open P1 bugs are there?"}]}
+
+<span class="c"># 2. Claude replies with stop_reason "tool_use" and a tool_use block</span>
+{"stop_reason": "tool_use",
+ "content": [{"type": "tool_use", "id": "toolu_01...", "name": "read_bug",
+              "input": {"name": "BUG-101.txt"}}]}
+
+<span class="c"># 3. Your code runs read_bug, then sends the result back as a user message</span>
+{"role": "user",
+ "content": [{"type": "tool_result", "tool_use_id": "toolu_01...",
+              "content": "BUG-101 Checkout total ignores voucher\nPriority: P1\nStatus: Open"}]}
+
+<span class="c"># 4. Repeat until stop_reason is "end_turn": Claude's final answer</span></pre></div>
+<p>Three details from the documentation matter in real code. The <code>tool_result</code> must answer the matching <code>id</code>. Tool results must come <em>first</em> in that user message, before any text. And if a tool fails, you send the error back with <code>"is_error": true</code> so Claude can adapt, rather than crashing your program.</p>
+<details class="deep"><summary>Under the hood: where the "plan" actually lives</summary><div class="body">
+<p>The model has no hidden memory between calls. Each turn, your program sends the <em>whole</em> conversation again: the goal, every earlier tool request and every result. The "plan" is whatever the model works out from that history on this call. Current Claude models think before answering (<a href="#ch19">Chapter 19</a>), so some of that planning happens in a thinking block you may not see in full.</p>
+<p>Two consequences follow. First, the history grows every step, which costs tokens and eventually fills the <a class="gl" href="#g-context-window">context window</a>, so long-running agents must trim or summarise it. Second, anything that gets into the history (including text inside a web page or test log the agent read) can influence the next decision. That is why <a class="gl" href="#g-prompt-injection">prompt injection</a> is an agent problem first and foremost.</p>
+</div></details>
+
+<h3 id="ch107-3"><span class="num">107.3</span>Tools: the agent's hands</h3>
+<p>A tool, in API terms, is a <strong>name</strong>, a plain-language <strong>description</strong>, and an <strong>input schema</strong> (a JSON description of the parameters). The model only knows what a tool does from those three things. A vague description gives you a confused agent, however good the model.</p>
+<p>Anthropic's "Building effective agents" article (December 2024) calls this the <a class="gl" href="#g-agent-computer-interface">agent-computer interface</a> (ACI), and suggests putting as much effort into it as you would into a user interface for people. Its advice, and the later article "Writing effective tools for agents" (September 2025), comes down to a few practical rules:</p>
+<div class="tbl"><table>
+<tr><th>Rule</th><th>Why</th><th>QA example</th></tr>
+<tr><td>Fewer, well-scoped tools</td><td>Every tool definition costs tokens and adds a choice the model can get wrong</td><td>One <code>search_tests(query, status)</code> tool, not separate tools for each status</td></tr>
+<tr><td>Describe it as you would to a new teammate</td><td>Include format, edge cases, and how it differs from similar tools</td><td>"Returns at most 50 results. Use status='failed' to see only failures."</td></tr>
+<tr><td>Unambiguous parameter names</td><td>Avoid guessing</td><td><code>jira_issue_key</code> rather than <code>id</code></td></tr>
+<tr><td>Return meaningful, compact results</td><td>Long raw dumps waste context and hide the signal</td><td>Return failing test names and messages, not the whole 2 MB XML report</td></tr>
+<tr><td>Helpful error messages</td><td>An error that says what to try next lets the agent recover</td><td>"No run found for 2026-11-31. Dates must be real calendar dates."</td></tr>
+<tr><td>Make mistakes hard ("poka-yoke")</td><td>Design the tool so the wrong call is impossible or harmless</td><td>Anthropic's article reports that requiring absolute file paths fixed a class of mistakes with relative paths</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A team gives an agent one tool called <code>run</code> that executes any shell command. It works in the demo. In week two it runs a database reset script against the shared test environment because a log suggested "try resetting the data". A better design gives the agent <code>run_test_suite(suite_name)</code> and <code>get_test_log(run_id)</code>: narrow tools that can only do what the task needs. This is <a class="gl" href="#g-least-privilege">least privilege</a> applied to tools, and <a href="#ch109">Chapter 109</a> builds it into code.</p></div>
+<p>Tools also come from outside your code. In Claude Code, built-in tools read and edit files and run commands; <a class="gl" href="#g-mcp">MCP</a> servers add more (<a href="#ch97">Chapter 97</a>). Anthropic also runs some tools on its own servers, such as web search. Whatever the source, the loop is the same.</p>
+
+<h3 id="ch107-4"><span class="num">107.4</span>Memory: what the agent knows, and for how long</h3>
+<p>"Memory" means several different things in agent design. It helps to separate them.</p>
+<div class="tbl"><table>
+<tr><th>Kind</th><th>What it is</th><th>Lifetime</th><th>Example</th></tr>
+<tr><td><b>Working memory</b> (short-term)</td><td>The conversation history sent with each call: goal, tool requests, results</td><td>One run; limited by the context window</td><td>The bug files read so far in this run</td></tr>
+<tr><td><b>Run state</b></td><td>Facts your <em>code</em> keeps about the run: step count, money spent, what's been written</td><td>One run, saved to disk so it survives a crash</td><td>"Step 7 of 20; summary not yet written"</td></tr>
+<tr><td><b>Long-term memory</b></td><td>Notes saved outside the conversation and loaded in later runs</td><td>Across runs, until deleted</td><td>"The payments suite is flaky on Mondays; check the retry log first"</td></tr>
+<tr><td><b>Knowledge</b></td><td>Documents the agent can search when it needs them</td><td>As long as the documents are kept</td><td>Test strategy, runbooks, past incident reports (RAG, <a href="#ch92">Chapter 92</a>)</td></tr>
+</table></div>
+<p>Claude Code shows several of these in practice: the session history is working memory, <code>CLAUDE.md</code> files are long-term instructions loaded at start-up, and auto memory saves notes between sessions (<a href="#ch20">Chapter 20</a>). On the API, Anthropic provides a <strong>memory tool</strong>: a client tool with an Anthropic-defined schema that lets Claude store and read notes in files that <em>you</em> control.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Working memory is the notes on your desk while you work on one ticket. Run state is the checklist pinned to the ticket. Long-term memory is the team wiki. Knowledge is the company document library. You clear your desk after each ticket, but the wiki stays.</p></div>
+<div class="box warn"><span class="tag">Memory is also an attack surface</span><p>Anything an agent writes to long-term memory will steer future runs. If a malicious test log tricks the agent into saving "always skip the security suite", that instruction persists. Treat memory writes as consequential: review them, scope them, and make them easy to inspect and delete.</p></div>
+
+<h3 id="ch107-5"><span class="num">107.5</span>Autonomy levels</h3>
+<p><a class="gl" href="#g-autonomy-level">Autonomy</a> is how much the system may do before a person checks. It isn't a property of the model; it's a setting you choose for each task and each tool. There is no single official scale. The ladder below is this book's way of describing the common options:</p>
+<div class="tbl"><table>
+<tr><th>Level</th><th>What the AI does</th><th>Who acts</th><th>QA example</th></tr>
+<tr><td>0. Assist</td><td>Answers questions, drafts text</td><td>The person does everything</td><td>"Suggest test cases for this story"</td></tr>
+<tr><td>1. Suggest actions</td><td>Proposes specific actions with reasons</td><td>The person carries them out</td><td>"These three tests look flaky; here's why"</td></tr>
+<tr><td>2. Act with approval</td><td>Prepares the action and waits</td><td>The AI acts after a person says yes</td><td>Drafts a Jira bug; files it only when you approve</td></tr>
+<tr><td>3. Act within limits</td><td>Acts freely inside a fenced area; asks for anything outside it</td><td>The AI, within rules set in code</td><td>Reruns failed tests and edits files in a branch; asks before pushing</td></tr>
+<tr><td>4. Act freely</td><td>Acts and reports afterwards</td><td>The AI</td><td>Rare in practice; only for low-impact, reversible actions in a sandbox</td></tr>
+</table></div>
+<p>Claude Code's permission modes (<a href="#ch67">Chapter 67</a>) are a concrete example of moving between levels 1 and 3: plan mode only proposes, the default mode asks before edits and commands, and more permissive modes approve whole classes of action in advance.</p>
+<div class="box note"><span class="tag">Choose autonomy per action, not per agent</span><p>One agent can read anything at level 4, edit files at level 3, and post to Slack only at level 2. Ask two questions for each action: <em>how bad is it if this is wrong?</em> and <em>can it be undone?</em> Reading a log: harmless and reversible. Closing 200 Jira tickets: visible and hard to undo.</p></div>
+
+<h3 id="ch107-6"><span class="num">107.6</span>Workflows versus agents</h3>
+<p>Anthropic's article "Building effective agents" (published 19 December 2024) draws a line that many teams now use. In its words, <strong>workflows</strong> are "systems where LLMs and tools are orchestrated through predefined code paths", while <strong>agents</strong> are systems where the LLM "dynamically direct[s] their own processes and tool usage, maintaining control over how they accomplish tasks". The article calls both "agentic systems".</p>
+<div class="cols2">
+<div><h4>Workflow</h4><p>You write the steps in code. The model fills in the judgement at each step. Example: for every new bug report, (1) summarise it, (2) classify the component, (3) suggest a priority. The order never changes.</p><p><b>Good when:</b> the steps are known; you want predictability, low cost and easy testing.</p></div>
+<div><h4>Agent</h4><p>You give a goal and tools. The model decides which tools to call, in what order, and when it's done. Example: "find out why the nightly run failed and propose a fix".</p><p><b>Good when:</b> the number and order of steps can't be known in advance, and you can tolerate higher cost and some unpredictability.</p></div>
+</div>
+<p>The article's central advice is to find "the simplest solution possible, and only increasing complexity when needed". Often that's a single well-prompted model call with good examples. Then a <a class="gl" href="#g-agentic-workflow">workflow</a>. Only then an agent. <a href="#ch108">Chapter 108</a> covers the workflow patterns it describes (prompt chaining, routing, parallelisation, orchestrator-workers, evaluator-optimiser) and when each fits.</p>
+<div class="flow"><div><b>Single call</b>One prompt, maybe with retrieval and examples</div><div><b>Workflow</b>Fixed steps in code; model at each step</div><div class="hl"><b>Agent</b>Model chooses steps in a loop with tools</div></div>
+<p>The article also gives three principles for building agents: keep the design simple, make the agent's planning steps visible (transparency), and craft the agent-computer interface carefully through good tool documentation and testing. On frameworks, it suggests starting with the model API directly, and if you use a framework, understanding what it does underneath, because extra layers can hide the actual prompts and responses and make debugging harder.</p>
+<div class="box opinion"><span class="tag">Opinion · Anthropic ("Building effective agents")</span><p>The article's authors argue that the most successful implementations they saw used simple, composable patterns rather than complex frameworks. This is a recommendation from experience, not a measured result, but it matches what many QA teams find: the agent you can debug beats the clever one you can't.</p></div>
+<details class="deep"><summary>Under the hood: why "agent" is a spectrum in practice</summary><div class="body">
+<p>Real systems mix the two. Claude Code is an agent at the top level, but inside it some steps are fixed code (checking permissions, running hooks). A workflow might include one step that is a small agent ("investigate this failure, up to 5 tool calls"). The useful question isn't "is it an agent?" but "for each decision, who chooses: my code or the model?" Every decision you move to the model gains flexibility and loses predictability.</p>
+</div></details>
+
+<h3 id="ch107-7"><span class="num">107.7</span>Where agents fail</h3>
+<p>Agents fail in recognisable ways. As a tester, this list is your starting test plan.</p>
+<div class="tbl"><table>
+<tr><th>Failure</th><th>What it looks like</th><th>Typical guard</th></tr>
+<tr><td><b><a class="gl" href="#g-compounding-error">Compounding errors</a></b></td><td>A wrong guess in step 2 feeds every later step</td><td>Checks between steps; shorter tasks; human review of key outputs</td></tr>
+<tr><td><b>Looping</b></td><td>Calls the same tool again and again without progress</td><td>Step limit; detect repeated identical calls</td></tr>
+<tr><td><b>Premature "done"</b></td><td>Declares success without checking (tests "pass" because none ran)</td><td>Verify the outcome in code, not by the agent's word</td></tr>
+<tr><td><b>Wrong tool or wrong arguments</b></td><td>Searches the wrong project; passes a relative path</td><td>Better tool descriptions; strict schemas; validation in the tool</td></tr>
+<tr><td><b>Prompt injection</b></td><td>Text inside a web page, email or log tells the agent to do something else</td><td>Least privilege; approval for consequential actions; treat tool output as data</td></tr>
+<tr><td><b>Scope creep</b></td><td>"While I was there, I also refactored the login module"</td><td>Narrow instructions; limit which files and tools are reachable</td></tr>
+<tr><td><b>Runaway cost or time</b></td><td>A long loop reads huge files over and over</td><td>Token, money and time budgets enforced in code</td></tr>
+<tr><td><b>Context overflow</b></td><td>The history fills the context window; early instructions get lost</td><td>Compact results; summarise history; split the task</td></tr>
+</table></div>
+<div class="figure" role="img" aria-label="Bar chart: chance a 20-step task succeeds if every step independently succeeds 99%, 95% or 90% of the time"><div class="bars"><div class="bt">Chance all 20 steps succeed (illustrative arithmetic)</div>
+<div class="bar-row"><span>99% per step</span><span class="track"><span class="fill" style="width:82%">82%</span></span></div>
+<div class="bar-row"><span>95% per step</span><span class="track"><span class="fill hl" style="width:36%">36%</span></span></div>
+<div class="bar-row"><span>90% per step</span><span class="track"><span class="fill" style="width:12%">12%</span></span></div></div>
+<div class="cap">Illustrative, not measured: 0.99<sup>20</sup> ≈ 0.82, 0.95<sup>20</sup> ≈ 0.36, 0.90<sup>20</sup> ≈ 0.12. Real steps aren't independent, and agents can recover from errors, but the arithmetic shows why long unchecked chains are risky.</div></div>
+<div class="box example"><span class="tag">Real-world example</span><p>An agent is asked to "make the checkout tests pass". It edits the assertion from <code>expect(total).toBe(90)</code> to <code>expect(total).toBe(100)</code>. The tests pass; the voucher bug ships. The agent met the goal as written. The guard is a better goal ("fix the product code, not the tests; never change assertions without asking") plus a review step a human actually reads.</p></div>
+<p>Anthropic's own experience points the same way. In its June 2025 write-up of its multi-agent research system, it reports that agents typically use about four times more tokens than chat, and that small failures in long runs are costly, so it added checkpoints and the ability to resume from where an error occurred. <a href="#ch109">Chapter 109</a> turns these guards into code, and <a href="#ch113">Chapter 113</a> covers supervising agents in production.</p>
+
+<div class="lab"><div class="lab-h"><b>Build the smallest useful agent (offline, no API key)</b><span>25 min · Python 3.10+ · terminal</span></div><ol>
+<li>Make a folder and save the program below as <code>mini_agent.py</code>. It has a real Claude mode and a <strong>fake model</strong> mode: a scripted stand-in that replies in the same format as the API, so you can see the loop work without an API key. The fake follows a fixed script; it doesn't think.<span class="expect">one file, about 75 lines.</span></li>
+<li>Run <code>python3 mini_agent.py --fake</code>.<span class="expect">it creates a <code>bugs/</code> folder with four files, prints five steps (one <code>list_bugs</code>, four <code>read_bug</code>), then: <code>2 open P1 bug(s): BUG-101 Checkout total ignores voucher; BUG-104 Payment page times out</code>.</span></li>
+<li>Match each printed step to the loop in 106.2. Find the four lines commented <code>decide</code>, <code>finished</code>, <code>act</code> and <code>observe</code>.<span class="expect">you can point to where perceive, plan, act and observe happen.</span></li>
+<li>Change <code>max_steps=10</code> to <code>max_steps=3</code> in <code>run()</code> and run again.<span class="expect">three steps, then <code>Stopped: step limit reached.</code> The limit is in your code, not the model.</span></li>
+<li>Put it back to 10. Add a fifth file, <code>bugs/BUG-105.txt</code>, with these three lines: <code>BUG-105 Login fails</code>, <code>Priority: P1</code>, <code>Status: Open</code>. Note the program rewrites the first four files each run but leaves yours alone.<span class="expect">six steps and <code>3 open P1 bug(s)</code>. The agent adapted to what it found, which a fixed script with four hard-coded reads couldn't.</span></li>
+<li>Optional, with an API key: <code>pip install anthropic</code>, set <code>ANTHROPIC_API_KEY</code> (<a href="#ch86">Chapter 86</a>), and run <code>python3 mini_agent.py</code> without <code>--fake</code>.<span class="expect">Claude chooses the tool calls itself; the order may differ and it may read files in parallel. The final answer should name the same open P1 bugs. Without a key it exits with a clear message.</span></li>
+</ol></div>
+<div class="code"><span class="cap">mini_agent.py</span><pre>"""The smallest useful agent loop: perceive, decide, act, observe, repeat.
+Offline: python3 mini_agent.py --fake      Real: python3 mini_agent.py (needs ANTHROPIC_API_KEY)"""
+import json, os, sys
+from pathlib import Path
+
+BUGS = Path("bugs")
+TOOLS = [
+    {"name": "list_bugs", "description": "List bug files in the bugs folder.",
+     "input_schema": {"type": "object", "properties": {}}},
+    {"name": "read_bug", "description": "Read one bug file by name.",
+     "input_schema": {"type": "object", "properties": {"name": {"type": "string"}},
+                      "required": ["name"]}},
+]
+
+def list_bugs():
+    return json.dumps(sorted(p.name for p in BUGS.glob("*.txt")))
+
+def read_bug(name):
+    return (BUGS / Path(name).name).read_text()   # Path(name).name drops any folder part
+
+def fake_model(messages):
+    """Pretends to be Claude: a fixed script, same reply shape as the real API."""
+    used = [b for m in messages if m["role"] == "assistant" for b in m["content"]
+            if b["type"] == "tool_use"]
+    seen = [b["content"] for m in messages if isinstance(m["content"], list)
+            for b in m["content"] if b["type"] == "tool_result"]
+    step = len(used) + 1
+    if not used:
+        return {"stop_reason": "tool_use", "content": [
+            {"type": "tool_use", "id": f"t{step}", "name": "list_bugs", "input": {}}]}
+    files = json.loads(seen[0])
+    if len(used) &lt;= len(files):
+        return {"stop_reason": "tool_use", "content": [
+            {"type": "tool_use", "id": f"t{step}", "name": "read_bug",
+             "input": {"name": files[len(used) - 1]}}]}
+    p1 = [s.splitlines()[0] for s in seen[1:] if "Priority: P1" in s and "Status: Open" in s]
+    return {"stop_reason": "end_turn", "content": [
+        {"type": "text", "text": f"{len(p1)} open P1 bug(s): " + "; ".join(p1)}]}
+
+def real_model(messages):
+    import anthropic
+    r = anthropic.Anthropic().messages.create(
+        model="claude-opus-5-5", max_tokens=1000, tools=TOOLS, messages=messages)
+    return r.to_dict()
+
+def run(task, model, max_steps=10):
+    messages = [{"role": "user", "content": task}]
+    for step in range(1, max_steps + 1):
+        reply = model(messages)                                   # decide
+        messages.append({"role": "assistant", "content": reply["content"]})
+        if reply["stop_reason"] != "tool_use":                    # finished
+            return " ".join(b["text"] for b in reply["content"] if b["type"] == "text")
+        results = []
+        for b in reply["content"]:
+            if b["type"] == "tool_use":                           # act
+                out = {"list_bugs": list_bugs, "read_bug": read_bug}[b["name"]](**b["input"])
+                print(f"step {step}: {b['name']}({b['input']}) -&gt; {out[:50]!r}")
+                results.append({"type": "tool_result", "tool_use_id": b["id"], "content": out})
+        messages.append({"role": "user", "content": results})     # observe
+    return "Stopped: step limit reached."
+
+if __name__ == "__main__":
+    BUGS.mkdir(exist_ok=True)
+    samples = {"BUG-101.txt": "BUG-101 Checkout total ignores voucher\nPriority: P1\nStatus: Open",
+               "BUG-102.txt": "BUG-102 Typo on login page\nPriority: P3\nStatus: Open",
+               "BUG-103.txt": "BUG-103 Search crashes on emoji\nPriority: P1\nStatus: Closed",
+               "BUG-104.txt": "BUG-104 Payment page times out\nPriority: P1\nStatus: Open"}
+    for name, text in samples.items():
+        (BUGS / name).write_text(text)
+    fake = "--fake" in sys.argv
+    if not fake and not os.environ.get("ANTHROPIC_API_KEY"):
+        sys.exit("No ANTHROPIC_API_KEY set. Run with --fake to use the offline stand-in.")
+    print(run("How many open P1 bugs are there? List them.", fake_model if fake else real_model))</pre></div>
+<p><b>Troubleshooting.</b> <code>SyntaxError</code> near <code>f"..."</code>: you're on an old Python; check <code>python3 --version</code> is 3.10 or newer. <code>No ANTHROPIC_API_KEY set</code>: add <code>--fake</code>, or set the key. <code>KeyError</code> in the real mode: Claude asked for a tool name you didn't define; check the <code>TOOLS</code> names match the dictionary in <code>run()</code>. The fake mode was tested on Python 3.11; the real mode follows Anthropic's documented format but was not run for this chapter because no API key was available.</p>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"The model runs the tools."</dt><dd>The model only requests a tool call. Your program decides whether to run it, which is where permissions and approvals live.</dd>
+<dt>"Agents are always better than workflows."</dt><dd>Agents cost more, vary more and are harder to test. Use one only when the steps can't be fixed in advance.</dd>
+<dt>"The agent remembers everything from last week."</dt><dd>Only what was saved outside the conversation and loaded again. Each API call sees only what you send.</dd>
+<dt>"If the agent says it's done, it's done."</dt><dd>Agents can declare success too early. Check the outcome in code or by a person.</dd>
+<dt>"Autonomy is a feature of the model."</dt><dd>It's a design decision you make for each action, based on impact and reversibility.</dd>
+</dl></div>
+
+<h3 id="ch107-r"><span class="num">107.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>An agent is a model plus tools plus a loop with limits: perceive, plan, act, observe, repeat.</li>
+<li>In the Claude API, the loop is tool use repeated: <code>stop_reason: "tool_use"</code>, run the tool, send a <code>tool_result</code>, until <code>end_turn</code>.</li>
+<li>Tool design (the agent-computer interface) matters as much as the prompt: few, narrow, well-described tools with helpful errors.</li>
+<li>Memory comes in layers: working memory (the conversation), run state (your code), long-term notes and searchable knowledge.</li>
+<li>Choose autonomy per action, based on how bad a mistake would be and whether it can be undone.</li>
+<li>Anthropic distinguishes workflows (predefined code paths) from agents (the model directs the process) and advises the simplest solution that works.</li>
+<li>Agents fail predictably: compounding errors, loops, premature "done", injection, scope creep, runaway cost. Test for each.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What tells your program that Claude wants a tool to be run?</p><div class="opts"><button>The reply contains the word "tool"</button><button data-ok>The reply has <code>stop_reason: "tool_use"</code> and a <code>tool_use</code> content block</button><button>Claude runs the tool and sends the result</button></div><p class="why" hidden>The tool_use block names the tool and its input; your code runs it and replies with a tool_result carrying the same id.</p></div>
+<div class="qz"><p class="q">By Anthropic's definition, which of these is a workflow rather than an agent?</p><div class="opts"><button data-ok>Code that always summarises, then classifies, then prioritises each new bug</button><button>A model that decides which logs to read until it finds the cause of a failure</button><button>Claude Code fixing a failing test on its own</button></div><p class="why" hidden>The steps are predefined in code. In an agent the model directs its own steps and tool use.</p></div>
+<div class="qz"><p class="q">An agent must close duplicate Jira tickets. Which autonomy level fits best at first?</p><div class="opts"><button>Act freely and report afterwards</button><button data-ok>Prepare the list and close tickets only after a person approves</button><button>Assist only: never touch Jira</button></div><p class="why" hidden>Closing tickets is visible and tedious to undo, so it needs approval; reading and preparing the list is safe to automate.</p></div>
+<div class="qz"><p class="q">Each step of a 20-step task succeeds 95% of the time, independently. Roughly how often does the whole task succeed?</p><div class="opts"><button>95%</button><button>75%</button><button data-ok>About 36%</button></div><p class="why" hidden>0.95 to the power 20 is about 0.36. This is why long unchecked chains are risky and checks between steps help.</p></div>
+<div class="qz"><p class="q">Where does an agent's long-term memory actually live?</p><div class="opts"><button>Inside the model's weights, updated after each run</button><button data-ok>In storage outside the conversation (files, a database), loaded into later runs</button><button>In the API's servers, automatically</button></div><p class="why" hidden>The model doesn't learn between calls. Memory is whatever your system saves and sends back later.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick one repetitive task from your team (for example: triaging nightly failures, checking a release checklist, tidying Jira labels). Write one page answering: (1) Could a single prompt do it? A workflow? Does it truly need an agent, and why? (2) List the tools it would need, each with a one-line description, and mark which are read-only and which change something. (3) Set an autonomy level for each tool and justify it. (4) Name the three failure modes from 106.7 you'd test first.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"An agent is a model in a loop. It looks at the goal and what it's learned, picks a tool, our code runs the tool, and the result goes back in. Round it goes until it says it's done or hits a limit we set. The model never acts directly; it asks, and our code decides. Most tasks don't need an agent; a fixed sequence of steps is cheaper and easier to test. When we do use one, we give it narrow tools, limits on steps and cost, and approval before anything consequential, and we test for the usual failures: loops, false 'done', and instructions hidden in the data."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://www.anthropic.com/engineering/building-effective-agents" target="_blank" rel="noopener">Building effective agents</a> (19 December 2024): workflows vs agents, simplicity, the three principles, agent-computer interface.</li>
+<li>Anthropic, <a href="https://www.anthropic.com/engineering/writing-tools-for-agents" target="_blank" rel="noopener">Writing effective tools for agents — with agents</a> (11 September 2025).</li>
+<li>Anthropic, <a href="https://www.anthropic.com/engineering/multi-agent-research-system" target="_blank" rel="noopener">How we built our multi-agent research system</a> (13 June 2025): token usage, checkpoints and resuming.</li>
+<li>Claude Docs, <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview" target="_blank" rel="noopener">Tool use with Claude</a> and <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/handle-tool-calls" target="_blank" rel="noopener">Handle tool calls</a> (tool_use, tool_result, is_error, ordering rules, memory tool).</li>
+<li>Yao et al., <a href="https://arxiv.org/abs/2210.03629" target="_blank" rel="noopener">ReAct: Synergizing Reasoning and Acting in Language Models</a> (arXiv, October 2022).</li>
+</ol><p class="verified">Verified 9 November 2026 against the Anthropic articles and Claude Docs pages listed. The autonomy ladder in 106.5 is this book's framing, not an official scale.</p></div>

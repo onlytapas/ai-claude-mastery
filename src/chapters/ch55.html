@@ -1,0 +1,324 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How to search inside files with <code>grep</code> and find files by name, type, size or age with <code>find</code></li>
+<li>How to count, sort and de-duplicate lines with <code>wc</code>, <code>sort</code>, <code>uniq</code> and <code>cut</code></li>
+<li>What standard input, standard output and standard error are, and why there are three of them</li>
+<li>How to join commands with a pipe <code>|</code> and save results with <code>&gt;</code>, <code>&gt;&gt;</code> and <code>2&gt;</code></li>
+<li>How exit codes work, how to read them with <code>$?</code>, and how <code>&amp;&amp;</code>, <code>||</code> and <code>;</code> use them</li>
+<li>How to answer real QA questions from logs and test results in one line</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch52">Chapter 52</a> (terminals and shells), <a href="#ch53">Chapter 53</a> (paths and quoting) and <a href="#ch54">Chapter 54</a> (<code>ls</code>, <code>cd</code>, <code>cat</code>, <code>head</code>, <code>tail</code>). You need a terminal: Terminal on macOS, any terminal on Linux, or WSL (Windows Subsystem for Linux) on Windows. Each section ends with notes for Linux and Windows.</div>
+
+<div class="bigidea"><p>Most command-line tools do one small job well: find lines, count lines, sort lines. The power comes from joining them. Every command reads text in through one channel and writes results out through another, with a third channel kept for error messages. The pipe <code>|</code> feeds one command's output straight into the next, and redirection (<code>&gt;</code>) sends it into a file. Every command also finishes with a number, its exit code, that says whether it succeeded, and that number is what scripts and CI pipelines use to decide what happens next.</p></div>
+
+<h3 id="ch55-1"><span class="num">55.1</span>Set up a practice folder</h3>
+<p>Every example in this chapter runs against the same small set of files: an application log, an API log and a CSV of test results. Create them once and you can repeat every command and see the same output that is printed here.</p>
+<p>Copy the whole block below and paste it into your terminal in one go. It uses a <strong>here-document</strong>: <code>cat &gt; file &lt;&lt;'EOF'</code> means "write everything I type next into this file, until a line that says only <code>EOF</code>". You don't need to master it yet; it's just a quick way to make files.</p>
+<div class="code"><span class="cap">Terminal (paste as one block)</span><pre>mkdir -p ~/qa-practice/logs ~/qa-practice/reports
+cd ~/qa-practice
+cat &gt; logs/app.log &lt;&lt;'EOF'
+2026-11-09 09:00:01 INFO  Server started on port 8080
+2026-11-09 09:00:05 INFO  User alice logged in
+2026-11-09 09:01:12 WARN  Slow response from /api/orders (2300 ms)
+2026-11-09 09:02:40 ERROR Payment service timeout for order 1042
+2026-11-09 09:03:02 INFO  User bob logged in
+2026-11-09 09:04:18 ERROR Database connection refused
+2026-11-09 09:05:30 error retrying payment for order 1042
+2026-11-09 09:06:45 WARN  Slow response from /api/orders (2900 ms)
+2026-11-09 09:07:10 ERROR Payment service timeout for order 1043
+2026-11-09 09:08:00 INFO  User alice logged out
+EOF
+cat &gt; logs/api.log &lt;&lt;'EOF'
+2026-11-09 10:00:00 INFO  GET /api/users 200
+2026-11-09 10:00:02 ERROR GET /api/orders 500
+2026-11-09 10:00:03 INFO  POST /api/login 200
+2026-11-09 10:00:09 ERROR POST /api/checkout 503
+EOF
+cat &gt; reports/results.csv &lt;&lt;'EOF'
+test,status,duration_ms
+login_valid,PASS,812
+login_wrong_password,PASS,640
+checkout_card,FAIL,3021
+checkout_paypal,PASS,2210
+search_empty,FAIL,95
+search_unicode,PASS,120
+profile_update,SKIP,0
+EOF
+ls logs reports</pre></div>
+<p>The last line should print the two folder listings: <code>api.log app.log</code> under <code>logs:</code> and <code>results.csv</code> under <code>reports:</code>. The data is illustrative, but its shape (timestamp, level, message) is how most real application logs look.</p>
+<div class="box note"><span class="tag">Windows</span><p>Everything in this chapter works unchanged inside WSL (Ubuntu by default), which is the easiest route for Windows users. PowerShell has its own equivalents, listed in a table at the end of each section, but its commands return objects rather than plain text, so the details differ.</p></div>
+
+<h3 id="ch55-2"><span class="num">55.2</span>grep: find lines that match</h3>
+<p><code>grep</code> reads text line by line and prints only the lines that contain a pattern. The name comes from an old editor command, "globally search for a regular expression and print". Its basic shape is:</p>
+<div class="code"><span class="cap">Syntax</span><pre>grep [OPTIONS] PATTERN [FILE...]   <span class="c"># square brackets mean "optional"</span></pre></div>
+<div class="code"><span class="cap">Terminal (in ~/qa-practice)</span><pre>grep ERROR logs/app.log</pre></div>
+<div class="code"><span class="cap">Output</span><pre>2026-11-09 09:02:40 ERROR Payment service timeout for order 1042
+2026-11-09 09:04:18 ERROR Database connection refused
+2026-11-09 09:07:10 ERROR Payment service timeout for order 1043</pre></div>
+<p>Three of the ten lines matched. Notice what's missing: line 7 says <code>error</code> in lower case. By default <code>grep</code> is <strong>case-sensitive</strong>, so <code>ERROR</code> and <code>error</code> are different patterns. That's exactly the kind of detail that makes a tester miss a bug in a log, so learn the options.</p>
+<div class="tbl"><table>
+<tr><th>Option</th><th>Meaning</th><th>Example and what it prints</th></tr>
+<tr><td><code>-i</code></td><td>Ignore case</td><td><code>grep -i error logs/app.log</code> prints 4 lines, including the lower-case one</td></tr>
+<tr><td><code>-c</code></td><td>Count matching lines instead of printing them</td><td><code>grep -c ERROR logs/app.log</code> prints <code>3</code></td></tr>
+<tr><td><code>-n</code></td><td>Show line numbers</td><td><code>grep -n WARN logs/app.log</code> prints <code>3:2026-11-09 09:01:12 WARN …</code> and <code>8:…</code></td></tr>
+<tr><td><code>-v</code></td><td>Invert: print lines that do <em>not</em> match</td><td><code>grep -v INFO logs/app.log</code> hides the routine lines, leaving warnings and errors</td></tr>
+<tr><td><code>-w</code></td><td>Match whole words only</td><td><code>grep -w error</code> matches "error" but not "errors" or "ERROR"</td></tr>
+<tr><td><code>-r</code></td><td>Search every file in a folder, recursively</td><td><code>grep -r ERROR logs</code> prefixes each line with its file name</td></tr>
+<tr><td><code>-l</code></td><td>List only the names of files that contain a match</td><td><code>grep -l ERROR logs/*</code> prints <code>logs/api.log</code> and <code>logs/app.log</code></td></tr>
+<tr><td><code>-o</code></td><td>Print only the matching part, not the whole line</td><td>See the pattern examples below</td></tr>
+<tr><td><code>-E</code></td><td>Extended patterns, so <code>|</code> means "or"</td><td><code>grep -E "ERROR|WARN" logs/app.log</code></td></tr>
+<tr><td><code>-A 1</code>, <code>-B 1</code>, <code>-C 1</code></td><td>Also show 1 line After, Before, or around each match</td><td>Context for a stack trace or the request that caused an error</td></tr>
+<tr><td><code>-q</code></td><td>Quiet: print nothing, just set the exit code</td><td>Used in scripts (section 55.7)</td></tr>
+</table></div>
+<p>Options can be combined: <code>grep -in error</code> is the same as <code>grep -i -n error</code>. Here is <code>-r</code> on the whole folder:</p>
+<div class="code"><span class="cap">Terminal</span><pre>grep -r ERROR logs</pre></div>
+<div class="code"><span class="cap">Output</span><pre>logs/api.log:2026-11-09 10:00:02 ERROR GET /api/orders 500
+logs/api.log:2026-11-09 10:00:09 ERROR POST /api/checkout 503
+logs/app.log:2026-11-09 09:02:40 ERROR Payment service timeout for order 1042
+logs/app.log:2026-11-09 09:04:18 ERROR Database connection refused
+logs/app.log:2026-11-09 09:07:10 ERROR Payment service timeout for order 1043</pre></div>
+<p>Each line now starts with <code>file name:</code> so you know where it came from. That's how you'd search a folder of CI logs for one failing test name.</p>
+
+<h4>Patterns: a first taste of regular expressions</h4>
+<p>The pattern doesn't have to be a plain word. <code>grep</code> understands <a class="gl" href="#g-regular-expression">regular expressions</a> (regex for short), a mini-language for describing text. You only need a few pieces to start:</p>
+<div class="tbl"><table>
+<tr><th>Piece</th><th>Means</th><th>Example</th></tr>
+<tr><td><code>.</code></td><td>Any single character</td><td><code>c.t</code> matches cat, cut, c9t</td></tr>
+<tr><td><code>*</code></td><td>The previous thing, zero or more times</td><td><code>[0-9]*</code> means "any run of digits"</td></tr>
+<tr><td><code>[0-9]</code>, <code>[a-z]</code></td><td>One character from a range</td><td><code>HTTP [45][0-9][0-9]</code> matches 4xx and 5xx codes</td></tr>
+<tr><td><code>^</code> and <code>$</code></td><td>Start and end of the line</td><td><code>^2026-11-09 09</code> finds lines from the 09:00 hour</td></tr>
+<tr><td><code>A|B</code> (with <code>-E</code>)</td><td>A or B</td><td><code>-E "ERROR|FATAL"</code></td></tr>
+</table></div>
+<div class="code"><span class="cap">Terminal</span><pre>grep -o "order [0-9]*" logs/app.log</pre></div>
+<div class="code"><span class="cap">Output</span><pre>order 1042
+order 1042
+order 1043</pre></div>
+<p><code>-o</code> printed only the part that matched, which pulls the order numbers out of the messages. Always put the pattern in <strong>double quotes</strong> when it contains spaces or special characters, or the shell will split or change it before <code>grep</code> sees it.</p>
+
+<div class="box analogy"><span class="tag">In everyday life</span><p><code>grep</code> is the "Find" box in your browser, but it works on a thousand files at once and gives you every hit as a list you can count, sort or save. <code>-v</code> is like crossing out every line you already know is fine, so the interesting ones are left.</p></div>
+<div class="tbl"><table>
+<tr><th>System</th><th>Notes</th></tr>
+<tr><td>macOS</td><td>Ships BSD grep (<code>grep --version</code> printed <code>grep (BSD grep, GNU compatible) 2.6.0-FreeBSD</code> on our test Mac, macOS 26). All the options above work.</td></tr>
+<tr><td>Linux</td><td>Ships GNU grep. Same options; many distributions also colour the matches by default.</td></tr>
+<tr><td>Windows PowerShell</td><td><code>Select-String -Path logs\app.log -Pattern ERROR</code>. It is case-<em>insensitive</em> by default; add <code>-CaseSensitive</code> to match grep. In old Command Prompt, <code>findstr</code> does a simpler job.</td></tr>
+</table></div>
+
+<h3 id="ch55-3"><span class="num">55.3</span>find: locate files by name, type, size or age</h3>
+<p><code>grep</code> looks <em>inside</em> files. <code>find</code> looks for the files themselves. It walks down through a folder and every folder inside it, testing each item against the conditions you give.</p>
+<div class="code"><span class="cap">Syntax</span><pre>find [WHERE TO START] [CONDITIONS] [ACTION]</pre></div>
+<div class="code"><span class="cap">Terminal</span><pre>find . -name "*.log"</pre></div>
+<div class="code"><span class="cap">Output</span><pre>./logs/api.log
+./logs/app.log</pre></div>
+<p>Read it as: start in <code>.</code> (the current folder), and print anything whose name matches <code>*.log</code>. The <code>*</code> is a <strong>wildcard</strong> meaning "any characters". The quotes matter: without them the shell tries to expand <code>*.log</code> itself before <code>find</code> runs. In zsh, the macOS default shell, an unquoted pattern that matches nothing in the current folder stops the command with <code>zsh: no matches found: *.log</code>.</p>
+<div class="tbl"><table>
+<tr><th>Condition</th><th>Meaning</th><th>Example</th></tr>
+<tr><td><code>-name "PATTERN"</code></td><td>Name matches (case-sensitive)</td><td><code>find . -name "*.csv"</code></td></tr>
+<tr><td><code>-iname "PATTERN"</code></td><td>Name matches, ignoring case</td><td><code>find . -iname "APP*"</code> finds <code>app.log</code></td></tr>
+<tr><td><code>-type f</code> / <code>-type d</code></td><td>Only files / only directories (folders)</td><td><code>find . -type d</code> prints <code>.</code>, <code>./logs</code>, <code>./reports</code></td></tr>
+<tr><td><code>-mtime -1</code></td><td>Modified less than 1 day ago (<code>+7</code> means more than 7 days ago)</td><td>Today's test reports</td></tr>
+<tr><td><code>-size +10M</code></td><td>Bigger than 10 megabytes (<code>k</code> for kilobytes)</td><td>Hunting giant log files filling a disk</td></tr>
+<tr><td><code>-exec CMD {} +</code></td><td>Run a command on everything found; <code>{}</code> stands for the file names</td><td>See below</td></tr>
+</table></div>
+<p>Several conditions together must all be true. <code>find . -type f -name "*.log" -mtime -1</code> means "files, ending in .log, changed in the last day". Combining <code>find</code> with <code>grep</code> answers "which of today's logs mention ERROR?":</p>
+<div class="code"><span class="cap">Terminal</span><pre>find . -name "*.log" -exec grep -l ERROR {} +</pre></div>
+<div class="code"><span class="cap">Output</span><pre>./logs/api.log
+./logs/app.log</pre></div>
+<div class="box warn"><span class="tag">find can delete</span><p><code>find</code> also has a <code>-delete</code> action, and people combine it with <code>-exec rm</code>. There is no bin and no undo. Always run the same <code>find</code> command <em>without</em> the delete part first, read the list, and only then add the action.</p></div>
+<div class="tbl"><table>
+<tr><th>System</th><th>Notes</th></tr>
+<tr><td>macOS / Linux</td><td>Both have <code>find</code> with these options. macOS also has <code>mdfind</code>, which searches the Spotlight index and is much faster across the whole disk.</td></tr>
+<tr><td>Windows PowerShell</td><td><code>Get-ChildItem -Recurse -Filter *.log</code> (short form <code>gci -r -fi *.log</code>).</td></tr>
+</table></div>
+
+<h3 id="ch55-4"><span class="num">55.4</span>wc, sort, uniq and cut: count and summarise</h3>
+<p>These four small tools turn a pile of lines into an answer.</p>
+<h4>wc: word count</h4>
+<div class="code"><span class="cap">Terminal</span><pre>wc logs/app.log
+wc -l logs/*.log</pre></div>
+<div class="code"><span class="cap">Output</span><pre>      10      79     570 logs/app.log
+       4 logs/api.log
+      10 logs/app.log
+      14 total</pre></div>
+<p>With no options <code>wc</code> prints three numbers: <strong>lines</strong> (10), <strong>words</strong> (79) and <strong>bytes</strong> (570), then the file name. <code>-l</code> asks for lines only, which is what you want 90% of the time; <code>-w</code> gives words and <code>-c</code> bytes. Given several files it adds a <code>total</code> line. The spaces in front of the numbers are just padding.</p>
+
+<h4>cut: pick out columns</h4>
+<p><code>cut -d, -f2</code> means "split each line at the delimiter <code>,</code> and keep field 2". On the results file that gives the status column:</p>
+<div class="code"><span class="cap">Terminal</span><pre>cut -d, -f2 reports/results.csv</pre></div>
+<div class="code"><span class="cap">Output</span><pre>status
+PASS
+PASS
+FAIL
+PASS
+FAIL
+PASS
+SKIP</pre></div>
+<p>The first line is the header. <code>tail -n +2</code> ("start from line 2") skips it, which you'll see in a moment.</p>
+
+<h4>sort and uniq</h4>
+<p><code>sort</code> puts lines in order. <code>uniq</code> removes <strong>adjacent</strong> duplicate lines, so it is almost always used after <code>sort</code>. With <code>-c</code> it counts how many times each line appeared.</p>
+<div class="tbl"><table>
+<tr><th>Command</th><th>Does</th></tr>
+<tr><td><code>sort</code></td><td>Alphabetical order</td></tr>
+<tr><td><code>sort -n</code></td><td>Numeric order (so 95 comes before 812, not after it)</td></tr>
+<tr><td><code>sort -r</code></td><td>Reverse the order; <code>-rn</code> means biggest number first</td></tr>
+<tr><td><code>sort -t, -k3 -n</code></td><td>Split on commas (<code>-t,</code>) and sort by column 3 (<code>-k3</code>), numerically</td></tr>
+<tr><td><code>sort -u</code></td><td>Sort and drop duplicates in one step</td></tr>
+<tr><td><code>uniq -c</code></td><td>Collapse repeated lines and put a count in front</td></tr>
+</table></div>
+<p>On their own they're mildly useful. Joined together with pipes they become a reporting tool, and that's the next section.</p>
+
+<h3 id="ch55-5"><span class="num">55.5</span>Standard input, output and error</h3>
+<p>Every program that runs in a terminal is started with three text channels already connected. They're called <strong>streams</strong>, and each has a number:</p>
+<div class="tbl"><table>
+<tr><th>Number</th><th>Name</th><th>Short name</th><th>Normally connected to</th></tr>
+<tr><td>0</td><td><a class="gl" href="#g-standard-input">Standard input</a></td><td>stdin</td><td>Your keyboard</td></tr>
+<tr><td>1</td><td><a class="gl" href="#g-standard-output">Standard output</a></td><td>stdout</td><td>Your terminal screen: the normal results</td></tr>
+<tr><td>2</td><td><a class="gl" href="#g-standard-error">Standard error</a></td><td>stderr</td><td>Also your terminal screen: error and warning messages</td></tr>
+</table></div>
+<p>Because stdout and stderr both appear on the same screen, they look like one thing. They're not, and you can prove it. Ask <code>ls</code> to list one folder that exists and one file that doesn't:</p>
+<div class="code"><span class="cap">Terminal</span><pre>ls logs missing.txt</pre></div>
+<div class="code"><span class="cap">Output</span><pre>ls: missing.txt: No such file or directory
+logs:
+api.log
+app.log</pre></div>
+<p>The first line went to stderr; the listing went to stdout. Once you start redirecting (next section) you'll see them separate.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a test runner as a worker at a desk with an in-tray (stdin), an out-tray for finished work (stdout) and a separate red tray for problems (stderr). Normally both trays are emptied onto the same table in front of you, your screen. Redirection lets you send the out-tray to one place and the red tray to another, so a report file doesn't fill up with error chatter, and errors don't get lost inside a report.</p></div>
+<details class="deep"><summary>Under the hood: file descriptors</summary><div class="body"><p>Inside the operating system, a running program refers to every open file, pipe or terminal by a small whole number called a <strong>file descriptor</strong>. Unix-like systems (macOS and Linux) agree that 0, 1 and 2 are always stdin, stdout and stderr. That's why redirection uses numbers: <code>2&gt;</code> literally means "point file descriptor 2 somewhere else before starting the program". The program itself doesn't know or care; it just writes to descriptor 1 or 2 as usual. This is why the same tool can write to a screen, a file or another program without any change to its code.</p></div></details>
+
+<h3 id="ch55-6"><span class="num">55.6</span>Pipes and redirection</h3>
+<h4>The pipe: |</h4>
+<p>A <a class="gl" href="#g-pipe">pipe</a>, the vertical bar <code>|</code> (Shift + backslash on most keyboards), connects the stdout of the command on its left to the stdin of the command on its right. Neither command needs to know about the other.</p>
+<div class="code"><span class="cap">Terminal</span><pre>grep ERROR logs/app.log | wc -l</pre></div>
+<div class="code"><span class="cap">Output</span><pre>       3</pre></div>
+<p><code>grep</code> found the error lines and, instead of printing them, handed them to <code>wc -l</code>, which counted them. When <code>wc</code> reads from a pipe there's no file name, so it prints only the number. Now the one-liner that summarises a test run:</p>
+<div class="code"><span class="cap">Terminal</span><pre>tail -n +2 reports/results.csv | cut -d, -f2 | sort | uniq -c | sort -rn</pre></div>
+<div class="code"><span class="cap">Output</span><pre>   4 PASS
+   2 FAIL
+   1 SKIP</pre></div>
+<div class="flow"><div><b>tail -n +2</b>drop the header row</div><div><b>cut -d, -f2</b>keep only the status column</div><div><b>sort</b>group identical statuses together</div><div class="hl"><b>uniq -c</b>count each group</div><div><b>sort -rn</b>biggest count first</div></div>
+<p>Build pipelines one stage at a time. Run the first command, look at the output, add <code>| next-command</code>, look again. If the final result is wrong, delete stages from the right until you find where it went wrong. A few more QA questions answered this way:</p>
+<div class="code"><span class="cap">Terminal</span><pre>tail -n +2 reports/results.csv | sort -t, -k3 -rn | head -3   <span class="c"># three slowest tests</span>
+grep -o "ERROR [A-Za-z ]*" logs/app.log | sort | uniq -c | sort -rn   <span class="c"># most common error types</span>
+grep -h -o "/api/[a-z]*" logs/*.log | sort | uniq -c | sort -rn   <span class="c"># most mentioned endpoints</span></pre></div>
+<div class="code"><span class="cap">Output</span><pre>checkout_card,FAIL,3021
+checkout_paypal,PASS,2210
+login_valid,PASS,812
+   2 ERROR Payment service timeout for order
+   1 ERROR Database connection refused
+   3 /api/orders
+   1 /api/users
+   1 /api/login
+   1 /api/checkout</pre></div>
+<p>(<code>-h</code> stops <code>grep</code> printing file names when it searches several files.) The middle one is the tester's favourite: it turns a long log into "two payment timeouts and one database failure", which is the first line of a good bug report.</p>
+
+<h4>Redirection: &gt;, &gt;&gt;, 2&gt; and &lt;</h4>
+<p><a class="gl" href="#g-redirection">Redirection</a> connects a stream to a file instead of the screen.</p>
+<div class="tbl"><table>
+<tr><th>Symbol</th><th>Meaning</th><th>Example</th></tr>
+<tr><td><code>&gt; file</code></td><td>Send stdout to a file, <strong>replacing</strong> whatever was in it</td><td><code>grep ERROR logs/app.log &gt; errors.txt</code></td></tr>
+<tr><td><code>&gt;&gt; file</code></td><td>Send stdout to a file, <strong>adding</strong> to the end</td><td><code>grep ERROR logs/api.log &gt;&gt; errors.txt</code></td></tr>
+<tr><td><code>2&gt; file</code></td><td>Send stderr (stream 2) to a file</td><td><code>ls logs missing.txt 2&gt; ls-errors.txt</code></td></tr>
+<tr><td><code>&gt; file 2&gt;&amp;1</code></td><td>Send stdout to the file, then send stderr to the same place as stdout</td><td>Capture everything a test run prints</td></tr>
+<tr><td><code>2&gt; /dev/null</code></td><td>Throw stderr away. <code>/dev/null</code> is a special file that discards whatever is written to it</td><td>Hide expected noise</td></tr>
+<tr><td><code>&lt; file</code></td><td>Feed a file into stdin</td><td><code>wc -l &lt; logs/app.log</code> prints just <code>10</code>, with no file name</td></tr>
+<tr><td><code>| tee file</code></td><td>Show the output <em>and</em> save a copy</td><td><code>grep ERROR logs/app.log | tee errs.txt | wc -l</code></td></tr>
+</table></div>
+<div class="code"><span class="cap">Terminal</span><pre>grep ERROR logs/app.log &gt; errors.txt       <span class="c"># prints nothing: the output went into the file</span>
+grep ERROR logs/api.log &gt;&gt; errors.txt      <span class="c"># add the API errors on the end</span>
+wc -l errors.txt
+ls logs missing.txt 2&gt; ls-errors.txt     <span class="c"># the listing shows; the error is saved</span>
+cat ls-errors.txt</pre></div>
+<div class="code"><span class="cap">Output</span><pre>       5 errors.txt
+logs:
+api.log
+app.log
+ls: missing.txt: No such file or directory</pre></div>
+<p>3 lines from the first <code>grep</code> plus 2 appended gives 5. In the second pair, the error was diverted to a file while the normal listing still appeared on screen: proof that the two streams are separate.</p>
+<div class="box warn"><span class="tag">&gt; empties the file first</span><p>The shell opens the target file and empties it <em>before</em> the command starts. <code>sort results.csv &gt; results.csv</code> therefore destroys your data: by the time <code>sort</code> reads the file, it's already empty. Write to a new file, check it, then rename it. And use <code>&gt;&gt;</code> whenever you mean "add to".</p></div>
+<div class="box note"><span class="tag">Order matters in 2&gt;&amp;1</span><p><code>cmd &gt; all.txt 2&gt;&amp;1</code> puts both streams in the file. <code>cmd 2&gt;&amp;1 &gt; all.txt</code> does not: it points stderr at the screen (where stdout was at that moment) and only then moves stdout. Read redirections left to right. In zsh and Bash, <code>&amp;&gt; all.txt</code> is a shorter way to write the first form.</p></div>
+<div class="tbl"><table>
+<tr><th>System</th><th>Notes</th></tr>
+<tr><td>macOS / Linux</td><td>Identical. On Linux GNU <code>wc</code> pads numbers differently, which doesn't matter.</td></tr>
+<tr><td>Windows PowerShell</td><td><code>|</code>, <code>&gt;</code>, <code>&gt;&gt;</code>, <code>2&gt;</code> and <code>2&gt;&amp;1</code> all exist, but PowerShell pipes pass <em>objects</em>. Equivalents: <code>Measure-Object -Line</code> for <code>wc -l</code>, <code>Sort-Object</code>, <code>Group-Object</code> for <code>sort | uniq -c</code>, <code>Tee-Object</code>, and <code>$null</code> in place of <code>/dev/null</code>.</td></tr>
+</table></div>
+
+<h3 id="ch55-7"><span class="num">55.7</span>Exit codes and chaining commands</h3>
+<p>Every command, when it finishes, hands the shell a number called its <a class="gl" href="#g-exit-code">exit code</a> (also called exit status or return code). The rule is simple: <strong>0 means success; anything from 1 to 255 means something went wrong</strong>. The shell keeps the last command's exit code in a special variable, <code>$?</code>, which you can print with <code>echo</code>.</p>
+<div class="code"><span class="cap">Terminal</span><pre>grep ERROR logs/app.log &gt; /dev/null
+echo $?
+grep FATAL logs/app.log
+echo $?
+grep FATAL nofile.log
+echo $?</pre></div>
+<div class="code"><span class="cap">Output</span><pre>0
+1
+grep: nofile.log: No such file or directory
+2</pre></div>
+<p><code>grep</code> documents three outcomes: <code>0</code> found a match, <code>1</code> found no match, <code>2</code> an error such as a missing file. Read <code>$?</code> immediately: the very next command, even <code>echo</code>, replaces it. Other tools have their own meanings above 0, listed in their <code>man</code> page under "EXIT STATUS". For example, <code>ls</code> with a missing file returns 1 on macOS and 2 on Linux.</p>
+<div class="box example"><span class="tag">Real-world example: why CI cares</span><p>When a CI pipeline (Jenkins, GitHub Actions, GitLab CI) runs <code>npx playwright test</code> or <code>pytest</code>, it doesn't read the words on screen. It looks only at the exit code. Zero turns the step green; anything else turns it red and stops the pipeline. If a wrapper script swallows the test runner's exit code, a failing suite shows as green. This is one of the most common causes of "the build passed but the tests were failing" (<a href="#ch57">Chapter 57</a> shows how to pass exit codes on correctly).</p></div>
+
+<h4>&amp;&amp;, || and ;</h4>
+<div class="tbl"><table>
+<tr><th>Operator</th><th>Meaning</th><th>Example</th></tr>
+<tr><td><code>A &amp;&amp; B</code></td><td>Run B only if A <strong>succeeded</strong> (exit code 0)</td><td><code>mkdir -p out &amp;&amp; cd out</code></td></tr>
+<tr><td><code>A || B</code></td><td>Run B only if A <strong>failed</strong> (non-zero)</td><td><code>grep -q ERROR app.log || echo "Clean log"</code></td></tr>
+<tr><td><code>A ; B</code></td><td>Run A, then B, whatever happened</td><td><code>echo one; false; echo two</code> prints both lines</td></tr>
+</table></div>
+<div class="code"><span class="cap">Terminal</span><pre>grep -q FATAL logs/app.log &amp;&amp; echo "Found fatal" || echo "No fatal errors"</pre></div>
+<div class="code"><span class="cap">Output</span><pre>No fatal errors</pre></div>
+<p><code>grep -q</code> printed nothing and returned 1 (no match), so the <code>&amp;&amp;</code> part was skipped and the <code>||</code> part ran. Two built-in commands make experiments easy: <code>true</code> does nothing and returns 0; <code>false</code> does nothing and returns 1.</p>
+<details class="deep"><summary>Under the hood: what a pipeline's exit code is</summary><div class="body"><p>A pipeline such as <code>grep FATAL logs/app.log | wc -l</code> has several commands but only one <code>$?</code>. By default it's the exit code of the <strong>last</strong> command. Here <code>grep</code> failed (1) but <code>wc</code> succeeded, so <code>$?</code> is 0 and the failure is hidden. Bash and zsh have an option, <code>set -o pipefail</code>, that makes the pipeline fail if any stage fails. We tested both: without it the status was 0; with it, 1. Scripts often turn it on (<a href="#ch57">Chapter 57</a>).</p></div></details>
+<div class="tbl"><table>
+<tr><th>System</th><th>Notes</th></tr>
+<tr><td>macOS / Linux</td><td>Identical in zsh and Bash.</td></tr>
+<tr><td>Windows PowerShell</td><td>The last program's exit code is in <code>$LASTEXITCODE</code>. <code>$?</code> exists but is just <code>True</code> or <code>False</code>. <code>&amp;&amp;</code> and <code>||</code> work in PowerShell 7 and later, not in the older Windows PowerShell 5.1; <code>;</code> works in both.</td></tr>
+</table></div>
+
+<div class="lab"><div class="lab-h"><b>Triage a log and a test run from the terminal</b><span>35 min · macOS, Linux or WSL</span></div><ol>
+<li>Create the practice files from section 55.1 and run <code>cd ~/qa-practice</code>.<span class="expect"><code>ls logs reports</code> shows <code>api.log</code>, <code>app.log</code> and <code>results.csv</code>.</span></li>
+<li>Count error lines both ways: <code>grep -c ERROR logs/app.log</code> and <code>grep -ci error logs/app.log</code>.<span class="expect"><code>3</code>, then <code>4</code>. Write down why they differ.</span></li>
+<li>Show only warnings and errors, with line numbers: <code>grep -n -v INFO logs/app.log</code>.<span class="expect">6 lines, starting <code>3:</code>, <code>4:</code>, <code>6:</code>, <code>7:</code>, <code>8:</code>, <code>9:</code>.</span></li>
+<li>Find every log in the folder tree: <code>find . -type f -name "*.log"</code>.<span class="expect"><code>./logs/api.log</code> and <code>./logs/app.log</code> (the order can differ).</span></li>
+<li>Summarise the test run: <code>tail -n +2 reports/results.csv | cut -d, -f2 | sort | uniq -c | sort -rn</code>. Build it up one stage at a time.<span class="expect">final result <code>4 PASS</code>, <code>2 FAIL</code>, <code>1 SKIP</code>.</span></li>
+<li>List only the failing tests: <code>grep ",FAIL," reports/results.csv | cut -d, -f1</code>.<span class="expect"><code>checkout_card</code> and <code>search_empty</code>.</span></li>
+<li>Save a triage file: <code>grep -h ERROR logs/*.log &gt; triage.txt</code>, then <code>echo "--- slow" &gt;&gt; triage.txt</code>, then <code>grep "Slow response" logs/app.log &gt;&gt; triage.txt</code>, then <code>cat triage.txt</code>.<span class="expect">5 error lines, a <code>--- slow</code> line, then 2 slow-response lines.</span></li>
+<li>Separate the streams: <code>ls reports nothing-here 2&gt; err.txt</code>, then <code>cat err.txt</code>.<span class="expect">the listing on screen, and the "No such file or directory" message only inside <code>err.txt</code>.</span></li>
+<li>Check exit codes: run <code>grep -q FATAL logs/app.log; echo $?</code>, then the same with <code>ERROR</code>.<span class="expect"><code>1</code>, then <code>0</code>.</span></li>
+<li>Write a release gate in one line: <code>grep -q ",FAIL," reports/results.csv &amp;&amp; echo "Release blocked" || echo "Ready"</code>.<span class="expect"><code>Release blocked</code>. Change both FAIL rows to PASS in a copy of the file and the same line prints <code>Ready</code>.</span></li>
+</ol>
+<p><b>Troubleshooting.</b> <code>zsh: no matches found</code>: put the pattern in quotes. <code>No such file or directory</code>: you're not in <code>~/qa-practice</code>; run <code>pwd</code>. Counts of 0 for things you can see: check upper and lower case, or add <code>-i</code>. The terminal seems stuck after a command: you probably left out the file name, so the tool is waiting for keyboard input on stdin; press Ctrl+C.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"grep found nothing, so the log is clean."</dt><dd>Maybe the case or wording differs. Search with <code>-i</code>, and check the exit code: 1 means no match, 2 means grep couldn't read the file at all.</dd>
+<dt>"<code>&gt;</code> and <code>&gt;&gt;</code> are interchangeable."</dt><dd><code>&gt;</code> replaces the file's contents; <code>&gt;&gt;</code> adds to the end. Mixing them up silently loses earlier results.</dd>
+<dt>"<code>uniq</code> removes all duplicates."</dt><dd>Only neighbouring ones. Sort first, or use <code>sort -u</code>.</dd>
+<dt>"Error messages are part of a command's output."</dt><dd>They travel on a separate stream, stderr. <code>&gt; file</code> captures only stdout; add <code>2&gt;&amp;1</code> to capture both.</dd>
+<dt>"Exit code 1 always means a crash."</dt><dd>It means whatever that tool documents. For <code>grep</code>, 1 simply means "no match", which may be good news.</dd>
+</dl></div>
+
+<h3 id="ch55-r"><span class="num">55.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li><code>grep</code> finds lines inside files (<code>-i</code>, <code>-c</code>, <code>-n</code>, <code>-v</code>, <code>-r</code>, <code>-l</code>, <code>-o</code>, <code>-E</code>, <code>-q</code>); <code>find</code> finds files by name, type, size or age.</li>
+<li><code>wc -l</code> counts lines; <code>cut</code> picks columns; <code>sort</code> orders; <code>uniq -c</code> counts repeated neighbouring lines.</li>
+<li>Every program has stdin (0), stdout (1) and stderr (2). Results and errors travel separately.</li>
+<li><code>|</code> joins commands; <code>&gt;</code> overwrites a file, <code>&gt;&gt;</code> appends, <code>2&gt;</code> redirects errors, <code>2&gt;&amp;1</code> merges them.</li>
+<li>Exit code 0 means success. <code>$?</code> shows the last one; <code>&amp;&amp;</code> runs on success, <code>||</code> on failure, <code>;</code> always. CI decides pass or fail from exit codes alone.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Which command counts the lines in app.log that contain "error" in any mix of upper and lower case?</p><div class="opts"><button>grep error app.log | wc</button><button data-ok>grep -ci error app.log</button><button>grep -v error app.log</button></div><p class="why" hidden><code>-c</code> counts matching lines and <code>-i</code> ignores case. <code>-v</code> would show the lines that don't match.</p></div>
+<div class="qz"><p class="q">You run <code>npx playwright test &gt; run.txt</code> but the error messages still appear on screen and not in the file. Why?</p><div class="opts"><button>The file was full</button><button data-ok>&gt; only redirects stdout; errors go to stderr, which needs 2&gt; or 2&gt;&amp;1</button><button>Playwright can't write to files</button></div><p class="why" hidden>Use <code>&gt; run.txt 2&gt;&amp;1</code> to capture both streams.</p></div>
+<div class="qz"><p class="q">Why does <code>sort | uniq -c</code> usually need the <code>sort</code>?</p><div class="opts"><button>uniq only works on numbers</button><button>sort removes the header</button><button data-ok>uniq only merges duplicates that are next to each other</button></div><p class="why" hidden>Sorting puts identical lines together so <code>uniq</code> can count them as one group.</p></div>
+<div class="qz"><p class="q"><code>grep -q FATAL app.log</code> returns exit code 1. What does that mean?</p><div class="opts"><button>grep crashed</button><button data-ok>The file was read and no line matched</button><button>The file doesn't exist</button></div><p class="why" hidden>For grep, 0 is a match, 1 is no match and 2 is an error such as a missing file.</p></div>
+<div class="qz"><p class="q">In <code>run-tests &amp;&amp; deploy</code>, when does <code>deploy</code> run?</p><div class="opts"><button>Always</button><button data-ok>Only if run-tests exits with code 0</button><button>Only if run-tests fails</button></div><p class="why" hidden><code>&amp;&amp;</code> runs the next command only on success, which is why it's the simplest release gate.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Take a real log from your team's test environment or CI (a Playwright run, an API server log or a Jenkins console output saved to a file, with any personal data removed). Write three one-line pipelines that answer: how many errors are there, which error message is most common, and which test or endpoint is mentioned most. Save each answer to a file with <code>&gt;</code> or <code>&gt;&gt;</code>, and paste the pipelines and results into your next bug report or stand-up note.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Terminal tools each do one small thing: grep finds lines, find finds files, wc counts, sort sorts, uniq counts repeats. The pipe symbol feeds one tool's output into the next, so grep ERROR app.log | wc -l counts errors. Greater-than saves output to a file; two greater-thans add to it. Errors travel on a separate stream, so you capture them with 2>. And every command ends with an exit code, zero for success, which is all CI looks at to turn a build red or green."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>GNU, <a href="https://www.gnu.org/software/grep/manual/grep.html" target="_blank" rel="noopener">GNU grep manual</a> (options and exit status).</li>
+<li>GNU, <a href="https://www.gnu.org/software/findutils/manual/html_mono/find.html" target="_blank" rel="noopener">GNU findutils manual</a> and <a href="https://www.gnu.org/software/coreutils/manual/coreutils.html" target="_blank" rel="noopener">GNU coreutils manual</a> (wc, sort, uniq, cut, tee).</li>
+<li>GNU, <a href="https://www.gnu.org/software/bash/manual/bash.html#Redirections" target="_blank" rel="noopener">Bash Reference Manual: Redirections</a> and <a href="https://www.gnu.org/software/bash/manual/bash.html#Pipelines" target="_blank" rel="noopener">Pipelines</a> (including <code>pipefail</code>).</li>
+<li>Zsh, <a href="https://zsh.sourceforge.io/Doc/Release/Redirection.html" target="_blank" rel="noopener">Zsh manual: Redirection</a>.</li>
+<li>Microsoft, <a href="https://learn.microsoft.com/powershell/module/microsoft.powershell.utility/select-string" target="_blank" rel="noopener">Select-String</a> and <a href="https://learn.microsoft.com/powershell/module/microsoft.powershell.core/about/about_pipeline_chain_operators" target="_blank" rel="noopener">about_Pipeline_Chain_Operators</a> (<code>&amp;&amp;</code> and <code>||</code> in PowerShell 7).</li>
+<li>The <code>man</code> pages on your own machine: <code>man grep</code>, <code>man find</code>, <code>man sort</code>.</li>
+</ol><p class="verified">Verified 9 November 2026 by running every command shown on macOS 26.6 (zsh 5.9, BSD grep 2.6.0); outputs are from those runs. Content type: established tools · Last reviewed 9 November 2026</p></div>

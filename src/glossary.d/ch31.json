@@ -1,0 +1,74 @@
+{
+ "Model tier": {
+  "d": "A named size level within a model family, such as Claude's Haiku, Sonnet, Opus and Fable. Higher tiers are usually more capable but slower and more expensive.",
+  "see": "ch31"
+ },
+ "Model snapshot": {
+  "d": "One fixed, frozen version of a model, identified by an exact model ID. Calling the same snapshot later gives you the same model.",
+  "see": "ch31"
+ },
+ "Deprecation": {
+  "d": "The stage where a model still works but has a published date after which it will be retired and stop answering.",
+  "see": "ch31"
+ },
+ "Distillation": {
+  "d": "Training a smaller 'student' model to imitate a larger 'teacher' model, so the small model gains much of the large one's skill at lower running cost.",
+  "see": "ch31"
+ },
+ "Mixture of Experts": {
+  "d": "A model design with many expert sub-networks and a router that uses only a few of them for each token, so total size can be huge while cost per token stays lower. Often shortened to MoE.",
+  "see": "ch31"
+ },
+ "Active parameters": {
+  "d": "In a Mixture of Experts model, the parameters actually used to process each token, as opposed to the model's total parameter count.",
+  "see": "ch31"
+ },
+ "Proprietary model": {
+  "d": "A model whose weights are kept private by its maker; you can only use it through the maker's app, API or approved cloud partners.",
+  "see": "ch32"
+ },
+ "Open source AI": {
+  "d": "Under the Open Source Initiative's 2024 definition, an AI system released with its weights, complete training and running code, and detailed training-data information, under terms allowing use, study, modification and sharing.",
+  "see": "ch32"
+ },
+ "Permissive licence": {
+  "d": "A licence such as Apache 2.0 or MIT that allows commercial use, modification and redistribution with few conditions, mainly keeping the notices.",
+  "see": "ch32"
+ },
+ "Acceptable use policy": {
+  "d": "A document from a model or service provider listing the uses that are forbidden. Licences and terms often require you to follow it.",
+  "see": "ch32"
+ },
+ "Self-hosting": {
+  "d": "Running a model on hardware you control (your own computer, servers or cloud account) instead of calling a vendor's API.",
+  "see": "ch32"
+ },
+ "Quantisation": {
+  "d": "Storing a model's numbers with fewer bits (for example 8-bit or 4-bit instead of 16-bit) so it needs less memory and runs faster, usually with a small loss of quality.",
+  "see": "ch32"
+ },
+ "Model card": {
+  "d": "A short document published with a model describing who made it, its intended uses, how it was evaluated, its results, risks and limits.",
+  "see": "ch33"
+ },
+ "System card": {
+  "d": "A detailed report a lab publishes with a major model release, covering capabilities, safety testing, red-teaming, safeguards and the deployment decision.",
+  "see": "ch33"
+ },
+ "Leaderboard": {
+  "d": "A public ranking of models by their scores on a benchmark or on human preference votes.",
+  "see": "ch33"
+ },
+ "Cherry-picking": {
+  "d": "Showing only the results that look good, such as the benchmarks a model won, while leaving out the rest.",
+  "see": "ch33"
+ },
+ "Benchmark contamination": {
+  "d": "When a benchmark's questions or answers have leaked into a model's training data, so it can score well by remembering rather than solving.",
+  "see": "ch33"
+ },
+ "Benchmark saturation": {
+  "d": "When top models all score near the maximum on a benchmark, so it no longer separates good models from better ones.",
+  "see": "ch33"
+ }
+}

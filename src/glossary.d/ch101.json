@@ -1,0 +1,42 @@
+{
+ "Acceptance criteria": {
+  "d": "The conditions a user story must meet to be accepted as done, usually written by the product owner. Testers turn them into test cases.",
+  "see": "ch101"
+ },
+ "Accessibility tree": {
+  "d": "The browser's structured description of a page (headings, buttons, text boxes and their names) used by screen readers. Playwright MCP reads it to understand pages without screenshots.",
+  "see": "ch102"
+ },
+ "API token": {
+  "d": "A long secret string that lets a program sign in to a service (such as Jira) on your behalf instead of a password. Treat it like a password and keep it out of code and chats.",
+  "see": "ch98"
+ },
+ "Headless browser": {
+  "d": "A web browser running without a visible window, controlled by software. Used for automated tests and on servers with no screen.",
+  "see": "ch102"
+ },
+ "JQL": {
+  "d": "Jira Query Language: Jira's search language, for example: project = PAY AND issuetype = Bug AND status != Done.",
+  "see": "ch101"
+ },
+ "Least privilege": {
+  "d": "The security principle of giving a person, program or AI only the access it needs for its task, and nothing more.",
+  "see": "ch105"
+ },
+ "Locator": {
+  "d": "In Playwright, a way of finding an element on the page, ideally the way a user would (by role, label or text) rather than by fragile CSS details.",
+  "see": "ch102"
+ },
+ "OAuth": {
+  "d": "A standard way to let an app act on your behalf without giving it your password: you sign in on the service's own page and approve, and the app receives a revocable access token.",
+  "see": "ch98"
+ },
+ "Playwright": {
+  "d": "A free, open-source tool from Microsoft for automating Chromium, Firefox and WebKit browsers, widely used for end-to-end testing.",
+  "see": "ch102"
+ },
+ "Storage state": {
+  "d": "A saved file of a browser's cookies and local storage, used to start automated sessions already logged in.",
+  "see": "ch102"
+ }
+}

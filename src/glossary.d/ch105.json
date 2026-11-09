@@ -1,0 +1,26 @@
+{
+ "Tool poisoning": {
+  "d": "An attack where an MCP server hides instructions for the AI inside its tool names or descriptions, which the AI reads when deciding which tool to use.",
+  "see": "ch105"
+ },
+ "Rug pull": {
+  "d": "When a tool or MCP server that was safe when you installed it changes later, for example through an automatic update, and starts behaving badly.",
+  "see": "ch105"
+ },
+ "Token passthrough": {
+  "d": "A forbidden MCP design where a server forwards an access token it received to another service without checking the token was issued for itself.",
+  "see": "ch105"
+ },
+ "Confused deputy": {
+  "d": "A security problem where a trusted middleman is tricked into using its own authority on someone else's behalf, such as an MCP proxy granting access without the user's consent.",
+  "see": "ch105"
+ },
+ "Data exfiltration": {
+  "d": "Data being copied or sent out of a system it's supposed to stay in, for example customer data pasted into a public issue.",
+  "see": "ch105"
+ },
+ "Least privilege": {
+  "d": "The security principle of giving a person, tool or token only the access it needs for its job, and nothing more.",
+  "see": "ch105"
+ }
+}

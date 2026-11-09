@@ -1,0 +1,188 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How to plan a session around what people will be able to do afterwards, not around what you know</li>
+<li>Three ready-to-use plans: a 60-minute workshop, a half-day workshop and a four-session series</li>
+<li>How to adapt AI topics for non-technical audiences, and how to run live demos that survive things going wrong</li>
+<li>Exercises that work, and how to handle hard questions such as "Will AI take my job?" and "Is our data safe?"</li>
+<li>How to measure whether people actually learned something, and how to use this book as course material</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> no technical prerequisites. You'll teach best from chapters you've completed yourself, including the labs. Useful companions: <a href="#ch128">Chapter 128</a> (a QA adoption roadmap), <a href="#ch132">Chapter 132</a> (privacy and data) and <a href="#ch135">Chapter 135</a> (responsible AI).</div>
+
+<div class="bigidea"><p>Teaching is the fastest way to find the gaps in your own understanding, and in a team adopting AI, it's how one person's skill becomes everyone's. Good AI teaching is mostly hands-on: a short explanation, a live demo, then people try it themselves on realistic work, with you nearby. Start from what people should be able to do afterwards, prepare demos that can fail safely, answer hard questions honestly, and check later whether anyone's work actually changed. This book's chapters, labs, quizzes and "Teach it" boxes are designed to be reused as course material.</p></div>
+
+<h3 id="ch145-1"><span class="num">145.1</span>Start with what people will do afterwards</h3>
+<p>The most common mistake in internal training is starting from the content: "I'll cover tokens, then context windows, then prompting…". Start instead from <a class="gl" href="#g-learning-objective">learning objectives</a>: specific things people will be able to do when they leave. Every slide, demo and exercise should serve one of them; anything that doesn't gets cut.</p>
+<div class="tbl"><table>
+<tr><th>Weak objective</th><th>Strong objective</th></tr>
+<tr><td>Understand prompting</td><td>Rewrite a vague prompt into one with task, context, format and constraints, and compare the two outputs</td></tr>
+<tr><td>Know about hallucinations</td><td>Spot an unsupported claim in an AI answer and check it against the source</td></tr>
+<tr><td>Learn Claude Code</td><td>Ask Claude Code to explain an unfamiliar test file and run one test from it</td></tr>
+<tr><td>Be aware of data risks</td><td>Say which of five example inputs may be pasted into the company's approved AI tool, and why</td></tr>
+</table></div>
+<p>Strong objectives start with an action verb you could observe (rewrite, spot, run, choose, explain to someone), which makes them easy to test at the end of the session.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A good swimming instructor doesn't open with fluid dynamics. Lesson one ends with "you can float on your back for ten seconds". The physics can come later, for those who want it. AI teaching works the same way: first a small, real success, then the explanation of why it worked.</p></div>
+
+<h3 id="ch145-2"><span class="num">145.2</span>Know your audience</h3>
+<p>Send a three-question survey a week before: What's your role? How often do you use AI tools now (never, monthly, weekly, daily)? What's one task you'd like help with? The third answer gives you exercises drawn from real work, which is the strongest motivation there is.</p>
+<div class="cols2">
+<div><h4>Non-technical audiences</h4><ul>
+<li>Use everyday analogies from this book's "In everyday life" boxes</li>
+<li>Demo in the chat app, not the terminal</li>
+<li>Focus on writing, summarising, analysing, checking</li>
+<li>Name the jargon once, then use plain words</li>
+<li>Spend more time on "when not to trust it"</li>
+</ul></div>
+<div><h4>Technical audiences</h4><ul>
+<li>Show the mechanism: tokens, context, tools, structured output</li>
+<li>Demo Claude Code, the API or MCP on a real repo</li>
+<li>Let them break things and measure (evals)</li>
+<li>Expect scepticism; welcome it and show failure cases</li>
+<li>Point to the "Under the hood" sections for depth</li>
+</ul></div>
+</div>
+<p>Mixed groups are common in QA teams. Pair people across experience levels for exercises: the confident user drives, the newcomer navigates and asks questions, then they swap.</p>
+
+<h3 id="ch145-3"><span class="num">145.3</span>Three ready-made plans</h3>
+<h4>A · The 60-minute workshop: "AI as a testing partner"</h4>
+<p>For any audience. Objectives: write a well-structured prompt, generate and critique test ideas for a story, and check an AI answer against a source.</p>
+<div class="tbl"><table>
+<tr><th>Time</th><th>Activity</th><th>Material</th></tr>
+<tr><td>0–5</td><td>Hook: show one great AI answer and one confidently wrong one. Ask "which would you trust?"</td><td>Chapter 22</td></tr>
+<tr><td>5–15</td><td>How it works in five minutes: predicting text, context, why it makes things up</td><td>Teach it boxes from Chapters 14, 20, 22</td></tr>
+<tr><td>15–25</td><td>Live demo: vague prompt versus structured prompt for test ideas from a story</td><td>Chapter 44, a demo story</td></tr>
+<tr><td>25–45</td><td>Hands-on in pairs: generate test ideas for a real (non-confidential) story, then mark each idea keep, fix or delete</td><td>Chapter 120</td></tr>
+<tr><td>45–55</td><td>Debrief: what did it miss? What did it invent? What would you check before using it?</td><td>Whiteboard</td></tr>
+<tr><td>55–60</td><td>Rules of the road (approved tools, data), one quiz question, next steps</td><td>Chapter 132, company policy</td></tr>
+</table></div>
+<h4>B · The half-day workshop: "AI-assisted QA in practice"</h4>
+<p>About 3.5 hours with a break. For testers and developers with laptops and access to the approved tools set up <em>before</em> the day.</p>
+<div class="tbl"><table>
+<tr><th>Block</th><th>Content</th><th>Hands-on</th></tr>
+<tr><td>1 · 45 min</td><td>How models work and fail; prompting fundamentals</td><td>Prompt rewrite exercise</td></tr>
+<tr><td>2 · 50 min</td><td>Requirements and test design with AI; ambiguity hunting</td><td>Test design for two stories, peer review</td></tr>
+<tr><td>Break · 15 min</td><td></td><td></td></tr>
+<tr><td>3 · 50 min</td><td>Automation with Claude Code: plan, write, run, make it fail, review the diff</td><td>Follow Chapter 121's lab on a practice repo</td></tr>
+<tr><td>4 · 35 min</td><td>Safety: data rules, prompt injection, approval before actions</td><td>Spot-the-risk cards</td></tr>
+<tr><td>5 · 15 min</td><td>Commitments: each person names one task they'll try this week</td><td>Written on a card or in a shared doc</td></tr>
+</table></div>
+<h4>C · The four-session series</h4>
+<p>Weekly 90-minute sessions with homework between them. This is the format most likely to change how people work, because they practise on real tasks between sessions and report back.</p>
+<div class="tbl"><table>
+<tr><th>Session</th><th>Theme</th><th>Chapters in this book</th><th>Homework</th></tr>
+<tr><td>1</td><td>Understanding: how AI works, where it fails</td><td>14, 20, 22, 44</td><td>Use AI on one real task; note one success and one failure</td></tr>
+<tr><td>2</td><td>Using: test design, exploratory testing, bug reports</td><td>119, 123</td><td>Draft test ideas for a live story; get a colleague's review</td></tr>
+<tr><td>3</td><td>Automating: Claude Code, Playwright, MCP</td><td>65, 101, 120</td><td>Automate one check with Claude Code and prove it can fail</td></tr>
+<tr><td>4</td><td>Trusting: evals, security, governance, measuring value</td><td>124, 130, 125</td><td>Write a one-page proposal for one workflow change in your team</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A QA lead runs the four-session series for eight testers. In session 4, each person presents their one-page proposal. Three are adopted, including drafting bug reports with AI from Playwright traces, with a person always reviewing before filing. The series ends not with a certificate but with three working changes to the team's process, each with an owner.</p></div>
+
+<h3 id="ch145-4"><span class="num">145.4</span>Demos that survive</h3>
+<p>Live AI demos fail in two ways: the tool breaks (network, sign-in, rate limits), or the model gives a different answer from your rehearsal. Both are manageable.</p>
+<div class="flow">
+<div><b>Rehearse</b>Run the full demo on the same machine and network the day before</div>
+<div><b>Prepare</b>Prompts in a text file to paste; demo data only; notifications off</div>
+<div class="hl"><b>Back up</b>A screen recording or screenshots of a good run</div>
+<div><b>Narrate</b>Say what you expect before you press Enter</div>
+<div><b>Use surprises</b>A different answer is a lesson about non-determinism</div>
+</div>
+<ul>
+<li><strong>Use demo data only.</strong> Never show customer data, real credentials or confidential code on a projector or in a recording. The demo apps from <a href="#ch102">Chapter 102</a> and <a href="#ch143">Chapter 143</a> are made for this.</li>
+<li><strong>Have an offline fallback.</strong> The Chapter 143 capstone has a fake-model mode that runs the whole pipeline without network or key. Chapter 93 and 94's projects have dry-run modes too.</li>
+<li><strong>Show a failure on purpose.</strong> Ask a question whose answer isn't in the documents, or a maths question with tricky numbers, and show how to catch the error. People remember the failure demo longest.</li>
+<li><strong>Increase the font size</strong> in the terminal and editor, and keep demos short: under five minutes each.</li>
+</ul>
+<div class="box warn"><span class="tag">Screens are recordings</span><p>Assume any workshop may be recorded, screenshotted or shared. Close other tabs, hide API keys (environment variables, never pasted into a prompt or shown in a file), and sign in with a demo account where possible.</p></div>
+
+<h3 id="ch145-5"><span class="num">145.5</span>Exercises that work</h3>
+<p>People learn by doing, and by comparing what they did with someone else. The best exercises use realistic work, have an answer people can check, and end with a discussion.</p>
+<input class="filter" data-filter="#ch144Ex" data-empty="#ch144ExEmpty" type="search" placeholder="Filter exercises…" aria-label="Filter exercises">
+<div class="tbl"><table id="ch144Ex">
+<tr><th>Exercise</th><th>How it runs</th><th>Audience</th><th>Time</th></tr>
+<tr class="group"><td colspan="4">Understanding</td></tr>
+<tr><td>Spot the hallucination</td><td>Give an AI answer with three claims, one unsupported. Groups find it and name the source they'd check.</td><td>All</td><td>10 min</td></tr>
+<tr><td>Token guessing</td><td>Guess how many tokens a sentence has, then check with a tokenizer tool. Discuss why non-English text often costs more tokens.</td><td>All</td><td>10 min</td></tr>
+<tr><td>Same prompt, three runs</td><td>Everyone sends the same prompt and compares answers. Discuss why outputs vary and what that means for testing.</td><td>All</td><td>10 min</td></tr>
+<tr class="group"><td colspan="4">Using</td></tr>
+<tr><td>Prompt makeover</td><td>Rewrite "write tests for login" with task, context, format and constraints. Compare outputs side by side.</td><td>All</td><td>15 min</td></tr>
+<tr><td>Ambiguity hunt</td><td>AI flags unclear wording in a story; the group decides which flags are real and writes the questions for the product owner.</td><td>Testers, BAs</td><td>20 min</td></tr>
+<tr><td>Bug report rescue</td><td>Turn a poor bug report plus a log into a good one with AI; check every detail against the log.</td><td>Testers</td><td>15 min</td></tr>
+<tr class="group"><td colspan="4">Building and trusting</td></tr>
+<tr><td>Make it fail</td><td>Generate a Playwright test with Claude Code, then break the app and confirm the test fails.</td><td>Technical</td><td>30 min</td></tr>
+<tr><td>Five-case eval</td><td>Write five inputs and expected outcomes for a prompt; run them; score pass rate; change the prompt; re-run.</td><td>Technical</td><td>30 min</td></tr>
+<tr><td>Spot-the-risk cards</td><td>Cards describe AI uses ("agent emails customers", "paste prod logs into chat"). Groups rate risk and name a control.</td><td>All</td><td>15 min</td></tr>
+</table></div>
+<p id="ch144ExEmpty" hidden>No exercises match.</p>
+
+<h3 id="ch145-6"><span class="num">145.6</span>Handling hard questions</h3>
+<p>AI training brings out strong feelings. Some people are excited, some sceptical, some anxious. Treat every question as legitimate. "I don't know, I'll find out" is always acceptable; a confident wrong answer about AI, in a session about AI's confident wrong answers, is not.</p>
+<div class="tbl"><table>
+<tr><th>Question</th><th>A good way to respond</th></tr>
+<tr><td>"Will AI take my job?"</td><td>Be honest that nobody knows for certain, and that this is debated. Separate fact from opinion. Talk about what's in your control: which tasks change, which skills grow in value (judgement, risk thinking, checking AI output), and what the team plans. Don't make promises you can't keep.</td></tr>
+<tr><td>"Is our data safe if I paste it in?"</td><td>Point to your organisation's AI policy and approved tools. Explain that it depends on the tool, the plan and the contract, and show where to check (Chapter 132). If there's no policy yet, say so and say who's working on it.</td></tr>
+<tr><td>"Which AI is the best?"</td><td>It depends on the task, and rankings change every few months. Show how to compare models on your own tasks (Chapter 36).</td></tr>
+<tr><td>"It gave me a wrong answer, so why use it?"</td><td>Agree that it makes mistakes. Then show the kinds of tasks where checking is cheap and the time saved is large, and those where it isn't worth it.</td></tr>
+<tr><td>"Isn't this cheating?"</td><td>Explain your organisation's view. A common position: using an approved tool is fine; passing off unchecked output as your own reviewed work is not.</td></tr>
+<tr><td>A question you can't answer</td><td>Write it down, promise a follow-up by a date, and keep the promise. Add it to your FAQ.</td></tr>
+</table></div>
+<div class="box opinion"><span class="tag">Opinion · this book</span><p>On the jobs question, predictions from researchers, economists and company leaders range widely, and nobody's forecast should be presented to a team as fact. What a trainer can say honestly is narrower and more useful: in the work we've seen, people who learn to use these tools well and check them carefully tend to take on more interesting work, not less. Say it as your view, and invite disagreement.</p></div>
+
+<h3 id="ch145-7"><span class="num">145.7</span>Measuring learning</h3>
+<p>Smiles at the end of a session prove little. The <a class="gl" href="#g-kirkpatrick-model">Kirkpatrick Model</a>, widely used in corporate training, separates four levels of evaluation. Each is harder to measure, and more meaningful, than the one before.</p>
+<div class="tbl"><table>
+<tr><th>Level</th><th>Question</th><th>Simple way to measure for an AI workshop</th></tr>
+<tr><td>1 · Reaction</td><td>Did people find it relevant and engaging?</td><td>Two-question form at the end: "How useful (1–5)?" and "What will you try first?"</td></tr>
+<tr><td>2 · Learning</td><td>Did they gain knowledge and skill?</td><td>The same five quiz questions before and after (use this book's "Check yourself" quizzes); a practical task, such as a prompt makeover, scored with a rubric</td></tr>
+<tr><td>3 · Behaviour</td><td>Do they apply it at work?</td><td>Check in after 30 days: which tasks are they using AI for? Ask for one example of output they checked and corrected</td></tr>
+<tr><td>4 · Results</td><td>Did the team or organisation benefit?</td><td>Agreed team measures, tracked before and after, such as time to first draft of test cases or defects found before release (Chapter 126)</td></tr>
+</table></div>
+<p>Keep the measures light, and tell people why you're collecting them. If you report results, label small samples as such: "6 of 8 participants (illustrative)" is honest; "75% adoption" from eight people overstates it.</p>
+
+<h3 id="ch145-8"><span class="num">145.8</span>Using this book as course material</h3>
+<ul>
+<li><strong>Learning paths.</strong> The "Where to start" page's goals and five stages suit self-paced groups: agree a goal and a set of chapters, then meet weekly to discuss.</li>
+<li><strong>Chapter parts as workshops.</strong> Each chapter's "What you'll learn" list makes ready-made objectives; its big idea is your opening; its lab is the hands-on block; its review quiz is your before-and-after check.</li>
+<li><strong>"Teach it" boxes.</strong> Every chapter ends with a two-minute explanation written to be said aloud. Ask each participant to deliver one to the group: a quick, low-stakes test of understanding.</li>
+<li><strong>Labs with expected results.</strong> Because every lab step shows what people should see, participants can check themselves and you can spot who's stuck.</li>
+<li><strong>Projects for longer programmes.</strong> Chapter 142's project menu and the Chapter 143 capstone, with its grading rubric, suit a cohort running over several weeks. Chapter 141's exams can close a programme.</li>
+<li><strong>Keep it current.</strong> Chapters show when facts were verified. Before teaching anything that changes (models, prices, commands), check the date and the linked official sources.</li>
+</ul>
+
+<div class="lab"><div class="lab-h"><b>Lab: a 10-minute micro-lesson</b><span>60 min preparation · 10 min delivery · one or more colleagues</span></div><ol>
+<li>Choose a chapter you've completed and write one strong learning objective for a 10-minute lesson, starting with an observable verb.<span class="expect">one sentence such as "Participants will be able to spot an unsupported claim in an AI answer and name the source to check."</span></li>
+<li>Plan the ten minutes: 2 minutes of explanation (use the chapter's analogy), 3 minutes of demo, 4 minutes for the learner to try it, 1 minute for one quiz question.<span class="expect">a four-line plan with timings that add up to 10.</span></li>
+<li>Rehearse the demo once and record your screen as a fallback.<span class="expect">a recording under three minutes.</span></li>
+<li>Give a two-question "before" check, deliver the lesson to a colleague, then the same two questions "after".<span class="expect">before-and-after answers you can compare; usually at least one improves.</span></li>
+<li>Ask the colleague: "What was the clearest moment, and where did you get lost?" Write down both answers and one change for next time.<span class="expect">one specific improvement, for example "the demo needed bigger text" or "I explained tokens before they needed them".</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"I need to be an expert before I can teach."</dt><dd>You need to be a few steps ahead and honest about the edges of what you know. Teaching what you learned last month, with fresh memories of what was confusing, often works better than an expert's version.</dd>
+<dt>"More content means a better workshop."</dt><dd>Hands-on practice and discussion beat coverage. Cut ruthlessly to the objectives.</dd>
+<dt>"A failed live demo ruins the session."</dt><dd>Handled calmly with a backup, it becomes a lesson in why AI output needs checking.</dd>
+<dt>"High satisfaction scores mean it worked."</dt><dd>They measure reaction only. Check learning in the session and behaviour a month later.</dd>
+</dl></div>
+
+<h3 id="ch145-r"><span class="num">145.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Plan from observable learning objectives, and cut anything that doesn't serve one.</li>
+<li>Match the medium to the audience: chat apps and analogies for non-technical groups, mechanisms and tools for technical ones; pair mixed groups.</li>
+<li>Use the 60-minute, half-day or four-session plans; the series changes behaviour most because people practise on real work between sessions.</li>
+<li>Rehearse demos, use demo data only, keep an offline or recorded fallback, and show a failure on purpose.</li>
+<li>Answer hard questions honestly, separating fact from opinion; follow up on what you can't answer.</li>
+<li>Measure beyond reaction: learning in the room, behaviour after a month, and results over time.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Which is the strongest learning objective?</p><div class="opts"><button>Understand AI hallucinations</button><button>Learn about prompt engineering</button><button data-ok>Rewrite a vague prompt with task, context, format and constraints, and compare the outputs</button></div><p class="why" hidden>It starts with an observable action, so you can check at the end whether people can do it.</p></div>
+<div class="qz"><p class="q">Your live demo gives a different answer from the rehearsal. What's the best response?</p><div class="opts"><button>Restart until it matches</button><button data-ok>Use it to show that outputs vary, and switch to your recording if you need the original</button><button>Skip the topic</button></div><p class="why" hidden>Variation is a real property of these systems and a useful teaching moment; the recording keeps the session on track.</p></div>
+<div class="qz"><p class="q">A participant asks, "Will AI take my job?" Which response fits this chapter's advice?</p><div class="opts"><button>"No, definitely not."</button><button>"Yes, within five years."</button><button data-ok>"Nobody knows for certain and views differ; here's what we know about how tasks are changing, and here's my view, labelled as mine."</button></div><p class="why" hidden>Honesty about uncertainty, fact separated from opinion, and a focus on what people can control.</p></div>
+<div class="qz"><p class="q">You run the same five quiz questions before and after a workshop. Which Kirkpatrick level is that?</p><div class="opts"><button>Reaction</button><button data-ok>Learning</button><button>Results</button></div><p class="why" hidden>Before-and-after tests measure knowledge and skill gained, which is level 2.</p></div>
+<div class="qz"><p class="q">Which format is most likely to change how a team works day to day?</p><div class="opts"><button>One 60-minute lecture</button><button data-ok>A four-session series with real-work homework between sessions</button><button>A recorded video sent by email</button></div><p class="why" hidden>Practice on real tasks between sessions, with a chance to report back and adjust, builds lasting habits.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Adapt the 60-minute plan for your own team. Replace the demo story with a real, non-confidential one, write three learning objectives, prepare a recorded fallback for each demo, and create a five-question before-and-after quiz from this book's chapters. Deliver it, collect the before-and-after results and the two-question reaction form, and check in with participants 30 days later. Write half a page on what changed and what you'd do differently.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"When you teach AI to your team, start with what they should be able to do afterwards, like 'spot an unsupported claim and check it'. Explain for a few minutes, demo, then let them try it on real work. Rehearse your demo and keep a recording in case it breaks, and show a failure on purpose, because that's what people remember. Be honest about hard questions. And don't judge success by smiles at the end; check a month later whether anyone's work actually changed."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Kirkpatrick Partners, <a href="https://www.kirkpatrickpartners.com/the-kirkpatrick-model/" target="_blank" rel="noopener">The Kirkpatrick Model</a></li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/overview" target="_blank" rel="noopener">Prompt engineering overview</a> and its linked interactive tutorial</li>
+<li>Anthropic, <a href="https://github.com/anthropics/prompt-eng-interactive-tutorial" target="_blank" rel="noopener">Prompt engineering interactive tutorial (GitHub)</a>, useful as workshop material</li>
+<li>This book: Chapters 22, 44, 120, 121, 125, 126, 128, 132 and 143 for session content</li>
+</ol>
+<p class="verified">Content type: established teaching practice; Kirkpatrick levels verified against Kirkpatrick Partners · Last reviewed 9 November 2026</p></div>

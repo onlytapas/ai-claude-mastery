@@ -1,0 +1,158 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>The difference between a model, a harness, an app, the API and the Agent SDK</li>
+<li>Where MCP and connectors fit, and why they are not "part of the model"</li>
+<li>How cloud platforms such as Amazon Bedrock, Google Cloud and Microsoft Foundry offer the same models through a different door</li>
+<li>Where your data goes in each case, and which data rules apply</li>
+<li>How to tell, in two minutes, exactly which pieces you are using right now</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch40">Chapter 40</a> (the current models). It helps to have met <a href="#ch63">Chapter 63</a> (what Claude Code is) and <a href="#ch97">Chapter 97</a> (what MCP is), but neither is required.</div>
+
+<div class="bigidea"><p>"Claude" is a word people use for several different things. The <strong>model</strong> is the trained brain that turns text into text. A <strong>harness</strong> is the software wrapped around it that gives it tools, memory and a loop to keep working. An <strong>app</strong> (claude.ai, the desktop and mobile apps, Claude Code) is a harness with a screen for people. The <strong>API</strong> is the door programs use to reach the model directly, and the <strong>Agent SDK</strong> lets you build your own harness. <strong>MCP</strong> is a standard plug that connects any of these to outside tools. Knowing which piece you are using tells you what it can do, what it costs, and where your data goes.</p></div>
+
+<h3 id="ch41-1"><span class="num">41.1</span>Why the word "Claude" causes confusion</h3>
+<p>Listen to a team talk about AI for ten minutes and you will hear sentences like these:</p>
+<ul>
+<li>"Claude can't read our Jira." (It can, if someone connects it. That is a connector question, not a model question.)</li>
+<li>"Claude Code is a different model from claude.ai." (Usually it is the same model family with a different harness around it.)</li>
+<li>"We can't use Claude, it isn't approved." (Perhaps the consumer app isn't, but the company's AWS account may already offer Claude through Bedrock.)</li>
+<li>"Claude remembered our project." (Memory is a feature of the app, not something the model learned.)</li>
+</ul>
+<p>Each sentence mixes up different layers. This chapter gives you a clear map so you can say precisely which piece you mean. That precision matters for support questions, for security reviews and for budgets.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a car. The <b>engine</b> provides the power (the model). The <b>car</b> around it, with steering, brakes, dashboard and fuel tank, makes the engine useful (the harness and app). You can buy a finished car (claude.ai or Claude Code), or buy just the engine and build your own vehicle (the API and Agent SDK). <b>Accessories</b> such as a tow bar or roof rack plug into standard fittings (MCP). And you can buy the same engine from the manufacturer's showroom or from a dealer you already have an account with (Anthropic directly, or a cloud platform). Same engine, different packaging, different paperwork.</p></div>
+
+<h3 id="ch41-2"><span class="num">41.2</span>The pieces, one by one</h3>
+<h4>The model</h4>
+<p>A <a class="gl" href="#g-model">model</a> is the trained neural network: Fable 5.1, Opus 5.5, Sonnet 5.5 or Haiku 5.5 (<a href="#ch40">Chapter 40</a>). On its own a model does exactly one thing. It receives text (and images or documents) and produces text. It cannot open a file, browse a website or run a test. It does not remember yesterday's conversation. Everything else people associate with "Claude" is built around it.</p>
+<p>A model can, however, <em>ask</em> for an action. Through <a class="gl" href="#g-tool-use">tool use</a> it writes a structured request such as "please run <code>npx playwright test login.spec.ts</code>". Some other piece of software must decide whether to do it, do it, and send back the result.</p>
+
+<h4>The harness</h4>
+<p>That other software is the harness. An <a class="gl" href="#g-agentic-harness">agentic harness</a> runs the <a class="gl" href="#g-agent-loop">agent loop</a>: send the task to the model, receive a tool request, run the tool (after checking permissions), feed the result back, and repeat until the job is done. The harness also manages the <a class="gl" href="#g-context-window">context window</a>, decides which instructions to load (such as <a class="gl" href="#g-claude-md">CLAUDE.md</a>), and enforces the safety rules your organisation set.</p>
+<div class="box note"><span class="tag">Why this matters</span><p>Two products using the same model can behave very differently because their harnesses differ. Claude Code's harness can edit files and run shell commands on your machine; the claude.ai chat harness cannot touch your laptop's files at all. When something works in one and not the other, the harness is usually the reason.</p></div>
+
+<h4>The apps</h4>
+<p>An app is a harness plus a user interface built for people. Anthropic's apps include:</p>
+<ul>
+<li><b>Claude apps</b> on the web (claude.ai), desktop (macOS, Windows; Linux in beta) and mobile (iOS, Android): chat, Projects, Artifacts, Research, memory, connectors and more (Part VI, starting at <a href="#ch43">Chapter 43</a>).</li>
+<li><b>Claude Code</b>: an agentic coding tool that works in your terminal, in VS Code, Cursor and JetBrains, in the desktop app, on the web at claude.ai/code and in GitHub Actions (Part VIII, starting at <a href="#ch63">Chapter 63</a>).</li>
+<li><b>Claude Cowork</b>, <b>Claude in Chrome</b>, <b>Claude for Excel, PowerPoint and Word</b> and <b>Claude Tag</b> (Claude in Slack): Claude placed inside the places people already work (<a href="#ch51">Chapter 51</a>).</li>
+</ul>
+<p>You sign in to apps with a Claude account, and they are paid for by a subscription plan (<a href="#ch42">Chapter 42</a>). Claude Code is the exception that can use either a subscription or an API key.</p>
+
+<h4>The API and the Console</h4>
+<p>The Claude <a class="gl" href="#g-api">API</a> is how programs talk to the model directly. Your code sends a request to the Messages endpoint (<code>POST /v1/messages</code>) with a model name, a maximum reply length and the conversation, and receives the model's reply. There is no chat window, no memory and no file access unless you build them. You pay per token. <a href="#ch86">Chapter 86</a> walks you through your first call.</p>
+<p>Developers manage API keys, billing and usage in the <a class="gl" href="#g-claude-console">Claude Console</a> at platform.claude.com (it moved there from console.anthropic.com in 2025). The Console groups keys and spending limits into <b>workspaces</b>, for example one for the QA team's CI jobs and one for an internal chatbot.</p>
+<p>The API also offers ready-made server tools that run on Anthropic's side, such as web search, web fetch and code execution, and a hosted agent service called <a class="gl" href="#g-managed-agents">Managed Agents</a> (in beta since 8 April 2026) for teams that want Anthropic to run the agent loop and sandbox for them.</p>
+
+<h4>The Agent SDK</h4>
+<p>The <a class="gl" href="#g-claude-agent-sdk">Claude Agent SDK</a> is a software library (an <a class="gl" href="#g-sdk">SDK</a>) for Python (<code>claude-agent-sdk</code>) and TypeScript (<code>@anthropic-ai/claude-agent-sdk</code>). Anthropic describes it as giving developers "the same tools, agent loop, and context management that power Claude Code". In car terms, it is the chassis, steering and brakes from a finished car, ready for you to build your own vehicle. It was called the Claude Code SDK until 29 September 2025. <a href="#ch110">Chapter 110</a> builds agents with it.</p>
+
+<h4>MCP and connectors</h4>
+<p>The <a class="gl" href="#g-mcp">Model Context Protocol</a> (MCP) is an open standard, announced by Anthropic on 25 November 2024 and donated in December 2025 to the Agentic AI Foundation under the Linux Foundation. It defines a common way for an AI application to talk to outside systems through <a class="gl" href="#g-mcp-server">MCP servers</a>: one for Jira, one for a browser, one for a database. In the Claude apps these appear as <a class="gl" href="#g-connector">connectors</a>; in Claude Code you add them with <code>claude mcp add</code>. MCP is not part of the model. It is a plug standard that harnesses use. Part XI (<a href="#ch97">Chapter 97</a> onward) covers it fully.</p>
+
+<h4>Cloud platforms</h4>
+<p>The same Claude models are also sold through the big cloud providers: Amazon Bedrock, Google Cloud (Vertex AI, which Claude Code's docs now call "Google Cloud's Agent Platform") and Microsoft Foundry. Anthropic also lists "Claude Platform on AWS" and "Claude Models on Google Cloud (Anthropic managed)". Model IDs are similar (for example <code>anthropic.claude-opus-5-5</code> on Bedrock), but the partner sets the price, handles billing and signs the contract. Companies often choose this route because their cloud account, security reviews and spending commitments already exist.</p>
+
+<h3 id="ch41-3"><span class="num">41.3</span>The whole picture in one diagram</h3>
+<p>Read the diagram from top to bottom. People and programs at the top reach one of the doors in the middle. Every door ends at the same family of models at the bottom. MCP servers sit beside the harness, because the harness, not the model, calls them.</p>
+<div class="figure" role="img" aria-label="Layer diagram: people use Claude apps or Claude Code; developers' programs use the Agent SDK or the Messages API directly; all pass through a harness or the API, sold by Anthropic or a cloud platform, to the same Claude models; MCP servers connect to the harness.">
+<div class="tbl"><table>
+<tr><th style="width:22%">Layer</th><th>What lives here</th><th style="width:28%">Who uses it</th></tr>
+<tr><td><b>1. People and programs</b></td><td>A tester in a browser; a developer in a terminal; a CI job; an internal QA tool</td><td>You, your team, your scripts</td></tr>
+<tr><td><b>2. Apps (harness + screen)</b></td><td>claude.ai web, desktop, mobile; Cowork; Claude in Chrome; Office add-ins; Claude Tag; <b>Claude Code</b> (terminal, IDE, desktop, web, GitHub Actions)</td><td>Anyone with a Claude plan (Claude Code also with an API key)</td></tr>
+<tr><td><b>3. Build-your-own harness</b></td><td><b>Claude Agent SDK</b> (your code, Claude Code's loop); <b>Managed Agents</b> (Anthropic-hosted loop, beta)</td><td>Developers</td></tr>
+<tr><td><b>4. The door to the model</b></td><td><b>Claude API</b> (Messages API, Console, workspaces) or a <b>cloud platform</b> (Bedrock, Google Cloud, Microsoft Foundry)</td><td>Every layer above ends up here</td></tr>
+<tr><td><b>5. The model</b></td><td>Fable 5.1 · Opus 5.5 · Sonnet 5.5 · Haiku 5.5</td><td>Never used directly: always through a door</td></tr>
+<tr><td><b>Beside layers 2–3: MCP</b></td><td>MCP servers for Jira, GitHub, Playwright, databases… (connectors in the apps)</td><td>Called by the harness, never by the model itself</td></tr>
+</table></div>
+<div class="cap">The Claude product stack. Product names checked against Anthropic's product, Claude Code and API documentation, 9 November 2026.</div></div>
+<div class="flow">
+<div><b>You</b>"Run the login tests and tell me why they fail"</div>
+<div><b>App / harness</b>Claude Code packs your words, CLAUDE.md and file list</div>
+<div class="hl"><b>Door</b>Request sent over the API (or a cloud platform)</div>
+<div class="hl"><b>Model</b>Opus 5.5 replies: "run npx playwright test"</div>
+<div><b>Harness</b>Checks permissions, runs the command on your machine, sends output back</div>
+<div><b>You</b>See the explanation and the proposed fix</div>
+</div>
+
+<div class="box example"><span class="tag">Real-world example: one task, three routes</span><p>A team wants Claude to draft test cases from new Jira stories.</p>
+<ul>
+<li><b>Route A, the app:</b> a tester connects the Jira connector in claude.ai, opens a Project with the team's test-case template, and asks Claude to draft cases for PROJ-412. No code, uses the tester's plan.</li>
+<li><b>Route B, Claude Code:</b> a QA engineer runs Claude Code in the test repository with a Jira MCP server, and asks it to draft the cases <em>and</em> write the Playwright specs. Uses the engineer's plan or the team's API key.</li>
+<li><b>Route C, your own tool:</b> a developer writes a small Python service with the Agent SDK that runs whenever a story moves to "Ready for QA" and posts draft cases as a Jira comment. Pays per token through the API or Bedrock.</li>
+</ul>
+<p>Same model family in all three. Different harness, different cost model, different data rules.</p></div>
+
+<h3 id="ch41-4"><span class="num">41.4</span>Choosing the right piece</h3>
+<div class="tbl"><table>
+<tr><th>You want to…</th><th>Use</th><th>Skill needed</th></tr>
+<tr><td>Ask questions, summarise documents, draft a test plan</td><td>Claude apps</td><td>Using a tool</td></tr>
+<tr><td>Have Claude read and change code, run tests, use git</td><td>Claude Code</td><td>Using a tool (some terminal comfort)</td></tr>
+<tr><td>Connect Claude to Jira, Confluence, GitHub or a browser</td><td>MCP servers / connectors, inside an app or Claude Code</td><td>Using, then configuring</td></tr>
+<tr><td>Add AI to a script, CI job or internal web app, one request at a time</td><td>Claude API (or a cloud platform)</td><td>Building a system</td></tr>
+<tr><td>Build your own agent that uses tools in a loop</td><td>Claude Agent SDK, or Managed Agents</td><td>Building a system</td></tr>
+<tr><td>Use Claude within your company's existing AWS, Google Cloud or Azure contract</td><td>Bedrock, Google Cloud or Microsoft Foundry</td><td>Building, plus your cloud team's help</td></tr>
+</table></div>
+<div class="box opinion"><span class="tag">Opinion · a common recommendation from practitioners</span><p>Many experienced teams suggest climbing the stack from the top: prove the idea in the app, automate it with Claude Code, and only write code against the API or SDK when the workflow has to run unattended or at scale. The argument is that each step down costs more engineering effort, so you should know the idea works first. Teams with strong developers sometimes skip straight to the API; neither path is "correct".</p></div>
+
+<h3 id="ch41-5"><span class="num">41.5</span>Where your data goes</h3>
+<p>Every route sends your prompt, and anything attached to it, to wherever the model runs. What happens next depends on which door you used and which agreement covers it. Here is what Anthropic's privacy centre says, as of 9 November 2026. Policies change, so treat this as a map and check the current wording before any compliance decision.</p>
+<div class="tbl"><table>
+<tr><th>Route</th><th>Used to train models?</th><th>How long is it kept?</th></tr>
+<tr><td><b>Consumer plans</b> (Free, Pro, Max, and Claude Code used with those accounts)</td><td>Your choice, via the model-training setting in your privacy settings. Incognito chats are never used for training.</td><td>Deleted chats leave back-end storage within 30 days. If training is on, de-identified chats may be kept up to 5 years in training pipelines.</td></tr>
+<tr><td><b>Commercial products</b> (Team, Enterprise, the API)</td><td>"By default, we will not use your inputs or outputs from our commercial products" for training. Exception: feedback you deliberately submit (thumbs up/down, bug reports).</td><td>API inputs and outputs are deleted "within 30 days of receipt or generation" by default. Zero data retention and other terms can be agreed separately.</td></tr>
+<tr><td><b>Any route, flagged content</b></td><td>n/a</td><td>Inputs and outputs flagged under the Usage Policy may be kept up to 2 years; feedback submissions 5 years.</td></tr>
+<tr><td><b>Cloud platforms</b> (Bedrock, Google Cloud, Foundry)</td><td colspan="2">Governed by your agreement with that cloud provider. Read its data-handling terms for the Claude models specifically.</td></tr>
+<tr><td><b>MCP servers and connectors</b></td><td colspan="2">Data the harness sends to an MCP server goes to whoever runs that server (for example Atlassian for a Jira connector, or your own machine for a local Playwright server). Each has its own terms.</td></tr>
+<tr><td><b>Claude Code on your machine</b></td><td colspan="2">Your account type decides the model-side rules above. Locally, Claude Code keeps session transcripts under <code>~/.claude/projects/</code>, cleaned up after 30 days by default (the <code>cleanupPeriodDays</code> setting changes this).</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">The most common data mistake</span><p>A tester pastes a production customer record into a personal Free or Pro account "just to check a bug". That data is now under consumer terms, outside the company's contract, possibly with training switched on. The model is the same as in the company's Team plan; the <em>agreement</em> is not. Use your organisation's approved route, and mask real personal data (<a href="#ch132">Chapter 132</a>).</p></div>
+<details class="deep"><summary>Under the hood: what actually travels in a Claude Code request</summary><div class="body">
+<p>When Claude Code asks the model for its next step, the request contains the system instructions, your CLAUDE.md files, the conversation so far, and the <em>results</em> of any tools that ran: file contents Claude read, command output, test logs, MCP responses. So if Claude Code reads your <code>.env</code> file, its contents go to the model provider. That is why teams add deny rules such as <code>Read(./.env)</code> to their settings (<a href="#ch78">Chapter 78</a>), and why an organisation can enforce such rules for everyone through managed settings (<a href="#ch42">Chapter 42</a>). Which provider receives the request depends on the credential Claude Code is using: a subscription login and an Anthropic API key both go to Anthropic; setting <code>CLAUDE_CODE_USE_BEDROCK</code>, <code>CLAUDE_CODE_USE_VERTEX</code> or <code>CLAUDE_CODE_USE_FOUNDRY</code> sends requests through that cloud instead.</p>
+</div></details>
+
+<div class="lab"><div class="lab-h"><b>Lab: map exactly which pieces you are using</b><span>20 min · claude.ai and/or Claude Code</span></div><ol>
+<li>Draw five empty boxes on paper labelled <i>Person/program</i>, <i>App or harness</i>, <i>Door</i>, <i>Model</i>, <i>MCP servers</i>. You will fill them for your own setup.<span class="expect">A blank version of the diagram in 41.3.</span></li>
+<li><b>If you use the Claude apps:</b> open claude.ai, start a new chat and open the model selector.<span class="expect">A list of the models your plan offers (on Free, Sonnet and Haiku only). Write the selected one in <i>Model</i>, "claude.ai" in <i>App</i>, and "Anthropic, consumer or Team/Enterprise plan" in <i>Door</i>.</span></li>
+<li>Open the connectors list from the chat's tools menu (or Settings).<span class="expect">The connectors you or your admin enabled, perhaps none. Write each one in <i>MCP servers</i>.</span></li>
+<li><b>If you use Claude Code:</b> in a terminal run <code>claude auth status --text</code>.<span class="expect">Whether you are logged in and with which kind of account (subscription or Console/API). This is your <i>Door</i>.</span></li>
+<li>Start Claude Code with <code>claude</code> and type <code>/status</code>.<span class="expect">A status panel showing the model, the active credential and a <code>Setting sources</code> line. If it mentions managed settings, your organisation controls part of your harness.</span></li>
+<li>Type <code>/mcp</code>.<span class="expect">The MCP servers configured for this project, or a message that none are configured. Add them to <i>MCP servers</i>.</span></li>
+<li>Finally, for each box, write one line: "My data in this box goes to … under … terms." Use the table in 41.5. If you can't answer, that is a question for your administrator.<span class="expect">A one-page map of your own Claude setup that you could show a security reviewer.</span></li>
+</ol>
+<p><b>No access to either?</b> Do the lab on paper for a colleague's setup, or for Route C in the example above. <b>Troubleshooting:</b> <code>claude: command not found</code> means Claude Code isn't installed (<a href="#ch64">Chapter 64</a>). If <code>/status</code> shows an unexpected account, run <code>/login</code> to switch. If the connectors menu is missing on a Team or Enterprise plan, an owner may have turned connectors off.</p>
+</div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Claude Code uses a special coding model."</dt><dd>Claude Code uses the same Claude models as everything else (Opus 5.5 by default on most plans). What's special is the harness: tools, permissions and the agent loop.</dd>
+<dt>"The model remembers my previous chats."</dt><dd>The model has no memory between requests. Memory, Projects and CLAUDE.md are app features that put saved text back into the context.</dd>
+<dt>"MCP is something the model does."</dt><dd>The model only asks for a tool. The harness connects to the MCP server, runs the call and returns the result.</dd>
+<dt>"Claude on Bedrock is a different, weaker Claude."</dt><dd>It is the same model family sold through a different door, with different pricing, contracts and sometimes a lag before the newest model appears.</dd>
+<dt>"If the model is the same, the data rules are the same."</dt><dd>Data rules follow the agreement (consumer, commercial, cloud partner, MCP server owner), not the model.</dd>
+</dl></div>
+
+<h3 id="ch41-r"><span class="num">41.6</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>The model turns input into output; it cannot act or remember on its own.</li>
+<li>A harness runs the agent loop, executes tools, enforces permissions and manages context. Apps are harnesses with a screen; Claude Code is the most capable one for software work.</li>
+<li>The API is the programmatic door, paid per token; the Agent SDK lets you build your own harness with Claude Code's loop; Managed Agents hosts one for you.</li>
+<li>MCP is an open plug standard used by harnesses to reach outside systems. Connectors are MCP inside the apps.</li>
+<li>Cloud platforms sell the same models under your cloud contract. Data rules follow the route and agreement, so pick the approved route for company data.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Claude Code runs <code>npx playwright test</code> on your laptop. Which piece actually executes the command?</p><div class="opts"><button>The model</button><button data-ok>The harness (Claude Code)</button><button>The MCP standard</button></div><p class="why" hidden>The model only requests the command. Claude Code checks permissions, runs it locally and returns the output to the model.</p></div>
+<div class="qz"><p class="q">What does the Claude Agent SDK give a developer?</p><div class="opts"><button>A cheaper, smaller model</button><button>A chat window for non-technical users</button><button data-ok>Claude Code's tools, agent loop and context management as a library for their own programs</button></div><p class="why" hidden>Anthropic describes it as "the same tools, agent loop, and context management that power Claude Code", for Python and TypeScript.</p></div>
+<div class="qz"><p class="q">Your company already pays for AWS and wants Claude under that contract. Which route fits?</p><div class="opts"><button data-ok>Amazon Bedrock</button><button>Individual Pro subscriptions</button><button>A Jira connector</button></div><p class="why" hidden>Bedrock offers Claude models through AWS, with AWS pricing and contracts. Pro is a consumer plan; a connector is a plug for tools, not a way to buy model access.</p></div>
+<div class="qz"><p class="q">By default, are API inputs and outputs used to train Anthropic's models?</p><div class="opts"><button>Yes, always</button><button data-ok>No, unless you deliberately submit feedback or otherwise allow it</button><button>Only for the Haiku model</button></div><p class="why" hidden>Anthropic's privacy centre says commercial products, including the API, are not used for training by default. Submitted feedback is the main exception.</p></div>
+<div class="qz"><p class="q">A tester says "Claude remembered our coding conventions from last week". What is the most accurate explanation?</p><div class="opts"><button>The model was retrained on last week's chat</button><button data-ok>An app feature (memory, a Project or CLAUDE.md) put saved text back into the context</button><button>The API keeps a permanent session for each user</button></div><p class="why" hidden>Models don't learn from individual chats. Apps re-insert saved information into each request.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Choose one QA workflow your team wants to use AI for. Draw the five-layer diagram for it, naming the exact app or harness, door, model and MCP servers. Add a column "where the data goes and under which agreement". Then write three sentences: why this route, what alternative route you rejected, and one question you need your security or platform team to answer. Share it with a colleague and see if they can find a gap.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"When people say 'Claude', they could mean five things. The model is the engine: it reads and writes text, nothing else. The harness is the car around it: Claude Code or the claude.ai app, which runs tools, checks permissions and loops until the job's done. The API is how our own programs reach the engine, and the Agent SDK lets us build our own car with Claude Code's parts. MCP is the standard tow-bar fitting for plugging in Jira or a browser. And Bedrock or Foundry is just buying the same engine through our cloud account. The data rules follow the route, not the engine, so always use the company's approved route."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/api/overview" target="_blank" rel="noopener">API overview</a> and <a href="https://platform.claude.com/docs/en/api/messages" target="_blank" rel="noopener">Messages API</a>.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/models/overview" target="_blank" rel="noopener">Models overview</a>: model IDs on Bedrock, Google Cloud and Microsoft Foundry.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/agent-sdk/overview" target="_blank" rel="noopener">Agent SDK overview</a> and <a href="https://claude.com/blog/building-agents-with-the-claude-agent-sdk" target="_blank" rel="noopener">Building agents with the Claude Agent SDK</a> (rename from Claude Code SDK).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/overview" target="_blank" rel="noopener">Claude Code overview</a> and <a href="https://code.claude.com/docs/en/settings" target="_blank" rel="noopener">settings</a>.</li>
+<li>Anthropic, <a href="https://www.anthropic.com/news/model-context-protocol" target="_blank" rel="noopener">Introducing the Model Context Protocol</a> and <a href="https://www.anthropic.com/news/donating-the-model-context-protocol-and-establishing-of-the-agentic-ai-foundation" target="_blank" rel="noopener">donation to the Agentic AI Foundation</a>.</li>
+<li>Anthropic Privacy Center, <a href="https://privacy.claude.com/en/articles/7996868-is-my-data-used-for-model-training" target="_blank" rel="noopener">Is my data used for model training?</a>, <a href="https://privacy.claude.com/en/articles/10023548-how-long-do-you-store-my-data" target="_blank" rel="noopener">How long do you store my data?</a> and <a href="https://privacy.claude.com/en/articles/7996866-how-long-do-you-store-my-organization-s-data" target="_blank" rel="noopener">How long do you store my organization's data?</a></li>
+<li>Anthropic, <a href="https://claude.com/product/overview" target="_blank" rel="noopener">Claude product overview</a> and <a href="https://claude.com/download" target="_blank" rel="noopener">downloads</a>.</li>
+</ol><p class="verified">Verified 9 November 2026 against Anthropic's API, Claude Code and Agent SDK documentation and the Anthropic Privacy Center. Data policies change: check the current wording before compliance decisions.</p></div>

@@ -1,0 +1,197 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How to use Claude to create realistic, safe <a class="gl" href="#g-synthetic-data">synthetic test data</a>, including the edge cases people forget</li>
+<li>Why real customer data must never go into test data or prompts, and what to do instead</li>
+<li>How to generate data files, SQL and JSON fixtures, and data builders with Claude Code</li>
+<li>How to use AI to troubleshoot test environments: logs, configuration and containers</li>
+<li>A practical method for triaging <a class="gl" href="#g-flaky-test">flaky tests</a> with Claude Code, and a fair quarantine policy</li>
+<li>What "self-healing tests" really means, and how to slim down a test suite safely</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 121 (test automation with Claude Code) and Chapter 54 (your first terminal commands). Chapter 115 on debugging helps too.</div>
+
+<div class="bigidea"><p>Testers spend a surprising share of their week on things that aren't testing: making test data, fixing broken environments, rerunning flaky tests and nursing old test code back to health. These jobs are repetitive, detailed and well described in text, which is exactly where AI shines. Claude can produce hundreds of realistic, varied test records in seconds, read a 5,000-line log to find the one line that matters, and sort fifty flaky failures into likely causes. You still decide what's right. But the grind shrinks, and the time comes back to real testing.</p></div>
+
+<h3 id="ch122-1"><span class="num">122.1</span>Why test data is a bottleneck</h3>
+<p>Ask any QA team what slows them down and "we didn't have the right data" is near the top. Typical problems:</p>
+<div class="tbl"><table>
+<tr><th>Problem</th><th>What it looks like</th></tr>
+<tr><td>Too little variety</td><td>Every test user is "John Smith, 30, London". Bugs with long names, accents or old dates go unseen.</td></tr>
+<tr><td>Missing edge cases</td><td>Nobody tested an order with 0 items, 9,999 items, or a price of £0.00.</td></tr>
+<tr><td>Copies of production</td><td>Someone copied real customer records into a test database "just this once". Now it's a privacy risk.</td></tr>
+<tr><td>Stale data</td><td>Tests break because a coupon expired or a user was deleted by another tester.</td></tr>
+<tr><td>Slow to create</td><td>A tester spends an afternoon building 40 rows in a spreadsheet by hand.</td></tr>
+</table></div>
+<p>AI can help with all five, as long as you stay in charge of what "good data" means.</p>
+
+<h3 id="ch122-2"><span class="num">122.2</span>Generating synthetic data with Claude</h3>
+<p><strong>Synthetic data</strong> is test data that is made up, not copied from real people, but realistic enough to behave like real data. Claude is good at this because it has seen how names, addresses, dates and product descriptions look in many languages and countries.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a film set. The shop fronts look real, the newspapers on the stand have headlines, the fruit looks fresh. None of it is a real shop. That's synthetic data: convincing enough to test the scene, with no real person's life involved.</p></div>
+<h4>A good data prompt</h4>
+<div class="code"><span class="cap">Prompt</span><pre>Create 40 customer records for testing a UK/EU online shop's signup form, as CSV with columns:
+first_name, last_name, email, date_of_birth (YYYY-MM-DD), country, postcode, phone, marketing_opt_in
+
+Mix:
+- 25 ordinary, realistic records across UK, Ireland, France, Germany and Poland
+- 15 edge cases, each labelled in an extra "case" column:
+  names with accents (Zoë, Łukasz), apostrophes (O'Brien), hyphens, very long names (60+ chars),
+  a single-character first name, an email with a plus sign, an age of exactly 18 today,
+  someone born on 29 February, empty optional fields, leading/trailing spaces
+
+Rules: all invented people; use example.com / example.org emails only; phone numbers
+must be clearly fake. Don't use any real person's name and details together.</pre></div>
+<p>Notice what the prompt does: it fixes the format, mixes normal and edge cases, labels each edge case so you know why it's there, and sets privacy rules (reserved <code>example.com</code> domains can never deliver email to a real person).</p>
+<div class="box example"><span class="tag">Real-world example</span><p>A tester asks for "20 test users" and gets 20 neat, similar records. A second tester uses the prompt above and finds, in the first run, that the signup form rejects "O'Brien" and trims "Zoë" to "Zo". Same tool, same minutes spent. The difference is that the second prompt asked for the edge cases.</p></div>
+
+<h4>Edge-case checklist to ask for</h4>
+<div class="cols2">
+<div><h4>Text</h4><ul><li>Accents and non-Latin scripts (é, ß, 漢字, العربية)</li><li>Emoji</li><li>Apostrophes, quotes, hyphens</li><li>Very long and very short values</li><li>Leading or trailing spaces</li><li>Characters that break HTML or SQL (&lt;, &gt;, ', ;)</li></ul></div>
+<div><h4>Numbers and dates</h4><ul><li>0, negative, maximum allowed, one over the maximum</li><li>Decimals and rounding (0.005)</li><li>29 February, 31 December, time-zone edges</li><li>Ages exactly at a limit (17, 18)</li><li>Very old and future dates</li><li>Different formats (1/2/2026 means different dates in different countries)</li></ul></div>
+</div>
+
+<h3 id="ch122-3"><span class="num">122.3</span>Privacy: never use real people</h3>
+<div class="box warn"><span class="tag">Hard rule</span><p>Never paste real customer data into an AI chat, and never copy production data into test environments without your organisation's approved masking process. Data-protection laws such as the EU's GDPR apply to test environments too, and leaked "test" data is still a leak. Check your company's AI and data policies (Chapter 132).</p></div>
+<p>When you truly need production-like data (for example, to reproduce a bug that only happens with real data shapes), the safe options are:</p>
+<ul>
+<li><strong><a class="gl" href="#g-data-masking">Masking</a></strong>: replace sensitive values (names, emails, card numbers) with fake ones while keeping the structure. "maria.lopez@bank.example" becomes "user0482@example.com".</li>
+<li><strong>Anonymisation</strong>: remove or generalise anything that could identify a person, even in combination (postcode + birth date + gender can identify many people).</li>
+<li><strong>Synthetic look-alikes</strong>: describe the <em>shape</em> of the real data to Claude ("orders have 1–30 lines, 5% use two currencies, some addresses have no postcode") and let it generate fresh records with the same shape.</li>
+</ul>
+<p>Claude can help write masking scripts, but have the approach reviewed by whoever owns data protection in your organisation. AI doesn't replace that sign-off.</p>
+
+<h3 id="ch122-4"><span class="num">122.4</span>Fixtures, seed files and data builders with Claude Code</h3>
+<p>In the chat app you get data as text. In Claude Code, Claude can write it straight into your project as files your tests load. A <a class="gl" href="#g-test-fixture">test fixture</a> is the fixed starting data (or setup) a test needs.</p>
+<div class="code"><span class="cap">Prompt in Claude Code</span><pre>Look at @db/schema.sql and @tests/checkout.spec.ts.
+Create tests/fixtures/orders.json with 12 orders that cover: empty basket, one item,
+100 items, mixed VAT rates, a 100% discount coupon, a cancelled order and a refunded order.
+Every order must match the schema's columns and constraints. Then write
+tests/fixtures/seed.sql that inserts the same data. Don't change the schema or the app.</pre></div>
+<p>Because Claude reads the real schema, the data respects the actual rules: column names, required fields, foreign keys. That's the big advantage over a chat window.</p>
+<h4>Builders: data as code</h4>
+<p>Fixed files get stale. Many teams prefer a small <strong>builder</strong> (or factory): a function that creates a valid record with sensible defaults, where each test overrides only what it cares about. Ask Claude to create one:</p>
+<div class="code"><span class="cap">tests/builders/customer.ts — the kind of builder Claude can write</span><pre><span class="k">import</span> { faker } <span class="k">from</span> <span class="s">'@faker-js/faker'</span>;
+
+<span class="c">// A valid customer by default; override only what a test needs.</span>
+<span class="k">export function</span> buildCustomer(overrides = {}) {
+  <span class="k">return</span> {
+    firstName: faker.person.firstName(),
+    lastName: faker.person.lastName(),
+    email: faker.internet.email({ provider: <span class="s">'example.com'</span> }),
+    country: <span class="s">'GB'</span>,
+    marketingOptIn: <span class="k">false</span>,
+    ...overrides,
+  };
+}
+
+<span class="c">// In a test: only the detail that matters is visible.</span>
+<span class="c">// const minor = buildCustomer({ dateOfBirth: '2010-05-01' });</span></pre></div>
+<p>Here <code>@faker-js/faker</code> is a widely used open-source library that produces fake names, emails and addresses. Claude writes and explains the builder; the library supplies endless variety at run time without anyone pasting data around.</p>
+<details class="deep"><summary>Fixed data, generated data, or both?</summary><div class="body">
+<p><strong>Fixed fixtures</strong> make failures easy to reproduce: the same data every run. <strong>Random generated data</strong> finds surprises, but a failure may not happen again. A common middle path is to generate data with a fixed <em>seed</em> (a starting number for the random generator), so "random" data is the same on every run until you change the seed. Faker libraries support this. Ask Claude: "Make the builder use a fixed seed in CI and a random seed locally, and print the seed when a test fails." Then any surprise can be replayed.</p>
+</div></details>
+
+<h3 id="ch122-5"><span class="num">122.5</span>Fixing test environments with AI</h3>
+<p>"It works on my machine" costs QA teams hours. Environment problems are mostly about reading: logs, configuration files and error messages. Claude Code can read them far faster than a person, and it can run the diagnostic commands too (with your permission).</p>
+<div class="flow">
+<div><b>Symptom</b>"The test environment won't start"</div>
+<div><b>Collect</b>Claude runs status and log commands, and reads config files</div>
+<div><b>Narrow down</b>Finds the first real error, not the noise after it</div>
+<div class="hl"><b>Propose</b>Explains the cause and suggests a fix</div>
+<div><b>You decide</b>Approve the change, or take it to the environment owner</div>
+</div>
+<div class="code"><span class="cap">Prompt in Claude Code</span><pre>Our local test stack won't start. Run `docker compose ps` and `docker compose logs --tail=200`,
+read docker-compose.yml and .env.example (NOT .env), and tell me:
+1) which service fails first and the exact error line,
+2) the most likely cause, 3) the smallest fix. Don't change any files yet.</pre></div>
+<p>Two good habits are built into that prompt. It asks for the <em>first</em> failure, because later errors are often just knock-on effects. And it keeps Claude away from the real <code>.env</code> file, which may hold secrets (Chapter 98). Pair that with a deny rule in your settings (Chapter 78).</p>
+<div class="box example"><span class="tag">Real-world example</span><p>A database container keeps restarting. Two hundred log lines scroll past. Claude points to line 37: "port 5432 is already in use". A forgotten local database is still running. The fix takes ten seconds once someone finds that line; the finding was the expensive part.</p></div>
+
+<h3 id="ch122-6"><span class="num">122.6</span>Flaky tests: a triage method</h3>
+<p>A <strong>flaky test</strong> passes sometimes and fails sometimes, with no change to the code. Flaky tests are dangerous because teams learn to ignore red builds, and then real failures get ignored too.</p>
+<h4>The five usual causes</h4>
+<div class="tbl"><table>
+<tr><th>Cause</th><th>What's happening</th><th>Typical clue in the logs</th></tr>
+<tr><td><b>Timing</b></td><td>The test checks before the page or service is ready</td><td>Timeouts; "element not found" that passes on retry</td></tr>
+<tr><td><b>Order</b></td><td>The test depends on another test running first</td><td>Fails only when run alone, or only in a certain order</td></tr>
+<tr><td><b>Shared state</b></td><td>Tests change the same user, basket or record</td><td>Fails only when tests run in parallel</td></tr>
+<tr><td><b>Environment</b></td><td>Network, slow machine, time zone, browser version</td><td>Fails on CI but not locally; at certain times of day</td></tr>
+<tr><td><b>Data</b></td><td>Random or expiring data produces an unlucky case</td><td>Fails with one particular value; fails after a date</td></tr>
+</table></div>
+
+<h4>Using Claude Code to triage</h4>
+<div class="code"><span class="cap">Prompt in Claude Code</span><pre>tests/checkout.spec.ts › "applies coupon" failed 3 times in the last 20 CI runs.
+1. Read the test and the page objects it uses.
+2. Read the three failure logs in ci-logs/ and compare them with a passing run.
+3. Run it 20 times locally: npx playwright test tests/checkout.spec.ts -g "applies coupon" --repeat-each=20
+4. Classify the most likely cause (timing, order, shared state, environment, data),
+   quote the evidence, and propose a fix. Do NOT add fixed waits (waitForTimeout).</pre></div>
+<p>Playwright's <code>--repeat-each</code> option runs the same test many times, a quick way to make an intermittent failure show itself. Its trace viewer (with <code>trace: 'on-first-retry'</code> in the configuration) records exactly what the browser did on the failing attempt, and Claude can read the trace's error and step list with you.</p>
+<div class="box warn"><span class="tag">Watch out</span><p>The lazy "fix" for timing problems is adding a fixed wait ("sleep 5 seconds"). It makes tests slower and still flaky. Ask Claude for a proper fix instead: wait for a specific condition, such as Playwright's web-first assertions that retry until an element is visible. Put this rule in your CLAUDE.md so it applies to every session (Chapter 77).</p></div>
+
+<h4>A fair quarantine policy</h4>
+<p>Sometimes you can't fix a flaky test today. <strong>Quarantine</strong> means moving it out of the main pass/fail gate so it doesn't block releases, while it's still run and tracked. A sensible policy, which Claude can help you write up and automate:</p>
+<ol>
+<li>A test that fails then passes on retry is labelled flaky automatically.</li>
+<li>Flaky tests go into quarantine with an owner and a ticket.</li>
+<li>Quarantined tests still run and report, but don't fail the build.</li>
+<li>Anything still in quarantine after an agreed period (say two sprints) is fixed or deleted. A test nobody fixes isn't protecting anyone.</li>
+</ol>
+
+<h3 id="ch122-7"><span class="num">122.7</span>Test maintenance and "self-healing" tests</h3>
+<p>When developers change a page, tests that find elements by their old names break. Fixing these <a class="gl" href="#g-locator">locators</a> one by one is tedious. Claude Code can do it in bulk: read the failing tests, look at the new page (through the code or the Playwright MCP server, Chapter 102), and propose updated locators.</p>
+<div class="code"><span class="cap">Prompt in Claude Code</span><pre>The login page was redesigned in this branch. 9 tests in tests/auth/ now fail to find elements.
+For each failure: find the element in the new markup, propose a resilient locator
+(prefer getByRole / getByLabel / data-testid over CSS classes), and show me the diff.
+If an element was genuinely removed, flag it — that may be a real bug, not a locator change.</pre></div>
+<p>The last line matters. Some tools advertise <strong>self-healing tests</strong> that automatically swap broken locators at run time. That can save time, but it has a real risk: if a button genuinely disappeared, a tool that quietly "heals" the test to click something else hides a bug. The safer pattern is <em>assisted</em> repair: AI proposes, a person reviews the diff, and anything that looks like a missing feature is reported, not patched.</p>
+<div class="box opinion"><span class="tag">Opinion · industry claims</span><p>Vendors often quote large reductions in maintenance effort from self-healing features. Treat such figures as marketing until you've measured them on your own suite. Chapter 126 shows how to measure effort saved honestly.</p></div>
+
+<h3 id="ch122-8"><span class="num">122.8</span>Slimming the suite: duplicates and smart regression</h3>
+<p>Big test suites grow slow and repetitive. Claude can help in two ways.</p>
+<p><strong>Finding duplicates and gaps.</strong> Ask Claude Code to read a folder of tests and produce a table: what each test checks, which ones overlap almost completely, and which requirements have no test at all. You decide what to merge or delete; Claude does the reading.</p>
+<p><strong>Choosing what to run.</strong> Running everything on every change is safe but slow. Claude can read the change and suggest which tests matter most:</p>
+<div class="code"><span class="cap">Prompt in Claude Code</span><pre>Run `git diff main...HEAD --stat` and read the changed files.
+List the test files most likely to be affected, ranked, with one line of reasoning each.
+Then list areas that changed but have NO tests. Don't run anything yet.</pre></div>
+<p>Use this to <em>prioritise</em> (run the risky tests first, get feedback sooner), not to skip the full suite before a release. A model's guess about impact can miss hidden connections, such as a shared configuration file.</p>
+
+<div class="lab"><div class="lab-h"><b>Data, logs and a flaky test</b><span>45 min · Claude Code</span></div><ol>
+<li>In a practice folder, ask Claude Code: "Create test-data/users.csv with 30 invented users: 20 normal and 10 labelled edge cases (accents, apostrophes, very long names, plus-sign emails, 29 Feb birthdays). Use example.com emails only."<span class="expect">a CSV file with a "case" column explaining each edge case, and only example.com addresses.</span></li>
+<li>Ask: "Write a short script that checks every email in users.csv ends with example.com or example.org, and run it."<span class="expect">a passing check. You've just tested the test data.</span></li>
+<li>Ask Claude to create a deliberately flaky Playwright test against https://demo.playwright.dev/todomvc that sometimes checks the counter before the item is added. Run it with <code>--repeat-each=10</code>.<span class="expect">some passes and some failures from the same test.</span></li>
+<li>Ask Claude to classify the cause and fix it without fixed waits, then run it again with <code>--repeat-each=10</code>.<span class="expect">"timing" as the cause, a fix using an assertion that waits, and 10 out of 10 passes.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"It's only test data, so real customer records are fine."</dt><dd>Privacy law and company policy still apply. Use synthetic or properly masked data.</dd>
+<dt>"Retrying flaky tests fixes them."</dt><dd>Retries hide the symptom. Use retries to detect flakiness, then fix the cause.</dd>
+<dt>"Self-healing means no more maintenance."</dt><dd>It can hide real bugs. Prefer AI-proposed fixes that a person reviews.</dd>
+<dt>"AI-generated data covers every edge case."</dt><dd>Only the ones you or it thought of. Keep your own edge-case checklist and ask for it explicitly.</dd>
+</dl></div>
+
+<h3 id="ch122-r"><span class="num">122.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Claude generates realistic synthetic data in seconds; the value comes from asking for labelled edge cases.</li>
+<li>Never put real personal data into prompts or test environments; use synthetic or approved masked data.</li>
+<li>In Claude Code, data respects your real schema; builders with fixed seeds give variety and reproducibility.</li>
+<li>For environment problems, have Claude find the first real error, and keep it away from secret files.</li>
+<li>Triage flaky tests by cause (timing, order, shared state, environment, data), fix without fixed waits, and quarantine with an owner and a deadline.</li>
+<li>Use AI to propose locator repairs and regression priorities, with a person reviewing the result.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Why should test emails use example.com?</p><div class="opts"><button>It makes tests faster</button><button data-ok>The domain is reserved, so email can never reach a real person</button><button>Claude can only generate example.com addresses</button></div><p class="why" hidden>example.com and example.org are reserved for documentation and testing.</p></div>
+<div class="qz"><p class="q">A test fails only when the whole suite runs in parallel. What's the most likely cause?</p><div class="opts"><button>Timing</button><button data-ok>Shared state between tests</button><button>A wrong locator</button></div><p class="why" hidden>Parallel tests changing the same data is the classic shared-state problem.</p></div>
+<div class="qz"><p class="q">What's the best fix for a test that checks a page before it's ready?</p><div class="opts"><button>Add a 5-second wait</button><button data-ok>Use an assertion that waits for a specific condition</button><button>Turn on three retries</button></div><p class="why" hidden>Condition-based waits are faster and reliable; fixed waits and retries hide the problem.</p></div>
+<div class="qz"><p class="q">What's the main risk of fully automatic "self-healing" tests?</p><div class="opts"><button>They're expensive</button><button data-ok>They may hide a real bug by quietly adapting to a missing element</button><button>They only work in Chrome</button></div><p class="why" hidden>A disappeared button may be a bug. Assisted repair with review is safer.</p></div>
+<div class="qz"><p class="q">Why use a fixed random seed for generated test data in CI?</p><div class="opts"><button data-ok>So the "random" data is the same every run and failures can be reproduced</button><button>It's required by Faker</button><button>It makes the data more realistic</button></div><p class="why" hidden>Fixed seeds give variety you can replay.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick your team's flakiest test. Use Claude Code to classify its cause with evidence, fix it, and prove the fix with a repeated run. Then draft a one-page quarantine policy for your team (owner, ticket, deadline, reporting) and ask Claude to suggest how to automate the labelling in your CI system.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"AI takes the grind out of test support work. It makes realistic fake data with all the awkward edge cases, reads logs to find the first real error, and sorts flaky tests by cause: timing, order, shared state, environment or data. Never use real customer data. Fix flaky tests properly instead of adding waits, and have a person review any automatic repairs, because a 'healed' test can hide a real bug."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Playwright: <a href="https://playwright.dev/docs/test-cli" target="_blank" rel="noopener">command line</a> (<code>--repeat-each</code>), <a href="https://playwright.dev/docs/trace-viewer" target="_blank" rel="noopener">trace viewer</a>, <a href="https://playwright.dev/docs/test-assertions" target="_blank" rel="noopener">web-first assertions</a>, <a href="https://playwright.dev/docs/test-retries" target="_blank" rel="noopener">retries and flaky tests</a>.</li>
+<li><a href="https://fakerjs.dev" target="_blank" rel="noopener">Faker (@faker-js/faker)</a> documentation.</li>
+<li>IETF RFC 2606, "Reserved Top Level DNS Names" (example.com, example.org).</li>
+<li>European Commission, <a href="https://commission.europa.eu/law/law-topic/data-protection_en" target="_blank" rel="noopener">data protection (GDPR)</a> overview.</li>
+<li>Docker, <a href="https://docs.docker.com/compose/" target="_blank" rel="noopener">Docker Compose documentation</a>.</li>
+<li>Anthropic, Claude Code documentation at <a href="https://code.claude.com/docs" target="_blank" rel="noopener">code.claude.com/docs</a> (permissions and settings).</li>
+</ol><p class="verified">Verified 9 November 2026</p></div>

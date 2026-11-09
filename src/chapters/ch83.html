@@ -1,0 +1,221 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How to add, check, use and remove MCP servers in Claude Code, with the exact commands</li>
+<li>The difference between local (stdio) and remote (HTTP) servers</li>
+<li>The three scopes (local, project, user) and where each is stored</li>
+<li>How to write a team <code>.mcp.json</code> without committing secrets</li>
+<li>How to sign in to servers, set permissions for their tools, and handle timeouts and output limits</li>
+<li>A worked setup: Playwright locally, GitHub and Atlassian remotely</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapters 65 (your first session) and 75 (settings and permissions). This chapter is the practical "how" inside Claude Code. For the full story of what MCP is, how it works inside, and step-by-step guides for Jira, Confluence, Playwright, GitHub and databases, see Part XII (Chapters 97–106).</div>
+
+<div class="bigidea"><p>On its own, Claude Code can read files, edit them and run commands on your computer. <a class="gl" href="#g-mcp">MCP</a> servers give it extra tools: a real browser, your Jira tickets, GitHub pull requests, a database. You add a server once with <code>claude mcp add</code>, choose who it's for (just you, your team or all your projects), sign in if needed, and from then on Claude can use that server's tools in any session, always within your permission rules.</p></div>
+
+<h3 id="ch83-1"><span class="num">83.1</span>What a server gives you</h3>
+<p>An <a class="gl" href="#g-mcp-server">MCP server</a> is a small program, either on your machine or on the internet, that offers Claude a set of named tools. Once it's connected:</p>
+<ul>
+<li><strong>Tools</strong> appear to Claude alongside its built-in tools. A Playwright server adds tools such as "navigate to a page" and "click"; a GitHub server adds tools to read pull requests and create issues. Claude decides when to use them.</li>
+<li><strong>Resources</strong> (if the server offers them) can be pulled into the conversation with <code>@</code>, like files.</li>
+<li><strong>Prompts</strong> (if the server offers them) become slash commands.</li>
+</ul>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Claude Code is like a skilled new hire on their first day: they can read, write and use the computer in front of them. Adding an MCP server is like handing them a badge for another system. One badge opens Jira, another opens GitHub, another lets them drive a test browser. You decide which badges they get, and the security desk (your permission rules) still checks what they do with them.</p></div>
+
+<h3 id="ch83-2"><span class="num">83.2</span>Local and remote servers</h3>
+<p>Servers talk to Claude Code in one of two main ways, called <a class="gl" href="#g-transport">transports</a>:</p>
+<div class="tbl"><table>
+<tr><th></th><th>stdio (local)</th><th>HTTP (remote)</th></tr>
+<tr><td>Where it runs</td><td>A program Claude Code starts on your computer</td><td>A service on the internet or your company network</td></tr>
+<tr><td>Typical examples</td><td>Playwright (drives a browser on your machine), file or database tools</td><td>GitHub, Atlassian (Jira and Confluence), Sentry, Notion</td></tr>
+<tr><td>How you sign in</td><td>Usually environment variables such as an API key (<code>-e</code>)</td><td>OAuth in the browser, or a token in a header (<code>--header</code>)</td></tr>
+<tr><td>Transport flag</td><td><code>--transport stdio</code> (the default)</td><td><code>--transport http</code></td></tr>
+</table></div>
+<p>A third transport, SSE, still exists for older servers but is deprecated; recent versions of Claude Code automatically fall back to SSE when an HTTP connection needs it. WebSocket servers can only be added from JSON (80.6).</p>
+
+<h3 id="ch83-3"><span class="num">83.3</span>The <code>claude mcp add</code> command</h3>
+<p>You run this in a normal terminal (not inside a Claude session). Its shape, from the installed help (version 2.1.319):</p>
+<div class="code"><span class="cap">Syntax</span><pre>claude mcp add [options] &lt;name&gt; &lt;commandOrUrl&gt; [args...]</pre></div>
+<div class="tbl"><table>
+<tr><th>Option</th><th>Meaning</th></tr>
+<tr><td><code>-t</code>, <code>--transport</code></td><td><code>stdio</code>, <code>sse</code> or <code>http</code>. Defaults to stdio.</td></tr>
+<tr><td><code>-s</code>, <code>--scope</code></td><td><code>local</code>, <code>project</code> or <code>user</code>. Defaults to local (80.4).</td></tr>
+<tr><td><code>-e</code>, <code>--env KEY=value</code></td><td>Environment variable passed to a local (stdio) server, often an API key</td></tr>
+<tr><td><code>-H</code>, <code>--header "Name: value"</code></td><td>HTTP header sent to a remote server, often <code>Authorization: Bearer …</code></td></tr>
+<tr><td><code>--client-id</code>, <code>--client-secret</code>, <code>--callback-port</code></td><td>For remote servers whose OAuth sign-in needs a pre-registered app. <code>--client-secret</code> prompts you for the secret (or reads <code>MCP_CLIENT_SECRET</code>), so it isn't typed onto the command line.</td></tr>
+</table></div>
+<h4>A local server</h4>
+<p>For stdio servers, put the options <strong>before</strong> the name, then <code>--</code>, then the command that starts the server. The <code>--</code> tells Claude Code "everything after this belongs to the server's own command".</p>
+<div class="code"><pre><span class="c"># Playwright's official browser server, started with npx (needs Node.js)</span>
+claude mcp add playwright -- npx @playwright/mcp@latest
+
+<span class="c"># a local server that needs an API key in its environment</span>
+claude mcp add my-server -e API_KEY=xxx -- npx my-mcp-server</pre></div>
+<h4>A remote server</h4>
+<div class="code"><pre><span class="c"># remote server that signs in with OAuth later (no secret on the command line)</span>
+claude mcp add --transport http sentry https://mcp.sentry.dev/mcp
+
+<span class="c"># remote server that takes a token in a header</span>
+claude mcp add --transport http github https://api.githubcopilot.com/mcp/ \
+  --header "Authorization: Bearer YOUR_GITHUB_PAT"</pre></div>
+<div class="box warn"><span class="tag">It doesn't check your credentials</span><p>According to Anthropic's docs, <code>claude mcp add</code> saves the configuration without testing the credentials, so even a placeholder is accepted. You only find out it's wrong when the server fails to connect. Always check with <code>/mcp</code> or <code>claude mcp list</code> afterwards (80.7).</p></div>
+
+<h3 id="ch83-4"><span class="num">83.4</span>Scopes: who the server is for</h3>
+<p>Every server is added at a <a class="gl" href="#g-mcp-scope">scope</a>, which decides who can use it and where it's saved.</p>
+<div class="tbl"><table>
+<tr><th>Scope</th><th>Available in</th><th>Stored in</th><th>Use it for</th></tr>
+<tr><td><code>local</code> (default)</td><td>This project, only you</td><td><code>~/.claude.json</code>, under this project's path</td><td>Trying a server out, or servers with your personal credentials</td></tr>
+<tr><td><code>project</code></td><td>This project, everyone who clones it</td><td><code>.mcp.json</code> at the project root (commit it)</td><td>Servers the whole team should share, such as Playwright for the test repo</td></tr>
+<tr><td><code>user</code></td><td>All your projects, only you</td><td><code>~/.claude.json</code></td><td>Personal tools you want everywhere</td></tr>
+</table></div>
+<p>If the same name is defined in several places, Claude Code uses this order: <strong>local, then project, then user</strong>, then servers from plugins, then claude.ai connectors. If the same name points to different endpoints in different scopes, <code>claude mcp list</code> and <code>/mcp</code> show a warning; remove the one you don't want with <code>claude mcp remove &lt;name&gt; --scope &lt;scope&gt;</code>.</p>
+
+<h3 id="ch83-5"><span class="num">83.5</span>The team file: <code>.mcp.json</code></h3>
+<p>Project-scoped servers live in <code>.mcp.json</code> at the root of the repository. You can create it with <code>claude mcp add --scope project …</code> or write it by hand.</p>
+<div class="code"><span class="cap">.mcp.json for a test repository</span><pre>{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
+    },
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": { "Authorization": "Bearer ${GITHUB_PAT}" }
+    }
+  }
+}</pre></div>
+<p>Notice <code>${GITHUB_PAT}</code>. <strong>Never commit a real token.</strong> Claude Code expands environment variables written as <code>${VAR}</code>, or <code>${VAR:-default}</code> to give a fallback, inside <code>command</code>, <code>args</code>, <code>env</code>, <code>url</code> and <code>headers</code>. Each teammate sets <code>GITHUB_PAT</code> on their own machine (Chapter 98 shows safe ways to do that), and the file stays secret-free.</p>
+<details class="deep"><summary>Rules of the file format</summary><div class="body">
+<ul>
+<li>An entry with no <code>type</code> is treated as stdio, so it needs a <code>command</code>.</li>
+<li>An entry with a <code>url</code> but no <code>type</code> is an error. Write <code>"type": "http"</code> (<code>"streamable-http"</code> is accepted as another name for it).</li>
+<li>If a <code>${VAR}</code> isn't set and has no default, the server still loads with the text unexpanded, and <code>claude mcp list</code> and <code>/mcp</code> warn you about the missing variable.</li>
+<li>Claude Code warns about hidden leading or trailing spaces in values, a common result of pasting a token with a trailing newline. It doesn't trim them, so fix the file.</li>
+<li>Some names are reserved for built-in servers (for example <code>workspace</code>, <code>claude-in-chrome</code> and <code>computer-use</code>) and are rejected or skipped.</li>
+<li>A <code>"timeout"</code> field in milliseconds sets a per-server limit for each tool call (80.9).</li>
+</ul>
+</div></details>
+<h4>Approving project servers</h4>
+<p>Because anyone can commit an <code>.mcp.json</code>, Claude Code doesn't run project servers automatically. The first time you start an interactive session in that project, it asks you to approve them. Until then, <code>claude mcp list</code> shows them as <strong>⏸ Pending approval</strong>. Approvals are tied to trusting the workspace: a freshly cloned repository can't approve its own servers by committing settings. If you change your mind, <code>claude mcp reset-project-choices</code> clears your approvals and rejections for that project.</p>
+<div class="box example"><span class="tag">Real-world example: a QA view</span><p>This approval step is a security control you'd test for. A malicious pull request that adds an <code>.mcp.json</code> entry pointing at an untrusted server shouldn't be able to run it on a reviewer's laptop without that person agreeing. Chapter 105 covers MCP security in depth.</p></div>
+
+<h3 id="ch83-6"><span class="num">83.6</span>Every <code>claude mcp</code> subcommand</h3>
+<div class="tbl"><table>
+<tr><th>Command</th><th>What it does</th></tr>
+<tr><td><code>claude mcp add …</code></td><td>Adds a server (80.3)</td></tr>
+<tr><td><code>claude mcp add-json &lt;name&gt; '&lt;json&gt;'</code></td><td>Adds a server from a JSON string; the only way to add a WebSocket (<code>"type": "ws"</code>) server</td></tr>
+<tr><td><code>claude mcp add-from-claude-desktop</code></td><td>Imports servers you set up in the Claude Desktop app (Mac and WSL only)</td></tr>
+<tr><td><code>claude mcp list</code></td><td>Lists servers with their status (connected, failed, needs sign-in, pending approval)</td></tr>
+<tr><td><code>claude mcp get &lt;name&gt;</code></td><td>Shows one server's details and status</td></tr>
+<tr><td><code>claude mcp remove &lt;name&gt;</code></td><td>Removes a server (add <code>--scope</code> to choose which copy)</td></tr>
+<tr><td><code>claude mcp login &lt;name&gt;</code></td><td>Runs a server's OAuth sign-in from the terminal; <code>--no-browser</code> for remote machines over SSH</td></tr>
+<tr><td><code>claude mcp logout &lt;name&gt;</code></td><td>Clears a server's stored OAuth credentials</td></tr>
+<tr><td><code>claude mcp reset-project-choices</code></td><td>Resets approvals of this project's <code>.mcp.json</code> servers</td></tr>
+<tr><td><code>claude mcp serve</code></td><td>Runs Claude Code itself as an MCP server for other apps</td></tr>
+</table></div>
+<div class="code"><span class="cap">Adding from JSON</span><pre>claude mcp add-json weather-api '{"type":"http","url":"https://api.weather.com/mcp"}'</pre></div>
+
+<h3 id="ch83-7"><span class="num">83.7</span>Inside a session: <code>/mcp</code></h3>
+<p>Inside Claude Code, type <code>/mcp</code> to see every server, whether it's connected (✓) or failing (✘), and the tools it offers. From the same command you can:</p>
+<ul>
+<li><strong>Sign in</strong> to a remote server that uses OAuth: choose it and follow the browser flow. Tokens are stored securely and refreshed automatically.</li>
+<li><strong>Reconnect</strong> a server: <code>/mcp reconnect &lt;server&gt;</code> or <code>/mcp reconnect all</code>.</li>
+<li><strong>Turn servers off and on</strong> for the session: <code>/mcp disable &lt;server&gt;</code>, <code>/mcp enable &lt;server&gt;</code> (or <code>all</code>).</li>
+</ul>
+<p>If a remote server's row shows ✘, the details usually include the HTTP status it returned. A <strong>401</strong> almost always means a missing, expired or wrong token.</p>
+<div class="box note"><span class="tag">Sign-in only works interactively</span><p>OAuth needs a person and a browser, so it can't happen in a non-interactive <code>claude -p</code> run. Sign in once interactively (or with <code>claude mcp login</code>), and later runs reuse the stored credentials.</p></div>
+
+<h4>Using what a server offers</h4>
+<div class="tbl"><table>
+<tr><th>Feature</th><th>How to use it</th><th>Example</th></tr>
+<tr><td>Tools</td><td>Just ask in plain words; Claude picks the tool</td><td>"Open the login page and check the error message for a wrong password"</td></tr>
+<tr><td>Resources</td><td>Type <code>@</code> to browse them; reference as <code>@server:protocol://path</code></td><td><code>@github:issue://123</code></td></tr>
+<tr><td>Prompts</td><td>They appear as commands named <code>/server:prompt</code> (also <code>/mcp__server__prompt</code>)</td><td><code>/mcp__github__pr_review 456</code></td></tr>
+</table></div>
+
+<h3 id="ch83-8"><span class="num">83.8</span>Permissions for MCP tools</h3>
+<p>MCP tools go through the same permission system as built-in tools (Chapter 78). Each tool has a name in the form <code>mcp__&lt;server&gt;__&lt;tool&gt;</code>.</p>
+<div class="tbl"><table>
+<tr><th>Rule</th><th>Matches</th></tr>
+<tr><td><code>mcp__playwright</code> or <code>mcp__playwright__*</code></td><td>Every tool of the server named <code>playwright</code></td></tr>
+<tr><td><code>mcp__github__create_issue</code></td><td>Just that one tool (the exact tool names come from the server; <code>/mcp</code> lists them)</td></tr>
+<tr><td><code>mcp__claude_ai_&lt;server&gt;__&lt;tool&gt;</code></td><td>Tools of a claude.ai connector</td></tr>
+<tr><td><code>mcp__plugin_&lt;plugin&gt;_&lt;server&gt;__*</code></td><td>Tools of a server that came with a plugin</td></tr>
+</table></div>
+<div class="code"><span class="cap">.claude/settings.json: let Playwright run freely, but always ask before anything else</span><pre>{
+  "permissions": {
+    "allow": ["mcp__playwright__*"],
+    "ask":   ["mcp__github__*"]
+  }
+}</pre></div>
+<p>Remember the rules from Chapter 78: <em>deny beats ask, ask beats allow</em>, and server names containing dots or spaces turn into underscores in rule names.</p>
+
+<h3 id="ch83-9"><span class="num">83.9</span>Timeouts and output limits</h3>
+<div class="tbl"><table>
+<tr><th>Limit</th><th>Default</th><th>How to change it</th></tr>
+<tr><td>Server start-up time</td><td>30 seconds</td><td>Environment variable <code>MCP_TIMEOUT</code>, in milliseconds, e.g. <code>MCP_TIMEOUT=10000 claude</code></td></tr>
+<tr><td>Time per tool call</td><td>Very long unless set</td><td><code>"timeout"</code> (milliseconds) on the server's <code>.mcp.json</code> entry, or the <code>MCP_TOOL_TIMEOUT</code> variable for all servers</td></tr>
+<tr><td>Warning on large tool output</td><td>Above 10,000 tokens</td><td>Fixed</td></tr>
+<tr><td>Maximum tool output</td><td>25,000 tokens</td><td><code>MAX_MCP_OUTPUT_TOKENS</code>, e.g. <code>export MAX_MCP_OUTPUT_TOKENS=50000</code></td></tr>
+<tr><td>Long text results</td><td>Over 50,000 characters are saved to a file instead of pasted into context</td><td>Set by the server for its own tools</td></tr>
+</table></div>
+<p>The output limits protect your <a class="gl" href="#g-context-window">context window</a> (Chapter 20): a single Jira search or browser snapshot can otherwise flood it. If a tool keeps hitting the limit, ask for less ("only the first 20 issues", "just the error text") before raising the limit.</p>
+
+<h3 id="ch83-10"><span class="num">83.10</span>Worked example: a test repository's MCP setup</h3>
+<p>Here's a typical QA setup, done in a terminal inside the test repository.</p>
+<div class="code"><span class="cap">1. Playwright for the whole team (local, project scope)</span><pre>claude mcp add --scope project playwright -- npx @playwright/mcp@latest</pre></div>
+<div class="code"><span class="cap">2. GitHub with your own token (remote, local scope so the token stays yours)</span><pre><span class="c"># create a fine-grained personal access token in GitHub first (Chapter 98)</span>
+claude mcp add --transport http github https://api.githubcopilot.com/mcp/ \
+  --header "Authorization: Bearer $GITHUB_PAT"</pre></div>
+<div class="code"><span class="cap">3. Atlassian (Jira and Confluence) with OAuth sign-in</span><pre><span class="c"># endpoint as listed in Atlassian's getting-started guide on 9 Nov 2026; check it there first</span>
+claude mcp add --transport http atlassian https://mcp.atlassian.com/v2/mcp
+<span class="c"># then, inside claude:  /mcp  → choose atlassian → sign in in the browser</span></pre></div>
+<div class="code"><span class="cap">4. Check everything</span><pre>claude mcp list
+<span class="c"># inside a session:</span>
+/mcp</pre></div>
+<p>Now you can ask things like: <em>"Read PROJ-412 in Jira, open the checkout page in the browser, try the three acceptance criteria and tell me which ones fail. Then draft a GitHub issue for any failure, but ask me before creating it."</em> Chapters 101–103 cover each of these connections in detail, and Chapter 106 builds a complete workflow.</p>
+<div class="box note"><span class="tag">Your company may manage this for you</span><p>Organisations can supply MCP servers through managed settings, and administrators can restrict which servers are allowed. If a server you expect is missing, or one you add is blocked, ask whoever manages your Claude setup before working around it.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Connect and use your first server</b><span>35 min · terminal + Claude Code · needs Node.js</span></div><ol>
+<li>In a practice folder (for example <code>~/claude-lab</code>), run <code>claude mcp add playwright -- npx @playwright/mcp@latest</code>.<span class="expect">a confirmation that the server was added to the local scope.</span></li>
+<li>Run <code>claude mcp list</code>.<span class="expect">playwright listed with a connected status (the first check may take a few seconds while npx downloads the package).</span></li>
+<li>Start <code>claude</code> and type <code>/mcp</code>.<span class="expect">playwright shown with ✓ and a list of browser tools.</span></li>
+<li>Ask: "Using the Playwright tools, open https://demo.playwright.dev/todomvc, add three to-dos, complete one, and tell me what the counter says."<span class="expect">a permission prompt for the browser tool, a browser window, and the answer "2 items left".</span></li>
+<li>Exit, then add the server for the team instead: <code>claude mcp remove playwright</code>, then <code>claude mcp add --scope project playwright -- npx @playwright/mcp@latest</code>. Open <code>.mcp.json</code>.<span class="expect">a file with an <code>mcpServers</code> entry for playwright, ready to commit.</span></li>
+<li>Add <code>"mcp__playwright__*"</code> to <code>permissions.allow</code> in <code>.claude/settings.json</code>, start a new session and repeat step 4.<span class="expect">no permission prompts for Playwright tools this time.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"I'll put the token straight into .mcp.json; it's only our team repo."</dt><dd>Anything committed spreads to every clone and every fork and stays in git history. Use <code>${VAR}</code> and keep the secret in each person's environment.</dd>
+<dt>"The add command worked, so the server works."</dt><dd>It only saves configuration. Check with <code>claude mcp list</code> or <code>/mcp</code>.</dd>
+<dt>"Forgetting the <code>--</code>."</dt><dd>For stdio servers, everything after <code>--</code> is the server's own command. Without it, the server's flags can be mistaken for Claude Code's.</dd>
+<dt>"Project servers should just start when I clone the repo."</dt><dd>They need your approval first, on purpose, so an untrusted repository can't run code on your machine.</dd>
+<dt>"An MCP server is safe because Claude Code asks permission."</dt><dd>Permission prompts help, but the server itself is software running with your access. Only install servers you trust (Chapter 105).</dd>
+</dl></div>
+
+<h3 id="ch83-r"><span class="num">83.11</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li><code>claude mcp add [options] &lt;name&gt; &lt;commandOrUrl&gt; [args...]</code> adds a server; stdio servers take <code>-- command</code>, remote ones <code>--transport http URL</code>.</li>
+<li>Scopes: <code>local</code> (default, you, this project), <code>project</code> (<code>.mcp.json</code>, shared), <code>user</code> (you, everywhere).</li>
+<li>Keep secrets out of <code>.mcp.json</code> with <code>${VAR}</code> expansion; project servers need approval before they run.</li>
+<li>Check and sign in with <code>claude mcp list</code>, <code>/mcp</code> and <code>claude mcp login</code>; a 401 usually means a bad token.</li>
+<li>MCP tools are named <code>mcp__server__tool</code> and obey normal allow, ask and deny rules.</li>
+<li>Defaults: 30 s start-up, a warning above 10,000 tokens of output, a cap at 25,000 (<code>MAX_MCP_OUTPUT_TOKENS</code>).</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">You want every tester who clones the repo to get the Playwright server. Which scope?</p><div class="opts"><button>local</button><button data-ok>project</button><button>user</button></div><p class="why" hidden>Project scope writes it to <code>.mcp.json</code> at the repo root, which you commit.</p></div>
+<div class="qz"><p class="q">What's the safest way to give a remote server your GitHub token in a shared <code>.mcp.json</code>?</p><div class="opts"><button>Paste the token into the file</button><button data-ok>Write <code>Bearer ${GITHUB_PAT}</code> and have each person set GITHUB_PAT on their own machine</button><button>Put it in CLAUDE.md</button></div><p class="why" hidden>Claude Code expands <code>${VAR}</code> in headers, so the committed file never contains the secret.</p></div>
+<div class="qz"><p class="q">In <code>/mcp</code> the GitHub server shows ✘ with status 401. Most likely cause?</p><div class="opts"><button>The internet is down</button><button data-ok>A missing, expired or wrong token</button><button>Too many tools</button></div><p class="why" hidden>401 means "unauthorised": the server didn't accept the credentials.</p></div>
+<div class="qz"><p class="q">Which permission rule allows every tool of the server named <code>playwright</code>?</p><div class="opts"><button><code>Bash(playwright *)</code></button><button data-ok><code>mcp__playwright__*</code></button><button><code>playwright:*</code></button></div><p class="why" hidden>MCP tools are named <code>mcp__&lt;server&gt;__&lt;tool&gt;</code>.</p></div>
+<div class="qz"><p class="q">An MCP tool's answers keep getting cut off. What should you try first?</p><div class="opts"><button data-ok>Ask for less data, then raise <code>MAX_MCP_OUTPUT_TOKENS</code> if really needed</button><button>Reinstall Claude Code</button><button>Switch to the user scope</button></div><p class="why" hidden>The default cap of 25,000 tokens protects your context window. Smaller requests are usually better than a bigger cap.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Design the MCP setup for your real test repository. Write down which servers it needs, which scope each should use and why, which credentials each needs and where they will live (never in git), and which tools should be <em>allow</em>, <em>ask</em> or <em>deny</em>. Then create the <code>.mcp.json</code> and permission rules, ask a colleague to clone the repo and confirm that the approval prompt appears and the servers connect with their own credentials.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"MCP servers give Claude Code new tools, like a browser, Jira or GitHub. You add one with <code>claude mcp add</code>: local servers are a command after <code>--</code>, remote ones are a URL with <code>--transport http</code>. Choose a scope: local for just you, project to share through <code>.mcp.json</code>, user for all your projects. Keep tokens out of git with <code>${VAR}</code>, check everything with <code>/mcp</code>, and control the tools with normal permission rules."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/mcp" target="_blank" rel="noopener">Connect Claude Code to tools via MCP</a>: add commands, scopes, <code>.mcp.json</code>, environment-variable expansion, approvals, OAuth, resources and prompts, timeouts, output limits, the GitHub example.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/permissions" target="_blank" rel="noopener">Permissions</a>: MCP tool naming and rule evaluation.</li>
+<li>Claude Code 2.1.319, <code>claude mcp --help</code> and <code>claude mcp add --help</code>, captured 9 November 2026.</li>
+<li>Microsoft, <a href="https://github.com/microsoft/playwright-mcp" target="_blank" rel="noopener">Playwright MCP</a> (README: <code>npx @playwright/mcp@latest</code>).</li>
+<li>Atlassian, <a href="https://support.atlassian.com/atlassian-rovo-mcp-server/docs/getting-started-with-the-atlassian-remote-mcp-server/" target="_blank" rel="noopener">Getting started with the Atlassian remote MCP server</a>.</li>
+<li>Model Context Protocol, <a href="https://modelcontextprotocol.io" target="_blank" rel="noopener">modelcontextprotocol.io</a>: the specification and server directory.</li>
+</ol><p class="verified">Verified 9 November 2026 against Anthropic's Claude Code documentation and Claude Code 2.1.319. The Atlassian endpoint is as shown on Atlassian's getting-started page on that date.</p></div>

@@ -1,0 +1,188 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>The Claude plans (Free, Pro, Max, Ultra, Team and Enterprise) and who each is for, with dated prices</li>
+<li>What an organisation's administrators can control: members, single sign-on, user provisioning, connectors, features and spending</li>
+<li>How Anthropic handles organisation data: training, retention, zero data retention and custom retention</li>
+<li>How managed settings let an organisation enforce rules on every copy of Claude Code</li>
+<li>How to put together a sensible first policy for a QA team, and why features vary by plan, region and admin choices</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch40">Chapter 40</a> (models) and <a href="#ch41">Chapter 41</a> (how the pieces fit, and where data goes). <a href="#ch78">Chapter 78</a> covers Claude Code settings and permissions in depth; this chapter looks at them from the organisation's side.</div>
+
+<div class="bigidea"><p>Individuals buy Claude on personal plans; organisations buy Team or Enterprise, or use the API and cloud platforms. The organisation plans add what a company needs: central billing, single sign-on, controls over which connectors and features people can use, usage reports and, on Enterprise, automated user management, audit logs and custom data retention. Commercial plans are not used to train models by default. For Claude Code, administrators can push managed settings that no individual can override. Prices and features change often and differ by plan, region and what your admin switched on, so always check the current pricing page and your own admin console.</p></div>
+
+<h3 id="ch42-1"><span class="num">42.1</span>The plans at a glance</h3>
+<p>Anthropic sells Claude to people and organisations through <strong>plans</strong>. A plan sets the price, how much you can use Claude before hitting a limit, which models and features you get and, for organisations, which administration tools are available. The table below is from Anthropic's pricing page as read on 9 November 2026. <strong>Check current pricing before you buy or budget:</strong> plan names and boundaries changed several times in 2026.</p>
+<div class="tbl"><table>
+<tr><th>Plan</th><th>Price (USD, 9 Nov 2026)</th><th>Who it's for</th><th>Highlights</th></tr>
+<tr class="group"><td colspan="4">Individual plans</td></tr>
+<tr><td><b>Free</b></td><td>$0</td><td>Trying Claude</td><td>Limited usage, resetting every 5 hours and weekly. Sonnet and Haiku only: no Opus, Fable or Claude Code. Includes web search, connectors (one custom), Artifacts, Skills, memory, up to 5 Projects.</td></tr>
+<tr><td><b>Pro</b></td><td>$20/month, or $17/month billed annually</td><td>Individual professionals</td><td>More usage than Free. Opus, Sonnet and Haiku; Fable through usage credits. Claude Code, Research, Claude in Chrome, Microsoft 365 add-ins.</td></tr>
+<tr><td><b>Max</b></td><td>$100/month</td><td>Heavy individual users</td><td>"5x Pro usage". Fable included "up to half your weekly limit". $100/month in API credits. Priority access.</td></tr>
+<tr><td><b>Ultra</b></td><td>$200/month</td><td>The heaviest individual users</td><td>"10x Pro usage every week"; "no 5-hour limit" for verified accounts. $200/month in API credits. Appears to replace the earlier "Max 20x".</td></tr>
+<tr class="group"><td colspan="4">Organisation plans</td></tr>
+<tr><td><b>Team</b></td><td>Standard seat $25/month ($20 annually); Premium seat $125/month ($100 annually)</td><td>Teams of 2 to 150</td><td>Premium seats get 5x the usage of Standard. Claude Code, Cowork, Claude Tag (Slack), Microsoft 365, up to $500/month pooled API credits. SSO, domain verification, central billing, connector controls, usage analytics, organisation-wide skills.</td></tr>
+<tr><td><b>Enterprise</b></td><td>"US$20/seat/month, billed annually, 20 seat minimum", plus usage at API rates</td><td>Larger or regulated organisations</td><td>Everything in Team plus SCIM, audit logs, role-based access, Compliance API, custom data retention, domain capture, IP allowlisting, spend limits and a HIPAA-ready option.</td></tr>
+</table></div>
+<p class="verified">Source: claude.com/pricing, read 9 November 2026 through a summarising tool; prices and boundaries should be confirmed by eye on the live page. No annual price was listed for Max or Ultra.</p>
+<div class="box note"><span class="tag">Usage limits are not a fixed message count</span><p>Anthropic's pricing page explains: "How fast you reach a limit depends on the model you use, how long your chats are, and how large your files are." A day of Opus with large log files uses your allowance far faster than short Haiku questions. <a href="#ch43">Chapter 43</a> shows how to see your usage.</p></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Personal plans are like a personal phone contract: you choose it, pay for it and manage it. Team and Enterprise are like a company phone fleet. IT decides which apps are allowed, sets up logins through the company directory, sees usage across the fleet and can wipe access when someone leaves. The phone (the model) is identical; the management around it is what you pay extra for.</p></div>
+
+<h3 id="ch42-2"><span class="num">42.2</span>Why an organisation needs more than personal plans</h3>
+<p>If fifty testers each buy their own Pro plan, they get the same models. What the company doesn't get:</p>
+<ul>
+<li><b>Data under the company's agreement.</b> Personal plans follow consumer terms, where each person chooses whether their chats help train models. Team and Enterprise follow commercial terms, where training is off by default (42.4).</li>
+<li><b>Control of who has access.</b> When someone leaves, a personal account leaves with them, chat history and all.</li>
+<li><b>Policy.</b> No way to switch off a risky connector, require single sign-on or limit sharing.</li>
+<li><b>Visibility and one bill.</b> No combined view of usage or spend, and fifty expense claims.</li>
+</ul>
+<div class="box example"><span class="tag">Real-world example</span><p>A QA department of 30 people (illustrative) started with personal Pro plans. A security review found test data containing real customer names in several personal chat histories. The department moved to a Team plan with SSO tied to the company directory, disabled every connector except Jira and Confluence, and turned off member feedback submissions. A one-page usage guide told people which data could go into Claude. The model was the same; the risk was much lower.</p></div>
+
+<h3 id="ch42-3"><span class="num">42.3</span>The admin console: what administrators control</h3>
+<p>Team and Enterprise organisations are managed from an administration area in claude.ai, usually called the admin console. Owners (the Primary Owner and other Owners) and, on Enterprise, other roles you define use it to run the organisation. The exact menus change often, so this section describes the <em>capabilities</em> rather than button names.</p>
+<h4>Identity: SSO, SCIM and domains</h4>
+<ul>
+<li><a class="gl" href="#g-single-sign-on">Single sign-on</a> (SSO) lets people log in with their company account (for example through Okta or Microsoft Entra ID) instead of a separate Claude password. Available on Team and Enterprise.</li>
+<li><b>Domain verification</b> proves your company owns its email domain. Team and Enterprise.</li>
+<li><a class="gl" href="#g-scim">SCIM</a> (System for Cross-domain Identity Management) is a standard that lets your company directory create, update and remove Claude accounts automatically. When HR marks someone as a leaver, their Claude access goes too. Enterprise only.</li>
+<li><a class="gl" href="#g-domain-capture">Domain capture</a> brings personal accounts created with a company email address into the organisation. Enterprise only.</li>
+</ul>
+<h4>Features, connectors and sharing</h4>
+<ul>
+<li><b>Connector controls</b>: decide which <a class="gl" href="#g-connector">connectors</a> members may use (Team and Enterprise). This is the main way to stop company data flowing to unapproved third-party services.</li>
+<li><b>Web search</b>: on Team and Enterprise an Owner must switch it on before members can use it.</li>
+<li><b>Feedback</b>: Owners can turn off members' thumbs up/down submissions. That matters because submitted feedback is the main way commercial conversations can end up in training data.</li>
+<li><b>Sharing</b>: on Team and Enterprise, chats can only be shared inside the organisation. Projects can be shared with colleagues.</li>
+<li><b>Organisation-wide skills</b>: publish approved <a class="gl" href="#g-skill">skills</a> (such as your bug-report template) to everyone.</li>
+</ul>
+<h4>Visibility and spending</h4>
+<ul>
+<li><b>Usage analytics</b> show who is using Claude and how much (Team and Enterprise). Useful for licence decisions and for spotting where training would help (<a href="#ch126">Chapter 126</a>).</li>
+<li><b>Seats</b>: choose Standard or Premium seats on Team; move heavy users to Premium.</li>
+<li><b>Spend limits</b> (Enterprise) cap usage costs, which matters because Enterprise usage is billed at API rates on top of seats.</li>
+<li><b>Audit logs</b> (Enterprise) record administrative and user events for security investigations.</li>
+<li><b>Compliance API</b> (Enterprise) gives programmatic access to usage and content data for compliance tooling.</li>
+<li><b>IP allowlisting</b> (Enterprise) restricts access to approved company networks.</li>
+</ul>
+<div class="flow">
+<div><b>Directory</b>Okta / Entra ID holds who works here</div>
+<div class="hl"><b>SSO + SCIM</b>Login and account creation follow the directory</div>
+<div><b>Admin console</b>Roles, seats, connectors, features, retention</div>
+<div class="hl"><b>Managed settings</b>Same policy pushed to every Claude Code install</div>
+<div><b>Analytics + audit logs</b>See what's happening; investigate if needed</div>
+</div>
+<h4>The API side: the Console and workspaces</h4>
+<p>If your organisation also uses the API, that is managed separately in the <a class="gl" href="#g-claude-console">Claude Console</a> at platform.claude.com. There you create API keys, invite members and set spending limits. <b>Workspaces</b> group keys, members and limits; an organisation can have up to 100. A sensible pattern is one workspace per team or system, for example "qa-ci" for the nightly failure-triage job, so you can see and cap its cost separately. If you use Bedrock, Google Cloud or Foundry instead, access and billing are managed in that cloud's own console.</p>
+<div class="box warn"><span class="tag">Features vary</span><p>What you see depends on your plan, your region and what your administrators enabled. Many features launch in beta on some plans first (for example, Claude Tag is in beta for Team and Enterprise). If a colleague's screen shows a feature yours doesn't, the reason is usually an admin setting, not a bug. Ask your Owner before assuming it's broken.</p></div>
+
+<h3 id="ch42-4"><span class="num">42.4</span>Data handling and retention</h3>
+<p>Security and legal teams will ask three questions: is our data used for training, how long is it kept, and can we change that? Anthropic's privacy centre answers as follows (read 9 November 2026; quotes are exact, and policies change).</p>
+<div class="tbl"><table>
+<tr><th>Question</th><th>Commercial (Team, Enterprise, API)</th><th>Consumer (Free, Pro, Max, Ultra)</th></tr>
+<tr><td><b>Used for training?</b></td><td>"By default, we will not use your inputs or outputs from our commercial products." Exception: feedback deliberately submitted, kept up to 5 years and de-linked from user IDs before any use.</td><td>Each user's choice through the model-training setting. Incognito chats are not used even if the setting is on.</td></tr>
+<tr><td><b>Default retention</b></td><td>API inputs and outputs deleted "within 30 days of receipt or generation". Chats in other commercial products are kept so you can return to them; deleted conversations leave back-end storage within 30 days.</td><td>Deleted chats leave back-end storage within 30 days. With training on, de-identified data may be kept up to 5 years.</td></tr>
+<tr><td><b>Flagged content</b></td><td colspan="2">Inputs and outputs flagged under the Usage Policy may be kept up to 2 years; trust and safety classification scores up to 7 years.</td></tr>
+<tr><td><b>Can it be changed?</b></td><td><a class="gl" href="#g-zero-data-retention">Zero data retention</a> (ZDR) agreements and other terms can be agreed with Anthropic. Enterprise offers custom data retention controls.</td><td>Users control training and can delete chats.</td></tr>
+</table></div>
+<details class="deep"><summary>Under the hood: what "zero data retention" does and doesn't mean</summary><div class="body">
+<p>ZDR is a contractual arrangement in which Anthropic agrees not to store inputs and outputs beyond what is needed to process the request, instead of the standard 30-day deletion. The privacy centre describes it as an agreement on terms "other than" the standard deletion and points to a separate article for which products it covers. Three practical points: it is something you <em>agree with Anthropic</em>, not a switch you flip; it may not cover every product or feature (features that store data by design, such as the Files API, keep data under your control until you delete it); and Usage Policy enforcement and legal requirements can still apply. If ZDR matters to you, get the current scope in writing from your account team.</p>
+</div></details>
+<div class="box note"><span class="tag">Cloud platforms</span><p>If you reach Claude through Amazon Bedrock, Google Cloud or Microsoft Foundry, your agreement with that provider governs data handling. Your cloud security team will already know how to review that, which is one reason enterprises like this route.</p></div>
+<div class="box opinion"><span class="tag">Opinion · widely held among security practitioners</span><p>Many security teams argue that contract terms are only half the control, and that the bigger risk is people putting the wrong data in. Their usual advice: approve one route, block the others where you can, give staff a short "what may go in" rule, and provide masked test data so people don't need production data. This is practitioner judgement rather than a published standard; <a href="#ch132">Chapter 132</a> and <a href="#ch135">Chapter 135</a> cover privacy and governance in depth.</p></div>
+
+<h3 id="ch42-5"><span class="num">42.5</span>Managed settings for Claude Code</h3>
+<p>Claude Code reads settings from several files: your personal settings, the project's shared settings and your local overrides (<a href="#ch78">Chapter 78</a>). Above all of them sit <a class="gl" href="#g-managed-settings">managed settings</a>, which the organisation deploys. Claude Code's documentation is explicit: "Nothing in your own settings files or <code>--settings</code> overrides a managed key."</p>
+<h4>How managed settings reach a machine</h4>
+<ul>
+<li><b>Server-managed settings</b> from the claude.ai admin console (or a self-hosted Claude apps gateway, started with <code>claude gateway</code>). These also reach Claude Code cloud sessions.</li>
+<li><b>MDM or operating-system policies</b> pushed by IT.</li>
+<li><b>A file</b> named <code>managed-settings.json</code> in a system folder: <code>/Library/Application Support/ClaudeCode/</code> on macOS, <code>/etc/claude-code/</code> on Linux and WSL, <code>C:\Program Files\ClaudeCode\</code> on Windows. An optional <code>managed-settings.d/</code> folder beside it holds drop-in files.</li>
+</ul>
+<p>A developer can check what is enforced by running <code>/status</code> in Claude Code: the <code>Setting sources</code> line names the managed source in use.</p>
+<h4>Useful keys for an organisation</h4>
+<div class="tbl"><table>
+<tr><th>Key</th><th>What it does</th></tr>
+<tr><td><code>permissions.deny</code></td><td>Block actions everywhere, for example reading <code>.env</code> files. A deny at any level cannot be overridden.</td></tr>
+<tr><td><code>permissions.disableBypassPermissionsMode</code></td><td>Set to <code>"disable"</code> so nobody can switch off permission prompts entirely.</td></tr>
+<tr><td><code>allowManagedPermissionRulesOnly</code></td><td>Makes managed settings the only source of permission rules; personal and project rules are ignored.</td></tr>
+<tr><td><code>availableModels</code></td><td>Restricts which models people can choose, for example <code>["sonnet", "haiku"]</code>.</td></tr>
+<tr><td><code>claudeMd</code></td><td>Managed only: injects organisation-wide CLAUDE.md instructions.</td></tr>
+<tr><td><code>forceLoginMethod</code>, <code>forceLoginOrgUUID</code></td><td>Restrict how people log in, and pin claude.ai logins to your organisation so staff can't use personal accounts.</td></tr>
+<tr><td><code>companyAnnouncements</code></td><td>Shows your organisation's messages at startup.</td></tr>
+<tr><td><code>cleanupPeriodDays</code></td><td>How many days local transcripts are kept before deletion (30 by default).</td></tr>
+</table></div>
+<p class="verified">Keys from code.claude.com settings and settings-reference pages, checked 9 November 2026.</p>
+<div class="box warn"><span class="tag">A few keys work the other way round</span><p>For some security-sensitive keys, Claude Code honours a <em>stricter</em> value from a lower level even if managed settings say otherwise. For example, a developer who sets <code>disableClaudeAiConnectors</code> to <code>true</code> keeps connectors off even if the organisation enabled them. The rule: anyone can make things safer, nobody below the organisation can make them less safe.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Lab: draft and test a QA team's Claude Code policy</b><span>30 min · your computer with Claude Code (any plan that includes it)</span></div>
+<p>You will write a draft policy file and test it for one session using <code>--settings</code>, which applies settings above your own files without installing anything system-wide. This does not need admin rights. (A real deployment would go into managed settings, which only administrators can install.)</p><ol>
+<li>Make a practice folder and a fake secret file:
+<div class="code"><span class="cap">Terminal</span><pre>mkdir policy-lab &amp;&amp; cd policy-lab
+echo "API_TOKEN=not-a-real-token" &gt; .env
+echo "# Policy lab" &gt; README.md</pre></div><span class="expect">A folder containing <code>.env</code> and <code>README.md</code>.</span></li>
+<li>Create <code>org-policy-draft.json</code> in the same folder with this content:
+<div class="code"><span class="cap">org-policy-draft.json</span><pre>{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "availableModels": ["opus", "sonnet", "haiku"],
+  "companyAnnouncements": ["QA policy: test accounts only. Never paste production customer data."],
+  "cleanupPeriodDays": 14,
+  "permissions": {
+    "deny": ["Read(./.env)", "Read(./.env.*)", "Read(./secrets/**)"],
+    "disableBypassPermissionsMode": "disable"
+  }
+}</pre></div><span class="expect">A strict JSON file: no comments, no trailing commas.</span></li>
+<li>Check the JSON is valid: <code>python3 -m json.tool org-policy-draft.json</code>.<span class="expect">The file printed back neatly. An error such as <code>Expecting ',' delimiter</code> means a typo; fix it and run again.</span></li>
+<li>Start Claude Code with the draft applied: <code>claude --settings ./org-policy-draft.json</code>.<span class="expect">The announcement text appears at startup.</span></li>
+<li>Type <code>/status</code>.<span class="expect">The <code>Setting sources</code> line includes the command-line settings. If a managed source is also listed, your organisation already enforces a policy; note it.</span></li>
+<li>Type <code>/model</code> and look at the choices.<span class="expect">Only models matching opus, sonnet and haiku are offered; Fable is not selectable. Press Esc to leave without changing.</span></li>
+<li>Ask: <code>Read the .env file and tell me what is in it.</code><span class="expect">Claude reports that reading <code>.env</code> is blocked by a permission rule, and does not show the token.</span></li>
+<li>Ask: <code>Read README.md.</code><span class="expect">It reads the file normally: the policy blocks secrets, not ordinary work.</span></li>
+<li>Exit with <code>/exit</code>. Write three lines for your admin: what you would add (for example a <code>claudeMd</code> with team conventions, or <code>forceLoginOrgUUID</code>), what you would remove, and why.<span class="expect">A reviewed draft policy ready for an administrator to deploy as managed settings.</span></li>
+</ol>
+<p><b>Troubleshooting:</b> If Claude Code shows a Settings Error, the JSON is invalid; rerun step 3. If <code>/model</code> still offers everything, an embedding host or a managed source may supply its own model list; check <code>/status</code>. If <code>claude</code> isn't found, see <a href="#ch64">Chapter 64</a>. <b>No Claude Code?</b> Do steps 2 and 3 only, then annotate each line of the file with the risk it reduces.</p>
+</div>
+
+<h3 id="ch42-6"><span class="num">42.6</span>A first policy for a QA team</h3>
+<p>Putting it together, here is a starting checklist for a QA team adopting Claude inside a company. Adapt it with your security, legal and platform teams.</p>
+<div class="tbl"><table>
+<tr><th>Area</th><th>Starting decision</th><th>Where it's set</th></tr>
+<tr><td>Plan</td><td>Team for up to 150 people, Enterprise if you need SCIM, audit logs or custom retention; Premium seats for heavy Claude Code users</td><td>Purchase / admin console</td></tr>
+<tr><td>Identity</td><td>SSO on; domain verified; SCIM if on Enterprise</td><td>Admin console</td></tr>
+<tr><td>Connectors</td><td>Allow only the ones you have reviewed (for example Jira, Confluence, GitHub)</td><td>Admin console; <a href="#ch105">Chapter 105</a> for MCP security</td></tr>
+<tr><td>Data rules</td><td>No production personal data; masked or synthetic test data only; feedback submissions considered</td><td>Usage guide + admin console</td></tr>
+<tr><td>Claude Code</td><td>Deny secret files; disable bypass mode; pin logins to the organisation; shared CLAUDE.md</td><td>Managed settings</td></tr>
+<tr><td>API automation</td><td>Separate workspace per system, with a spending limit</td><td>Claude Console</td></tr>
+<tr><td>Review</td><td>Check usage analytics monthly; re-read pricing and data terms every quarter</td><td>Calendar reminder</td></tr>
+</table></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Team and Enterprise get better models."</dt><dd>The same models are available. Organisation plans add administration, data terms and usage, not a smarter Claude.</dd>
+<dt>"Enterprise is $20 a seat, so it's cheaper than Team."</dt><dd>Enterprise also bills usage at API rates on top of seats, has a 20-seat minimum and is billed annually. Compare total cost for your usage.</dd>
+<dt>"Commercial plans never keep anything."</dt><dd>Default deletion is within 30 days for the API, chats are kept until deleted, and flagged content and feedback have longer retention. ZDR is a separate agreement.</dd>
+<dt>"A developer can override the company's Claude Code settings with --settings."</dt><dd>Managed settings sit above everything, including <code>--settings</code>. Only stricter values for a few security keys can come from lower levels.</dd>
+<dt>"If I can't see a feature, my account is broken."</dt><dd>Features vary by plan, region and admin choices. Ask your Owner.</dd>
+</dl></div>
+
+<h3 id="ch42-r"><span class="num">42.7</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>As of 9 November 2026: Free, Pro ($20), Max ($100), Ultra ($200) for individuals; Team (Standard $25 / Premium $125 per seat monthly, 2–150 people) and Enterprise ($20/seat annually, 20-seat minimum, plus usage at API rates) for organisations. Check current pricing.</li>
+<li>Team adds SSO, domain verification, central billing, connector controls, usage analytics and organisation-wide skills. Enterprise adds SCIM, audit logs, role-based access, Compliance API, custom retention, domain capture, IP allowlisting and spend limits.</li>
+<li>Commercial products are not used for training by default; API data is deleted within 30 days by default; ZDR and custom retention are agreed separately.</li>
+<li>Managed settings for Claude Code override every personal and project setting and can arrive from the admin console, MDM or a system file.</li>
+<li>Features differ by plan, region and admin settings: approve one route, write a short data rule and review it regularly.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Your company wants Claude accounts removed automatically when someone leaves, via the HR directory. Which feature, on which plan?</p><div class="opts"><button>SSO, on Pro</button><button data-ok>SCIM, on Enterprise</button><button>Domain verification, on Free</button></div><p class="why" hidden>SCIM provisions and de-provisions accounts from the directory. The pricing page lists it for Enterprise, not Team.</p></div>
+<div class="qz"><p class="q">By default, are conversations on a Team plan used to train Anthropic's models?</p><div class="opts"><button>Yes, unless each user opts out</button><button data-ok>No, except for feedback that users deliberately submit</button><button>Only conversations using Haiku</button></div><p class="why" hidden>Commercial products are not used for training by default. Thumbs up/down feedback is the exception, and Owners can turn it off.</p></div>
+<div class="qz"><p class="q">A developer runs <code>claude --settings '{"permissions":{"allow":["Read(./.env)"]}}'</code>, but the organisation's managed settings deny reading <code>.env</code>. What happens?</p><div class="opts"><button>The command-line allow wins for that session</button><button>Claude asks the developer which rule to follow</button><button data-ok>The read stays blocked: a deny can't be overridden, and managed settings sit above --settings</button></div><p class="why" hidden>Deny rules beat allow rules at any level, and managed settings have the highest precedence.</p></div>
+<div class="qz"><p class="q">Where does a QA team best separate the API cost of its nightly CI triage job from other API use?</p><div class="opts"><button data-ok>Its own workspace in the Claude Console, with a spending limit</button><button>A separate Pro subscription</button><button>A connector in the claude.ai admin console</button></div><p class="why" hidden>Console workspaces group API keys, members and limits, so costs can be tracked and capped per system.</p></div>
+<div class="qz"><p class="q">A colleague on the same Team plan sees a feature you don't. What's the most likely cause?</p><div class="opts"><button>Your account is corrupted</button><button data-ok>Differences in admin settings, beta rollout or region</button><button>You are using an older model</button></div><p class="why" hidden>Features vary by plan, region and administrator choices, and betas often roll out gradually.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Write a one-page "Claude at our company" proposal for your QA team. Include: the plan you recommend and why (with today's prices and the date you checked them), the identity setup, the connectors you would allow, a three-line data rule for testers, a draft Claude Code managed-settings file based on the lab, and the questions you need your security team to answer (for example, whether ZDR or custom retention is needed). Ask one person from security and one from finance to review it.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Personal Claude plans are like personal phones. Team and Enterprise are the company fleet: same models, but we log in with company SSO, admins decide which connectors are allowed, we see usage, and our conversations aren't used for training by default. Enterprise adds automatic account removal, audit logs and custom retention. For Claude Code, the company can push managed settings that nobody can override, like blocking .env files. Prices and features change often, so we check the pricing page and our admin console rather than trusting last quarter's slide."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://claude.com/pricing" target="_blank" rel="noopener">Claude plans and pricing</a>: plans, prices, seat types and admin features by plan.</li>
+<li>Anthropic Privacy Center, <a href="https://privacy.claude.com/en/articles/7996868-is-my-data-used-for-model-training" target="_blank" rel="noopener">Is my data used for model training?</a> (commercial products).</li>
+<li>Anthropic Privacy Center, <a href="https://privacy.claude.com/en/articles/7996866-how-long-do-you-store-my-organization-s-data" target="_blank" rel="noopener">How long do you store my organization's data?</a> and <a href="https://privacy.claude.com/en/articles/10023548-how-long-do-you-store-my-data" target="_blank" rel="noopener">How long do you store my data?</a></li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/settings" target="_blank" rel="noopener">Claude Code settings</a>, <a href="https://code.claude.com/docs/en/managed-settings" target="_blank" rel="noopener">managed settings</a>, <a href="https://code.claude.com/docs/en/server-managed-settings" target="_blank" rel="noopener">server-managed settings</a> and <a href="https://code.claude.com/docs/en/settings-reference" target="_blank" rel="noopener">settings reference</a>.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/manage-claude/workspaces" target="_blank" rel="noopener">Workspaces</a> (Claude Console).</li>
+<li>Anthropic Help Center, <a href="https://support.claude.com/en/articles/10684626-enable-and-use-web-search" target="_blank" rel="noopener">Enable and use web search</a> and <a href="https://support.claude.com/en/articles/11176164-use-connectors-to-extend-claude-s-capabilities" target="_blank" rel="noopener">Use connectors</a>.</li>
+</ol><p class="verified">Verified 9 November 2026 against claude.com/pricing, the Anthropic Privacy Center and the Claude Code settings documentation. Plan prices were read through a summarising tool: confirm them on the live pricing page.</p></div>

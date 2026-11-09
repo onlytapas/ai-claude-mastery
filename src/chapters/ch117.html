@@ -1,0 +1,279 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>The four ways an organisation can get AI: buy an assistant, use a model platform, build, or partner</li>
+<li>How to evaluate AI vendors with a weighted scorecard and must-have gates</li>
+<li>What to look for in licences and contracts, data protection terms and data residency</li>
+<li>The building blocks of an enterprise AI architecture: SSO, gateways, logging, model routing and private networking</li>
+<li>How to decide between build, buy and partner, and how a light governance board keeps adoption safe</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch41">Chapter 41</a> (how the Claude pieces fit) and <a href="#ch42">Chapter 42</a> (Claude for organisations) give the Claude-specific background. Measuring value and ROI is in <a href="#ch126">Chapter 126</a>, and a step-by-step rollout for a QA team is in <a href="#ch128">Chapter 128</a>. This chapter sits above both: it is about the organisation-wide decisions that come first.</div>
+
+<div class="bigidea"><p>When one person uses AI, the questions are "is it useful?" and "is it safe for what I paste in?". When a whole organisation adopts it, new questions appear: which vendors, on what contract terms, where the data is processed, how access and spending are controlled, and who decides what is allowed. Good adoption treats AI like any other important supplier and platform: compare options against written criteria, set non-negotiable gates, put a thin layer of shared architecture in the middle, and keep a small group accountable for the rules. Most organisations end up buying for everyday work and building only where they have a real difference to protect.</p></div>
+
+<h3 id="ch117-1"><span class="num">117.1</span>Why enterprise adoption is different</h3>
+<p>Picture three QA engineers who each pay for a different AI assistant on a personal card. Each is productive. But their company now has customer data in three places it has no contract with, no record of who used what, three invoices nobody approved, and no way to switch any of it off when someone leaves. This is sometimes called "shadow AI", by analogy with shadow IT.</p>
+<p>Enterprise adoption replaces that with deliberate choices across six areas:</p>
+<div class="tbl"><table>
+<tr><th>Area</th><th>The question</th><th>Who usually owns it</th></tr>
+<tr><td>Vendors</td><td>Which assistants, models and platforms do we approve?</td><td>IT, procurement, a technical evaluation panel</td></tr>
+<tr><td>Contracts</td><td>What are we paying for, and what does the vendor promise?</td><td>Procurement, legal</td></tr>
+<tr><td>Data protection</td><td>What data may go where, and where is it processed and stored?</td><td>Privacy, security, legal</td></tr>
+<tr><td>Architecture</td><td>How do people and systems connect, and how is it controlled and logged?</td><td>Enterprise architecture, platform engineering</td></tr>
+<tr><td>Governance</td><td>Who approves new uses, and how are incidents handled?</td><td>An AI governance board or working group</td></tr>
+<tr><td>People</td><td>How do staff learn to use it well?</td><td>Team leads, learning and development</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A household can buy a kettle on impulse. A hotel chain buying kettles for 5,000 rooms writes down requirements (safety certification, energy use, warranty, spare parts), asks three suppliers to quote, tests samples in one hotel, negotiates a contract and decides who replaces broken ones. AI assistants are far more consequential than kettles, but the discipline is the same.</p></div>
+
+<h3 id="ch117-2"><span class="num">117.2</span>The options: assistant, platform, build or partner</h3>
+<p>"Adopt AI" can mean very different purchases. It helps to separate them.</p>
+<div class="tbl"><table>
+<tr><th>Option</th><th>What you get</th><th>Examples (verified 9 Nov 2026)</th><th>Good for</th></tr>
+<tr><td><b>Buy an assistant</b></td><td>A ready-made app for staff, priced per seat, with admin controls</td><td>Claude Team and Enterprise; ChatGPT Business and Enterprise; Microsoft 365 Copilot; Google's Gemini in Workspace</td><td>Everyday writing, analysis, research, meetings</td></tr>
+<tr><td><b>Buy a coding tool</b></td><td>An AI coding agent or assistant for engineers</td><td>Claude Code; GitHub Copilot; OpenAI Codex; Cursor</td><td>Development and test automation</td></tr>
+<tr><td><b>Use a model platform</b></td><td>Pay-per-use access to models through an API, to put inside your own systems</td><td>The Claude API; Amazon Bedrock; Google Cloud's Vertex AI (now called Agent Platform in Claude Code's docs); Microsoft Foundry</td><td>AI features in your own products and internal tools</td></tr>
+<tr><td><b>Build</b></td><td>Your own application on top of a model platform, or your own model</td><td>An internal QA assistant using retrieval over your test documents (<a href="#ch93">Chapter 93</a>)</td><td>Workflows that are unique to you and worth owning</td></tr>
+<tr><td><b>Partner</b></td><td>A consultancy or specialist vendor builds or runs it with you</td><td>Systems integrators; specialist vertical AI vendors</td><td>Speed when skills are missing; regulated or complex domains</td></tr>
+</table></div>
+<p>These are not exclusive. A typical mid-sized company might buy one assistant for all staff, buy a coding tool for engineers, use one model platform for internal tools, and build two or three focused applications. Claude is available through several of these routes: its own apps, the Claude API, and the major clouds (Amazon Bedrock, Google Cloud and Microsoft Foundry), which is one reason enterprises can often fit it into contracts they already hold.</p>
+<div class="box note"><span class="tag">Same model, different features</span><p>The same model can behave differently by route. For example, Claude Code's documentation lists features that are not available when it runs through Bedrock, Google Cloud's Agent Platform or Foundry (such as some commands and the Chrome integration), and its model aliases can resolve to older models on those platforms unless you pin a full model name. Always evaluate the exact route you will deploy.</p></div>
+
+<h3 id="ch117-3"><span class="num">117.3</span>Vendor selection criteria</h3>
+<p>Write the criteria down <em>before</em> you see demos. Otherwise the most impressive demo wins, and demos are designed to impress. Criteria fall into two kinds.</p>
+<div class="cols2">
+<div><h4>Must-have gates</h4><p>Pass or fail. A vendor that fails one is out, however good it is. Keep this list short and genuinely non-negotiable: for example, no training on your data under commercial terms, single sign-on with your identity provider, processing in an approved region, and a signed data processing agreement.</p></div>
+<div><h4>Weighted criteria</h4><p>Scored, usually 1 to 5, and weighted by importance. These separate the vendors that pass the gates. The weights are a statement of your priorities, so agree them with stakeholders before scoring.</p></div>
+</div>
+<h4>The criteria that matter most</h4>
+<div class="tbl"><table>
+<tr><th>Criterion</th><th>Questions to ask</th><th>Evidence to request</th></tr>
+<tr><td>Output quality on <em>your</em> work</td><td>How well does it do our real tasks, not benchmark tasks?</td><td>Results on your own eval set (<a href="#ch36">Chapter 36</a>, <a href="#ch125">Chapter 125</a>)</td></tr>
+<tr><td>Security and data protection</td><td>Training use, retention, encryption, sub-processors, breach notification</td><td>Security documentation from the vendor's trust centre, independent audit reports, the data processing agreement</td></tr>
+<tr><td>Admin and governance</td><td>SSO, user provisioning (<a class="gl" href="#g-scim">SCIM</a>), roles, audit logs, usage analytics, spend limits</td><td>Admin console walkthrough on your intended plan</td></tr>
+<tr><td>Integration</td><td>Does it connect to Jira, Confluence, GitHub, Slack, Microsoft 365, our CI?</td><td>Connector list, API documentation, a working pilot connection</td></tr>
+<tr><td><a class="gl" href="#g-total-cost-of-ownership">Total cost of ownership</a></td><td>Licences, usage, integration effort, training, support, switching cost</td><td>Price list, a three-year cost model (<a href="#ch126">Chapter 126</a>)</td></tr>
+<tr><td>Model lifecycle</td><td>How much notice before a model is retired? Can we pin versions?</td><td>Published deprecation policy</td></tr>
+<tr><td>Vendor viability and support</td><td>Financial stability, roadmap, support hours, account management</td><td>References from similar customers; support terms</td></tr>
+<tr><td>Portability</td><td>How hard is it to leave? Can we export our data and prompts?</td><td>Export features; use of open standards such as <a class="gl" href="#g-mcp">MCP</a></td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example: published model lifecycles</span><p>Anthropic publishes deprecation and retirement dates for its models. For example, its models overview lists Claude Opus 5.5 (released 22 September 2026) with a retirement date of "not before" 22 September 2027. A commitment like this lets you plan re-testing of AI features before a model is withdrawn. Ask every vendor for the equivalent, and record it in your evaluation.</p></div>
+
+<h3 id="ch117-4"><span class="num">117.4</span>The vendor-evaluation scorecard</h3>
+<p>The <a class="gl" href="#g-vendor-scorecard">scorecard</a> turns your criteria into a single, explainable comparison. Here is a worked example with illustrative vendors, weights and scores.</p>
+<div class="tbl"><table>
+<tr><th>Criterion</th><th>Weight</th><th>Vendor A</th><th>Vendor B</th><th>Vendor C</th></tr>
+<tr class="group"><td colspan="5">Must-have gates (pass/fail)</td></tr>
+<tr><td>No training on our data (commercial terms)</td><td>gate</td><td>Pass</td><td>Pass</td><td>Pass</td></tr>
+<tr><td>SSO with our identity provider</td><td>gate</td><td>Pass</td><td>Pass</td><td><b>Fail</b></td></tr>
+<tr><td>Processing in an approved region</td><td>gate</td><td>Pass</td><td>Pass</td><td>Pass</td></tr>
+<tr class="group"><td colspan="5">Weighted criteria (1 = poor, 5 = excellent)</td></tr>
+<tr><td>Output quality on our eval set</td><td>25</td><td>5</td><td>4</td><td>5</td></tr>
+<tr><td>Security and data protection</td><td>20</td><td>4</td><td>4</td><td>3</td></tr>
+<tr><td>Admin, audit and governance</td><td>15</td><td>4</td><td>3</td><td>2</td></tr>
+<tr><td>Integration with our tools</td><td>15</td><td>3</td><td>5</td><td>4</td></tr>
+<tr><td>Total cost of ownership</td><td>15</td><td>3</td><td>4</td><td>5</td></tr>
+<tr><td>Vendor viability and support</td><td>10</td><td>4</td><td>4</td><td>3</td></tr>
+<tr><td><b>Weighted score (out of 5)</b></td><td>100</td><td><b>3.95</b></td><td><b>4.00</b></td><td>excluded</td></tr>
+</table></div>
+<p>Three lessons hide in this small table. First, Vendor C has the best quality and price but fails a gate, so it is out: gates protect you from being dazzled. Second, A and B are 0.05 apart, which is well within the uncertainty of 1-to-5 scores; the scorecard says "both are viable", not "B wins". Third, a pilot with real users on real work (<a href="#ch128">Chapter 128</a>) is the right tie-breaker.</p>
+<details class="deep"><summary>Under the hood: making scores honest</summary><div class="body">
+<p>Scorecards can be gamed, often unconsciously. A few practices keep them honest. <b>Anchor each score:</b> write what 1, 3 and 5 mean for each criterion before scoring (for admin: 1 = no SSO, 3 = SSO and usage reports, 5 = SSO, SCIM, audit logs and API access to logs). <b>Score independently, then discuss:</b> each panel member scores alone; large disagreements show where evidence is missing. <b>Separate evidence from impressions:</b> each score should cite a document, test result or demo observation. <b>Run a sensitivity check:</b> change the weights to reflect a different stakeholder's priorities and see whether the ranking flips. If it does, the decision depends on priorities, and that is a conversation for leadership, not a calculation. <b>Record the decision</b> in a short <a class="gl" href="#g-decision-record">decision record</a> so the reasoning survives when people change.</p>
+</div></details>
+
+<h3 id="ch117-5"><span class="num">117.5</span>Licensing and contracts</h3>
+<p>AI pricing combines two models, and many contracts mix them.</p>
+<div class="tbl"><table>
+<tr><th>Model</th><th>How you pay</th><th>Watch for</th></tr>
+<tr><td>Per seat</td><td>A fixed price per user per month or year</td><td>Minimum seat counts; usage limits within a seat; paying for unused seats</td></tr>
+<tr><td>Usage-based</td><td>Per <a class="gl" href="#g-token">token</a> or per request, through an API or cloud</td><td>Unpredictable bills; agents that loop; long contexts; set budgets and alerts</td></tr>
+<tr><td>Hybrid</td><td>Seats plus usage, or committed spend with discounts</td><td>Commitments you can't use; overage rates</td></tr>
+</table></div>
+<p>As an example of how one vendor mixes these, Anthropic's pricing page (read 9 November 2026) lists Claude Enterprise at "US$20/seat/month, billed annually, 20 seat minimum", plus usage at API rates; Team seats start at $20 per month billed annually. Prices change, so check the current page.</p>
+<h4>Contract terms to read carefully</h4>
+<ul>
+<li><b>Data use and retention:</b> whether inputs and outputs are used for training, how long they are kept, and whether you can agree shorter retention or <a class="gl" href="#g-zero-data-retention">zero data retention</a>.</li>
+<li><b><a class="gl" href="#g-data-processing-agreement">Data processing agreement</a> (DPA):</b> required in many jurisdictions when a supplier processes personal data for you; it lists sub-processors and security obligations.</li>
+<li><b>Ownership of outputs and indemnities:</b> who owns generated content, and whether the vendor defends you against certain intellectual-property claims. Terms vary; your legal team should read them.</li>
+<li><b>Service levels:</b> uptime commitments, support response times, and what happens during outages.</li>
+<li><b>Model changes:</b> notice periods for retiring models and for material changes to terms.</li>
+<li><b>Exit:</b> data export, deletion on termination, and any lock-in from proprietary features (<a class="gl" href="#g-vendor-lock-in">vendor lock-in</a>).</li>
+</ul>
+<div class="box warn"><span class="tag">Not legal advice</span><p>This section lists what to look for, not what any contract means for you. Contract terms differ by vendor, plan, region and negotiation. Your legal and procurement teams make the final call.</p></div>
+
+<h3 id="ch117-6"><span class="num">117.6</span>Data protection and residency</h3>
+<p><a class="gl" href="#g-data-residency">Data residency</a> means controlling the geography where your data is processed and stored. Some regulations, customer contracts and public-sector rules require it. Two things are worth separating: where the model runs (inference) and where data is stored at rest.</p>
+<p>Anthropic's data residency documentation (verified 9 November 2026) shows what these controls look like in practice:</p>
+<div class="tbl"><table>
+<tr><th>Control</th><th>What it does</th><th>Detail</th></tr>
+<tr><td><code>inference_geo</code> (per request)</td><td>Chooses where model inference runs</td><td><code>"global"</code> (default) or <code>"us"</code>; US-only inference is priced at 1.1× standard rates on Claude 4.6 and later models</td></tr>
+<tr><td>Workspace defaults</td><td>Admins restrict which geos a workspace may use and set a default</td><td><code>allowed_inference_geos</code> and <code>default_inference_geo</code></td></tr>
+<tr><td>Workspace geo</td><td>Where data is stored at rest and some processing happens</td><td>Set when the workspace is created and can't be changed; currently <code>"us"</code> only</td></tr>
+<tr><td>Cloud routes</td><td>Region is set by the cloud's endpoint or deployment</td><td>On Amazon Bedrock and Google-managed Google Cloud, the endpoint or inference profile decides; on Microsoft Foundry, a US Data Zone deployment type keeps inference in the US</td></tr>
+</table></div>
+<p>The lesson generalises: when a vendor says "we support data residency", ask exactly which regions, for which features, for which models, at what price, and whether it covers storage as well as processing. For EU or India-specific requirements, check what each route offers today; <a href="#ch132">Chapter 132</a> and <a href="#ch133">Chapter 133</a> cover privacy law and standards.</p>
+<div class="box note"><span class="tag">Training and retention</span><p><a href="#ch42">Chapter 42</a> sets out Anthropic's current commercial terms: by default, inputs and outputs from commercial products are not used for training, and API data is deleted within 30 days unless other terms such as zero data retention are agreed. Compare every vendor on these same questions, in writing.</p></div>
+
+<h3 id="ch117-7"><span class="num">117.7</span>Enterprise architecture</h3>
+<p>Once more than a handful of systems call AI models, most organisations put a thin shared layer in the middle. The common name is an <a class="gl" href="#g-ai-gateway">AI gateway</a> (also called an LLM gateway or proxy): one controlled path between your people and systems and the model providers.</p>
+<div class="flow">
+<div><b>People and apps</b>Assistants, Claude Code, internal tools, CI jobs</div>
+<div><b>Identity</b>Single sign-on; service identities for systems</div>
+<div class="hl"><b>AI gateway</b>Policy, logging, budgets, routing, data checks</div>
+<div><b>Private network path</b>e.g. AWS PrivateLink to the cloud provider</div>
+<div><b>Model providers</b>Claude API, Bedrock, Google Cloud, Foundry</div>
+</div>
+<div class="tbl"><table>
+<tr><th>Building block</th><th>What it does</th><th>Why it matters</th></tr>
+<tr><td><a class="gl" href="#g-single-sign-on">Single sign-on</a> and SCIM</td><td>Staff sign in with company accounts; leavers lose access automatically</td><td>No orphaned accounts; access follows HR records</td></tr>
+<tr><td>Gateway policy</td><td>Approves which models and features each team may use</td><td>One place to enforce rules instead of in every app</td></tr>
+<tr><td>Logging and audit</td><td>Records who called what, when, at what cost (content logging is a separate privacy decision)</td><td>Incident investigation, cost allocation, compliance</td></tr>
+<tr><td>Budgets and rate limits</td><td>Caps spend per team or application</td><td>Stops a looping agent becoming a large bill</td></tr>
+<tr><td><a class="gl" href="#g-model-routing">Model routing</a></td><td>Sends simple tasks to cheaper, faster models and hard ones to stronger models; can fail over between providers</td><td>Cost control and resilience</td></tr>
+<tr><td>Data checks</td><td>Scans prompts for secrets or personal data before they leave (data loss prevention)</td><td>Catches mistakes before they become incidents</td></tr>
+<tr><td>Private networking</td><td>Traffic to the cloud provider stays on private network paths</td><td>Required by many security teams; AWS documents PrivateLink interface endpoints for Bedrock, so instances "don't need public IP addresses"</td></tr>
+</table></div>
+<h4>How Claude Code fits</h4>
+<p>Claude Code supports these patterns directly. Its documented environment variables include <code>ANTHROPIC_BASE_URL</code>, which sends requests to a proxy or gateway, and <code>CLAUDE_CODE_USE_BEDROCK</code>, <code>CLAUDE_CODE_USE_VERTEX</code> and <code>CLAUDE_CODE_USE_FOUNDRY</code> for the cloud routes. Administrators can enforce policy through managed settings (<a href="#ch42">Chapter 42</a>), and the CLI includes a <code>claude gateway</code> command for running Anthropic's self-hosted enterprise gateway. Configuration details are in <a href="#ch78">Chapter 78</a>.</p>
+<div class="box opinion"><span class="tag">Opinion · common among platform engineering teams</span><p>Many platform teams argue that a gateway is worth it once you have several AI-using applications or more than one provider, and is overkill for a single assistant purchase where the vendor's admin console already provides SSO, logs and limits. Their caution: a gateway is itself critical infrastructure that can become a bottleneck or a single point of failure, and it can strip features the provider's own tools rely on. Start with the vendor's controls; add a gateway when you have a concrete need.</p></div>
+
+<h3 id="ch117-8"><span class="num">117.8</span>Build, buy or partner</h3>
+<p>The most expensive mistake in enterprise AI is building something you could have bought, then maintaining it for years. The second most expensive is buying a generic tool for a problem that is genuinely specific to you.</p>
+<div class="tbl"><table>
+<tr><th>Lean towards…</th><th>When…</th><th>QA example</th></tr>
+<tr><td><b>Buy</b></td><td>The task is common across companies; vendors improve it faster than you could; speed matters more than differentiation</td><td>Drafting test plans, summarising defects, writing emails: use an approved assistant</td></tr>
+<tr><td><b>Build (on a platform)</b></td><td>The workflow uses your private data and processes in a way no product supports; you can name an owner and budget for upkeep; you can evaluate it (<a href="#ch125">Chapter 125</a>)</td><td>An assistant that reads your requirements, retrieves your test standards and produces cases in your exact format (<a href="#ch127">Chapter 127</a>)</td></tr>
+<tr><td><b>Partner</b></td><td>You need the result before you have the skills; the domain is specialised or regulated; you want to learn while delivering</td><td>A specialist helps build the first version and trains your engineers to own it</td></tr>
+<tr><td><b>Wait</b></td><td>The value is unclear, the vendors are immature, or the risk is high and controls aren't ready</td><td>Fully autonomous release approval</td></tr>
+</table></div>
+<h4>Five questions that usually decide it</h4>
+<ol>
+<li><b>Is this a differentiator?</b> If customers would never notice whether you built it, buy.</li>
+<li><b>Who maintains it in two years?</b> Models change, prompts drift and integrations break. No named owner means don't build.</li>
+<li><b>Can we evaluate it?</b> If you can't measure whether it works, you can't safely build or buy it.</li>
+<li><b>What is the full cost?</b> Include engineering time, evals, monitoring, security review and support, not just tokens.</li>
+<li><b>How reversible is it?</b> Prefer choices you can undo: short contracts, open standards, your data in exportable form.</li>
+</ol>
+<details class="deep"><summary>Under the hood: the hidden costs of "build"</summary><div class="body">
+<p>A first prototype on a model API can take days, which makes building look cheap. The ongoing costs are what surprise people: re-running evaluations whenever the model is upgraded or retired; maintaining retrieval indexes as documents change; logging and monitoring (<a href="#ch95">Chapter 95</a>); security reviews for prompt injection and data leakage (<a href="#ch130">Chapter 130</a>, <a href="#ch131">Chapter 131</a>); user support and training; and keeping up with features a bought product would have added for free. A useful rule of thumb some teams use is to estimate the yearly maintenance effort explicitly before approving a build, and to compare that, not the prototype cost, with the price of buying.</p>
+</div></details>
+
+<h3 id="ch117-9"><span class="num">117.9</span>Governance boards and people</h3>
+<p>A governance board (sometimes an "AI council" or working group) is a small, cross-functional group that owns the rules. It should make safe use easy, not slow everything down.</p>
+<div class="tbl"><table>
+<tr><th>Role on the board</th><th>Brings</th></tr>
+<tr><td>Chair (often a technology or risk leader)</td><td>Decisions and escalation</td></tr>
+<tr><td>Security and privacy</td><td>Data classification, vendor risk, incident handling</td></tr>
+<tr><td>Legal and procurement</td><td>Contracts, regulation</td></tr>
+<tr><td>Architecture or platform</td><td>Approved routes, gateway, integrations</td></tr>
+<tr><td>Business and engineering representatives (including QA)</td><td>Real use cases, practical feedback, evaluation skills</td></tr>
+</table></div>
+<p>A workable pattern is tiered approval: low-risk uses (drafting, summarising non-sensitive material on an approved tool) are pre-approved by the <a class="gl" href="#g-acceptable-use-policy">acceptable use policy</a>; medium-risk uses get a short checklist review; high-risk uses (customer-facing AI, decisions about people, autonomous actions) get a full review with an evaluation plan. <a href="#ch135">Chapter 135</a> covers responsible-AI governance in depth.</p>
+<p>Technology is the easier half. Adoption succeeds when people know what's allowed, have time to learn, and see colleagues succeed. Common elements are a short policy, role-based training, a network of <a class="gl" href="#g-ai-champion">AI champions</a> and a place to share prompts and results. <a href="#ch128">Chapter 128</a> turns this into a step-by-step roadmap for a QA team, <a href="#ch126">Chapter 126</a> shows how to measure value and ROI, and <a href="#ch145">Chapter 145</a> covers running workshops.</p>
+
+<div class="lab"><div class="lab-h"><b>Lab: run a vendor scorecard with a sensitivity check</b><span>25 min · Python 3 on your computer (or a spreadsheet)</span></div>
+<p>You will run a weighted scorecard with must-have gates, then change the weights to see whether the decision is robust. All vendors and numbers are illustrative.</p><ol>
+<li>Create a folder <code>vendor-eval</code> and inside it a file <code>scorecard.py</code>:
+<div class="code"><span class="cap">scorecard.py</span><pre>"""Weighted vendor scorecard with must-have gates and a sensitivity check.
+All vendors, weights and scores below are illustrative: replace them with yours."""
+
+<span class="c"># Must-haves: a vendor that fails any of these is out, whatever its score.</span>
+GATES = ["Commercial terms: no training on our data", "SSO with our identity provider",
+         "Data processed in an approved region"]
+
+<span class="c"># Criteria and weights (weights must add up to 100).</span>
+WEIGHTS = {
+    "Output quality on our eval set": 25,
+    "Security and data protection": 20,
+    "Admin, audit and governance": 15,
+    "Integration with our tools": 15,
+    "Total cost of ownership": 15,
+    "Vendor viability and support": 10,
+}
+
+<span class="c"># Scores from 1 (poor) to 5 (excellent), agreed by the evaluation panel.</span>
+VENDORS = {
+    "Vendor A": {"gates": [True, True, True],
+                 "scores": [5, 4, 4, 3, 3, 4]},
+    "Vendor B": {"gates": [True, True, True],
+                 "scores": [4, 4, 3, 5, 4, 4]},
+    "Vendor C": {"gates": [True, False, True],
+                 "scores": [5, 3, 2, 4, 5, 3]},
+}
+
+<span class="c"># An alternative weighting to test how sensitive the result is.</span>
+SECURITY_FIRST = [15, 30, 20, 15, 10, 10]
+
+
+def total(scores, weights):
+    """Weighted score out of 5.00."""
+    return sum(s * w for s, w in zip(scores, weights)) / 100
+
+
+def rank(weights, label):
+    print(f"\n{label}")
+    results = []
+    for name, v in VENDORS.items():
+        failed = [g for g, ok in zip(GATES, v["gates"]) if not ok]
+        if failed:
+            print(f"  {name}: EXCLUDED (fails: {'; '.join(failed)})")
+            continue
+        results.append((total(v["scores"], weights), name))
+    for score, name in sorted(results, reverse=True):
+        print(f"  {name}: {score:.2f} / 5.00")
+
+
+assert sum(WEIGHTS.values()) == 100, "Weights must add up to 100"
+assert sum(SECURITY_FIRST) == 100, "Alternative weights must add up to 100"
+for name, v in VENDORS.items():
+    assert len(v["scores"]) == len(WEIGHTS), f"{name}: one score per criterion"
+    assert all(1 &lt;= s &lt;= 5 for s in v["scores"]), f"{name}: scores must be 1-5"
+
+rank(list(WEIGHTS.values()), "Ranking with agreed weights:")
+rank(SECURITY_FIRST, "Ranking with security-first weights (sensitivity check):")</pre></div><span class="expect">A Python file using only the standard language, no installs.</span></li>
+<li>Run it: <code>cd vendor-eval</code> then <code>python3 scorecard.py</code>.<span class="expect">
+<code>Ranking with agreed weights:</code> Vendor C EXCLUDED (fails: SSO with our identity provider), Vendor B 4.00 / 5.00, Vendor A 3.95 / 5.00. Then <code>Ranking with security-first weights</code>: Vendor C excluded, Vendor B 3.95, Vendor A 3.90.</span></li>
+<li>Change Vendor C's second gate from <code>False</code> to <code>True</code> and run again.<span class="expect">Vendor C now appears, but third with 3.80: its top scores for quality and cost don't outweigh weak admin and security scores. The ranking of A and B is unchanged.</span> Change it back to <code>False</code>.</li>
+<li>Write your own anchors: for "Admin, audit and governance", write one sentence each for what a 1, 3 and 5 mean. Ask Claude: <code>Critique these scoring anchors for an AI assistant evaluation. Are they specific and checkable?</code><span class="expect">Suggestions to make each anchor observable, such as naming SSO, SCIM, audit logs and usage reports.</span></li>
+<li>Replace the vendors and scores with two or three real tools your organisation is considering, using public documentation for each score, and run again.<span class="expect">A ranking, plus a note of which scores you could not evidence. Those gaps are your questions for the vendors.</span></li>
+<li>Write a five-line decision record: options, gates, result, sensitivity finding, next step (usually a pilot).<span class="expect">A record a manager could read in one minute.</span></li>
+</ol>
+<p><b>Troubleshooting:</b> <code>AssertionError: Weights must add up to 100</code> means a weight was changed without rebalancing the others. <code>AssertionError: Vendor X: one score per criterion</code> means a scores list has the wrong length; it needs six numbers in the same order as <code>WEIGHTS</code>. <code>SyntaxError</code> usually means a missing comma or bracket after editing. If <code>python3</code> isn't found, see <a href="#ch58">Chapter 58</a>. <b>No Python?</b> Build the same table in a spreadsheet: score × weight in each cell, <code>SUMPRODUCT</code> of scores and weights divided by 100 for the total.</p>
+</div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"The best model wins the evaluation."</dt><dd>Model quality is one criterion. Security, admin controls, integration and cost often decide, and a gate failure overrides any quality score.</dd>
+<dt>"A higher scorecard total means a clear winner."</dt><dd>Small differences are within scoring noise. Run a sensitivity check and use a pilot to decide close calls.</dd>
+<dt>"Using Claude through our cloud provider is identical to using it directly."</dt><dd>The models are the same, but features, defaults, pricing and data residency controls can differ by route. Evaluate the route you will deploy.</dd>
+<dt>"Building is cheaper because the API costs pennies."</dt><dd>Tokens are usually the smallest cost. Maintenance, evaluation, monitoring, security and support dominate over time.</dd>
+<dt>"A governance board means slowing everything down."</dt><dd>A good board pre-approves low-risk uses and spends its time on the risky few.</dd>
+</dl></div>
+
+<h3 id="ch117-r"><span class="num">117.10</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Enterprise adoption replaces scattered personal tools with deliberate choices about vendors, contracts, data, architecture, governance and people.</li>
+<li>The options are: buy an assistant, buy a coding tool, use a model platform, build, or partner. Most organisations mix them.</li>
+<li>Write criteria before demos: a short list of pass/fail gates, then weighted criteria with anchored 1–5 scores and cited evidence.</li>
+<li>Read contracts for data use, retention, DPAs, output ownership, service levels, model retirement notice and exit terms, with your legal team.</li>
+<li>Data residency separates where inference runs from where data is stored; ask which regions, features, models and prices are covered.</li>
+<li>A thin architecture layer (SSO, gateway, logging, budgets, routing, private networking) makes AI controllable at scale. Add a gateway when you have a concrete need.</li>
+<li>Buy for common tasks, build only for real differentiators with an owner and an eval, partner to close skill gaps. ROI is in Chapter 126; the QA rollout is in Chapter 128.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Vendor C scores highest on quality and price but doesn't support SSO, which is one of your must-have gates. What happens?</p><div class="opts"><button>It wins, because its weighted score is highest</button><button data-ok>It is excluded, whatever its score</button><button>Its score is reduced by 10%</button></div><p class="why" hidden>Gates are pass/fail. They exist so that impressive features can't override non-negotiable requirements.</p></div>
+<div class="qz"><p class="q">Two vendors score 3.95 and 4.00 out of 5. What is the best conclusion?</p><div class="opts"><button>The 4.00 vendor is clearly better</button><button data-ok>Both are viable; check sensitivity to weights and run a pilot to decide</button><button>Re-score until the gap is larger</button></div><p class="why" hidden>A 0.05 difference is well within the uncertainty of 1–5 scores.</p></div>
+<div class="qz"><p class="q">On the Claude API, what does setting <code>inference_geo</code> to <code>"us"</code> control?</p><div class="opts"><button>Where your data is stored at rest</button><button data-ok>Where model inference runs for that request</button><button>Which country's law applies to the contract</button></div><p class="why" hidden>Inference geo controls where the model runs; workspace geo is the separate setting for storage at rest.</p></div>
+<div class="qz"><p class="q">Which situation most clearly favours building rather than buying?</p><div class="opts"><button>Summarising meeting notes for all staff</button><button>Drafting emails faster</button><button data-ok>A workflow using your private test standards and formats that no product supports, with a named owner and an eval plan</button></div><p class="why" hidden>Build where the work is genuinely specific to you and someone will own, evaluate and maintain it.</p></div>
+<div class="qz"><p class="q">What is the main job of an AI gateway?</p><div class="opts"><button>To train the organisation's own model</button><button data-ok>To provide one controlled path to model providers, with policy, logging, budgets and routing</button><button>To replace single sign-on</button></div><p class="why" hidden>It centralises controls that would otherwise be repeated, inconsistently, in every application.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Prepare an evaluation pack for one real decision your organisation faces, such as choosing an AI assistant for the QA department or a model platform for an internal tool. Include: (1) three to five must-have gates with the reason for each; (2) six to eight weighted criteria with anchors for 1, 3 and 5; (3) a scored comparison of at least two options using only public documentation, with each score citing its evidence; (4) a sensitivity check; (5) a list of questions for each vendor covering what you couldn't evidence; and (6) a one-paragraph build-buy-partner recommendation. Link the value case to <a href="#ch126">Chapter 126</a> and the rollout plan to <a href="#ch128">Chapter 128</a> rather than repeating them.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Adopting AI as a company is like choosing any important supplier. Write down the non-negotiables first: no training on our data, single sign-on, the right region. Anyone who fails those is out. Then score the rest on quality with our own tests, security, admin controls, integration and full cost, and check whether the ranking changes if you weight things differently. Put a thin control layer in the middle once several systems use AI. Buy for everyday tasks, build only where it's truly ours and someone will maintain it, and let a small board pre-approve the safe uses so people can get on with it."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://claude.com/pricing" target="_blank" rel="noopener">Claude plans and pricing</a>: Team and Enterprise seats, admin features by plan.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/manage-claude/data-residency" target="_blank" rel="noopener">Data residency</a>: <code>inference_geo</code>, workspace geo, workspace restrictions, pricing and platform notes.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/models/overview" target="_blank" rel="noopener">Models overview</a> and <a href="https://platform.claude.com/docs/en/about-claude/model-deprecations" target="_blank" rel="noopener">Model deprecations</a>: availability on cloud platforms and retirement dates.</li>
+<li>Anthropic Privacy Center, <a href="https://privacy.claude.com/en/articles/7996868-is-my-data-used-for-model-training" target="_blank" rel="noopener">Is my data used for model training?</a> and <a href="https://privacy.claude.com/en/articles/7996866-how-long-do-you-store-my-organization-s-data" target="_blank" rel="noopener">How long do you store my organization's data?</a></li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/settings" target="_blank" rel="noopener">Claude Code settings</a> and environment variables (<code>ANTHROPIC_BASE_URL</code>, cloud provider variables); Claude Code 2.1.319 CLI help for <code>claude gateway</code>.</li>
+<li>Amazon Web Services, <a href="https://docs.aws.amazon.com/bedrock/latest/userguide/vpc-interface-endpoints.html" target="_blank" rel="noopener">Use interface VPC endpoints (AWS PrivateLink) with Amazon Bedrock</a>.</li>
+<li>Anthropic, <a href="https://trust.anthropic.com/" target="_blank" rel="noopener">Trust Center</a> (security and compliance documentation; request reports through it).</li>
+<li>NIST, <a href="https://www.nist.gov/itl/ai-risk-management-framework" target="_blank" rel="noopener">AI Risk Management Framework</a> (a common reference for governance boards; see Chapter 133).</li>
+</ol><p class="verified">Verified 9 November 2026 against Anthropic's pricing, data residency, models and privacy pages, the AWS Bedrock PrivateLink documentation and the research fact sheets for this book. Vendor examples are listed neutrally and are not recommendations.</p></div>

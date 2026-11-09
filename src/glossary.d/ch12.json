@@ -1,0 +1,62 @@
+{
+ "Loss function": {
+  "d": "A formula that turns a model's mistake on an example into a single number: zero is perfect, bigger is worse. Training tries to make this number small.",
+  "see": "ch12"
+ },
+ "Learning rate": {
+  "d": "How big a step gradient descent takes each time it adjusts the weights. Too small and training is slow; too large and the loss bounces around or explodes.",
+  "see": "ch12"
+ },
+ "Epoch": {
+  "d": "One complete pass through all the training data during training.",
+  "see": "ch12"
+ },
+ "Batch": {
+  "d": "A small group of training examples processed together. The model averages their gradients and makes one weight update per batch.",
+  "see": "ch12"
+ },
+ "Overfitting": {
+  "d": "When a model learns the quirks and noise of its training data so closely that it does worse on new examples. Training loss keeps falling while validation loss rises.",
+  "see": "ch12"
+ },
+ "Underfitting": {
+  "d": "When a model is too simple, or trained too little, to capture the real pattern. It does badly on both training and new data.",
+  "see": "ch12"
+ },
+ "Training set": {
+  "d": "The part of a dataset the model actually learns from: its weights are adjusted on these examples.",
+  "see": "ch13"
+ },
+ "Validation set": {
+  "d": "Data held back from training and checked during development, to compare models, tune settings and spot overfitting.",
+  "see": "ch13"
+ },
+ "Test set": {
+  "d": "Data kept locked away until the very end and used once for an honest final score. Never used for training or tuning.",
+  "see": "ch13"
+ },
+ "Data leakage": {
+  "d": "When information from the validation or test data sneaks into training, for example through duplicates or time order, so scores look better than real-world performance.",
+  "see": "ch13"
+ },
+ "Data bias": {
+  "d": "When a dataset is systematically unrepresentative of the real world a model will be used in, through sampling, history, labelling or measurement. The model learns the bias.",
+  "see": "ch13"
+ },
+ "Data labelling": {
+  "d": "Attaching the correct answer (label) to each example in a dataset, usually by people following written guidelines. Also called annotation.",
+  "see": "ch13"
+ },
+ "Cosine similarity": {
+  "d": "A measure of how closely two vectors point in the same direction: the dot product divided by the product of their lengths. 1 means same direction, around 0 means unrelated.",
+  "see": "ch15"
+ },
+ "Semantic search": {
+  "d": "Search by meaning rather than exact words: the query and documents are turned into embeddings and the closest documents are returned.",
+  "see": "ch15"
+ },
+ "Embedding model": {
+  "d": "A model whose job is to turn text (or images) into embedding vectors for search, clustering and RAG. Anthropic does not make one; providers include Voyage AI and open-source models.",
+  "see": "ch15"
+ }
+}

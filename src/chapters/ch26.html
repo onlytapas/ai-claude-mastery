@@ -1,0 +1,164 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>The five layers of the AI industry, from chips to the apps you use every day</li>
+<li>The difference between research labs, foundation-model developers, cloud providers, application companies and coding platforms</li>
+<li>How open and closed ecosystems compete and depend on each other</li>
+<li>How money and computing power flow between the big players, and why the same companies are partners and rivals at once</li>
+<li>The major 2026 deals that reshaped the industry, and what they mean for a team choosing AI tools</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch7">Chapter 7</a> (the ChatGPT moment) and <a href="#ch25">Chapter 25</a> (chips, data centres and the cost of an answer). No technical setup is needed.</div>
+
+<div class="bigidea"><p>The AI industry is a stack. At the bottom are chip makers; above them, cloud providers that rent out data centres; then the labs that train <a class="gl" href="#g-foundation-model">foundation models</a>; then platforms that offer those models to developers; and at the top, the apps and tools people actually use. Most big companies sit on several layers at once, so they are partners in one place and competitors in another. Huge sums move between them, often as computing power rather than cash. In 2026 the industry consolidated sharply, and knowing who owns and depends on whom helps you judge the risks of the tools you rely on.</p></div>
+
+<h3 id="ch26-1"><span class="num">26.1</span>The stack: five layers</h3>
+<p>When you ask Claude Code to write a Playwright test, you're using the top of a tall stack. Every layer below has to work, and every layer has companies competing to own it.</p>
+<div class="flow">
+<div><b>1. Chips</b>NVIDIA, AMD, plus in-house chips: Google TPU, Amazon Trainium, Microsoft Maia, Meta MTIA</div>
+<div><b>2. Cloud and data centres</b>AWS, Microsoft Azure, Google Cloud, Oracle, and dedicated builds such as Stargate and Colossus</div>
+<div class="hl"><b>3. Model labs</b>Train foundation models: OpenAI, Anthropic, Google DeepMind, Meta, xAI, DeepSeek, Mistral, Alibaba (Qwen) and others</div>
+<div><b>4. Platforms</b>Sell model access to developers: model APIs, Amazon Bedrock, Microsoft Foundry, Google Vertex AI, Hugging Face</div>
+<div><b>5. Applications</b>What people use: ChatGPT, Claude apps, Gemini, Copilot, Cursor, Perplexity, and AI features inside every product</div>
+</div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of the food industry. Farmers grow wheat (chips), mills grind it (cloud), bakeries make bread (model labs), wholesalers distribute it (platforms), and cafés make sandwiches (applications). A supermarket chain might own its own bakery and its own cafés, and still buy flour from a rival. AI works the same way: vertical integration in some places, buying from competitors in others.</p></div>
+<p>A <a class="gl" href="#g-foundation-model">foundation model</a> is a large, general model trained on broad data that many different products can be built on. GPT, Claude, Gemini, Grok and Llama/Muse are all foundation-model families. The labs that build them are often called <strong>frontier labs</strong> when they compete at the cutting edge.</p>
+
+<h3 id="ch26-2"><span class="num">26.2</span>The kinds of players</h3>
+<p>Labels get used loosely in the press. Here is a cleaner way to sort them.</p>
+<input class="filter" data-filter="#ch26Players" data-empty="#ch26Empty" type="search" placeholder="Filter companies or types…" aria-label="Filter companies or types">
+<div class="tbl"><table id="ch26Players">
+<tr><th>Company</th><th>Main role</th><th>Also does</th></tr>
+<tr class="group"><td colspan="3">Chip makers</td></tr>
+<tr><td>NVIDIA</td><td>GPUs, networking and the CUDA software platform</td><td>Open-weight Nemotron models; agreed to buy Hugging Face (pending)</td></tr>
+<tr class="group"><td colspan="3">Cloud providers (hyperscalers)</td></tr>
+<tr><td>Amazon Web Services</td><td>Cloud; Bedrock model marketplace; Trainium chips</td><td>Own Nova models; Anthropic's primary cloud and a major investor</td></tr>
+<tr><td>Microsoft</td><td>Azure cloud; Microsoft Foundry</td><td>Copilot apps; own MAI models; large stake in OpenAI; hosts Claude in Foundry</td></tr>
+<tr><td>Google</td><td>Google Cloud; TPUs; Vertex AI</td><td>Google DeepMind trains Gemini; Gemini app; Search</td></tr>
+<tr class="group"><td colspan="3">Foundation-model developers</td></tr>
+<tr><td>OpenAI</td><td>GPT models</td><td>ChatGPT, Codex, API (<a href="#ch27">Chapter 27</a>)</td></tr>
+<tr><td>Anthropic</td><td>Claude models</td><td>Claude apps, Claude Code, Claude API; created MCP (<a href="#ch37">Chapter 37</a>)</td></tr>
+<tr><td>Meta</td><td>Llama (open weights), now mostly proprietary Muse</td><td>Meta AI inside its social apps</td></tr>
+<tr><td>xAI (now SpaceX Super Intelligence)</td><td>Grok models</td><td>Owned by SpaceX; Grok in X</td></tr>
+<tr><td>DeepSeek, Mistral, Alibaba (Qwen), Moonshot, Zhipu</td><td>Mostly open-weight models</td><td>Chat apps and APIs (<a href="#ch30">Chapter 30</a>)</td></tr>
+<tr class="group"><td colspan="3">Platforms and hubs</td></tr>
+<tr><td>Hugging Face</td><td>The main hub for sharing open models and datasets</td><td>The <code>transformers</code> library</td></tr>
+<tr class="group"><td colspan="3">Application and coding-platform companies</td></tr>
+<tr><td>Cursor (Anysphere)</td><td>AI code editor</td><td>Own Composer models; owned by SpaceX since Aug 2026</td></tr>
+<tr><td>Cognition</td><td>Devin agent; Devin Desktop (formerly Windsurf)</td><td>In-house models</td></tr>
+<tr><td>GitHub (Microsoft)</td><td>GitHub Copilot</td><td>Uses models from several labs</td></tr>
+<tr><td>Perplexity</td><td>AI answer engine with citations</td><td>Comet browser; in-house Sonar models</td></tr>
+</table></div>
+<p id="ch26Empty" hidden>No rows match.</p>
+<p>A few distinctions worth holding on to:</p>
+<ul>
+<li><strong>Research lab vs foundation-model developer.</strong> Some groups mainly publish research (university labs, Meta's FAIR in its early years). Foundation-model developers turn research into products they sell. Most frontier labs now do both, but the commercial side drives most decisions.</li>
+<li><strong>Cloud provider vs model lab.</strong> A <a class="gl" href="#g-hyperscaler">hyperscaler</a> rents out computing at enormous scale. Three of them (Google, Microsoft, Amazon) also build their own models, and all three sell other labs' models too.</li>
+<li><strong>Application company vs model lab.</strong> Many successful AI products don't train their own frontier model; they build on someone else's through an <a class="gl" href="#g-api">API</a>. Increasingly, the biggest app companies train smaller in-house models too (Cursor's Composer, Perplexity's Sonar).</li>
+<li><strong>Coding platforms</strong> are now a category in their own right: Claude Code, OpenAI Codex, GitHub Copilot, Cursor, Devin, Google's Antigravity and Jules. Most read an instruction file such as <code>CLAUDE.md</code> or <code>AGENTS.md</code>.</li>
+</ul>
+
+<h3 id="ch26-3"><span class="num">26.3</span>Open and closed ecosystems</h3>
+<p>The industry has two broad camps, with plenty of overlap.</p>
+<div class="cols2">
+<div><h4>Closed (proprietary)</h4><p>You can use the model only through the company's apps or API. The weights stay private. Examples: GPT-6 Astra, Claude, Gemini, Grok 4.7, Muse Spark. The company controls safety measures, updates and pricing, and you get a managed service with no hardware to run.</p></div>
+<div><h4>Open weights</h4><p>The trained weights are published so anyone can download and run the model, subject to a licence. Examples: DeepSeek V4 (MIT), Mistral Large 4, many Qwen3.8 models, NVIDIA Nemotron, Google's Gemma, OpenAI's gpt-oss. You control where data goes, but you run (and pay for) the hardware.</p></div>
+</div>
+<p>An <a class="gl" href="#g-open-weight-model">open-weight model</a> is not the same as open source: the training data and code are usually not published, and licences vary from very permissive (Apache 2.0, MIT) to custom terms with restrictions. <a href="#ch32">Chapter 32</a> covers this in depth.</p>
+<div class="box example"><span class="tag">Real-world example: the camps keep shifting</span><p>Meta made open weights mainstream with Llama from 2023. In April 2026 it launched Muse Spark, its first model from Meta Superintelligence Labs, as a proprietary model, though it has since released some open-weight Muse models such as Muse Glimmer. OpenAI went the other way in August 2025, releasing open-weight gpt-oss models alongside its closed frontier line. Few companies are purely one or the other.</p></div>
+<div class="box opinion"><span class="tag">Opinion · competing views</span><p>Supporters of open weights (including Mistral and, historically, Meta) argue they spread benefits, allow independent safety research and prevent a few companies controlling AI. Labs that keep frontier models closed, including Anthropic and OpenAI for their top models, argue that releasing the most capable weights can't be undone and may help misuse. Both are positions, held by those groups; the debate is unresolved.</p></div>
+
+<h3 id="ch26-4"><span class="num">26.4</span>How money and compute flow</h3>
+<p>Training and serving frontier models needs enormous computing power (<a href="#ch25">Chapter 25</a>). Model labs need compute; cloud companies and chip makers have it and want customers. The result is a web of deals in which investment money often comes back as spending on the investor's own cloud or chips.</p>
+<div class="tbl"><table>
+<tr><th>Deal</th><th>What flows which way</th><th>Source</th></tr>
+<tr><td>Microsoft and OpenAI</td><td>Microsoft invested from 2019; holds about 27% of OpenAI Group PBC since Oct 2025. OpenAI runs mainly on Azure and pays Microsoft a revenue share (now capped, through 2030).</td><td>Microsoft blog; CNBC</td></tr>
+<tr><td>Amazon and Anthropic</td><td>Amazon invested (initially "up to $4 billion", Sept 2023). AWS became Anthropic's primary cloud, using Trainium chips.</td><td>Anthropic</td></tr>
+<tr><td>Google and Anthropic</td><td>Anthropic agreed to use up to one million Google TPUs (Oct 2025).</td><td>Anthropic</td></tr>
+<tr><td>Microsoft, NVIDIA and Anthropic</td><td>Anthropic committed $30B to Azure compute; NVIDIA up to $10B and Microsoft up to $5B of investment in Anthropic (Nov 2025).</td><td>Anthropic</td></tr>
+<tr><td>OpenAI's compute deals</td><td>Stargate (with Oracle, SoftBank and MGX, Jan 2025), Oracle compute (Sep 2025), AMD chips (Oct 2025), AWS (Nov 2025), a custom chip with Broadcom, and NVIDIA.</td><td>Wikipedia: OpenAI</td></tr>
+<tr><td>Google and Apple</td><td>Apple's next-generation Apple Foundation Models will be based on Gemini models and cloud technology (announced Jan 2026).</td><td>Google–Apple joint statement</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>It's like a landlord who invests in a promising restaurant on condition it rents the landlord's building and buys from the landlord's suppliers. The restaurant gets money and space; the landlord gets a tenant and a share of success. If the restaurant thrives, both win. If it struggles, both are exposed.</p></div>
+<div class="box opinion"><span class="tag">Opinion · is it a bubble?</span><p>Some financial commentators argue these circular arrangements, where investment returns as cloud and chip revenue, inflate the apparent size of the AI market and resemble past tech bubbles. Company leaders argue demand for AI compute is real and growing faster than supply. Treat both as views, not facts; the honest answer is that nobody yet knows how the economics settle.</p></div>
+<details class="deep"><summary>Under the hood: how model labs make money</summary><div class="body">
+<p>Most frontier labs combine four income streams:</p>
+<ol>
+<li><strong>Consumer subscriptions</strong> (ChatGPT Plus, Claude Pro and Max, Google AI Pro and Ultra, SuperGrok).</li>
+<li><strong>Business seats</strong> (Team and Enterprise plans, Microsoft 365 Copilot).</li>
+<li><strong>Pay-per-token API usage</strong> by developers and companies, directly or through cloud marketplaces such as Bedrock, Vertex AI and Foundry, where the cloud company sets its own price and takes a share.</li>
+<li><strong>Large enterprise and government contracts.</strong></li>
+</ol>
+<p>Companies with other businesses can fund AI differently: Google and Meta through advertising, Amazon and Microsoft through cloud consumption, NVIDIA through hardware sales, and DeepSeek through its owner, the hedge fund High-Flyer. That's one reason some can offer models cheaply or free: the model doesn't have to pay for itself directly.</p>
+</div></details>
+
+<h3 id="ch26-5"><span class="num">26.5</span>The 2026 consolidation</h3>
+<p>2026 saw several deals that changed who owns what. These facts were verified on 9 November 2026; some are still in progress.</p>
+<ol class="timeline">
+<li class="key"><span class="yr">Feb 2026</span><span class="ev"><b>SpaceX acquires xAI</b> in an all-stock deal (announced Feb 2). xAI, maker of Grok, was later renamed, and its API documentation now uses "SpaceXSI" (SpaceX Super Intelligence). The exact rename dates are not confirmed by an official source.</span></li>
+<li><span class="yr">Apr 2026</span><span class="ev"><b>Microsoft–OpenAI deal rewritten</b> (Apr 27). Microsoft's licence to OpenAI's technology becomes non-exclusive through 2032; OpenAI may serve products on any cloud, with Azure remaining primary; the "AGI clause" is removed; OpenAI's revenue share to Microsoft is capped through 2030.</span></li>
+<li><span class="yr">Apr 2026</span><span class="ev"><b>Meta moves to the mostly proprietary Muse family</b> (Muse Spark, Apr 8), a shift away from open Llama releases.</span></li>
+<li><span class="yr">Jun 2026</span><span class="ev"><b>Google retires Gemini CLI for free and individual users</b> (Jun 18), replacing it with Antigravity CLI. In the same month Cognition renamed Windsurf to Devin Desktop.</span></li>
+<li class="key"><span class="yr">Jun–Aug 2026</span><span class="ev"><b>SpaceX acquires Cursor's maker Anysphere</b> for $60B (announced Jun 16, closed Aug 14). One of the most popular AI code editors is now owned by the same group as Grok.</span></li>
+<li class="key"><span class="yr">Sep 2026</span><span class="ev"><b>NVIDIA agrees to buy Hugging Face</b> for about $12.9B (definitive agreement Sep 2). Not yet closed: expected in the first half of 2027, pending regulators.</span></li>
+<li><span class="yr">Sep 2026</span><span class="ev"><b>Cohere signs a merger agreement with Aleph Alpha</b> (pending).</span></li>
+</ol>
+<p>The pattern: companies at one layer of the stack are buying into others. A rocket company now owns a model lab and a coding tool. The leading chip maker is buying the leading open-model hub. A cloud provider that was one lab's exclusive home no longer is.</p>
+<div class="box warn"><span class="tag">Pending is not done</span><p>The NVIDIA–Hugging Face and Cohere–Aleph Alpha deals were not complete on 9 November 2026. Regulators can block or change deals. Say "agreed to buy", not "owns", until a deal closes.</p></div>
+
+<h3 id="ch26-6"><span class="num">26.6</span>Why this matters for your team</h3>
+<p>Industry structure sounds abstract, but it affects decisions a QA team makes every quarter.</p>
+<div class="tbl"><table>
+<tr><th>Question</th><th>Why the stack matters</th></tr>
+<tr><td>Where does our data go?</td><td>The same Claude model can be reached directly from Anthropic or through AWS Bedrock, Google Cloud or Microsoft Foundry. Each path has its own contract, data handling and region options (<a href="#ch41">Chapter 41</a>, <a href="#ch42">Chapter 42</a>).</td></tr>
+<tr><td>What if a vendor changes owner or terms?</td><td>Cursor's ownership changed in 2026; Gemini CLI's free tier ended. Tools you depend on can change direction quickly.</td></tr>
+<tr><td>Are we locked in?</td><td>Prompts, instruction files, MCP servers and evals are more portable than vendor-specific features. <code>AGENTS.md</code> and MCP are shared across many tools.</td></tr>
+<tr><td>Is a "partner" neutral?</td><td>A cloud marketplace may also sell its own competing models. That's normal, but worth knowing when you read recommendations.</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A test-automation team standardises on one AI code editor. In 2026 its owner changes. Nothing breaks on day one, but the team's lead asks three sensible questions: does the contract survive the change, can our tests and instruction files move to another tool, and do our evals (<a href="#ch125">Chapter 125</a>) let us compare a replacement quickly? Teams that kept their prompts, MCP configuration and evals tool-neutral answered in an afternoon.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Map your team's AI supply chain</b><span>30 min · paper or a spreadsheet; optionally claude.ai</span></div><ol>
+<li>List every AI tool your team uses or is trialling: chat apps, coding assistants, AI features inside Jira, Slack, your IDE or your test tools.<span class="expect">a list of perhaps 3–10 tools. If your team uses none yet, use: Claude Code, GitHub Copilot and ChatGPT.</span></li>
+<li>For each tool, fill in a row with five columns: the <b>application</b>, the <b>platform</b> it reaches the model through, the <b>model lab</b>, the <b>cloud</b> it probably runs on, and the <b>chip family</b> where known. Write "unknown" where you can't find out, and use the tables in this chapter and the vendors' own documentation.<span class="expect">a five-column table. Several cells will say "unknown", which is itself a finding.</span></li>
+<li>Mark any tool where one company appears in more than one column (for example, Microsoft in both application and cloud for Copilot).<span class="expect">at least one vertically integrated tool.</span></li>
+<li>For each tool, note one recent ownership, pricing or policy change you know of (from this chapter or the vendor's announcements).<span class="expect">at least one change for most tools in a fast-moving year like 2026.</span></li>
+<li>Optional: paste your table into Claude and ask: "Which of these dependencies would hurt most if the vendor changed terms, and what could we keep portable?" Then check its claims against the vendors' documentation.<span class="expect">a ranked list of risks with suggestions such as keeping prompts, instruction files and evals tool-neutral. Treat any company facts it gives as claims to verify.</span></li>
+</ol></div>
+<div class="box note"><span class="tag">Troubleshooting</span><p><b>Can't find which model a tool uses:</b> check its documentation or admin settings; many tools let you choose between several labs' models. <b>Company policy forbids pasting internal tool lists into an AI:</b> skip step 5 or use the example tools instead. <b>The table feels out of date:</b> it will be, eventually; put the date at the top, as this chapter does.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Each AI company does one thing."</dt><dd>Most big players work on several layers. Google makes chips, runs a cloud, trains models and sells apps.</dd>
+<dt>"Partners can't be competitors."</dt><dd>Microsoft invests in OpenAI, hosts Claude, and builds its own MAI models. Partnerships and rivalry coexist.</dd>
+<dt>"Open weights means open source."</dt><dd>Usually only the weights are published, under licences that vary. Training data and full code are rarely released.</dd>
+<dt>"An agreed acquisition is a done deal."</dt><dd>Until it closes, regulators or the parties can change or stop it.</dd>
+<dt>"If an app uses Claude, the app company is Anthropic."</dt><dd>Many apps build on another company's model through an API; the app, the platform and the lab can all be different firms.</dd>
+</dl></div>
+
+<h3 id="ch26-r"><span class="num">26.7</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>The AI stack has five layers: chips, cloud, model labs, platforms and applications.</li>
+<li>Big companies span several layers, so they are partners and competitors at the same time.</li>
+<li>Closed models are offered as services; open-weight models can be downloaded and run under a licence. Many companies do both.</li>
+<li>Investment often returns as spending on the investor's cloud or chips, tying labs and clouds together.</li>
+<li>2026 brought major consolidation: SpaceX bought xAI and Cursor's maker, NVIDIA agreed to buy Hugging Face, and the Microsoft–OpenAI deal was rewritten.</li>
+<li>For teams, structure affects data handling, lock-in and vendor risk: keep prompts, instruction files, MCP setups and evals portable.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Which layer of the stack does Amazon Bedrock mainly belong to?</p><div class="opts"><button>Chips</button><button data-ok>Platforms: offering many labs' models to developers</button><button>Applications</button></div><p class="why" hidden>Bedrock is a marketplace that gives developers access to models from many vendors, including Claude.</p></div>
+<div class="qz"><p class="q">What best describes Microsoft's position in 2026?</p><div class="opts"><button>A pure cloud provider with no models of its own</button><button>OpenAI's exclusive and only partner</button><button data-ok>A cloud provider, app maker and model builder that partners with OpenAI and also hosts Claude</button></div><p class="why" hidden>Microsoft spans several layers; the April 2026 amendment made its OpenAI arrangement non-exclusive.</p></div>
+<div class="qz"><p class="q">On 9 November 2026, what was the status of NVIDIA's deal for Hugging Face?</p><div class="opts"><button>Completed in September 2026</button><button data-ok>Agreed but not closed, pending regulators</button><button>Cancelled</button></div><p class="why" hidden>The definitive agreement was signed on 2 September 2026, with closing expected in the first half of 2027.</p></div>
+<div class="qz"><p class="q">Why does "open weights" not automatically mean "open source"?</p><div class="opts"><button data-ok>The training data and full code are usually not released, and licences can add restrictions</button><button>Open-weight models can't be run locally</button><button>Open weights are always encrypted</button></div><p class="why" hidden>You get the trained numbers, not necessarily everything needed to rebuild the model, and the licence sets the rules.</p></div>
+<div class="qz"><p class="q">Which practice most reduces a QA team's risk if an AI tool vendor changes owner or terms?</p><div class="opts"><button>Using only the newest tool</button><button data-ok>Keeping prompts, instruction files, MCP setups and evals portable across tools</button><button>Avoiding written documentation of AI use</button></div><p class="why" hidden>Portable assets and evals let you compare and switch tools quickly.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Using your lab table, write a one-page "AI vendor dependency note" for your manager. Include: the tools in use, the five-layer map for each, the two biggest dependencies, one change in 2026 that affected (or could affect) a tool you use, and three concrete steps to stay portable. Date it, and cite the vendor pages you used.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"The AI industry is a stack: chips at the bottom, then cloud data centres, then the labs that train models like Claude and GPT, then platforms that sell access, and finally the apps we use. The big players sit on several layers at once, so Microsoft can invest in OpenAI, host Claude and build its own models. Investment often comes back as cloud spending, which ties labs to clouds. 2026 was a year of consolidation: SpaceX bought xAI and Cursor, NVIDIA agreed to buy Hugging Face. For us, it means knowing where our data goes and keeping our prompts and evals portable."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>xAI, <a href="https://x.ai/news/xai-joins-spacex" target="_blank" rel="noopener">xAI joins SpaceX</a>; Wikipedia, <a href="https://en.wikipedia.org/wiki/XAI_(company)" target="_blank" rel="noopener">xAI (company)</a>.</li>
+<li>CNBC, <a href="https://www.cnbc.com/2026/06/16/spacex-spcx-cursor-acquisition-ipo.html" target="_blank" rel="noopener">SpaceX to acquire Cursor maker Anysphere</a> (Jun 2026); Wikipedia, <a href="https://en.wikipedia.org/wiki/Anysphere" target="_blank" rel="noopener">Anysphere</a>.</li>
+<li>NVIDIA, <a href="https://www.sec.gov/Archives/edgar/data/0001045810/000104581026000078/nvda-20260902.htm" target="_blank" rel="noopener">SEC Form 8-K, 2 Sep 2026</a>; TechCrunch, <a href="https://techcrunch.com/2026/09/03/nvidia-confirms-it-will-buy-hugging-face-for-12-9-billion/" target="_blank" rel="noopener">NVIDIA confirms it will buy Hugging Face</a>.</li>
+<li>CNBC, <a href="https://www.cnbc.com/2026/04/27/openai-microsoft-partnership-revenue-cap.html" target="_blank" rel="noopener">OpenAI–Microsoft partnership amended</a> (Apr 2026); Microsoft, <a href="https://blogs.microsoft.com/blog/2025/10/28/the-next-chapter-of-the-microsoft-openai-partnership/" target="_blank" rel="noopener">The next chapter of the Microsoft–OpenAI partnership</a> (Oct 2025).</li>
+<li>Meta, <a href="https://about.fb.com/news/2026/04/introducing-muse-spark-meta-superintelligence-labs/" target="_blank" rel="noopener">Introducing Muse Spark</a> (Apr 2026).</li>
+<li>Google Developers Blog, <a href="https://developers.googleblog.com/an-important-update-transitioning-gemini-cli-to-antigravity-cli/" target="_blank" rel="noopener">Transitioning Gemini CLI to Antigravity CLI</a>; Cognition, <a href="https://cognition.com/blog/introducing-devin-desktop" target="_blank" rel="noopener">Introducing Devin Desktop</a>.</li>
+<li>Anthropic, <a href="https://www.anthropic.com/news/anthropic-amazon" target="_blank" rel="noopener">Anthropic and Amazon</a>, <a href="https://www.anthropic.com/news/expanding-our-use-of-google-cloud-tpus-and-services" target="_blank" rel="noopener">Google Cloud TPUs</a>, <a href="https://www.anthropic.com/news/microsoft-nvidia-anthropic-announce-strategic-partnerships" target="_blank" rel="noopener">Microsoft, NVIDIA and Anthropic</a>.</li>
+<li>Google, <a href="https://blog.google/company-news/inside-google/company-announcements/joint-statement-google-apple/" target="_blank" rel="noopener">Joint statement from Google and Apple</a> (Jan 2026); Wikipedia, <a href="https://en.wikipedia.org/wiki/OpenAI" target="_blank" rel="noopener">OpenAI</a> and <a href="https://en.wikipedia.org/wiki/Cohere" target="_blank" rel="noopener">Cohere</a>.</li>
+<li><a href="https://agents.md/" target="_blank" rel="noopener">AGENTS.md</a> (the cross-tool instruction-file standard).</li>
+</ol><p class="verified">Verified 9 November 2026 against the sources above and the project's AI industry fact sheet. Exact xAI rename dates and the Windsurf rename date are not confirmed by official sources.</p></div>

@@ -1,0 +1,308 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How to set up a Playwright (TypeScript) test project with Claude Code, step by step</li>
+<li>How to write a CLAUDE.md that makes Claude follow your team's automation standards</li>
+<li>The working rhythm: plan → implement → run → prove the test can fail → review the diff</li>
+<li>Page objects, fixtures, locator strategy and API tests, with complete runnable code</li>
+<li>How to fix flaky tests with Claude without hiding real bugs (the red-test rule)</li>
+<li>How to add a test-reviewer subagent, a lint hook and a headless CI job</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapters 54 (first terminal commands), 58 (Git), 62 (your first Claude Code session) and 64 (planning and permission modes). Chapter 102 (Playwright MCP) is useful but not required. You need Node.js installed (Chapter 58).</div>
+
+<div class="bigidea"><p>Claude Code can write, run and fix automated tests inside your real repository. That turns days of automation work into hours, but only if you work in a disciplined way. Give it your standards in CLAUDE.md, make it plan before it codes, make it run every test it writes, prove each test can fail, and never let it "fix" a failing test by weakening the check. With that discipline, one tester can maintain far more automation than before. Without it, you get a large, green, useless test suite.</p></div>
+
+<h3 id="ch121-1"><span class="num">121.1</span>The working rhythm</h3>
+<div class="flow">
+<div><b>1 · Explore</b>Claude reads the app, the existing tests and your CLAUDE.md</div>
+<div><b>2 · Plan</b>Plan mode: Claude proposes tests; you correct the plan</div>
+<div><b>3 · Implement</b>Claude writes tests, page objects and fixtures</div>
+<div><b>4 · Run</b>Claude runs the tests and fixes its own mistakes</div>
+<div class="hl"><b>5 · Prove</b>Break the feature on purpose: the test must go red</div>
+<div><b>6 · Review</b>You read the diff, then commit</div>
+</div>
+<p>Steps 5 and 6 are what separate a professional from someone who just generated code. Every chapter section below supports this loop.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of an apprentice electrician. They're fast and know the theory. You still agree the plan before they start, you watch them test each circuit, and you flip the breaker yourself to check the safety cut-out actually works. "It looks wired" isn't the same as "it works".</p></div>
+
+<h3 id="ch121-2"><span class="num">121.2</span>Setting up a Playwright project</h3>
+<p>Playwright is Microsoft's open-source browser testing framework. Create a fresh project (or use your team's existing one):</p>
+<div class="code"><span class="cap">Terminal</span><pre>mkdir shop-tests &amp;&amp; cd shop-tests
+git init
+npm init playwright@latest     <span class="c"># choose TypeScript, a "tests" folder, and install browsers</span>
+npx playwright test            <span class="c"># runs the example tests that come with the template</span>
+npx playwright show-report     <span class="c"># opens the HTML report in your browser</span></pre></div>
+<div class="tbl"><table>
+<tr><th>Command</th><th>What it does</th></tr>
+<tr><td><code>npm init playwright@latest</code></td><td>Creates the project: a config file, example tests and the browser downloads</td></tr>
+<tr><td><code>npx playwright test</code></td><td>Runs all tests, headless (no visible browser window) by default</td></tr>
+<tr><td><code>npx playwright test --headed</code></td><td>Runs with the browser visible, which is useful to watch what happens</td></tr>
+<tr><td><code>npx playwright test --ui</code></td><td>Opens Playwright's interactive UI mode to step through tests</td></tr>
+<tr><td><code>npx playwright codegen &lt;url&gt;</code></td><td>Records your clicks and writes test code, a handy starting point</td></tr>
+<tr><td><code>npx playwright show-report</code></td><td>Shows the last run's HTML report, with traces for failures</td></tr>
+</table></div>
+<p>Then start Claude Code in that folder with <code>claude</code>.</p>
+
+<h3 id="ch121-3"><span class="num">121.3</span>A CLAUDE.md for a test repository</h3>
+<p>CLAUDE.md is the briefing Claude reads at the start of every session (Chapter 77). For automation, it's where your standards live, so every test Claude writes follows them without you repeating yourself.</p>
+<div class="code"><span class="cap">CLAUDE.md</span><pre># Shop tests — Playwright + TypeScript
+
+## Commands
+- Run all: `npx playwright test`
+- One file: `npx playwright test tests/checkout.spec.ts`
+- Repeat to check flakiness: `npx playwright test tests/checkout.spec.ts --repeat-each=10`
+- Report: `npx playwright show-report`
+
+## Standards
+- Page objects live in `pages/`, one class per page. Tests never contain raw selectors.
+- Locators, in order of preference: getByRole, getByLabel, getByTestId. Never CSS classes or XPath.
+- Use web-first assertions (`await expect(locator).toHaveText(...)`). Never `waitForTimeout`.
+- Test data comes from `fixtures/` or is created through the API in a fixture. Never hard-code real emails.
+- Test names: "should <behaviour> when <condition>".
+
+## The red-test rule
+If a test fails, decide whether the APP or the TEST is wrong and tell me before changing either.
+Never weaken, skip or delete an assertion to make a test pass without my approval.
+
+## Don't
+- Don't edit anything outside `tests/`, `pages/` and `fixtures/`.</pre></div>
+
+<h3 id="ch121-4"><span class="num">121.4</span>Plan mode first</h3>
+<p>Press <kbd>Shift</kbd>+<kbd>Tab</kbd> until the mode indicator shows plan mode, or start Claude Code with <code>claude --permission-mode plan</code>. In plan mode Claude reads and investigates but changes nothing (Chapter 67). Remember that interactive sessions now start in <strong>auto</strong> mode by default, where a safety classifier approves most actions for you. That's convenient, but for new automation work, planning first is still the professional habit.</p>
+<div class="code"><span class="cap">Prompt in plan mode</span><pre>Read CLAUDE.md, the pages/ folder and tests/ to learn our patterns.
+Then plan Playwright tests for the discount-code story in @docs/stories/PAY-412.md.
+Use the test design in @docs/test-design/PAY-412.md (boundaries and decision table).
+For each test: name, steps, assertion, data needed, and which page object methods.
+List any new page object methods you'd add. Don't write code yet.</pre></div>
+<p>Read the plan as a reviewer. Common corrections: "use the existing <code>CheckoutPage</code>, don't create a new one", "the £500.01 case is unconfirmed, so leave it out", "create the test user through the API, not the UI". Approve once it's right.</p>
+
+<h3 id="ch121-5"><span class="num">121.5</span>Page objects, fixtures and locators</h3>
+<p>A <a class="gl" href="#g-page-object">page object</a> keeps all the knowledge about one page (its locators and actions) in one class. When the UI changes, you fix one file, not fifty tests.</p>
+<div class="code"><span class="cap">pages/CheckoutPage.ts</span><pre>import { type Page, type Locator, expect } from '@playwright/test';
+
+export class CheckoutPage {
+  readonly page: Page;
+  readonly codeInput: Locator;
+  readonly applyButton: Locator;
+  readonly discountLine: Locator;
+  readonly total: Locator;
+  readonly codeError: Locator;
+
+  constructor(page: Page) {
+    this.page = page;
+    this.codeInput = page.getByLabel('Discount code');
+    this.applyButton = page.getByRole('button', { name: 'Apply' });
+    this.discountLine = page.getByTestId('discount-line');
+    this.total = page.getByTestId('order-total');
+    this.codeError = page.getByTestId('code-error');
+  }
+
+  async goto() {
+    await this.page.goto('/checkout');
+  }
+
+  async applyCode(code: string) {
+    await this.codeInput.fill(code);
+    await this.applyButton.click();
+  }
+}</pre></div>
+<p>A <a class="gl" href="#g-fixture">fixture</a> is reusable setup a test asks for by name. Here, every test that asks for <code>checkout</code> gets a ready page object:</p>
+<div class="code"><span class="cap">fixtures/test.ts</span><pre>import { test as base } from '@playwright/test';
+import { CheckoutPage } from '../pages/CheckoutPage';
+
+type Fixtures = { checkout: CheckoutPage };
+
+export const test = base.extend&lt;Fixtures&gt;({
+  checkout: async ({ page }, use) =&gt; {
+    const checkout = new CheckoutPage(page);
+    await checkout.goto();
+    await use(checkout);
+  },
+});
+export { expect } from '@playwright/test';</pre></div>
+<div class="code"><span class="cap">tests/discount.spec.ts</span><pre>import { test, expect } from '../fixtures/test';
+
+test('should apply 10% when the basket is exactly at the £20.00 minimum', async ({ checkout }) =&gt; {
+  // Arrange: basket set to £20.00 (in a real suite, through an API fixture)
+  await checkout.applyCode('SAVE10');
+  await expect(checkout.discountLine).toHaveText('-£2.00');
+  await expect(checkout.total).toHaveText('£18.00');
+});
+
+test('should reject the code when the basket is £19.99', async ({ checkout }) =&gt; {
+  await checkout.applyCode('SAVE10');
+  await expect(checkout.codeError).toHaveText('Spend £20 or more to use this code');
+});</pre></div>
+<div class="tbl"><table>
+<tr><th>Locator</th><th>Example</th><th>Why</th></tr>
+<tr><td><code>getByRole</code></td><td><code>getByRole('button', { name: 'Apply' })</code></td><td>Matches how users and screen readers see the page; resilient and accessibility-friendly</td></tr>
+<tr><td><code>getByLabel</code></td><td><code>getByLabel('Discount code')</code></td><td>Finds form fields by their visible label</td></tr>
+<tr><td><code>getByTestId</code></td><td><code>getByTestId('order-total')</code></td><td>Stable hooks (<code>data-testid</code>) agreed with developers</td></tr>
+<tr><td>CSS / XPath</td><td><code>.btn-primary &gt; span</code></td><td>Breaks when styling changes; avoid</td></tr>
+</table></div>
+<p>An <a class="gl" href="#g-assertion">assertion</a> such as <code>await expect(locator).toHaveText(...)</code> is "web-first": Playwright keeps retrying until the text appears or a timeout passes. That's why you never need <code>waitForTimeout</code>.</p>
+
+<h3 id="ch121-6"><span class="num">121.6</span>Run it, then prove it can fail</h3>
+<div class="code"><span class="cap">Prompt after implementation</span><pre>Run npx playwright test tests/discount.spec.ts.
+If anything fails, apply the red-test rule from CLAUDE.md:
+tell me whether the app or the test is wrong, with evidence from the trace, before changing anything.</pre></div>
+<p>When everything is green, prove the tests can go red. This step is the one most teams skip, and it's the one that matters most.</p>
+<div class="code"><span class="cap">Prompt: mutation check</span><pre>Temporarily change the expected discount in the first test from -£2.00 to -£3.00
+and run it. Confirm it fails with a clear message. Then revert the change and
+show me git diff to prove the file is back to the original.</pre></div>
+<p>Better still, ask a developer to break the feature itself in a local branch (for example, apply the discount after tax). If your tests stay green, they aren't testing what you think.</p>
+<details class="deep"><summary>Why "green" is not evidence</summary><div class="body">
+<p>A test passes when its assertion holds. If the assertion is too weak (checking that the total is <em>visible</em> instead of <em>correct</em>), checks the wrong element, or never runs because of an early return, the test passes whatever the app does. AI-written tests are especially prone to this because the model is trying to produce code that runs successfully. Deliberately breaking the system and seeing the right test fail is a lightweight form of <em>mutation testing</em>: it measures whether your tests can detect a change. Dedicated mutation-testing tools automate this for unit tests; for UI tests, a few deliberate breaks per feature is a practical substitute.</p>
+</div></details>
+
+<h3 id="ch121-7"><span class="num">121.7</span>API tests</h3>
+<p>Many checks are faster and more reliable through the API than through the browser. Playwright includes an HTTP client as the <code>request</code> fixture.</p>
+<div class="code"><span class="cap">tests/api/discount.api.spec.ts</span><pre>import { test, expect } from '@playwright/test';
+
+test('should return 400 for an unknown discount code', async ({ request }) =&gt; {
+  const response = await request.post('/api/basket/apply-code', {
+    data: { code: 'NOT-A-REAL-CODE' },
+  });
+  expect(response.status()).toBe(400);
+  const body = await response.json();
+  expect(body.error).toBe('CODE_NOT_FOUND');
+});</pre></div>
+<p>A good prompt: "Read <code>@openapi.yaml</code> and write negative API tests for <code>POST /api/basket/apply-code</code>: missing fields, wrong types, empty strings, very long strings, unauthenticated requests and rate limits. Use only status codes and error codes that appear in the spec." The last sentence stops Claude inventing error codes. For APIs, HTTP and status codes see Chapter 85.</p>
+
+<h3 id="ch121-8"><span class="num">121.8</span>Flaky tests and the red-test rule</h3>
+<p>A <a class="gl" href="#g-flaky-test">flaky test</a> passes sometimes and fails sometimes with no code change. Claude is very good at diagnosing flakiness, provided you stop it from "fixing" the symptom.</p>
+<div class="code"><span class="cap">Prompt: investigate flakiness</span><pre>tests/discount.spec.ts fails about 1 run in 10 in CI.
+1. Run it with --repeat-each=20 and report how many runs fail.
+2. Open the traces for the failures and explain the root cause with evidence.
+3. Propose a fix. Allowed: better locators, web-first assertions, proper
+   waiting for network responses, isolated test data.
+   Not allowed: waitForTimeout, retries as the fix, weaker assertions.
+Show me the proposal before editing.</pre></div>
+<div class="tbl"><table>
+<tr><th>Common cause</th><th>Typical fix</th></tr>
+<tr><td>Asserting before the app has updated</td><td>Web-first assertion on the final state</td></tr>
+<tr><td>Tests sharing one user or basket</td><td>Create fresh data per test in a fixture (Chapter 122)</td></tr>
+<tr><td>Ambiguous locator matching two elements</td><td>Role and name, or a unique <code>data-testid</code></td></tr>
+<tr><td>Animations or toasts covering a button</td><td>Wait for the element to be stable or the toast to disappear</td></tr>
+<tr><td>A genuine race condition in the app</td><td>That's a bug: report it, don't hide it</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">The red-test rule</span><p>An agent asked to "make the tests pass" may succeed by changing <code>toHaveText('£18.00')</code> to <code>toBeVisible()</code>, adding <code>test.skip</code>, or bumping retries until it passes by luck. Each of these turns a failing test into a lie. Your CLAUDE.md rule, plus reviewing every diff, is the defence. A red test that reveals a real bug is the most valuable output of your whole suite.</p></div>
+
+<h3 id="ch121-9"><span class="num">121.9</span>Reviewing the diff</h3>
+<p>Before you commit, read the change yourself: <code>!git diff</code> inside Claude Code, or the diff view in VS Code. Look for:</p>
+<ul>
+<li>Changes outside <code>tests/</code>, <code>pages/</code> and <code>fixtures/</code></li>
+<li>Assertions removed, loosened or skipped</li>
+<li>Raw selectors in tests instead of page objects</li>
+<li>Hard-coded waits, emails or passwords</li>
+<li>Copy-pasted tests that should be one parameterised test</li>
+</ul>
+<p>Then ask Claude to commit with a clear message, or commit yourself. Chapter 71 covers Git workflows with Claude Code.</p>
+
+<h3 id="ch121-10"><span class="num">121.10</span>Skills, subagents and hooks for QA</h3>
+<p>Three Claude Code features turn good habits into automatic ones (Chapters 80–82).</p>
+<h4>A test-reviewer subagent</h4>
+<p>A <a class="gl" href="#g-subagent">subagent</a> works in its own fresh context and reports back. A reviewer that has only read access can't "helpfully" change anything.</p>
+<div class="code"><span class="cap">.claude/agents/test-reviewer.md</span><pre>---
+name: test-reviewer
+description: Reviews Playwright tests for weak assertions, flakiness risks and
+  standards violations. Use after tests are written or changed.
+tools: Read, Glob, Grep
+model: sonnet
+---
+You are a strict QA automation reviewer. For each changed test file, report:
+- assertions that could never fail, or that check visibility instead of values
+- waitForTimeout, retries used as a fix, or test.skip without a reason
+- raw selectors in tests instead of page objects
+- shared state or hard-coded data between tests
+- missing negative and boundary cases compared with the test design
+Return a table: file, line, issue, suggested fix. Do not edit files.</pre></div>
+<p>Use it with a prompt such as "Use the test-reviewer subagent on the files changed in this branch." The <code>/agents</code> command no longer opens a setup wizard; you create agents by writing the file or asking Claude to create it.</p>
+<h4>A lint and format hook</h4>
+<p>A <a class="gl" href="#g-hook">hook</a> runs every time, whatever the model decides. This one formats every file Claude edits:</p>
+<div class="code"><span class="cap">.claude/settings.json</span><pre>{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "jq -r '.tool_input.file_path' | xargs npx prettier --write" }
+        ]
+      }
+    ]
+  }
+}</pre></div>
+<p>The hook receives details of the edit as JSON on standard input; <code>jq</code> extracts the file path and passes it to Prettier. It needs <code>jq</code> and Prettier installed. You could equally run ESLint or <code>npx tsc --noEmit</code>.</p>
+<h4>A skill for your test template</h4>
+<p>A <a class="gl" href="#g-skill">skill</a> such as <code>/new-e2e-test</code> can hold the steps for adding a test the team's way: page object first, fixture, test, run, mutation check. Chapter 80 shows how to write one.</p>
+
+<h3 id="ch121-11"><span class="num">121.11</span>Headless in CI</h3>
+<p>Claude Code can run without the interactive screen in print mode (<code>claude -p</code>). In print mode it starts in the standard (Manual) permission mode, so you must explicitly allow the tools it may use.</p>
+<div class="code"><span class="cap">Triage failures and write a summary</span><pre>claude -p "Read test-results/ and the Playwright report. Group failures by likely root cause, mark which look flaky, and write a short Markdown summary." \
+  --allowedTools "Read,Grep,Glob" \
+  --output-format text &gt; triage.md</pre></div>
+<div class="code"><span class="cap">.github/workflows/e2e.yml (excerpt)</span><pre>name: e2e
+on: [pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npx playwright install --with-deps
+      - run: npx playwright test
+      - name: Triage failures with Claude
+        if: failure()
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          npm install -g @anthropic-ai/claude-code
+          claude -p "Summarise the Playwright failures in test-results/ by root cause" \
+            --allowedTools "Read,Grep,Glob" &gt; triage.md
+          cat triage.md &gt;&gt; "$GITHUB_STEP_SUMMARY"</pre></div>
+<p>The API key comes from a GitHub Actions secret, never from the file (Chapter 98). For interactive use in pull requests, Anthropic's official action <code>anthropics/claude-code-action@v1</code> lets reviewers write <code>@claude</code> in a comment; run <code>/install-github-app</code> in Claude Code to set it up.</p>
+<div class="box note"><span class="tag">Playwright's own AI agents</span><p>Playwright itself ships test agents (planner, generator and healer) that can be set up for Claude Code with <code>npx playwright init-agents --loop=claude</code> (Chapter 102). They automate plan → write → repair. The same rules apply: review every generated or "healed" change, and watch for weakened assertions.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Automate one feature end to end</b><span>60 min · Claude Code + Playwright</span></div><ol>
+<li>Create the project in 112.2 and run the example tests.<span class="expect">all example tests pass, and the HTML report opens.</span></li>
+<li>Add the CLAUDE.md from 112.3. Start <code>claude</code> and ask: "Summarise our automation standards."<span class="expect">a summary that matches your CLAUDE.md, including the red-test rule.</span></li>
+<li>Switch to plan mode and ask Claude to plan tests for <code>https://demo.playwright.dev/todomvc</code>: add, complete, filter and delete to-dos, using a page object.<span class="expect">a plan with test names, a TodoPage class and no code changes.</span></li>
+<li>Approve the plan and let Claude implement and run it.<span class="expect">new files in <code>pages/</code> and <code>tests/</code>, and a passing run.</span></li>
+<li>Run the mutation check from 112.6 on one test.<span class="expect">the test fails with a clear message, then passes again after the revert.</span></li>
+<li>Create the test-reviewer subagent and ask Claude to use it on the new tests.<span class="expect">a table of findings, even if only minor ones.</span></li>
+<li>Read <code>git diff</code> yourself using 112.9, then commit.</li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"All green means done."</dt><dd>Green only means the assertions held. Prove each important test can fail.</dd>
+<dt>"Retries fix flaky tests."</dt><dd>Retries hide flakiness. Find the root cause; use retries only as a temporary safety net with a tracked ticket.</dd>
+<dt>"Auto mode means I don't need to review."</dt><dd>Auto mode decides which actions are safe to run without asking. It doesn't judge whether your tests are good. Reviewing the diff is still your job.</dd>
+<dt>"Let Claude write 300 tests overnight."</dt><dd>Every test is code someone must maintain. Automate what your risk analysis (Chapter 120) says matters.</dd>
+<dt>"The <code>#</code> key adds a memory."</dt><dd>That shortcut was removed. Edit CLAUDE.md directly or use <code>/memory</code>.</dd>
+</dl></div>
+
+<h3 id="ch121-r"><span class="num">121.12</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Work in a loop: explore, plan, implement, run, prove it can fail, review the diff.</li>
+<li>CLAUDE.md carries your automation standards and the red-test rule into every session.</li>
+<li>Page objects, fixtures and role/label/test-id locators keep AI-written tests maintainable.</li>
+<li>Prove tests can fail by breaking things on purpose. Green alone is not evidence.</li>
+<li>Diagnose flakiness from traces. Never let "fixes" weaken assertions, add sleeps or rely on retries.</li>
+<li>A read-only reviewer subagent, a formatting hook and a headless CI triage step make good habits automatic.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Claude reports it "fixed" a failing test by changing <code>toHaveText('£18.00')</code> to <code>toBeVisible()</code>. What's the right response?</p><div class="opts"><button>Accept it; the test passes now</button><button data-ok>Reject it: the assertion was weakened. Check whether the app or the test is wrong.</button><button>Add retries instead</button></div><p class="why" hidden>The test no longer checks the total. That's the red-test rule.</p></div>
+<div class="qz"><p class="q">Which locator does this chapter recommend first?</p><div class="opts"><button>XPath</button><button>CSS class</button><button data-ok>getByRole</button></div><p class="why" hidden>Role-based locators match how users and assistive technology see the page and survive styling changes.</p></div>
+<div class="qz"><p class="q">Why make a test fail on purpose after it passes?</p><div class="opts"><button>To check the CI pipeline</button><button data-ok>To prove the test can detect the bug it's meant to catch</button><button>To generate a report</button></div><p class="why" hidden>A test that can't fail gives false confidence.</p></div>
+<div class="qz"><p class="q">In <code>claude -p</code> print mode, how do you let Claude read test results without prompts?</p><div class="opts"><button>Press Shift+Tab</button><button data-ok>Pass allowed tools, e.g. <code>--allowedTools "Read,Grep,Glob"</code></button><button>Add a line to CLAUDE.md</button></div><p class="why" hidden>Print mode starts in the standard (Manual) mode, so tools must be allowed explicitly.</p></div>
+<div class="qz"><p class="q">Why give the test-reviewer subagent only Read, Glob and Grep tools?</p><div class="opts"><button>It runs faster</button><button data-ok>A reviewer that can't edit files can't quietly change what it's reviewing</button><button>Subagents can't use other tools</button></div><p class="why" hidden>Least privilege applies to agents too.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick one real feature in your product that has manual regression tests but no automation. Using the loop in this chapter, automate its five highest-risk cases. Record: time taken, number of corrections you made to Claude's plan and code, and one bug or weak assertion the mutation check or reviewer caught. Present the result to your team in ten minutes, including what Claude got wrong.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Claude Code can build and run Playwright tests in our repo. Put our standards and the red-test rule in CLAUDE.md, plan first, let it implement and run, then break something on purpose to prove the test goes red, and read the diff before committing. A reviewer subagent and a formatting hook make good habits automatic, and claude -p can triage failures in CI."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Playwright, <a href="https://playwright.dev/docs/intro" target="_blank" rel="noopener">Installation</a>, <a href="https://playwright.dev/docs/locators" target="_blank" rel="noopener">Locators</a>, <a href="https://playwright.dev/docs/pom" target="_blank" rel="noopener">Page object models</a>, <a href="https://playwright.dev/docs/test-fixtures" target="_blank" rel="noopener">Fixtures</a>, <a href="https://playwright.dev/docs/api-testing" target="_blank" rel="noopener">API testing</a>, <a href="https://playwright.dev/docs/test-assertions" target="_blank" rel="noopener">Assertions</a>, <a href="https://playwright.dev/docs/test-agents" target="_blank" rel="noopener">Test agents</a>.</li>
+<li>Anthropic, Claude Code docs: <a href="https://code.claude.com/docs/en/permission-modes" target="_blank" rel="noopener">Permission modes</a>, <a href="https://code.claude.com/docs/en/sub-agents" target="_blank" rel="noopener">Subagents</a>, <a href="https://code.claude.com/docs/en/hooks" target="_blank" rel="noopener">Hooks</a>, <a href="https://code.claude.com/docs/en/headless" target="_blank" rel="noopener">Headless mode</a>, <a href="https://code.claude.com/docs/en/github-actions" target="_blank" rel="noopener">GitHub Actions</a>.</li>
+<li>Claude Code 2.1.319 <code>claude --help</code> output (for <code>-p</code>, <code>--allowedTools</code>, <code>--output-format</code>, <code>--permission-mode</code>), captured 9 November 2026.</li>
+</ol><p class="verified">Verified 9 November 2026 against Claude Code 2.1.319 and current Playwright documentation</p></div>

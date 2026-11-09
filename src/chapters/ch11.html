@@ -1,0 +1,270 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What an artificial neuron is, and how it differs from a brain cell</li>
+<li>How weights, a bias and an activation function turn inputs into an output, worked by hand with real numbers</li>
+<li>Why activation functions such as ReLU and sigmoid are essential, not decoration</li>
+<li>How neurons form layers, and how layers form a network</li>
+<li>How to compute a full forward pass through a tiny network that solves a problem one neuron can't</li>
+<li>What "parameters" means, how to count them, and why models have billions</li>
+<li>How to run and experiment with a complete network in plain Python, with no libraries</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch9">Chapter 9</a> (model, weights, training versus inference) and <a href="#ch10">Chapter 10</a> (supervised learning). The maths is only multiplying, adding and comparing with zero. The lab needs Python 3 (<a href="#ch58">Chapter 58</a>). The history of neural networks is in <a href="#ch3">Chapter 3</a> and <a href="#ch5">Chapter 5</a>.</div>
+
+<div class="bigidea"><p>A <a class="gl" href="#g-neural-network">neural network</a> is built from one very simple part repeated many times. An artificial <a class="gl" href="#g-neuron">neuron</a> multiplies each input by a <a class="gl" href="#g-weight">weight</a>, adds them up, adds a <a class="gl" href="#g-bias-neuron">bias</a>, and passes the total through an <a class="gl" href="#g-activation-function">activation function</a>, a small rule such as "if negative, output zero". Neurons are arranged in <a class="gl" href="#g-layer">layers</a>, each feeding the next. Running an input through every layer to get an output is the <a class="gl" href="#g-forward-pass">forward pass</a>. The weights and biases are the network's <a class="gl" href="#g-parameter">parameters</a>: the numbers training adjusts. Claude is, at heart, this same idea at enormous scale.</p></div>
+
+<h3 id="ch11-1"><span class="num">11.1</span>Inspired by the brain, but not a brain</h3>
+<p>Your brain contains tens of billions of nerve cells, called neurons. Each one receives signals from others, and if the combined signal is strong enough, it "fires" and sends a signal on. In 1943 Warren McCulloch and Walter Pitts proposed a mathematical cartoon of this, and in 1958 Frank Rosenblatt built the <a class="gl" href="#g-perceptron">perceptron</a>, a machine that learned its own weights (<a href="#ch3">Chapter 3</a>).</p>
+<p>The artificial neuron kept only the bare idea: <em>combine weighted inputs, then decide how strongly to respond</em>. Everything else about real neurons (chemistry, timing, the way they grow and rewire) was left out.</p>
+<div class="box warn"><span class="tag">Keep the analogy loose</span><p>"Neural network" is a historical name. Modern artificial networks are arithmetic, designed by engineers for what works on computer chips, not by copying biology. Claims like "this AI works just like the human brain" are marketing, not science.</p></div>
+
+<h3 id="ch11-2"><span class="num">11.2</span>One neuron, worked by hand</h3>
+<p>An artificial neuron does three things:</p>
+<div class="flow">
+<div><b>1. Weigh</b>Multiply each input by its own weight</div>
+<div><b>2. Sum</b>Add the results together, then add the bias. Call the total z</div>
+<div class="hl"><b>3. Activate</b>Pass z through the activation function to get the output</div>
+</div>
+<p>Let's make it concrete with a made-up QA example. Imagine a neuron that scores how risky a code change is. (The example and all its numbers are illustrative; in real life training would find the weights, as <a href="#ch12">Chapter 12</a> explains.)</p>
+<div class="tbl"><table>
+<tr><th>Input</th><th>Meaning</th><th>Value</th><th>Weight</th><th>Why that weight</th></tr>
+<tr><td>x<sub>1</sub></td><td>Does the change touch checkout code? (1 = yes, 0 = no)</td><td>1.0</td><td>w<sub>1</sub> = 0.8</td><td>Positive: touching checkout raises risk</td></tr>
+<tr><td>x<sub>2</sub></td><td>Test coverage of the changed code (0.5 = 50%)</td><td>0.5</td><td>w<sub>2</sub> = −0.4</td><td>Negative: more coverage lowers risk</td></tr>
+<tr><td>bias</td><td>A baseline that applies whatever the inputs</td><td>—</td><td>b = 0.1</td><td>Every change carries some risk</td></tr>
+</table></div>
+<p><strong>Step 1 and 2, the weighted sum:</strong></p>
+<div class="code"><span class="cap">By hand</span><pre>z = (x1 × w1) + (x2 × w2) + b
+  = (1.0 × 0.8) + (0.5 × −0.4) + 0.1
+  =     0.8     +     −0.2     + 0.1
+  = 0.7</pre></div>
+<p><strong>Step 3, activation.</strong> What the neuron outputs depends on which activation function it uses. With the two most common ones:</p>
+<ul>
+<li><a class="gl" href="#g-relu">ReLU</a> (rectified linear unit): "if z is negative, output 0; otherwise output z". ReLU(0.7) = <strong>0.7</strong>.</li>
+<li><a class="gl" href="#g-sigmoid">Sigmoid</a>: squashes any number into the range 0 to 1, so it can be read like a probability. sigmoid(0.7) = 1 ÷ (1 + e<sup>−0.7</sup>) ≈ <strong>0.668</strong>, roughly "67% risky".</li>
+</ul>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Deciding whether to take an umbrella. Inputs: dark clouds (yes), forecast rain chance (30%), whether you're cycling (yes). You care about some inputs more than others; those are weights. You're naturally cautious, or naturally relaxed; that's the bias. Then you make a decision rather than just holding a number in your head; that's the activation. A neuron is that habit written as arithmetic.</p></div>
+<h4>What the weights and bias mean</h4>
+<ul>
+<li>A <strong>large positive weight</strong> means "this input pushes the output up a lot".</li>
+<li>A <strong>negative weight</strong> means "this input pushes the output down".</li>
+<li>A <strong>weight near zero</strong> means "ignore this input".</li>
+<li>The <strong>bias</strong> shifts the whole sum up or down, setting how easily the neuron activates even when inputs are small.</li>
+</ul>
+<p>In a trained network nobody chooses these numbers by hand, and individual weights rarely mean anything as tidy as "checkout risk". Understanding what learned weights represent is a research field of its own, called interpretability (<a href="#ch38">Chapter 38</a>).</p>
+
+<h3 id="ch11-3"><span class="num">11.3</span>Activation functions: the small rule that makes it all work</h3>
+<p>Why not skip the activation and just output z? Because then the network could only ever learn straight-line relationships, no matter how many layers you stacked. A weighted sum of weighted sums is still just one weighted sum. The activation function adds a bend, and stacking many bends lets a network fit curved, complicated patterns. The technical word for "bendy" is <em>non-linear</em>.</p>
+<div class="tbl"><table>
+<tr><th>Function</th><th>Rule in words</th><th>Output range</th><th>z = −2</th><th>z = 0</th><th>z = 2</th><th>Where you'll see it</th></tr>
+<tr><td>Step</td><td>1 if z &gt; 0, else 0</td><td>0 or 1</td><td>0</td><td>0</td><td>1</td><td>The original perceptron; not used in modern training because it gives no hint which way to adjust</td></tr>
+<tr><td>Sigmoid</td><td>1 ÷ (1 + e<sup>−z</sup>)</td><td>0 to 1</td><td>0.119</td><td>0.5</td><td>0.881</td><td>Output layers that give a yes/no probability; older hidden layers</td></tr>
+<tr><td>Tanh</td><td>Like sigmoid, stretched</td><td>−1 to 1</td><td>−0.964</td><td>0</td><td>0.964</td><td>Older networks such as LSTMs</td></tr>
+<tr><td>ReLU</td><td>max(0, z)</td><td>0 upwards</td><td>0</td><td>0</td><td>2</td><td>The everyday default for hidden layers since around 2010–2012</td></tr>
+</table></div>
+<div class="figure" role="img" aria-label="Bar chart of sigmoid output for weighted sums from minus 4 to plus 4, rising from about 2 percent to about 98 percent">
+<div class="bars"><div class="bt">Sigmoid output for different weighted sums z</div>
+<div class="bar-row"><span>z = −4</span><span class="track"><span class="fill" style="width:1.8%">0.018</span></span></div>
+<div class="bar-row"><span>z = −2</span><span class="track"><span class="fill" style="width:11.9%">0.119</span></span></div>
+<div class="bar-row"><span>z = −1</span><span class="track"><span class="fill" style="width:26.9%">0.269</span></span></div>
+<div class="bar-row"><span>z = 0</span><span class="track"><span class="fill" style="width:50%">0.500</span></span></div>
+<div class="bar-row"><span>z = 0.7</span><span class="track"><span class="fill hl" style="width:66.8%">0.668</span></span></div>
+<div class="bar-row"><span>z = 1</span><span class="track"><span class="fill" style="width:73.1%">0.731</span></span></div>
+<div class="bar-row"><span>z = 2</span><span class="track"><span class="fill" style="width:88.1%">0.881</span></span></div>
+<div class="bar-row"><span>z = 4</span><span class="track"><span class="fill" style="width:98.2%">0.982</span></span></div>
+</div>
+<div class="cap">Computed with Python's math library. The highlighted bar is our risk neuron from section 11.2. Large negative sums approach 0, large positive sums approach 1, and the curve is steepest around 0.</div></div>
+<details class="deep"><summary>Why ReLU won</summary><div class="body">
+<p>Training adjusts each weight according to how much changing it would change the error (<a href="#ch12">Chapter 12</a>). That depends on the slope of the activation function. Sigmoid and tanh flatten out at both ends, so for large positive or negative z their slope is almost zero. In a deep network those tiny slopes get multiplied together layer after layer and the learning signal fades away: the "vanishing gradient" problem.</p>
+<p>ReLU's slope is exactly 1 for any positive z, so the signal passes through undiminished. It's also extremely cheap to compute: a single comparison. Research around 2010–2011 (Nair and Hinton; Glorot, Bordes and Bengio) showed that it made deep networks much easier to train, and AlexNet used it in 2012 (<a href="#ch5">Chapter 5</a>).</p>
+<p>ReLU has a weakness: a neuron whose z is always negative outputs 0 forever and stops learning (a "dead" neuron). Smoother variants such as GELU are common in Transformer language models. The principle is the same: a cheap non-linear bend after each weighted sum.</p>
+</div></details>
+
+<h3 id="ch11-4"><span class="num">11.4</span>From neurons to layers</h3>
+<p>One neuron can only draw one straight dividing line through its inputs. Power comes from many neurons working together. A <strong>layer</strong> is a group of neurons that all read the same inputs, each with its own weights and bias, so each one picks up on a different pattern. The outputs of one layer become the inputs of the next.</p>
+<div class="flow">
+<div><b>Input layer</b>The raw numbers: pixel brightness, word codes, feature values. No calculation here.</div>
+<div class="hl"><b>Hidden layers</b>Neurons computing new features from the previous layer. "Hidden" because you never see their values directly.</div>
+<div><b>Output layer</b>The answer: a category score, a number, or a probability for every possible next token.</div>
+</div>
+<p>When every neuron in a layer is connected to every output of the previous layer, it's called a <strong>fully connected</strong> (or "dense") layer. A network with more than one <a class="gl" href="#g-hidden-layer">hidden layer</a> is called <em>deep</em>, which is where <a class="gl" href="#g-deep-learning">deep learning</a> gets its name.</p>
+<div class="box example"><span class="tag">Real-world example: recognising a handwritten digit</span><p>A classic beginner network reads 28 × 28 pixel images of handwritten digits: 784 inputs, one per pixel. It might have one hidden layer of 128 neurons and an output layer of 10 neurons, one for each digit 0–9. Early hidden neurons tend to respond to simple strokes and edges; the output neuron with the highest score is the prediction. Nobody programmed "a 7 has a horizontal bar and a diagonal"; training found weights that respond to such patterns.</p></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A bug triage team works in stages. First-line testers each check one thing: does it crash, is it in checkout, does it affect many users. Leads combine those reports into "probably a payments outage" or "cosmetic issue". The release manager combines the leads' views into one decision. Each stage builds a more abstract judgement from the one before. Layers do the same with numbers.</p></div>
+
+<h3 id="ch11-5"><span class="num">11.5</span>A tiny network that one neuron can't replace</h3>
+<p>Here is a famous small problem called <strong>XOR</strong> ("exclusive or"): output 1 if exactly one of two inputs is 1, otherwise 0. QA version: alert when exactly one of two mirrored servers is down; if both are up all is well, and if both are down another alarm already fires.</p>
+<div class="tbl"><table>
+<tr><th>x<sub>1</sub></th><th>x<sub>2</sub></th><th>Wanted output</th></tr>
+<tr><td>0</td><td>0</td><td>0</td></tr>
+<tr><td>0</td><td>1</td><td>1</td></tr>
+<tr><td>1</td><td>0</td><td>1</td></tr>
+<tr><td>1</td><td>1</td><td>0</td></tr>
+</table></div>
+<p>A single neuron cannot do this. Draw the four points on a grid and you'll find no single straight line that puts (0,1) and (1,0) on one side and (0,0) and (1,1) on the other. Marvin Minsky and Seymour Papert highlighted limits like this in their 1969 book <i>Perceptrons</i>, which contributed to the first loss of confidence in neural networks (<a href="#ch4">Chapter 4</a>). The fix is a hidden layer.</p>
+<h4>The network</h4>
+<p>Two inputs, a hidden layer of two ReLU neurons, and one output neuron with no activation (it just outputs its sum). These weights are a well-known hand-made solution, used in Goodfellow, Bengio and Courville's <i>Deep Learning</i> textbook.</p>
+<div class="tbl"><table>
+<tr><th>Neuron</th><th>Weights</th><th>Bias</th><th>Activation</th><th>In words</th></tr>
+<tr><td>Hidden h<sub>1</sub></td><td>1, 1</td><td>0</td><td>ReLU</td><td>"How many inputs are on?"</td></tr>
+<tr><td>Hidden h<sub>2</sub></td><td>1, 1</td><td>−1</td><td>ReLU</td><td>"Are both on?" (only positive when both are 1)</td></tr>
+<tr><td>Output y</td><td>1, −2</td><td>0</td><td>none</td><td>"Count, minus a penalty of 2 if both are on"</td></tr>
+</table></div>
+<h4>The forward pass, by hand</h4>
+<div class="tbl"><table>
+<tr><th>Input</th><th>h<sub>1</sub> = ReLU(x<sub>1</sub> + x<sub>2</sub>)</th><th>h<sub>2</sub> = ReLU(x<sub>1</sub> + x<sub>2</sub> − 1)</th><th>y = h<sub>1</sub> − 2·h<sub>2</sub></th><th>Correct?</th></tr>
+<tr><td>(0, 0)</td><td>ReLU(0) = 0</td><td>ReLU(−1) = 0</td><td>0 − 0 = <b>0</b></td><td>Yes</td></tr>
+<tr><td>(0, 1)</td><td>ReLU(1) = 1</td><td>ReLU(0) = 0</td><td>1 − 0 = <b>1</b></td><td>Yes</td></tr>
+<tr><td>(1, 0)</td><td>ReLU(1) = 1</td><td>ReLU(0) = 0</td><td>1 − 0 = <b>1</b></td><td>Yes</td></tr>
+<tr><td>(1, 1)</td><td>ReLU(2) = 2</td><td>ReLU(1) = 1</td><td>2 − 2 = <b>0</b></td><td>Yes</td></tr>
+</table></div>
+<p>Look at what the hidden layer did. It turned the raw inputs into two new, more useful features ("how many" and "both"), and the output layer combined them with a simple subtraction. That is the core trick of deep learning: <strong>hidden layers learn useful intermediate features, so the final decision becomes easy</strong>. In a large language model the intermediate features are far richer (grammar, topic, tone, who "it" refers to), but the mechanism is the same.</p>
+<div class="box note"><span class="tag">Try it without the activation</span><p>Remove ReLU from the hidden layer and recompute (0, 0): h<sub>2</sub> becomes −1 instead of 0, and y = 0 − 2 × (−1) = 2. Wrong. Without the bend, the network collapses into a single straight-line function and can't solve XOR. The lab lets you watch this happen.</p></div>
+
+<h3 id="ch11-6"><span class="num">11.6</span>Parameters: counting the knobs</h3>
+<p>Every weight and every bias is a <strong>parameter</strong>: a number that training can adjust. For a fully connected layer, counting them is simple:</p>
+<div class="code"><span class="cap">Formula</span><pre>parameters in a layer = (inputs × neurons) + neurons
+                         └─ one weight per connection   └─ one bias per neuron</pre></div>
+<div class="tbl"><table>
+<tr><th>Network</th><th>Calculation</th><th>Parameters</th></tr>
+<tr><td>Our XOR network (2 → 2 → 1)</td><td>(2×2 + 2) + (2×1 + 1) = 6 + 3</td><td>9</td></tr>
+<tr><td>Digit recogniser (784 → 128 → 10)</td><td>(784×128 + 128) + (128×10 + 10) = 100,480 + 1,290</td><td>101,770</td></tr>
+<tr><td>GPT-3 (OpenAI, 2020)</td><td>Published in its paper</td><td>175 billion</td></tr>
+<tr><td>Current Claude models</td><td>Anthropic doesn't publish parameter counts</td><td>Not disclosed</td></tr>
+</table></div>
+<p>Large language models aren't built only from fully connected layers. They're <a class="gl" href="#g-transformer">Transformers</a>, which also contain attention layers and embedding tables (<a href="#ch16">Chapter 16</a>). But much of their parameter count sits in fully connected "feed-forward" layers made of exactly the neurons in this chapter, and the counting principle is the same.</p>
+<div class="box note"><span class="tag">Total versus active parameters</span><p>Some recent models use a design called mixture of experts, where only part of the network runs for each token. Their announcements may give two figures: total parameters and "active" parameters per token. Read such numbers carefully when comparing models (<a href="#ch33">Chapter 33</a>), and remember that parameter count alone doesn't tell you how good a model is.</p></div>
+<details class="deep"><summary>Under the hood: layers are matrix multiplications</summary><div class="body">
+<p>Writing out every neuron separately is clear but slow. In practice, a layer's weights are stored as a grid of numbers, a <strong>matrix</strong>, with one row per neuron and one column per input. The inputs form a list, a <a class="gl" href="#g-vector">vector</a>. The whole layer's weighted sums are then one operation: matrix times vector, plus a bias vector. Then the activation is applied to every element.</p>
+<div class="code"><span class="cap">The XOR hidden layer as a matrix (input (1, 1))</span><pre>  W           x        b         z            ReLU(z)
+[ 1  1 ]   [ 1 ]   [  0 ]    [ 2 ]          [ 2 ]
+[ 1  1 ] × [ 1 ] + [ -1 ] =  [ 1 ]   →      [ 1 ]</pre></div>
+<p>Matrix multiplication is thousands of independent multiply-and-add operations that can all happen at once. That's exactly what <a class="gl" href="#g-gpu">GPUs</a> are built for, which is why the rise of GPUs and the rise of deep learning went together (<a href="#ch5">Chapter 5</a>, <a href="#ch25">Chapter 25</a>). Libraries such as NumPy and PyTorch do this efficiently; the lab deliberately doesn't use them so you can see every step.</p>
+</div></details>
+
+<h3 id="ch11-7"><span class="num">11.7</span>The forward pass, and what it means for Claude</h3>
+<p>Feeding an input through every layer, in order, to produce an output is called the <strong>forward pass</strong>. It's all that happens during <a class="gl" href="#g-inference">inference</a>: no weights change, the numbers just flow through.</p>
+<div class="flow">
+<div><b>Input</b>Your prompt, converted into token IDs and then into numbers (<a href="#ch14">Chapter 14</a>)</div>
+<div><b>Many layers</b>Attention and feed-forward layers, each refining the numbers</div>
+<div class="hl"><b>Output layer</b>A score for every token in the vocabulary, turned into probabilities</div>
+<div><b>Pick a token</b>One token is chosen and appended to the text</div>
+<div><b>Repeat</b>A new forward pass for each next token</div>
+</div>
+<p>So when Claude writes a 500-token answer, it runs roughly 500 forward passes, one per token (with engineering tricks that avoid recomputing earlier work). That's why longer answers take longer and cost more: each output token is a trip through the whole network.</p>
+<p>Training adds a second direction. After a forward pass on a training example, the network's output is compared with the right answer, and a <em>backward</em> pass works out how to nudge every weight to reduce the error. That's <a class="gl" href="#g-backpropagation">backpropagation</a> and <a class="gl" href="#g-gradient-descent">gradient descent</a>, the subject of <a href="#ch12">Chapter 12</a>.</p>
+<div class="box example"><span class="tag">Real-world example: why the same prompt can give different answers</span><p>A tester runs the same prompt twice and gets two different test plans. The forward pass itself is deterministic arithmetic, but the final step picks a token from a probability distribution, and that choice can involve randomness. Small differences early in the answer then send later forward passes down different paths. This is why AI outputs are called <a class="gl" href="#g-non-deterministic">non-deterministic</a> and why AI features need evals rather than single exact-match assertions (<a href="#ch125">Chapter 125</a>). <a href="#ch17">Chapter 17</a> explains sampling.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Build and break a neural network in plain Python</b><span>25 min · your computer, Python 3, no libraries</span></div><ol>
+<li>Check Python: run <code>python3 --version</code> (on Windows, <code>python --version</code> or <code>py --version</code>).<span class="expect">a version such as <code>Python 3.12.4</code>. Any Python 3.6 or later works.</span></li>
+<li>Create a file called <code>tiny_net.py</code> with this complete code:
+<div class="code"><span class="cap">tiny_net.py</span><pre><span class="c"># tiny_net.py - a neural network forward pass in plain Python (no libraries)</span>
+import math
+
+def relu(z):
+    return max(0.0, z)
+
+def sigmoid(z):
+    return 1 / (1 + math.exp(-z))
+
+def neuron(inputs, weights, bias, activation):
+    <span class="c"># weighted sum: multiply each input by its weight, add them up, add the bias</span>
+    z = sum(x * w for x, w in zip(inputs, weights)) + bias
+    return activation(z)
+
+def layer(inputs, weight_rows, biases, activation):
+    <span class="c"># a layer is several neurons that all read the same inputs</span>
+    return [neuron(inputs, w, b, activation) for w, b in zip(weight_rows, biases)]
+
+def identity(z):
+    return z
+
+<span class="c"># Part 1: one neuron, worked by hand in the chapter</span>
+z_inputs, z_weights, z_bias = [1.0, 0.5], [0.8, -0.4], 0.1
+print("One neuron:")
+print("  weighted sum z =", round(sum(x * w for x, w in zip(z_inputs, z_weights)) + z_bias, 3))
+print("  ReLU output    =", round(neuron(z_inputs, z_weights, z_bias, relu), 3))
+print("  sigmoid output =", round(neuron(z_inputs, z_weights, z_bias, sigmoid), 3))
+
+<span class="c"># Part 2: a 2-2-1 network that computes XOR ("exactly one input is on")</span>
+hidden_weights = [[1.0, 1.0], [1.0, 1.0]]
+hidden_biases = [0.0, -1.0]
+output_weights = [[1.0, -2.0]]
+output_biases = [0.0]
+
+print("XOR network:")
+for x in [[0, 0], [0, 1], [1, 0], [1, 1]]:
+    h = layer(x, hidden_weights, hidden_biases, relu)
+    y = layer(h, output_weights, output_biases, identity)
+    print(f"  input {x} -&gt; hidden {h} -&gt; output {y[0]}")
+
+<span class="c"># Part 3: count parameters (weights + biases) for any layer sizes</span>
+def count_parameters(sizes):
+    total = 0
+    for n_in, n_out in zip(sizes, sizes[1:]):
+        total += n_in * n_out + n_out
+    return total
+
+print("Parameters in 2-2-1 network:", count_parameters([2, 2, 1]))
+print("Parameters in 784-128-10 network:", count_parameters([784, 128, 10]))</pre></div>
+<span class="expect">a saved file. Keep the indentation exactly as shown.</span></li>
+<li>Run <code>python3 tiny_net.py</code> in the same folder.<span class="expect">exactly this output, matching the hand calculations in sections 11.2, 11.5 and 11.6:
+<div class="code"><span class="cap">Output</span><pre>One neuron:
+  weighted sum z = 0.7
+  ReLU output    = 0.7
+  sigmoid output = 0.668
+XOR network:
+  input [0, 0] -&gt; hidden [0.0, 0.0] -&gt; output 0.0
+  input [0, 1] -&gt; hidden [1.0, 0.0] -&gt; output 1.0
+  input [1, 0] -&gt; hidden [1.0, 0.0] -&gt; output 1.0
+  input [1, 1] -&gt; hidden [2.0, 1.0] -&gt; output 0.0
+Parameters in 2-2-1 network: 9
+Parameters in 784-128-10 network: 101770</pre></div></span></li>
+<li><strong>Break the activation.</strong> In Part 2, change <code>hidden_biases, relu)</code> to <code>hidden_biases, identity)</code> and run again.<span class="expect">the first XOR line becomes <code>input [0, 0] -&gt; hidden [0.0, -1.0] -&gt; output 2.0</code>. Without ReLU the hidden neuron goes negative and the network gets (0, 0) wrong. Change it back to <code>relu</code>.</span></li>
+<li><strong>Break a weight.</strong> Change <code>output_weights = [[1.0, -2.0]]</code> to <code>[[1.0, -1.0]]</code> and run again.<span class="expect">the last XOR line now ends <code>output 1.0</code> instead of <code>0.0</code>. One wrong weight, one wrong answer. Training's job is to find weights that make every answer right. Change it back.</span></li>
+<li><strong>Explore the neuron.</strong> In Part 1, change the coverage input from <code>0.5</code> to <code>1.0</code> (full coverage).<span class="expect">z becomes 0.5, ReLU 0.5 and sigmoid 0.622: more coverage, lower risk score, because w<sub>2</sub> is negative.</span></li>
+<li><strong>Count a bigger network.</strong> Add a line: <code>print(count_parameters([784, 512, 512, 10]))</code>.<span class="expect"><code>669706</code>. Two wider hidden layers instead of one took the count from about 100 thousand to about 670 thousand. Now imagine the billions in an LLM.</span></li>
+</ol>
+<p><b>No Python?</b> Ask Claude: "Here is a tiny neural network [paste the code]. Compute the forward pass by hand for each XOR input, showing every multiplication." Check its arithmetic against the table in section 11.5. If it slips, you've just found a reason to let code do arithmetic.</p>
+<p><b>Troubleshooting</b></p>
+<ul>
+<li><code>python3: command not found</code>: on Windows use <code>python</code> or <code>py</code>; otherwise install Python 3 from python.org.</li>
+<li><code>IndentationError</code>: re-copy the code and use spaces only.</li>
+<li><code>NameError: name 'identity' is not defined</code> after editing: make sure the <code>def identity</code> function is still above Part 1.</li>
+<li>Numbers like <code>0.30000000000000004</code>: normal floating-point rounding in any language; the code rounds where it matters.</li>
+</ul></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Artificial neurons work like brain cells."</dt><dd>They borrow one idea: combine weighted inputs and respond. Everything else is engineering arithmetic.</dd>
+<dt>"Activation functions are optional extras."</dt><dd>Without them, any number of layers collapses into one straight-line function. They're what makes depth useful.</dd>
+<dt>"Each neuron stores a fact."</dt><dd>Knowledge is spread across many weights, and a single neuron often responds to several unrelated things. Interpretability research tries to untangle this (<a href="#ch38">Chapter 38</a>).</dd>
+<dt>"More parameters always means a better model."</dt><dd>Data quality, training method and design matter as much. Smaller recent models often beat larger older ones.</dd>
+<dt>"The model updates its weights while it answers me."</dt><dd>Answering is forward passes only. Weights change only during training.</dd>
+</dl></div>
+
+<h3 id="ch11-r"><span class="num">11.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>A neuron computes a weighted sum of its inputs, adds a bias, and applies an activation function.</li>
+<li>Weights set how much each input matters (and in which direction); the bias shifts the threshold.</li>
+<li>Activation functions such as ReLU and sigmoid add the non-linear bend that lets stacked layers learn complex patterns.</li>
+<li>Layers of neurons build increasingly useful features; hidden layers are what let a network solve XOR and far harder problems.</li>
+<li>Parameters are all the weights and biases. A dense layer has inputs × neurons + neurons of them.</li>
+<li>The forward pass is inference. An LLM runs one forward pass per generated token; training adds a backward pass to adjust weights.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">A neuron has inputs (2, 1), weights (0.5, −1) and bias 0.5. What is its ReLU output?</p><div class="opts"><button>0</button><button data-ok>0.5</button><button>1.5</button></div><p class="why" hidden>z = 2×0.5 + 1×(−1) + 0.5 = 1 − 1 + 0.5 = 0.5. ReLU of a positive number is the number itself.</p></div>
+<div class="qz"><p class="q">Why do neural networks need activation functions?</p><div class="opts"><button>To make the arithmetic faster</button><button data-ok>Without them, stacked layers reduce to a single straight-line function and can't learn complex patterns</button><button>To store the training data</button></div><p class="why" hidden>A weighted sum of weighted sums is still one weighted sum. The non-linear bend is what makes depth worthwhile.</p></div>
+<div class="qz"><p class="q">How many parameters does a fully connected layer with 10 inputs and 4 neurons have?</p><div class="opts"><button>40</button><button data-ok>44</button><button>14</button></div><p class="why" hidden>10 × 4 = 40 weights, plus one bias for each of the 4 neurons.</p></div>
+<div class="qz"><p class="q">What does the sigmoid function do to a weighted sum?</p><div class="opts"><button>Sets negative values to zero and leaves positive values unchanged</button><button data-ok>Squashes it into the range 0 to 1</button><button>Rounds it to 0 or 1</button></div><p class="why" hidden>Sigmoid gives 0.5 at z = 0 and approaches 0 or 1 at the extremes. Setting negatives to zero is ReLU; rounding to 0 or 1 is the step function.</p></div>
+<div class="qz"><p class="q">Claude writes a 300-token answer. Roughly how many forward passes did that take?</p><div class="opts"><button>One</button><button data-ok>About 300, one per generated token</button><button>None: forward passes only happen during training</button></div><p class="why" hidden>Each new token needs a pass through the network. Inference is forward passes; training adds backward passes.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Design your own single neuron for a QA decision, such as "should this test be quarantined as flaky?" Choose three inputs (for example: failure rate over the last 20 runs, whether failures correlate with a specific environment, days since the test changed), pick weights and a bias with a one-line reason for each, and compute sigmoid outputs for three example tests by hand. Then add your neuron to <code>tiny_net.py</code> and check your arithmetic. Finally, write two sentences on why hand-picked weights won't scale, and what you'd need to learn them instead (preview of <a href="#ch12">Chapter 12</a>).</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"A neural network is one tiny calculation repeated millions of times. Each neuron multiplies its inputs by weights, adds them, adds a bias, then applies a simple rule like 'if it's negative, make it zero'. That rule matters: without it, stacking layers gains nothing. Neurons sit in layers, and each layer turns the previous layer's numbers into more useful features, which is how a two-layer network solves a problem one neuron can't. All the weights and biases together are the parameters; Claude has billions. When Claude answers, it just runs numbers forward through those layers, once per word-piece it writes. Learning the weights is a separate step called training."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>W. S. McCulloch and W. Pitts, "A Logical Calculus of the Ideas Immanent in Nervous Activity", <i>Bulletin of Mathematical Biophysics</i> 5 (1943).</li>
+<li>F. Rosenblatt, "The Perceptron: A Probabilistic Model for Information Storage and Organization in the Brain", <i>Psychological Review</i> 65 (1958).</li>
+<li>M. Minsky and S. Papert, <i>Perceptrons</i> (MIT Press, 1969).</li>
+<li>I. Goodfellow, Y. Bengio and A. Courville, <a href="https://www.deeplearningbook.org/" target="_blank" rel="noopener"><i>Deep Learning</i></a> (MIT Press, 2016), chapter 6, including section 6.1 "Example: Learning XOR", the source of the XOR weights used here.</li>
+<li>V. Nair and G. E. Hinton, "Rectified Linear Units Improve Restricted Boltzmann Machines", ICML (2010); X. Glorot, A. Bordes and Y. Bengio, "Deep Sparse Rectifier Neural Networks", AISTATS (2011).</li>
+<li>T. Brown et al., <a href="https://arxiv.org/abs/2005.14165" target="_blank" rel="noopener">"Language Models are Few-Shot Learners"</a> (2020): GPT-3's 175 billion parameters.</li>
+<li>3Blue1Brown, <a href="https://www.3blue1brown.com/topics/neural-networks" target="_blank" rel="noopener">Neural networks</a> video series: a visual introduction using the handwritten-digit example.</li>
+<li>M. Nielsen, <a href="http://neuralnetworksanddeeplearning.com/" target="_blank" rel="noopener"><i>Neural Networks and Deep Learning</i></a> (free online book).</li>
+</ol><p class="verified">Content type: established concepts · Lab code and all worked numbers computed with Python 3 on 9 November 2026 · Last reviewed 9 November 2026</p></div>

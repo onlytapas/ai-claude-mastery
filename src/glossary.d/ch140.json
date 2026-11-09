@@ -1,0 +1,42 @@
+{
+ "Time horizon": {
+  "d": "In METR's research, the length of task (measured by how long skilled humans take) that an AI agent completes successfully about half the time.",
+  "see": "ch140"
+ },
+ "Mechanistic interpretability": {
+  "d": "Research that tries to work out the actual internal mechanisms (features and circuits) by which a neural network produces its outputs.",
+  "see": "ch140"
+ },
+ "World model": {
+  "d": "A learned model of how an environment behaves, letting a system predict what will happen next if it takes an action.",
+  "see": "ch140"
+ },
+ "Vision-language-action model": {
+  "d": "A robot-control model built on a pre-trained vision-language model, which takes in images and instructions and outputs robot actions.",
+  "see": "ch140"
+ },
+ "Scalable oversight": {
+  "d": "Methods that let humans supervise AI systems reliably even on tasks where the AI is more capable than the supervisor, often by using AI to help check AI.",
+  "see": "ch140"
+ },
+ "Chain-of-thought monitoring": {
+  "d": "Reading or automatically scanning a model's written reasoning to catch signs of mistakes or intended misbehaviour before it acts.",
+  "see": "ch140"
+ },
+ "Continual learning": {
+  "d": "A model learning new things after deployment without forgetting what it already knows. Largely unsolved for large language models, whose weights are frozen after training.",
+  "see": "ch140"
+ },
+ "Capstone project": {
+  "d": "A substantial final project that combines many skills from a course into one working result, assessed against a rubric.",
+  "see": "ch142"
+ },
+ "Marking guide": {
+  "d": "A document that tells an assessor what a good answer contains and how many marks each part earns, so different markers grade consistently.",
+  "see": "ch141"
+ },
+ "Portfolio": {
+  "d": "A collection of finished work (projects, write-ups, code, reports) that shows what you can do, used for reviews and job applications.",
+  "see": "ch142"
+ }
+}

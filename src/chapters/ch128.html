@@ -1,0 +1,204 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How to check whether your QA organisation is ready to adopt AI, and what to fix first</li>
+<li>How to get policy and security sign-off without stalling for months</li>
+<li>How to run a 90-day <a class="gl" href="#g-pilot">pilot</a> with clear success criteria</li>
+<li>How to set Claude up the same way for a whole team: shared instructions, skills, MCP servers and permission rules</li>
+<li>How to train people, govern usage, scale across teams and handle the human side of change</li>
+<li>A five-level <a class="gl" href="#g-maturity-model">maturity model</a> to see where you are and what comes next</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch119">Chapter 119</a> (the ideas catalogue) and <a href="#ch126">Chapter 126</a> (measuring value). Chapters <a href="#ch77">74</a>, <a href="#ch78">75</a> and <a href="#ch105">98</a> help with the technical setup, but you can read this chapter without them.</div>
+
+<div class="bigidea"><p>Giving everyone an AI licence and hoping for the best rarely works. Successful teams treat AI adoption like any other change programme: check readiness, agree the rules, run a small pilot with clear goals, set Claude up consistently, train people properly, measure honestly and then scale what works. This chapter gives you a step-by-step roadmap to take a QA team from "a few people experimenting" to "AI is a normal, well-governed part of how we test", with the same team covering more ground.</p></div>
+
+<h3 id="ch128-1"><span class="num">128.1</span>The roadmap at a glance</h3>
+<div class="flow">
+<div><b>1 · Ready?</b>Assess people, process, data and policy</div>
+<div><b>2 · Sign-off</b>Security, privacy and policy agreed</div>
+<div><b>3 · Pilot</b>90 days, few use-cases, clear success criteria</div>
+<div><b>4 · Standardise</b>Shared setup, training, governance</div>
+<div class="hl"><b>5 · Scale</b>More teams, more use-cases, continuous measurement</div>
+</div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think about how a hospital introduces a new piece of equipment. It doesn't hand it to every ward on Monday. It checks the wards are ready, gets safety approval, trials it on one ward with trained staff, writes standard procedures, then rolls it out with training and monitoring. AI in a QA team deserves the same care, because it touches your product's quality and your company's data.</p></div>
+
+<h3 id="ch128-2"><span class="num">128.2</span>Step 1: readiness assessment</h3>
+<p>Spend a week answering these questions honestly. Each "no" isn't a blocker, but it becomes an early task.</p>
+<div class="tbl"><table>
+<tr><th>Area</th><th>Question</th><th>If the answer is no…</th></tr>
+<tr><td rowspan="2"><b>Policy</b></td><td>Does the company have an AI usage policy that names approved tools?</td><td>Start sign-off early (119.3); it takes longest</td></tr>
+<tr><td>Is it clear what data may go into AI tools (customer data, credentials, source code)?</td><td>Agree data rules before the pilot</td></tr>
+<tr><td rowspan="2"><b>Process</b></td><td>Are requirements and test cases written down somewhere AI can read (Jira, Confluence, a repo)?</td><td>AI works from text; tidy the key sources for the pilot area</td></tr>
+<tr><td>Do you have any measurements today (time, defects, coverage)?</td><td>Start a baseline now (<a href="#ch126">Chapter 126</a>)</td></tr>
+<tr><td rowspan="2"><b>Tools</b></td><td>Do testers have access to Claude (Team or Enterprise plan) and, where needed, Claude Code?</td><td>Arrange licences for pilot members only</td></tr>
+<tr><td>Is there a test repository with a working way to run tests locally?</td><td>Fix that first; AI can't help automate what nobody can run</td></tr>
+<tr><td rowspan="2"><b>People</b></td><td>Is there at least one person keen to lead and learn?</td><td>Find a champion (119.5) before starting</td></tr>
+<tr><td>Does management support time for learning, not just "be faster"?</td><td>Agree protected learning time as part of the pilot</td></tr>
+</table></div>
+
+<h3 id="ch128-3"><span class="num">128.3</span>Step 2: policy and security sign-off</h3>
+<p>Security and legal teams aren't the enemy; they're protecting the company. You'll get faster approval if you bring a clear, specific proposal rather than "can we use AI?"</p>
+<div class="cols2">
+<div><h4>Bring them</h4><ul><li>Which tools and plans (e.g. Claude Team or Enterprise)</li><li>Which use-cases, for which people</li><li>What data will and won't be used</li><li>Which MCP servers you want, and with what access (<a href="#ch105">Chapter 105</a>)</li><li>How outputs are reviewed before use</li><li>How you'll measure and report</li></ul></div>
+<div><h4>Ask them</h4><ul><li>What data classes are off-limits?</li><li>What are the plan's data-retention and training terms? (Check the current terms for your plan; don't assume.)</li><li>Do they require SSO, audit logs or admin controls? (These vary by plan; see <a href="#ch42">Chapter 42</a>)</li><li>Who approves new MCP servers and plugins?</li></ul></div>
+</div>
+<div class="box example"><span class="tag">Real-world example: a one-paragraph proposal</span><p>"We propose a 90-day pilot with six testers on the Payments squad, using Claude (Team plan) and Claude Code. Use-cases: drafting test cases from Jira stories, triaging failed CI runs, and drafting bug reports. No production customer data will be used; test environments use synthetic data. We'll connect the Atlassian MCP server with each tester's own access and Playwright locally; no other servers. All AI outputs are reviewed by a tester before use. We'll report time, coverage and quality measures fortnightly." <em>(Illustrative.)</em></p></div>
+
+<h3 id="ch128-4"><span class="num">128.4</span>Step 3: choosing pilot use-cases</h3>
+<p>Pick two to four use-cases from the ideas catalogue in <a href="#ch119">Chapter 119</a>. Good pilot use-cases share four traits:</p>
+<ol>
+<li><strong>Frequent.</strong> Done every week, so you get enough data.</li>
+<li><strong>Measurable.</strong> Clear start and end, easy to time.</li>
+<li><strong>Low risk.</strong> A mistake is caught in review, not by customers.</li>
+<li><strong>Visible.</strong> A win people will notice.</li>
+</ol>
+<div class="tbl"><table>
+<tr><th>Use-case</th><th>Frequency</th><th>Measurable</th><th>Risk</th><th>Good pilot?</th></tr>
+<tr><td>Test cases from user stories</td><td>High</td><td>Yes: time per story</td><td>Low (reviewed)</td><td>Excellent</td></tr>
+<tr><td>Failed CI run triage</td><td>High</td><td>Yes: MTTR</td><td>Low</td><td>Excellent</td></tr>
+<tr><td>Bug report drafting</td><td>High</td><td>Yes: time, bounce rate</td><td>Low</td><td>Good</td></tr>
+<tr><td>Test data generation</td><td>Medium</td><td>Yes</td><td>Medium (data rules)</td><td>Good, with data rules</td></tr>
+<tr><td>Auto-approving releases</td><td>Low</td><td>Hard</td><td>High</td><td>No: keep humans in charge</td></tr>
+</table></div>
+
+<h3 id="ch128-5"><span class="num">128.5</span>Step 4: the 90-day pilot</h3>
+<div class="tbl"><table>
+<tr><th>Weeks</th><th>Focus</th><th>Activities</th><th>Done when…</th></tr>
+<tr><td>1–2</td><td>Baseline and setup</td><td>Record baseline (<a href="#ch126">Chapter 126</a>); licences; shared team setup (119.6); kick-off training</td><td>Baseline sheet filled; everyone can run Claude Code in the test repo</td></tr>
+<tr><td>3–6</td><td>Learn and try</td><td>Use AI on the chosen use-cases; weekly 30-minute show-and-tell; collect good prompts into skills</td><td>Each person has used each use-case at least five times</td></tr>
+<tr><td>7–10</td><td>Refine and measure</td><td>Improve CLAUDE.md and skills based on mistakes; track measures and counter-metrics</td><td>Measures stable; known pitfalls documented</td></tr>
+<tr><td>11–12</td><td>Evaluate</td><td>Compare to baseline; survey the team; write the one-page case</td><td>Decision: stop, adjust or scale</td></tr>
+</table></div>
+<div class="box note"><span class="tag">Write success criteria before you start</span><p>Agree them with your manager in week 1, so nobody moves the goalposts later. For example (illustrative): "Test design time per story falls by at least 30% including review; requirement questions raised at refinement increase; no rise in escaped defects; no data incidents; at least four of six testers want to continue."</p></div>
+<h4>Champions</h4>
+<p>An <a class="gl" href="#g-ai-champion">AI champion</a> is a team member who learns early and helps others. A good champion network has one champion per team of about six to ten people, a regular slot to share what works, a shared place for prompts and skills, and a direct line to whoever runs the rollout. Champions should be given time for this, not expected to do it on top of a full workload.</p>
+
+<h3 id="ch128-6"><span class="num">128.6</span>Step 5: a shared team setup</h3>
+<p>If every tester configures Claude differently, results vary and lessons don't spread. Put the setup in the test repository so everyone who clones it gets the same behaviour. These are the building blocks; their chapters have the exact syntax.</p>
+<div class="tbl"><table>
+<tr><th>Building block</th><th>File</th><th>What it does for the team</th><th>Details</th></tr>
+<tr><td>Team instructions</td><td><code>CLAUDE.md</code> in the repo</td><td>How to run tests, conventions, rules such as "never weaken a failing test without asking"</td><td><a href="#ch77">Chapter 77</a></td></tr>
+<tr><td>Shared skills</td><td><code>.claude/skills/&lt;name&gt;/SKILL.md</code></td><td>Repeatable team workflows: <code>/bug-report</code>, <code>/test-plan</code>, <code>/triage</code></td><td><a href="#ch80">Chapter 80</a></td></tr>
+<tr><td>Shared MCP servers</td><td><code>.mcp.json</code> in the repo</td><td>Everyone gets Jira, Playwright and GitHub connections; secrets come from each person's environment variables, never from the file</td><td><a href="#ch83">Chapter 83</a>, <a href="#ch100">93</a></td></tr>
+<tr><td>Permission rules</td><td><code>.claude/settings.json</code></td><td>Allow safe test commands; deny reading secrets; ask before writes to Jira</td><td><a href="#ch78">Chapter 78</a></td></tr>
+<tr><td>Organisation-wide policy</td><td><code>managed-settings.json</code> (deployed by IT)</td><td>Rules individuals can't override, including which MCP servers are allowed</td><td><a href="#ch78">Chapter 78</a>, <a href="#ch105">98</a></td></tr>
+</table></div>
+<div class="code"><span class="cap">A team .mcp.json with no secrets in it (shape only; see Chapters 83 and 106 for exact, verified syntax)</span><pre>{
+  "mcpServers": {
+    "playwright": { "command": "npx", "args": ["@playwright/mcp@latest"] },
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": { "Authorization": "Bearer ${GITHUB_PAT}" }   <span class="c">// each tester's own token, from their environment</span>
+    }
+  }
+}</pre></div>
+<div class="box warn"><span class="tag">Secrets never go in shared files</span><p>Tokens and API keys stay in each person's environment variables or a secret manager, never in <code>.mcp.json</code>, <code>CLAUDE.md</code> or a skill (<a href="#ch98">Chapter 98</a>). Claude Code also asks each person to approve project servers from <code>.mcp.json</code> before they run, which is a deliberate safety check.</p></div>
+<p>Organisations on managed plans can go further. IT can deploy a <code>managed-settings.json</code> file that sets rules nobody can override, and control which MCP servers are allowed (for example with an approved list) or deploy a fixed set through <code>managed-mcp.json</code>. <a href="#ch105">Chapter 105</a> shows the verified syntax.</p>
+
+<h3 id="ch128-7"><span class="num">128.7</span>Step 6: training</h3>
+<p>Licences without training produce disappointing results. Use this book as the curriculum:</p>
+<div class="tbl"><table>
+<tr><th>Audience</th><th>Path</th><th>Time</th></tr>
+<tr><td>Every tester in the pilot</td><td>Chapters 14, 20, 22 (tokens, context, hallucination); 42–43 (prompting); 60–65 (Claude Code basics); 109–110 (the AI-powered QA engineer and ideas)</td><td>About 2 weeks at an hour a day</td></tr>
+<tr><td>Automation engineers</td><td>Add Part VII (terminal), 74–80 (configuration and MCP), Part XII (MCP and tokens), 112 (test automation)</td><td>About 4 more weeks</td></tr>
+<tr><td>Champions and leads</td><td>Add 117 (value), this chapter, 98 (MCP security), 125 (governance), 134 (teaching)</td><td>About 2 more weeks</td></tr>
+</table></div>
+<p>Pair reading with practice on real work: one 60-minute workshop a week (<a href="#ch145">Chapter 145</a> has a format) and a shared channel for questions.</p>
+
+<h3 id="ch128-8"><span class="num">128.8</span>Step 7: governance</h3>
+<p>Governance is a short list of rules everyone knows, not a thick binder.</p>
+<div class="tbl"><table>
+<tr><th>Rule</th><th>Example wording</th></tr>
+<tr><td>Human review</td><td>"Every AI-generated test, bug report or analysis is reviewed by a tester before it's used or shared."</td></tr>
+<tr><td>Data handling</td><td>"No production customer data, credentials or personal data in prompts. Use synthetic test data."</td></tr>
+<tr><td>Approved tools and servers</td><td>"Only approved MCP servers and plugins. Request new ones through the QA lead; security reviews them."</td></tr>
+<tr><td>Writes need approval</td><td>"Claude may draft Jira issues and PRs, but a person approves anything written to shared systems."</td></tr>
+<tr><td>Red tests</td><td>"AI may not change a failing test's expected result without a person confirming the requirement."</td></tr>
+<tr><td>Incidents</td><td>"Report suspected data leaks or prompt-injection attempts to security immediately."</td></tr>
+</table></div>
+<p>Many of these can be enforced, not just written down: permission rules, managed settings and MCP allow-lists (119.6). <a href="#ch135">Chapter 135</a> covers responsible AI and governance more broadly.</p>
+
+<h3 id="ch128-9"><span class="num">128.9</span>Step 8: scaling across teams</h3>
+<ol>
+<li><strong>Decide with evidence.</strong> Scale only use-cases that met their success criteria.</li>
+<li><strong>Package the setup.</strong> Turn the pilot's skills, CLAUDE.md patterns and permission rules into a shared template repository or a plugin (<a href="#ch84">Chapter 84</a>).</li>
+<li><strong>Grow champions first.</strong> Each new team gets a champion trained by the pilot team.</li>
+<li><strong>Roll out in waves.</strong> Two or three teams at a time, each with a short baseline.</li>
+<li><strong>Keep measuring.</strong> A shared dashboard of the measures from <a href="#ch126">Chapter 126</a>, reviewed monthly.</li>
+<li><strong>Keep improving.</strong> A monthly review of the skills library: retire what nobody uses, improve what people complain about.</li>
+</ol>
+
+<h3 id="ch128-10"><span class="num">128.10</span>The human side</h3>
+<p>People have real concerns about AI, and ignoring them is the fastest way to fail. Address them openly.</p>
+<div class="tbl"><table>
+<tr><th>Concern you'll hear</th><th>An honest response</th></tr>
+<tr><td>"Will AI replace me?"</td><td>Be truthful about the organisation's intentions. Where the aim is "same team, more coverage", say so clearly, and show how saved time goes into work the team has wanted to do (<a href="#ch126">Chapter 126</a>).</td></tr>
+<tr><td>"I'm not technical enough."</td><td>Start with the Claude app and plain-language chapters; pair with a champion; terminal skills come later and are learnable (Part VII).</td></tr>
+<tr><td>"I don't trust its output."</td><td>Good: that's the right instinct. Review is part of the process, and testers are well suited to it.</td></tr>
+<tr><td>"This is extra work on top of my job."</td><td>Protect learning time during the pilot; remove something else from the plate.</td></tr>
+<tr><td>"It made a mistake, so it's useless."</td><td>Track mistakes, fix them with better instructions, and compare overall results with the baseline.</td></tr>
+</table></div>
+<div class="box opinion"><span class="tag">Opinion · the tester's role is changing, not disappearing</span><p>Many practitioners expect QA roles to shift towards test strategy, risk analysis, reviewing AI output, testing AI systems themselves and building team tooling, and away from repetitive drafting. How fast this happens, and what it means for team sizes, varies by organisation and is genuinely uncertain. Investing in people's skills is the safest bet either way.</p></div>
+
+<h3 id="ch128-11"><span class="num">128.11</span>Common failure modes</h3>
+<div class="tbl"><table>
+<tr><th>Failure</th><th>What it looks like</th><th>Prevention</th></tr>
+<tr><td>Licences without a plan</td><td>Usage drops after the first month</td><td>Specific use-cases, champions, weekly show-and-tell</td></tr>
+<tr><td>No baseline</td><td>Nobody can prove the value</td><td>Measure before you start</td></tr>
+<tr><td>Unreviewed output</td><td>Weak tests and wrong bug reports slip through</td><td>Review rule plus counter-metrics</td></tr>
+<tr><td>Everyone configures differently</td><td>Inconsistent results; lessons don't spread</td><td>Shared repo setup (119.6)</td></tr>
+<tr><td>Security as an afterthought</td><td>Pilot halted by a data concern</td><td>Sign-off first; approved servers; no secrets in files</td></tr>
+<tr><td>Over-reaching first project</td><td>Trying to automate everything at once</td><td>Two to four narrow use-cases</td></tr>
+<tr><td>Champions burn out</td><td>Helping others on top of a full workload</td><td>Give champions protected time</td></tr>
+</table></div>
+
+<h3 id="ch128-12"><span class="num">128.12</span>A QA AI maturity model</h3>
+<div class="tbl"><table>
+<tr><th>Level</th><th>Name</th><th>What it looks like</th><th>Checklist to reach it</th></tr>
+<tr><td>0</td><td>Ad hoc</td><td>A few people use AI privately; no rules</td><td>—</td></tr>
+<tr><td>1</td><td>Approved</td><td>Policy and approved tools in place; individuals use the Claude app</td><td>AI policy; data rules; licences; basic training</td></tr>
+<tr><td>2</td><td>Piloted</td><td>One team runs a measured pilot on specific use-cases</td><td>Baseline; success criteria; champion; shared CLAUDE.md and skills; fortnightly measures</td></tr>
+<tr><td>3</td><td>Standardised</td><td>Several teams share a common setup and governance</td><td>Template repo or plugin; approved MCP servers; permission and managed settings; training path; monthly dashboard</td></tr>
+<tr><td>4</td><td>Optimising</td><td>AI is built into QA processes and tools; continuously measured and improved</td><td>Team-built QA tools and MCP servers (<a href="#ch127">Chapter 127</a>); AI in CI; evals for AI features (<a href="#ch125">Chapter 125</a>); regular review of value and risk</td></tr>
+</table></div>
+<p>Most teams don't need to rush to level 4. Moving one level up, properly, is a solid year's goal.</p>
+
+<div class="lab"><div class="lab-h"><b>Draft your adoption plan</b><span>45 min · Claude app</span></div><ol>
+<li>Answer the readiness questions in 119.2 for your own team. Mark each yes or no.<span class="expect">a short list of gaps, such as "no baseline" or "no AI policy".</span></li>
+<li>Create a Claude Project, paste in your answers, and ask: "Using this readiness assessment, propose a 90-day pilot for a QA team of [size] with two to four use-cases, success criteria and a week-by-week plan."<span class="expect">a pilot plan in the shape of 119.5. Check that every use-case is frequent, measurable and low-risk.</span></li>
+<li>Ask: "Write a one-paragraph proposal for our security team, listing tools, data rules, MCP servers and review rules."<span class="expect">a paragraph like the example in 119.3. Remove anything that doesn't match your real plan.</span></li>
+<li>Place your team on the maturity model and write the three most important actions to reach the next level.<span class="expect">a short, realistic next-step list.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Adoption means buying licences."</dt><dd>Licences are step one of eight. Use-cases, setup, training, governance and measurement decide the outcome.</dd>
+<dt>"Security will just say no."</dt><dd>A specific, bounded proposal with data rules and review steps is far more likely to be approved.</dd>
+<dt>"Each tester should find their own way."</dt><dd>Personal experimentation is useful early, but shared setup is what lets good practice spread.</dd>
+<dt>"Once it's rolled out, we're done."</dt><dd>Tools, models and features change monthly. Keep reviewing skills, settings and measures.</dd>
+</dl></div>
+
+<h3 id="ch128-r"><span class="num">128.13</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Treat AI adoption as a change programme: readiness, sign-off, pilot, standardise, scale.</li>
+<li>Bring security a specific proposal: tools, use-cases, data rules, MCP servers and review steps.</li>
+<li>Pilot two to four frequent, measurable, low-risk use-cases for 90 days with success criteria agreed up front.</li>
+<li>Share one setup through the repo (CLAUDE.md, skills, .mcp.json without secrets, permission rules), with managed settings for organisation-wide rules.</li>
+<li>Train with clear paths, give champions time, keep governance short and enforceable.</li>
+<li>Take people's concerns seriously; frame the goal as the same team covering more risk.</li>
+<li>Use the maturity model to choose realistic next steps.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Which makes the best first pilot use-case?</p><div class="opts"><button>Letting AI approve releases automatically</button><button data-ok>Drafting test cases from user stories, reviewed by a tester</button><button>Rewriting the whole regression suite at once</button></div><p class="why" hidden>It's frequent, measurable, low-risk and visible.</p></div>
+<div class="qz"><p class="q">Where should a tester's GitHub token go when the team shares an .mcp.json file?</p><div class="opts"><button>Directly in .mcp.json</button><button>In CLAUDE.md</button><button data-ok>In the tester's own environment variable, referenced from .mcp.json</button></div><p class="why" hidden>Shared files must never contain secrets (Chapter 98).</p></div>
+<div class="qz"><p class="q">When should pilot success criteria be agreed?</p><div class="opts"><button data-ok>At the start, before results come in</button><button>After seeing the results</button><button>They aren't needed</button></div><p class="why" hidden>Agreeing them up front stops goalposts moving and keeps the evaluation honest.</p></div>
+<div class="qz"><p class="q">What best describes level 3, "Standardised", in the maturity model?</p><div class="opts"><button>A few people use AI privately</button><button data-ok>Several teams share a common setup, governance and training</button><button>AI runs testing with no human involvement</button></div><p class="why" hidden>Standardisation means shared setup and rules across teams.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Write a complete adoption plan for your QA team (two to three pages): readiness assessment, security proposal, chosen use-cases with success criteria, a week-by-week 90-day plan, the shared setup files you'll create, a training path from this book, five governance rules and your current and target maturity level. Review it with your manager and one security contact.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Rolling out AI in QA works like any change programme. Check we're ready, get security to agree a specific plan, pilot a few frequent, low-risk tasks for 90 days with goals agreed up front, and set Claude up the same way for everyone through the repo, with no secrets in shared files. Train people, give champions time, keep a short set of enforceable rules, and be honest about people's concerns. Then scale what worked."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, Claude Code documentation: <a href="https://code.claude.com/docs/en/settings" target="_blank" rel="noopener">settings</a>, <a href="https://code.claude.com/docs/en/managed-settings" target="_blank" rel="noopener">managed settings</a>, <a href="https://code.claude.com/docs/en/managed-mcp" target="_blank" rel="noopener">controlling MCP server access</a>, <a href="https://code.claude.com/docs/en/memory" target="_blank" rel="noopener">memory (CLAUDE.md)</a> and <a href="https://code.claude.com/docs/en/mcp" target="_blank" rel="noopener">MCP</a>, checked 9 November 2026.</li>
+<li>Anthropic, <a href="https://claude.com/pricing" target="_blank" rel="noopener">Claude plans</a>, for which admin features each plan includes (checked 9 November 2026).</li>
+<li>J. P. Kotter, <i>Leading Change</i> (1996), a classic model of organisational change programmes.</li>
+<li>NIST, <a href="https://www.nist.gov/itl/ai-risk-management-framework" target="_blank" rel="noopener">AI Risk Management Framework (AI RMF 1.0)</a> (2023), a widely used reference for AI governance.</li>
+</ol><p class="verified">Settings and file names verified 9 November 2026 against Claude Code docs · examples and figures are illustrative</p></div>

@@ -1,0 +1,194 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What you need before installing Claude Code: plan, computer and network</li>
+<li>How to install it on macOS, Linux and Windows, and which method to choose</li>
+<li>How updates and update channels work</li>
+<li>Every way to sign in, and which one your company probably uses</li>
+<li>How to find out exactly how <em>your</em> machine was set up</li>
+<li>The most common installation and sign-in problems, and their fixes</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 63. Basic terminal skills from Chapters 52–54 help: you'll type a few commands. Chapter 98 explains API keys and tokens in depth.</div>
+
+<div class="bigidea"><p>Installing Claude Code takes one command, and signing in takes one browser click. The part most people skip is <strong>understanding what was set up</strong>: which install method, which account, which kind of credential. That knowledge is what lets you fix problems, set up a colleague's laptop, and explain to your security team how it works. If someone else installed Claude Code for you, this chapter shows you how to find out exactly what they did.</p></div>
+
+<h3 id="ch64-1"><span class="num">64.1</span>Before you install: what you need</h3>
+<div class="tbl"><table>
+<tr><th>Need</th><th>Requirement</th></tr>
+<tr><td>A plan that includes Claude Code</td><td>A Claude Pro, Max, Ultra, Team or Enterprise subscription, or a Claude Console (API) account. <strong>The free Claude plan doesn't include Claude Code.</strong></td></tr>
+<tr><td>Operating system</td><td>macOS 13.0 or later; Windows 10 (version 1809) or later, or Windows Server 2019+; Ubuntu 20.04+, Debian 10+ or Alpine Linux 3.19+</td></tr>
+<tr><td>Hardware</td><td>4 GB of memory or more; an x64 or ARM64 processor (that covers almost every modern laptop, including Apple Silicon Macs)</td></tr>
+<tr><td>Network</td><td>An internet connection, in a country where Anthropic offers its services</td></tr>
+<tr><td>Shell</td><td>Bash, Zsh, PowerShell or CMD (Chapter 52 explains what a <a class="gl" href="#g-shell">shell</a> is)</td></tr>
+<tr><td>Nice to have</td><td>Git. On native Windows, Git for Windows is recommended so Claude can use its Bash tool; without it, Claude Code uses PowerShell.</td></tr>
+</table></div>
+<div class="box note"><span class="tag">At work</span><p>Company laptops often have extra rules: an approved software list, a proxy for internet traffic, or managed settings pushed by IT. Check your company's process before installing, and see 61.8.</p></div>
+
+<h3 id="ch64-2"><span class="num">64.2</span>Choosing an install method</h3>
+<p>There are several ways to install. They put the same program on your computer; they differ in <strong>how it gets updated</strong>.</p>
+<div class="tbl"><table>
+<tr><th>Method</th><th>Command</th><th>Updates</th></tr>
+<tr><td><b>Native installer</b> (recommended) · macOS, Linux, WSL</td><td><code>curl -fsSL https://claude.ai/install.sh | bash</code></td><td>Automatic, in the background</td></tr>
+<tr><td><b>Native installer</b> · Windows PowerShell</td><td><code>irm https://claude.ai/install.ps1 | iex</code></td><td>Automatic</td></tr>
+<tr><td><b>Native installer</b> · Windows CMD</td><td><code>curl -fsSL https://claude.ai/install.cmd -o install.cmd &amp;&amp; install.cmd &amp;&amp; del install.cmd</code></td><td>Automatic</td></tr>
+<tr><td><b>Homebrew</b> · macOS/Linux</td><td><code>brew install --cask claude-code</code></td><td>Manual: <code>brew upgrade claude-code</code></td></tr>
+<tr><td><b>WinGet</b> · Windows</td><td><code>winget install Anthropic.ClaudeCode</code></td><td>Manual: <code>winget upgrade Anthropic.ClaudeCode</code></td></tr>
+<tr><td><b>npm</b> · any OS with Node.js 22+</td><td><code>npm install -g @anthropic-ai/claude-code</code></td><td>Manual: <code>npm install -g @anthropic-ai/claude-code@latest</code></td></tr>
+<tr><td><b>Linux packages</b></td><td>Signed apt, dnf and apk repositories (exact commands on the setup page)</td><td>Through your package manager</td></tr>
+</table></div>
+<p>The native installer is recommended because it keeps itself up to date. Pick Homebrew or WinGet if your company manages software that way. Use npm only if you already use Node.js and know why you want it.</p>
+
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of buying a phone app. The native installer is like downloading from the app store with automatic updates turned on. Homebrew, WinGet and npm are like getting the app from a company software portal: it works the same, but you (or IT) decide when to update.</p></div>
+
+<h4>What the command actually does</h4>
+<div class="code"><span class="cap">macOS / Linux, read left to right</span><pre>curl -fsSL https://claude.ai/install.sh | bash
+<span class="c">#  curl            download something from the internet</span>
+<span class="c">#  -fsSL           f: fail on errors, s: silent, S: but show errors, L: follow redirects</span>
+<span class="c">#  https://...     the install script's address</span>
+<span class="c">#  |               "pipe": hand the downloaded script to the next program</span>
+<span class="c">#  bash            run the script</span></pre></div>
+<p>Running a script straight from the internet is common, but it means trusting the source. That's why the address must be exactly <code>https://claude.ai/install.sh</code>. If you're unsure, download the script first and read it, or ask IT. Chapter 55 explains pipes in detail.</p>
+
+<details class="deep"><summary>Where the native installer puts things</summary><div class="body">
+<p>On macOS and Linux, the native install places the launcher at <code>~/.local/bin/claude</code> and keeps downloaded versions in <code>~/.local/share/claude/versions/</code>. The <code>~</code> means your home folder (Chapter 53). For the <code>claude</code> command to work, <code>~/.local/bin</code> must be on your <a class="gl" href="#g-path">PATH</a>, the list of folders your shell searches for commands (Chapter 56). The installer normally takes care of this; if you see "command not found", it didn't, or your terminal needs restarting.</p>
+<p>You can install a specific channel or version with the native installer, for example <code>curl -fsSL https://claude.ai/install.sh | bash -s stable</code>. The CLI also has its own <code>claude install</code> subcommand, which installs the native build and accepts <code>stable</code>, <code>latest</code> or a version number. It's useful for switching an npm install to the native one.</p>
+</div></details>
+
+<h3 id="ch64-3"><span class="num">64.3</span>Check it worked</h3>
+<div class="code"><span class="cap">Terminal</span><pre>claude --version     <span class="c"># prints the version, e.g. 2.1.319 (Claude Code)</span>
+claude doctor        <span class="c"># health check: install method, updates, settings problems</span></pre></div>
+<p><code>claude doctor</code> runs from your normal shell and only reads; it's the first thing to try if Claude Code won't start. Inside a running session there's also <code>/doctor</code>, a fuller checkup that can offer to fix problems. They're different things: one is a CLI command, the other a bundled skill you type inside Claude Code.</p>
+<div class="box warn"><span class="tag">Windows: two common mix-ups</span><p>If you see <code>irm is not recognized</code>, you're in CMD but used the PowerShell command. If you see <code>The token '&amp;&amp;' is not a valid statement separator</code>, you're in PowerShell but used the CMD command. Use the command that matches your shell.</p></div>
+
+<h3 id="ch64-4"><span class="num">64.4</span>Updates and update channels</h3>
+<ul>
+<li><strong>Native installs update themselves</strong> in the background. Homebrew, WinGet and Linux package installs don't; upgrade them with their own tools.</li>
+<li><strong>Update by hand</strong> any time with <code>claude update</code> (also <code>claude upgrade</code>).</li>
+<li><strong>Two channels</strong>: <code>latest</code> (the default, newest features) and <code>stable</code> (about a week behind, skipping releases with major problems). Choose in <code>/config</code> → Auto-update channel, or with the <code>autoUpdatesChannel</code> setting.</li>
+<li><strong>Turning updates off</strong>: the environment variable <code>DISABLE_AUTOUPDATER=1</code> stops background updates only; <code>DISABLE_UPDATES=1</code> blocks all updates. Companies sometimes set these so everyone runs an approved version.</li>
+</ul>
+<div class="box example"><span class="tag">Real-world example</span><p>A QA team pins everyone to the <code>stable</code> channel so a new release can't change behaviour in the middle of a regression cycle. One engineer stays on <code>latest</code> to try new features first and reports back. It's the same idea as testing a browser beta before rolling it out.</p></div>
+
+<h3 id="ch64-5"><span class="num">64.5</span>Signing in: the options</h3>
+<p>Claude Code needs to know who's paying for the model. There are several ways to prove that, called <a class="gl" href="#g-credentials">credentials</a>:</p>
+<div class="tbl"><table>
+<tr><th>Option</th><th>Who it's for</th><th>How</th></tr>
+<tr><td><b>Claude subscription</b> (Pro, Max, Ultra, Team, Enterprise)</td><td>Most people, including most company users</td><td>Run <code>claude</code> and follow the browser sign-in; or <code>/login</code> inside a session, or <code>claude auth login</code></td></tr>
+<tr><td><b>Claude Console</b> (pay per use)</td><td>Developers and teams billed through the API</td><td><code>claude auth login --console</code>. An admin must invite you.</td></tr>
+<tr><td><b>API key</b></td><td>Scripts and some developer setups</td><td>Set the <a class="gl" href="#g-environment-variable">environment variable</a> <code>ANTHROPIC_API_KEY</code></td></tr>
+<tr><td><b>Long-lived token</b></td><td>CI pipelines using a subscription</td><td><code>claude setup-token</code> prints a one-year token; store it as <code>CLAUDE_CODE_OAUTH_TOKEN</code></td></tr>
+<tr><td><b>Amazon Bedrock</b></td><td>Companies that buy AI through AWS</td><td><code>CLAUDE_CODE_USE_BEDROCK=1</code> plus AWS credentials; <code>/setup-bedrock</code> wizard</td></tr>
+<tr><td><b>Google Cloud's Agent Platform</b> (formerly Vertex AI)</td><td>Companies on Google Cloud</td><td><code>CLAUDE_CODE_USE_VERTEX=1</code> plus Google Cloud credentials; <code>/setup-vertex</code> wizard</td></tr>
+<tr><td><b>Microsoft Foundry</b></td><td>Companies on Azure</td><td><code>CLAUDE_CODE_USE_FOUNDRY=1</code> plus Azure credentials</td></tr>
+<tr><td><b>Gateway / bearer token</b></td><td>Companies routing traffic through their own gateway</td><td><code>ANTHROPIC_AUTH_TOKEN</code>, often with <code>ANTHROPIC_BASE_URL</code></td></tr>
+</table></div>
+<p>If you signed in with a company email and a browser window, you're almost certainly using a <strong>Team or Enterprise subscription</strong>, possibly through your company's single sign-on.</p>
+
+<h4>The subscription sign-in, step by step</h4>
+<div class="flow">
+<div><b>Run</b><code>claude</code> in a terminal (or open the VS Code panel)</div>
+<div><b>Choose</b>"Claude account with subscription" at the prompt</div>
+<div><b>Browser</b>A sign-in page opens. If it doesn't, press <kbd>c</kbd> to copy the address and paste it into a browser.</div>
+<div><b>Approve</b>Sign in (company SSO if your organisation uses it) and approve access</div>
+<div class="hl"><b>Done</b>Claude Code stores the credential securely and you're in</div>
+</div>
+<p>The credential is stored in the macOS Keychain on a Mac, or in <code>~/.claude/.credentials.json</code> (readable only by you) on Linux, and <code>%USERPROFILE%\.claude\.credentials.json</code> on Windows. You'll be warned three days before a login expires. When it does, run <code>/login</code>.</p>
+
+<h4>The <code>claude auth</code> commands</h4>
+<div class="code"><span class="cap">Terminal</span><pre>claude auth status            <span class="c"># who am I signed in as, and how?</span>
+claude auth status --json     <span class="c"># the same, as JSON (handy for scripts)</span>
+claude auth login             <span class="c"># sign in (add --console for Console billing, --sso for SSO)</span>
+claude auth logout            <span class="c"># sign out</span></pre></div>
+
+<details class="deep"><summary>Which credential wins when there are several?</summary><div class="body">
+<p>A machine can have more than one credential at once, for example a subscription login <em>and</em> an old <code>ANTHROPIC_API_KEY</code> in your shell profile. Claude Code picks one in this order:</p>
+<ol>
+<li>Cloud-provider settings (<code>CLAUDE_CODE_USE_BEDROCK</code>, <code>_VERTEX</code>, <code>_FOUNDRY</code>)</li>
+<li><code>ANTHROPIC_AUTH_TOKEN</code></li>
+<li><code>ANTHROPIC_API_KEY</code></li>
+<li>An <code>apiKeyHelper</code> script set in settings</li>
+<li><code>CLAUDE_CODE_OAUTH_TOKEN</code> (from <code>claude setup-token</code>)</li>
+<li>Your <code>/login</code> subscription sign-in</li>
+</ol>
+<p>Your normal subscription login is <em>last</em>. Anything higher in the list overrides it. In an interactive session Claude Code asks you once to approve an API key it finds; in print mode (<code>-p</code>) it always uses it. <code>/status</code> shows which credential is active right now.</p>
+</div></details>
+
+<div class="box warn"><span class="tag">The API-key trap</span><p>A very common surprise: you have a perfectly good company subscription, but Claude Code says something like <em>"This organization has been disabled"</em> or bills a personal account. The cause is usually an old <code>ANTHROPIC_API_KEY</code> left in your shell profile from an earlier experiment, which overrides your subscription. Fix it with <code>unset ANTHROPIC_API_KEY</code>, then remove the line from your shell profile file (for Zsh, <code>~/.zshrc</code>). Chapter 98 covers keys and tokens in depth.</p></div>
+
+<h3 id="ch64-6"><span class="num">64.6</span>Detective work: how was <em>my</em> machine set up?</h3>
+<p>If a colleague installed Claude Code for you, these commands reveal what they did. All of them only read; none change anything.</p>
+<div class="tbl"><table>
+<tr><th>Question</th><th>Command</th><th>How to read the answer</th></tr>
+<tr><td>Where is it installed?</td><td><code>which claude</code></td><td><code>~/.local/bin/claude</code> → native installer. A path with <code>homebrew</code> or <code>Caskroom</code> → Homebrew. A path containing <code>node</code> or <code>npm</code> → npm. Nothing printed → not on your PATH.</td></tr>
+<tr><td>Which version?</td><td><code>claude --version</code></td><td>A number such as <code>2.1.319</code>. Compare with the latest release notes.</td></tr>
+<tr><td>Is it healthy, and how does it update?</td><td><code>claude doctor</code></td><td>Install method, update status and any settings problems</td></tr>
+<tr><td>Who am I signed in as?</td><td><code>claude auth status</code> or <code>/status</code> in a session</td><td>Account email, organisation and login method (subscription, Console, API key, cloud provider)</td></tr>
+<tr><td>Is an API key set in my shell?</td><td><code>echo $ANTHROPIC_API_KEY</code> (macOS/Linux)</td><td>Blank = not set (good, if you use a subscription). Any text = a key is set. Don't paste it anywhere.</td></tr>
+<tr><td>What personal configuration exists?</td><td><code>ls -la ~/.claude</code></td><td>Look for <code>settings.json</code>, <code>CLAUDE.md</code>, <code>skills/</code>, <code>agents/</code>, <code>projects/</code></td></tr>
+<tr><td>What do my settings say?</td><td><code>/config</code> in a session, or open <code>~/.claude/settings.json</code></td><td>Model, permissions, environment variables, hooks (Chapter 78)</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example: what a typical audit finds</span><p>Running these on a tester's laptop typically shows something like this: <code>which claude</code> → <code>/Users/sam/.local/bin/claude</code> (native installer, auto-updating); <code>claude auth status</code> → signed in with the company account on a Team plan; <code>~/.claude/settings.json</code> → a few permission rules a colleague added, such as always allowing <code>npm test</code>. That's three facts, and Sam can now explain the setup to anyone.</p></div>
+
+<h3 id="ch64-7"><span class="num">64.7</span>Using Claude Code inside VS Code and JetBrains</h3>
+<ul>
+<li><strong>VS Code</strong>: install the extension <code>anthropic.claude-code</code> from the marketplace (VS Code 1.94 or later; it also works in Cursor). The extension includes its own copy of Claude Code for its panel, but to type <code>claude</code> in VS Code's terminal you also need the standalone install from 61.2.</li>
+<li><strong>JetBrains</strong> (IntelliJ IDEA, PyCharm, WebStorm and others): install the "Claude Code" plugin from the JetBrains Marketplace <em>and</em> the CLI. The plugin doesn't include the CLI.</li>
+</ul>
+<p>Both use the same sign-in and the same <code>~/.claude</code> settings as the terminal. Chapter 70 covers the editor integrations in depth.</p>
+
+<h3 id="ch64-8"><span class="num">64.8</span>At work: proxies, certificates and managed settings</h3>
+<ul>
+<li><strong>Proxies</strong>: if your company routes internet traffic through a proxy, set <code>HTTPS_PROXY</code> (and <code>HTTP_PROXY</code>) in your environment. Errors such as <code>unable to get local issuer certificate</code> usually mean the company's security certificate needs configuring; ask IT, and see the network-config page in the docs.</li>
+<li><strong>Managed settings</strong>: IT can push settings that you can't override, such as allowed models, permission rules or approved MCP servers (Chapters 78 and 105). If a setting won't change, this is probably why.</li>
+<li><strong>Several accounts</strong>: to keep a personal and a work setup apart, run Claude Code with a different configuration folder, for example <code>alias claude-work='CLAUDE_CONFIG_DIR=~/.claude-work claude'</code>.</li>
+</ul>
+
+<h3 id="ch64-9"><span class="num">64.9</span>Uninstalling</h3>
+<p>For a native install on macOS or Linux:</p>
+<div class="code"><span class="cap">Terminal</span><pre>rm -f ~/.local/bin/claude          <span class="c"># remove the launcher</span>
+rm -rf ~/.local/share/claude       <span class="c"># remove downloaded versions</span></pre></div>
+<p>For other methods, use the same tool you installed with (for example <code>brew uninstall --cask claude-code</code>). Your settings and history in <code>~/.claude</code> stay unless you delete that folder too. <code>rm -rf</code> deletes permanently with no recycle bin, so double-check what you type (Chapter 54).</p>
+
+<div class="lab"><div class="lab-h"><b>Audit your own install</b><span>25 min · terminal</span></div><ol>
+<li>Open a terminal (in VS Code: <kbd>Ctrl</kbd>+<kbd>`</kbd>). Run <code>which claude</code> and <code>claude --version</code>.<span class="expect">an install path and a version number. Decide from 61.6 which install method was used.</span></li>
+<li>Run <code>claude doctor</code>.<span class="expect">a health report including the install type and update status. Note any warnings.</span></li>
+<li>Run <code>claude auth status</code>.<span class="expect">your account and login method. If it says API key when you expected a subscription, go back to the API-key trap in 61.5.</span></li>
+<li>Run <code>echo $ANTHROPIC_API_KEY</code> (macOS/Linux) or <code>echo $env:ANTHROPIC_API_KEY</code> (PowerShell).<span class="expect">a blank line if you use a subscription. If a key appears, don't share it; decide whether it should be there.</span></li>
+<li>Run <code>ls -la ~/.claude</code>, then start Claude Code and ask: <em>"Explain everything in my ~/.claude/settings.json in plain English. Don't change anything."</em><span class="expect">a line-by-line explanation of the settings someone set up for you.</span></li>
+<li>Write a five-line "my setup" note: install method, version, update channel, account and login method, notable settings.</li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"The free Claude plan includes Claude Code."</dt><dd>It doesn't. You need Pro, Max, Ultra, Team, Enterprise or a Console account.</dd>
+<dt>"Installing the VS Code extension is enough to use <code>claude</code> in the terminal."</dt><dd>The extension uses its own built-in copy. Typing <code>claude</code> in a terminal needs the standalone install.</dd>
+<dt>"If I'm signed in with my subscription, that's what Claude Code uses."</dt><dd>Not if an API key or other credential is set: those take priority. Check with <code>/status</code>.</dd>
+<dt>"<code>claude doctor</code> and <code>/doctor</code> are the same."</dt><dd><code>claude doctor</code> runs from the shell and only reads. <code>/doctor</code> runs inside a session and can offer fixes.</dd>
+<dt>"Use sudo if npm complains about permissions."</dt><dd>Don't: Anthropic's docs warn against <code>sudo npm install -g</code>. Fix the npm permissions, or use the native installer.</dd>
+</dl></div>
+
+<h3 id="ch64-r"><span class="num">64.10</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>You need a paid Claude plan or a Console account; the free plan doesn't include Claude Code.</li>
+<li>The native installer is recommended and updates itself; Homebrew, WinGet, npm and Linux packages update through their own tools.</li>
+<li>Check an install with <code>claude --version</code> and <code>claude doctor</code>; update with <code>claude update</code>; choose <code>latest</code> or <code>stable</code> channels.</li>
+<li>Most people sign in with a subscription through the browser. API keys, long-lived tokens and cloud providers suit scripts, CI and companies on AWS, Google Cloud or Azure.</li>
+<li>Other credentials override your subscription login; <code>/status</code> shows which one is active.</li>
+<li><code>which claude</code>, <code>claude auth status</code> and <code>~/.claude</code> reveal how any machine was set up.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Which install method updates itself automatically?</p><div class="opts"><button>Homebrew</button><button data-ok>The native installer</button><button>npm</button></div><p class="why" hidden>Native installs auto-update in the background; the others update through their own package tools.</p></div>
+<div class="qz"><p class="q"><code>which claude</code> prints <code>/Users/sam/.local/bin/claude</code>. How was Claude Code most likely installed?</p><div class="opts"><button data-ok>With the native installer</button><button>With Homebrew</button><button>Through the VS Code extension only</button></div><p class="why" hidden>The native installer places the launcher at ~/.local/bin/claude.</p></div>
+<div class="qz"><p class="q">You have a company subscription, but Claude Code is billing a personal API account. What's the most likely cause?</p><div class="opts"><button>The subscription expired</button><button data-ok>An ANTHROPIC_API_KEY is set in your environment and overrides the subscription</button><button>You're on the stable update channel</button></div><p class="why" hidden>API keys take priority over the /login subscription. Unset it and remove it from your shell profile.</p></div>
+<div class="qz"><p class="q">Which command shows who you're signed in as, without starting a session?</p><div class="opts"><button>claude --version</button><button data-ok>claude auth status</button><button>claude update</button></div><p class="why" hidden><code>claude auth status</code> reports the account and login method; <code>/status</code> does the same inside a session.</p></div>
+<div class="qz"><p class="q">Your CI pipeline needs to run Claude Code using the team's subscription. Which option fits?</p><div class="opts"><button>Type /login in the pipeline</button><button data-ok>Create a token with <code>claude setup-token</code> and store it as the secret CLAUDE_CODE_OAUTH_TOKEN</button><button>Paste your password into the pipeline file</button></div><p class="why" hidden>setup-token creates a one-year token designed for non-interactive use; keep it in the CI secret store (Chapter 98).</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Write a one-page "Setting up Claude Code at [your company]" guide for a new team member. Include: which plan and sign-in your company uses, the install command to run, how to check it worked, the API-key trap, and who to ask about proxies or managed settings. Test it by following it on a colleague's laptop (with permission) or in a fresh user account, and fix any step that didn't work as written.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Install Claude Code with the one-line native installer; it updates itself. Check it with <code>claude --version</code> and <code>claude doctor</code>. Sign in by running <code>claude</code> and approving in the browser with your company account. If billing looks wrong, an old API key is probably overriding your subscription, so check <code>/status</code>. To see how any machine was set up, run <code>which claude</code>, <code>claude auth status</code> and look inside <code>~/.claude</code>."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/setup" target="_blank" rel="noopener">Set up Claude Code</a>: requirements, install methods, updates and channels.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/authentication" target="_blank" rel="noopener">Authentication</a>: sign-in options, credential precedence and storage.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/env-vars" target="_blank" rel="noopener">Environment variables</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/troubleshooting" target="_blank" rel="noopener">Troubleshooting</a> and <a href="https://code.claude.com/docs/en/troubleshoot-install" target="_blank" rel="noopener">install troubleshooting</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/vs-code" target="_blank" rel="noopener">VS Code</a> and <a href="https://code.claude.com/docs/en/jetbrains" target="_blank" rel="noopener">JetBrains</a> integration pages.</li>
+<li>Local <code>claude --help</code>, <code>claude auth --help</code> output, Claude Code 2.1.319.</li>
+</ol><p class="verified">Verified 9 November 2026 against Claude Code 2.1.319</p></div>

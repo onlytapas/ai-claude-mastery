@@ -1,0 +1,264 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What a package manager is, and what actually happens on your disk when you "install" something</li>
+<li>How to use Homebrew to install command-line tools on a Mac (with Linux and Windows equivalents)</li>
+<li>How Node.js, npm and npx fit together, and how to switch Node versions with nvm</li>
+<li>How Python, pip and virtual environments fit together, and where the newer tool uv fits</li>
+<li>Global versus local installs, lock files, and why "it works on my machine" usually means a version mismatch</li>
+<li>How to install packages safely, because every package you install is code you run</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch53">Chapter 53</a> (paths), <a href="#ch54">Chapter 54</a> (first commands) and <a href="#ch56">Chapter 56</a> (environment variables and <a class="gl" href="#g-path">PATH</a>). You need a terminal. Admin rights on your machine help; if your company laptop blocks installs, the lab notes the alternatives.</div>
+
+<div class="bigidea"><p>Almost every tool in this book (Claude Code via npm, Playwright, the Python SDKs, MCP servers) arrives through a <a class="gl" href="#g-package-manager">package manager</a>. A package manager is an app store for code: you name what you want, and it downloads the right version plus everything that version needs. On a Mac, Homebrew installs tools for the whole machine. Inside a project, npm (for JavaScript) and pip or uv (for Python) install libraries into that project only. If you understand where things get installed, which version you got, and how the project records it, most "it doesn't work on my machine" problems become easy to fix.</p></div>
+
+<h3 id="ch58-1"><span class="num">58.1</span>What a package manager is</h3>
+<p>A <b>package</b> is a bundle of code someone has published so others can reuse it: a command-line tool, or a library you call from your own code. A <a class="gl" href="#g-package-manager">package manager</a> is the program that finds packages in an online catalogue (a <b>registry</b>), downloads them, puts them in the right place and keeps track of what you have.</p>
+<p>Most packages rely on other packages. Those are its <a class="gl" href="#g-dependency">dependencies</a>. Installing one package can quietly pull in dozens more. Working out a set of versions that all fit together is called <b>dependency resolution</b>, and it is the hardest part of the manager's job.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a recipe box delivered to your door. You order "lasagne for four". The service works out that you need pasta sheets, tomatoes, cheese and a particular sauce, which itself needs garlic and basil. It sends the lot, labelled, in quantities that match. You never list the garlic yourself. A package manager does the same for software: you ask for one thing, and it works out and fetches everything that thing needs.</p></div>
+<div class="tbl"><table>
+<tr><th>Package manager</th><th>Installs</th><th>Registry</th><th>Typical use in this book</th></tr>
+<tr><td><a class="gl" href="#g-homebrew">Homebrew</a> (<code>brew</code>)</td><td>Command-line tools and apps for the whole machine (macOS, Linux)</td><td>Homebrew formulae and casks</td><td>Install Node.js, Python, Git, jq, uv, Claude Code</td></tr>
+<tr><td><a class="gl" href="#g-npm">npm</a></td><td>JavaScript packages, usually into one project</td><td>npmjs.com</td><td>Playwright, MCP servers, the TypeScript SDK</td></tr>
+<tr><td><a class="gl" href="#g-pip">pip</a></td><td>Python packages, ideally into a virtual environment</td><td>PyPI (pypi.org)</td><td><code>requests</code>, <code>httpx</code>, <code>anthropic</code>, <code>pytest</code></td></tr>
+<tr><td><a class="gl" href="#g-uv">uv</a></td><td>Python packages, Python itself, and project environments</td><td>PyPI</td><td>A faster, all-in-one alternative to pip plus venv</td></tr>
+<tr><td>apt / dnf (Linux), winget (Windows)</td><td>System software for that operating system</td><td>The OS vendor's catalogue</td><td>The equivalents of Homebrew on those systems</td></tr>
+</table></div>
+
+<h3 id="ch58-2"><span class="num">58.2</span>What "installing" actually does</h3>
+<p>Installing feels like magic, but it is a few ordinary steps you could do by hand.</p>
+<div class="flow">
+<div><b>1 · Resolve</b>Work out which versions of the package and its dependencies fit together</div>
+<div><b>2 · Download</b>Fetch archives from the registry (and check their checksums)</div>
+<div><b>3 · Unpack</b>Copy files into a known folder: a Homebrew prefix, <code>node_modules</code>, or <code>.venv</code></div>
+<div class="hl"><b>4 · Link</b>Make commands findable, by putting a link in a folder that is on your PATH</div>
+<div><b>5 · Record</b>Write down what was installed: package.json, a lock file, or the Homebrew database</div>
+</div>
+<p>Step 4 is why a fresh install sometimes says "command not found". The files are on disk, but the folder holding the command isn't on your <a class="gl" href="#g-path">PATH</a> yet (<a href="#ch56">Chapter 56</a>). Opening a new terminal window, or running the line the installer printed, usually fixes it. <code>which node</code> or <code>which python3</code> shows which copy your shell will actually run.</p>
+<details class="deep"><summary>Under the hood: why one install brings 200 packages</summary><div class="body">
+<p>Dependencies form a tree. If you install package A, and A needs B and C, and C needs D, you get four packages. The ones you didn't ask for directly are <b>transitive dependencies</b>. JavaScript packages tend to be small and numerous, so a tool like a test framework can pull in hundreds. npm stores them in a mostly flat <code>node_modules</code> folder and keeps a separate copy only when two packages need incompatible versions of the same thing. Python's pip installs exactly one version of each package per environment, so if two packages demand incompatible versions, pip reports a conflict instead. That difference is one reason Python projects lean so heavily on <a class="gl" href="#g-virtual-environment">virtual environments</a>: each project gets its own clean set.</p>
+</div></details>
+
+<h3 id="ch58-3"><span class="num">58.3</span>Homebrew: tools for the whole Mac</h3>
+<p><a class="gl" href="#g-homebrew">Homebrew</a> is the most common way to install developer tools on macOS. It is free and also works on Linux. Its official install command, from <a href="https://brew.sh/" target="_blank" rel="noopener">brew.sh</a>, is:</p>
+<div class="code"><span class="cap">Terminal (macOS or Linux)</span><pre>/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</pre></div>
+<p>The script explains what it will do and pauses before changing anything. At the end it may print two or three "Next steps" lines that add Homebrew to your PATH. Run them: skipping that step is the most common reason <code>brew</code> is "not found" afterwards.</p>
+<p>Homebrew keeps everything under one folder, its <b>prefix</b>: <code>/opt/homebrew</code> on Apple Silicon Macs, <code>/usr/local</code> on Intel Macs, and <code>/home/linuxbrew/.linuxbrew</code> on Linux. Each package lives in its own folder under <code>Cellar</code>, and its commands are linked into <code>bin</code> under the prefix.</p>
+<div class="tbl"><table>
+<tr><th>Command</th><th>What it does</th></tr>
+<tr><td><code>brew install jq</code></td><td>Installs a command-line tool (a "formula")</td></tr>
+<tr><td><code>brew install --cask firefox</code></td><td>Installs a desktop app (a "cask") into /Applications</td></tr>
+<tr><td><code>brew list</code></td><td>Shows what you have installed</td></tr>
+<tr><td><code>brew info node</code></td><td>Shows the version available, dependencies and notes</td></tr>
+<tr><td><code>brew update</code></td><td>Refreshes Homebrew's catalogue (doesn't upgrade anything)</td></tr>
+<tr><td><code>brew upgrade</code> / <code>brew upgrade jq</code></td><td>Upgrades everything, or one package</td></tr>
+<tr><td><code>brew uninstall jq</code></td><td>Removes a package</td></tr>
+<tr><td><code>brew doctor</code></td><td>Checks your setup and explains common problems</td></tr>
+</table></div>
+<div class="box note"><span class="tag">Linux and Windows</span><p>On Ubuntu or Debian, the system package manager is <code>apt</code> (<code>sudo apt install jq</code>). On Windows, <code>winget</code> plays the same role, and much of this book's command-line work is easiest inside WSL (Windows Subsystem for Linux), where the Linux instructions apply. Claude Code itself can be installed with Homebrew (<code>brew install --cask claude-code</code>) or npm; <a href="#ch63">Chapter 63</a> covers the options, and notes that Homebrew installs don't auto-update.</p></div>
+
+<h3 id="ch58-4"><span class="num">58.4</span>Node.js and its versions</h3>
+<p><a class="gl" href="#g-node-js">Node.js</a> runs JavaScript outside a web browser. You need it for Playwright, many MCP servers, the npm install route for Claude Code, and front-end projects. Check whether you have it, and which version:</p>
+<div class="code"><span class="cap">Terminal</span><pre>node --version     <span class="c"># for example v26.x.x, or "command not found"</span>
+npm --version      <span class="c"># npm comes with Node.js</span></pre></div>
+<p>Node.js has a release rhythm worth knowing, because tools state a minimum version ("requires Node 22 or newer"). Even-numbered releases become <b>LTS</b> (Long-Term Support): stable, patched for about 30 months, and the ones to use for real work. Odd-numbered releases (up to 25) were short-lived. From Node 27 the project moves to one major release a year.</p>
+<div class="tbl"><table>
+<tr><th>Version</th><th>Codename</th><th>First released</th><th>Status on 9 Nov 2026</th></tr>
+<tr><td>Node 26</td><td>Lithium</td><td>5 May 2026</td><td>LTS (latest LTS)</td></tr>
+<tr><td>Node 24</td><td>Krypton</td><td>6 May 2025</td><td>LTS</td></tr>
+<tr><td>Node 22</td><td>Jod</td><td>24 April 2024</td><td>LTS (oldest still supported)</td></tr>
+<tr><td>Node 25, 23, 20, 18</td><td>(various)</td><td>2022–2025</td><td>End of life: no security fixes</td></tr>
+<tr><td>Node 27</td><td>(none yet)</td><td>Pre-release</td><td>Alpha: not for real work</td></tr>
+</table></div>
+<p>Source: the Node.js releases page, checked 9 November 2026. Versions move on, so check <a href="https://nodejs.org/en/about/previous-releases" target="_blank" rel="noopener">nodejs.org</a> before you pick one.</p>
+<h4>Switching versions with nvm</h4>
+<p>Different projects often need different Node versions: an old test suite pinned to Node 22, a new one on Node 26. A <b>version manager</b> lets you keep several and switch per project. The best known is <b>nvm</b> (Node Version Manager) for macOS, Linux and WSL. Install it with the command in the <a href="https://github.com/nvm-sh/nvm" target="_blank" rel="noopener">nvm README</a>; at the time of writing that is:</p>
+<div class="code"><span class="cap">Terminal</span><pre>curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.41.0/install.sh | bash
+<span class="c"># open a new terminal window, then:</span>
+command -v nvm             <span class="c"># prints "nvm" if it worked</span>
+nvm install --lts          <span class="c"># install the newest LTS release</span>
+nvm install 22             <span class="c"># and an older one</span>
+nvm use 22                 <span class="c"># switch this terminal to Node 22</span>
+nvm alias default --lts node   <span class="c"># make the newest LTS the default for new terminals</span>
+echo "22" &gt; .nvmrc         <span class="c"># record the project's version in the project folder</span>
+nvm use                    <span class="c"># reads .nvmrc and switches</span></pre></div>
+<p>nvm doesn't support native Windows. Its README points Windows users to WSL; separate projects such as nvm-windows exist but are not part of nvm. If you only ever need one version, installing Node with Homebrew (<code>brew install node</code>) or the official installer from nodejs.org is fine.</p>
+
+<h3 id="ch58-5"><span class="num">58.5</span>npm and npx: packages for a project</h3>
+<p><a class="gl" href="#g-npm">npm</a> installs JavaScript packages into a project. Three files and folders matter:</p>
+<div class="tbl"><table>
+<tr><th>File or folder</th><th>What it is</th><th>Commit to Git?</th></tr>
+<tr><td><code>package.json</code></td><td>The project's description: its name, its scripts (shortcuts such as <code>npm test</code>) and the packages it needs, with allowed version ranges</td><td>Yes</td></tr>
+<tr><td><code>package-lock.json</code></td><td>The <a class="gl" href="#g-lock-file">lock file</a>: the exact version of every package, including transitive ones</td><td>Yes</td></tr>
+<tr><td><code>node_modules/</code></td><td>The downloaded packages themselves; can be huge</td><td>No. Add it to <code>.gitignore</code>; anyone can rebuild it</td></tr>
+</table></div>
+<div class="tbl"><table>
+<tr><th>Command</th><th>What it does</th></tr>
+<tr><td><code>npm init -y</code></td><td>Creates a <code>package.json</code> with default values</td></tr>
+<tr><td><code>npm install dayjs</code></td><td>Adds a runtime dependency to package.json and node_modules</td></tr>
+<tr><td><code>npm install -D prettier</code></td><td>Adds a <b>dev dependency</b>: needed to build or test, not to run</td></tr>
+<tr><td><code>npm install</code></td><td>Installs everything package.json lists (used after cloning a project)</td></tr>
+<tr><td><code>npm ci</code></td><td>Clean install for CI: removes node_modules, installs exactly what the lock file says, and fails if package.json and the lock file disagree</td></tr>
+<tr><td><code>npm run test</code> (or <code>npm test</code>)</td><td>Runs the script named <code>test</code> in package.json</td></tr>
+<tr><td><code>npm ls</code></td><td>Shows the installed packages as a tree</td></tr>
+<tr><td><code>npm outdated</code></td><td>Lists packages with newer versions available</td></tr>
+<tr><td><code>npm audit</code></td><td>Checks installed packages against a database of known vulnerabilities</td></tr>
+<tr><td><code>npx playwright test</code></td><td>Runs a package's command; downloads the package first if needed</td></tr>
+</table></div>
+<p><a class="gl" href="#g-npx">npx</a> deserves a sentence of its own. <code>npx playwright test</code> runs the <code>playwright</code> command from this project's node_modules. <code>npx @playwright/mcp@latest</code>, which you saw in <a href="#ch102">Chapter 102</a>, downloads and runs a package you haven't installed. That is convenient, and it also means you are running whatever the registry hands you at that moment.</p>
+<h4>Reading version ranges</h4>
+<p>npm versions follow <a class="gl" href="#g-semantic-versioning">semantic versioning</a>: <code>MAJOR.MINOR.PATCH</code>, such as <code>1.11.23</code>. A major bump may break your code; minor adds features; patch fixes bugs. In package.json you'll see ranges:</p>
+<div class="tbl"><table>
+<tr><th>Written as</th><th>Means</th><th>Example matches for 1.11.23</th></tr>
+<tr><td><code>^1.11.23</code> (npm's default)</td><td>Same major version, this or newer</td><td>1.11.24, 1.12.0, but not 2.0.0</td></tr>
+<tr><td><code>~1.11.23</code></td><td>Same minor version, this or newer</td><td>1.11.24, but not 1.12.0</td></tr>
+<tr><td><code>1.11.23</code></td><td>Exactly this version</td><td>Only 1.11.23</td></tr>
+</table></div>
+
+<h3 id="ch58-6"><span class="num">58.6</span>Lock files: the cure for "works on my machine"</h3>
+<p>A range like <code>^1.11.23</code> means two people installing a week apart can get different versions. Usually that's harmless. Sometimes a "minor" release changes behaviour and one person's tests fail while another's pass. The <a class="gl" href="#g-lock-file">lock file</a> fixes this by recording the exact version that was actually installed, for every package in the tree. Commit it, and everyone (including CI) installs the same set.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>A team's Playwright suite goes red in CI on Monday morning with "locator.click: Timeout exceeded", but passes on every laptop. Nobody changed the tests. The pipeline ran <code>npm install</code>, not <code>npm ci</code>, and the lock file had never been committed, so CI picked up a newer release of a dependency than the laptops had. The fix: commit <code>package-lock.json</code>, switch CI to <code>npm ci</code>, and upgrade on purpose in a separate pull request where a test failure is expected and investigated. (Illustrative scenario.)</p></div>
+<div class="tbl"><table>
+<tr><th>Ecosystem</th><th>Declares what you want</th><th>Lock file (exact versions)</th></tr>
+<tr><td>npm</td><td>package.json</td><td>package-lock.json</td></tr>
+<tr><td>uv</td><td>pyproject.toml</td><td>uv.lock</td></tr>
+<tr><td>pip</td><td>requirements.txt (often written by hand with ranges)</td><td>No built-in lock; <code>pip freeze &gt; requirements.txt</code> records exact versions as a simple substitute</td></tr>
+</table></div>
+
+<h3 id="ch58-7"><span class="num">58.7</span>Python: which one have you got?</h3>
+<p><a class="gl" href="#g-python">Python</a> is the language of most AI tooling and much test automation. You may have more than one copy already, which is where confusion starts.</p>
+<div class="code"><span class="cap">Terminal</span><pre>python3 --version    <span class="c"># for example Python 3.13.9</span>
+which python3        <span class="c"># which copy your shell runs, e.g. /opt/homebrew/bin/python3</span>
+python --version     <span class="c"># on many Macs this is "command not found"; use python3</span></pre></div>
+<div class="tbl"><table>
+<tr><th>Series</th><th>First released</th><th>Status on 9 Nov 2026</th><th>Support ends</th></tr>
+<tr><td>3.15</td><td>October 2026</td><td>Bug fixes (newest)</td><td>October 2031</td></tr>
+<tr><td>3.14</td><td>October 2025</td><td>Bug fixes</td><td>October 2030</td></tr>
+<tr><td>3.13</td><td>October 2024</td><td>Security fixes only</td><td>October 2029</td></tr>
+<tr><td>3.12</td><td>October 2023</td><td>Security fixes only</td><td>October 2028</td></tr>
+<tr><td>3.11</td><td>October 2022</td><td>Security fixes only</td><td>October 2027</td></tr>
+<tr><td>3.10 and older</td><td>2021 and earlier</td><td>End of life</td><td>3.10 ended October 2026</td></tr>
+</table></div>
+<p>Source: python.org downloads page, checked 9 November 2026. All code in Chapters 59 and 60 was tested on Python 3.11 and uses nothing newer, so any supported version works. Ways to install: <code>brew install python</code>, the installer from <a href="https://www.python.org/downloads/" target="_blank" rel="noopener">python.org</a> (the usual choice on Windows), your Linux package manager, or <code>uv python install</code> (58.9).</p>
+<div class="box warn"><span class="tag">"externally-managed-environment"</span><p>If you run <code>pip install requests</code> against a Homebrew or Linux system Python, pip may refuse with an <code>externally-managed-environment</code> error. That's deliberate (Python's PEP 668): the operating system or Homebrew manages that Python, and installing into it can break their tools. Don't override it with <code>--break-system-packages</code>. Create a virtual environment instead (next section). The error is protecting you.</p></div>
+
+<h3 id="ch58-8"><span class="num">58.8</span>pip and virtual environments</h3>
+<p>A <a class="gl" href="#g-virtual-environment">virtual environment</a> is a folder, conventionally <code>.venv</code>, inside your project. It holds links to a Python interpreter plus that project's own installed packages. Project A can have one version of <code>requests</code> and project B another, and neither touches the system Python. Use one for every project. It costs nothing and prevents a whole class of problems.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A virtual environment is like a separate toolbox for each job. The plumber's box and the electrician's box can both contain a screwdriver of a different size, and neither tradesperson borrows the wrong one. The system Python is the shared workshop wall: you don't hang your own tools on it.</p></div>
+<div class="code"><span class="cap">Terminal (macOS / Linux)</span><pre>mkdir qa-py-lab &amp;&amp; cd qa-py-lab
+python3 -m venv .venv            <span class="c"># create the environment</span>
+source .venv/bin/activate        <span class="c"># switch this terminal into it; the prompt shows (.venv)</span>
+which python                     <span class="c"># now points inside .venv</span>
+python -m pip install requests   <span class="c"># installs into .venv only</span>
+python -m pip freeze &gt; requirements.txt   <span class="c"># record exact versions</span>
+deactivate                       <span class="c"># leave the environment</span></pre></div>
+<div class="code"><span class="cap">Windows PowerShell</span><pre>py -m venv .venv
+.venv\Scripts\Activate.ps1       <span class="c"># if blocked, see troubleshooting in the lab</span>
+python -m pip install requests</pre></div>
+<p>Two habits pay off. First, write <code>python -m pip</code> rather than bare <code>pip</code>: it guarantees pip installs into the Python you're actually running. Second, add <code>.venv/</code> to <code>.gitignore</code>. Commit <code>requirements.txt</code> instead; a colleague recreates your setup with <code>python -m pip install -r requirements.txt</code> in their own fresh environment.</p>
+<details class="deep"><summary>Under the hood: what "activate" really changes</summary><div class="body">
+<p>Activation is less magical than it sounds. The <code>activate</code> script puts <code>.venv/bin</code> at the front of your PATH and sets a <code>VIRTUAL_ENV</code> environment variable. So when you type <code>python</code>, the shell finds <code>.venv/bin/python</code> first. That Python looks for packages in <code>.venv/lib/pythonX.Y/site-packages</code> rather than the system location. You can skip activation entirely by calling the environment's Python directly: <code>.venv/bin/python script.py</code>. That is exactly what CI scripts and tools such as uv often do.</p>
+</div></details>
+
+<h3 id="ch58-9"><span class="num">58.9</span>uv: the all-in-one alternative</h3>
+<p><a class="gl" href="#g-uv">uv</a>, from the company Astral, is a newer Python tool that does the jobs of pip, venv and a Python version manager in one fast program. Many recent projects and several AI SDK quick-starts show uv commands next to pip ones (for example, the Claude Agent SDK documents both <code>pip install claude-agent-sdk</code> and <code>uv add claude-agent-sdk</code>). You don't have to switch, but you should recognise it.</p>
+<div class="code"><span class="cap">Terminal</span><pre><span class="c"># install (pick one; commands from the uv documentation)</span>
+curl -LsSf https://astral.sh/uv/install.sh | sh     <span class="c"># macOS / Linux</span>
+brew install uv                                     <span class="c"># Homebrew</span>
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"   <span class="c"># Windows</span>
+
+<span class="c"># a project, uv style</span>
+uv init qa-tools        <span class="c"># creates a folder with pyproject.toml, .python-version and starter code</span>
+cd qa-tools
+uv add requests         <span class="c"># adds to pyproject.toml, writes uv.lock, creates .venv</span>
+uv run check.py         <span class="c"># runs your script inside the project environment; no activation needed</span>
+uv sync                 <span class="c"># make .venv match uv.lock (after cloning, for example)</span></pre></div>
+<div class="tbl"><table>
+<tr><th>Task</th><th>pip + venv</th><th>uv</th></tr>
+<tr><td>Create an environment</td><td><code>python3 -m venv .venv</code></td><td><code>uv venv</code> (or automatic with <code>uv add</code>)</td></tr>
+<tr><td>Add a package</td><td><code>python -m pip install requests</code></td><td><code>uv add requests</code></td></tr>
+<tr><td>Record exact versions</td><td><code>pip freeze &gt; requirements.txt</code></td><td>Automatic: <code>uv.lock</code></td></tr>
+<tr><td>Recreate on another machine</td><td><code>pip install -r requirements.txt</code></td><td><code>uv sync</code></td></tr>
+<tr><td>Run a script</td><td>Activate, then <code>python main.py</code></td><td><code>uv run main.py</code></td></tr>
+</table></div>
+<div class="box opinion"><span class="tag">Opinion · this book's authors</span><p>For a beginner, learn pip and venv first: they come with Python, every tutorial uses them, and they show you what is really going on. Adopt uv when your team does, or when you start juggling several projects and Python versions. Either is a sound choice; mixing both in one project is the thing to avoid.</p></div>
+
+<h3 id="ch58-10"><span class="num">58.10</span>Global versus local, and installing safely</h3>
+<div class="cols2">
+<div><h4>Global (machine-wide)</h4><p>Command-line tools you use everywhere: Git, jq, Node itself, Python itself, uv, Claude Code. Install these with Homebrew (or <code>npm install -g</code> for a few Node tools). One copy, available in every folder.</p></div>
+<div><h4>Local (per project)</h4><p>Libraries your code imports, and project-specific tools such as Playwright or pytest. Install these into <code>node_modules</code> or <code>.venv</code> so each project records and controls its own versions.</p></div>
+</div>
+<p>A good rule: if it appears in your code's <code>import</code> or <code>require</code>, or a teammate needs the same version to reproduce your results, it's local.</p>
+<div class="box warn"><span class="tag">Never use sudo with npm or pip</span><p><code>sudo npm install -g …</code> and <code>sudo pip install …</code> run a stranger's install scripts as the all-powerful root user and leave files your normal account can't update. Anthropic's Claude Code install guide says explicitly not to use sudo with the npm route. If you get "EACCES: permission denied", fix the cause: use a Node version manager, Homebrew's Node, or a virtual environment.</p></div>
+<h4>Every package is code you run</h4>
+<p>Installing a package runs someone else's code on your machine, sometimes immediately (npm packages can declare install scripts). That is a real attack route, known as a <b>supply-chain attack</b>. A basic checklist for testers and AI users:</p>
+<ul>
+<li><b>Check the name carefully.</b> Attackers publish look-alikes (<b>typosquatting</b>), such as one letter off a popular package. AI assistants occasionally suggest package names that don't exist, and attackers have registered such names. Confirm a package on its registry page before installing.</li>
+<li><b>Prefer well-used, maintained packages</b> with a linked source repository.</li>
+<li><b>Commit lock files</b> and use <code>npm ci</code> in CI, so an upstream change can't slip in silently.</li>
+<li><b>Run <code>npm audit</code></b> (or your company's scanner) and read what it reports rather than blindly forcing fixes.</li>
+<li><b>Pin versions</b> for anything that runs with access to secrets, such as MCP servers (<a href="#ch99">Chapter 99</a>).</li>
+</ul>
+<div class="box example"><span class="tag">Real-world example: Claude Code and installs</span><p>Claude Code will often want to run <code>npm install</code> or <code>pip install</code> while working. Under the default permission mode it asks first. Read the package name before approving, exactly as you would when a colleague asks. A team can pre-approve safe project commands, such as <code>Bash(npm run *)</code>, in settings (<a href="#ch78">Chapter 78</a>), while still being asked about new installs.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Lab: one Node project and one Python project</b><span>30 min · your own machine (macOS, Linux or WSL)</span></div><ol>
+<li>Check what you have: <code>brew --version</code>, <code>node --version</code>, <code>python3 --version</code>. Install anything missing with Homebrew (<code>brew install node</code>, <code>brew install python</code>) or the official installers.<span class="expect">Version numbers print for all three. Node should be 22 or newer, Python 3.11 or newer.</span></li>
+<li>Create a Node project: <code>mkdir -p ~/labs/qa-node-lab &amp;&amp; cd ~/labs/qa-node-lab</code>, then <code>npm init -y</code>.<span class="expect">A <code>package.json</code> appears, with "name": "qa-node-lab".</span></li>
+<li>Install a small date library: <code>npm install dayjs</code>. Run <code>ls</code> and <code>cat package.json</code>.<span class="expect">"added 1 package". You now have <code>node_modules/</code>, <code>package-lock.json</code>, and a "dependencies" entry like <code>"dayjs": "^1.11.23"</code> (your version may be newer).</span></li>
+<li>Create <code>index.js</code> with this code and run <code>node index.js</code>:
+<div class="code"><span class="cap">index.js</span><pre>const dayjs = require('dayjs');
+const release = dayjs('2026-12-01');
+console.log(`Release is ${release.diff(dayjs('2026-11-09'), 'day')} days after 9 Nov 2026`);</pre></div>
+<span class="expect"><code>Release is 22 days after 9 Nov 2026</code></span></li>
+<li>Prove node_modules is disposable: <code>rm -rf node_modules</code>, then <code>npm ci</code>, then <code>node index.js</code> again.<span class="expect">The same output. The lock file rebuilt exactly what you had.</span></li>
+<li>Run <code>npm ls</code> and <code>npm audit</code>.<span class="expect">A one-line tree (<code>└── dayjs@1.11.x</code>) and "found 0 vulnerabilities".</span></li>
+<li>Now Python: <code>mkdir -p ~/labs/qa-py-lab &amp;&amp; cd ~/labs/qa-py-lab</code>, then <code>python3 -m venv .venv</code> and <code>source .venv/bin/activate</code>.<span class="expect">Your prompt starts with <code>(.venv)</code>, and <code>which python</code> prints a path ending in <code>qa-py-lab/.venv/bin/python</code>.</span></li>
+<li>Install and record: <code>python -m pip install requests</code>, then <code>python -m pip freeze</code>.<span class="expect">Five lines: certifi, charset-normalizer, idna, requests and urllib3, each with <code>==</code> and a version. You asked for one package and got four transitive dependencies.</span></li>
+<li>Save them: <code>python -m pip freeze &gt; requirements.txt</code>, then <code>deactivate</code> and run <code>python3 -c "import requests"</code>.<span class="expect">Outside the environment you probably get <code>ModuleNotFoundError: No module named 'requests'</code>. That's isolation working: the package lives only in <code>.venv</code>.</span></li>
+<li>Optional: if you installed uv, run <code>cd ~/labs &amp;&amp; uv init qa-uv-lab &amp;&amp; cd qa-uv-lab &amp;&amp; uv add requests</code>, then <code>uv run python -c "import requests; print('requests', requests.__version__)"</code>.<span class="expect">uv creates <code>.venv</code> and <code>uv.lock</code> and prints something like <code>requests 2.34.2</code>. The starter files <code>uv init</code> creates differ between uv versions (recent versions make a small package under <code>src/</code>); that doesn't matter here.</span></li>
+</ol>
+<p><b>Troubleshooting</b></p>
+<ul>
+<li><b>"command not found: brew" right after installing:</b> run the "Next steps" lines the installer printed, or open a new terminal.</li>
+<li><b>"EACCES: permission denied" from npm:</b> don't use sudo. Install Node through nvm or Homebrew so global packages live in a folder you own.</li>
+<li><b><code>externally-managed-environment</code> from pip:</b> you're not in a virtual environment. Activate <code>.venv</code> first.</li>
+<li><b>PowerShell refuses to run <code>Activate.ps1</code>:</b> your execution policy blocks scripts. Ask IT, or run <code>Set-ExecutionPolicy -Scope CurrentUser RemoteSigned</code> if your company policy allows it.</li>
+<li><b>Company laptop blocks installs or the registry:</b> ask IT for the approved route. Many companies run an internal registry mirror, which npm and pip can be pointed at. Alternatively, do the lab in a browser-based environment such as GitHub Codespaces.</li>
+<li><b>Proxy or certificate errors (<code>SELF_SIGNED_CERT_IN_CHAIN</code>, <code>SSL: CERTIFICATE_VERIFY_FAILED</code>):</b> a corporate proxy is inspecting traffic. Get the company's certificate setup from IT. Don't turn off certificate checking.</li>
+</ul></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"I installed it, so it should work everywhere."</dt><dd>Local packages exist only in that project's node_modules or .venv. Global commands also need their folder on your PATH.</dd>
+<dt>"node_modules should be committed so others have the same code."</dt><dd>Commit the lock file instead. node_modules is rebuilt from it with <code>npm ci</code>.</dd>
+<dt>"pip and python are always the same Python."</dt><dd>Not necessarily. <code>python -m pip</code> guarantees they match.</dd>
+<dt>"sudo fixes permission errors."</dt><dd>It hides the cause and runs install scripts as root. Fix the install location instead.</dd>
+<dt>"If an AI suggests a package, it exists and is safe."</dt><dd>Models can suggest packages that don't exist or are malicious look-alikes. Check the registry page first.</dd>
+</dl></div>
+
+<h3 id="ch58-r"><span class="num">58.11</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>A package manager resolves, downloads, unpacks, links and records packages and their dependencies.</li>
+<li>Homebrew installs machine-wide tools on macOS and Linux; npm, pip and uv install project libraries locally.</li>
+<li>Use Node.js LTS releases (22, 24 and 26 on 9 Nov 2026); nvm switches versions per project via <code>.nvmrc</code>.</li>
+<li>npm: package.json declares, package-lock.json locks, node_modules holds; CI uses <code>npm ci</code>.</li>
+<li>Python: one virtual environment per project, <code>python -m pip</code>, and a recorded requirements.txt or uv.lock.</li>
+<li>Commit lock files, never use sudo for installs, and check every package name before installing it.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">CI fails but every laptop passes, and nobody changed the tests. The pipeline runs <code>npm install</code> and package-lock.json isn't committed. What is the most likely cause?</p><div class="opts"><button>Node.js is non-deterministic</button><button data-ok>CI resolved newer dependency versions than the laptops have</button><button>npm install never installs dev dependencies</button></div><p class="why" hidden>Without a committed lock file, version ranges can resolve differently over time. Commit the lock file and use <code>npm ci</code>.</p></div>
+<div class="qz"><p class="q">pip says <code>externally-managed-environment</code>. What should you do?</p><div class="opts"><button>Add <code>--break-system-packages</code></button><button>Run it with sudo</button><button data-ok>Create and activate a virtual environment, then install there</button></div><p class="why" hidden>The error protects a Python managed by the OS or Homebrew. A virtual environment is the intended route.</p></div>
+<div class="qz"><p class="q">package.json says <code>"dayjs": "^1.11.23"</code>. Which version could npm install?</p><div class="opts"><button>2.0.0</button><button data-ok>1.12.0</button><button>1.10.9</button></div><p class="why" hidden>A caret allows newer minor and patch releases within the same major version, from 1.11.23 upwards.</p></div>
+<div class="qz"><p class="q">Which belongs in Git?</p><div class="opts"><button>node_modules/ and .venv/</button><button data-ok>package.json, package-lock.json and requirements.txt (or uv.lock)</button><button>Only package.json; lock files are generated</button></div><p class="why" hidden>Declarations and lock files are small and make installs reproducible; the installed folders are rebuilt from them.</p></div>
+<div class="qz"><p class="q">What does <code>npx @playwright/mcp@latest</code> do if the package isn't installed?</p><div class="opts"><button>Fails with "command not found"</button><button data-ok>Downloads the latest published version and runs it</button><button>Installs it globally for every project</button></div><p class="why" hidden>That convenience is also a risk: you run whatever is latest at that moment. Pin versions for tools with access to secrets.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick one real repository your team uses for test automation. Write a one-page "setup audit": which package managers it uses; whether lock files are committed; which Node or Python version it expects, and whether that's written down (<code>.nvmrc</code>, <code>.python-version</code>, a README line or the CI config); whether CI uses <code>npm ci</code> or <code>npm install</code>; and the output of <code>npm audit</code> or <code>npm outdated</code>. Finish with up to three recommended changes, each with a reason.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"A package manager is an app store for code. Homebrew installs tools for your whole Mac; npm and pip install libraries into one project. Each project lists what it wants in package.json or requirements, and a lock file records the exact versions it actually got. Commit the lock file and CI gets the same versions you tested with. For Python, always make a virtual environment, a private toolbox per project, so projects can't break each other. And never sudo an install: every package is someone else's code running on your machine."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Homebrew, <a href="https://brew.sh/" target="_blank" rel="noopener">brew.sh</a> (install command, prefixes) and <a href="https://docs.brew.sh/" target="_blank" rel="noopener">documentation</a>.</li>
+<li>Node.js, <a href="https://nodejs.org/en/about/previous-releases" target="_blank" rel="noopener">Node.js releases</a> (LTS status, release schedule change from Node 27).</li>
+<li>nvm, <a href="https://github.com/nvm-sh/nvm" target="_blank" rel="noopener">nvm README</a> (install, <code>nvm install --lts</code>, <code>.nvmrc</code>, Windows support).</li>
+<li>npm Docs, <a href="https://docs.npmjs.com/cli/commands/npm-ci" target="_blank" rel="noopener">npm ci</a>, <a href="https://docs.npmjs.com/cli/configuring-npm/package-lock-json" target="_blank" rel="noopener">package-lock.json</a>, <a href="https://docs.npmjs.com/cli/commands/npx" target="_blank" rel="noopener">npx</a> and <a href="https://docs.npmjs.com/about-semantic-versioning" target="_blank" rel="noopener">semantic versioning</a>.</li>
+<li>Python, <a href="https://www.python.org/downloads/" target="_blank" rel="noopener">downloads and release status</a>; <a href="https://docs.python.org/3/library/venv.html" target="_blank" rel="noopener">venv</a>; <a href="https://peps.python.org/pep-0668/" target="_blank" rel="noopener">PEP 668: externally managed environments</a>; <a href="https://packaging.python.org/en/latest/tutorials/installing-packages/" target="_blank" rel="noopener">Installing packages</a>.</li>
+<li>Astral, <a href="https://docs.astral.sh/uv/getting-started/installation/" target="_blank" rel="noopener">uv installation</a> and <a href="https://docs.astral.sh/uv/guides/projects/" target="_blank" rel="noopener">working on projects</a>.</li>
+<li>Anthropic, Claude Code setup (install routes, no sudo with npm) and Agent SDK install commands, from <code>research/claude-code-interface.md</code> and <code>research/claude-code-config.md</code>.</li>
+</ol><p class="verified">Verified 9 November 2026 against brew.sh, the Node.js releases page, the nvm README, the uv documentation and python.org. Lab commands tested with Node 25 / npm 11 and Python 3.11 on macOS.</p></div>

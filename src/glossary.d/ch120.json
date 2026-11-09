@@ -1,0 +1,42 @@
+{
+ "Equivalence partitioning": {
+  "d": "A test design technique: split all possible inputs into groups (partitions) that the system should treat the same way, then test one value from each group instead of every value.",
+  "see": "ch120"
+ },
+ "Boundary value analysis": {
+  "d": "A test design technique that tests values at the edges of each valid range (just below, on, and just above the limit), because bugs cluster at boundaries.",
+  "see": "ch120"
+ },
+ "Decision table": {
+  "d": "A table listing every combination of conditions and the expected action for each, used to test business rules with several inputs.",
+  "see": "ch120"
+ },
+ "Pairwise testing": {
+  "d": "A combinatorial technique that covers every pair of input values at least once, using far fewer test cases than testing every combination.",
+  "see": "ch120"
+ },
+ "Gherkin": {
+  "d": "A plain-language format for describing behaviour as scenarios using Given (starting state), When (action) and Then (expected result). Used in BDD tools such as Cucumber.",
+  "see": "ch120"
+ },
+ "Traceability matrix": {
+  "d": "A table that links each requirement to the tests that cover it, so you can see what is tested, what isn't, and what a change affects.",
+  "see": "ch120"
+ },
+ "Assertion": {
+  "d": "The check inside an automated test that decides pass or fail, for example 'the total shown should be £90'. A test without a meaningful assertion proves nothing.",
+  "see": "ch121"
+ },
+ "Page object": {
+  "d": "A test-automation pattern where each page or component of an app gets one class holding its locators and actions, so tests read clearly and selectors are changed in one place.",
+  "see": "ch121"
+ },
+ "Flaky test": {
+  "d": "An automated test that sometimes passes and sometimes fails without any change to the code, usually because of timing, shared state or unstable test data.",
+  "see": "ch122"
+ },
+ "Fixture": {
+  "d": "In a test framework, reusable setup (and clean-up) that tests ask for by name, such as a logged-in page or a fresh test user.",
+  "see": "ch121"
+ }
+}

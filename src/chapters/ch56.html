@@ -1,0 +1,302 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What environment variables are, how to read, set, export and remove them, and how programs inherit them</li>
+<li>How <code>PATH</code> decides which program runs when you type a name, and how <code>which</code> shows you</li>
+<li>What <code>.zshrc</code> (and <code>.bashrc</code>) are for, and how to change them safely</li>
+<li>What a process is; how to list, watch and stop processes with <code>ps</code>, <code>top</code> and <code>kill</code></li>
+<li>How to run jobs in the background with <code>&amp;</code>, <code>jobs</code>, <code>fg</code>, <code>bg</code> and Ctrl+Z</li>
+<li>How to read file permissions, change them with <code>chmod</code>, and use <code>sudo</code> carefully</li>
+<li>How to call a web address from the terminal with <code>curl</code> (and <code>wget</code>)</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch54">Chapter 54</a> (first commands, <code>nano</code>) and <a href="#ch55">Chapter 55</a> (pipes, redirection and exit codes). <a href="#ch85">Chapter 85</a> explains HTTP and JSON if the <code>curl</code> section is your first contact with APIs.</div>
+
+<div class="bigidea"><p>Your shell is not just a place to type commands. It carries settings (environment variables) that every program you start can read, such as which test environment to use or where to look for programs. Every program you start becomes a process with its own number, which you can list, watch and stop. Every file carries permissions that say who may read it, change it or run it. And <code>curl</code> lets you talk to any web server or API straight from the terminal. Together, these explain most "it works on my machine" mysteries.</p></div>
+
+<h3 id="ch56-1"><span class="num">56.1</span>Environment variables</h3>
+<p>A <strong>variable</strong> is a name with a value attached, like <code>TEST_ENV=staging</code>. An <a class="gl" href="#g-environment-variable">environment variable</a> is one that the shell passes on to every program it starts. Programs read them for settings: which browser to use, which server to test, which API key to send. Names are usually in CAPITALS by convention.</p>
+<p>To read a variable, put <code>$</code> in front of its name. <code>echo</code> prints whatever you give it:</p>
+<div class="code"><span class="cap">Terminal</span><pre>echo $HOME
+echo $SHELL
+echo $USER</pre></div>
+<div class="code"><span class="cap">Output (on one Mac; yours shows your own user name)</span><pre>/Users/alex
+/bin/zsh
+alex</pre></div>
+<p><code>HOME</code> is your home folder (the <code>~</code> from <a href="#ch53">Chapter 53</a>), <code>SHELL</code> is your login shell, and <code>USER</code> is your account name. To see all of them, run <code>env</code> (or <code>printenv</code>). It prints one <code>NAME=value</code> per line, usually dozens; pipe it into <code>sort</code> or <code>grep</code> to find what you want: <code>env | grep -i proxy</code>.</p>
+
+<h4>Setting, exporting and removing</h4>
+<div class="tbl"><table>
+<tr><th>Command</th><th>What it does</th></tr>
+<tr><td><code>TEST_ENV=staging</code></td><td>Create a <strong>shell variable</strong>. No spaces around <code>=</code>. Only this shell can see it.</td></tr>
+<tr><td><code>export TEST_ENV</code></td><td>Turn it into an environment variable, so programs started from this shell inherit it</td></tr>
+<tr><td><code>export TEST_ENV=staging</code></td><td>Both steps at once (the usual form)</td></tr>
+<tr><td><code>TEST_ENV=uat npx playwright test</code></td><td>Set it for <strong>that one command only</strong>; the shell itself is unchanged afterwards</td></tr>
+<tr><td><code>unset TEST_ENV</code></td><td>Remove it</td></tr>
+</table></div>
+<p>The difference between a shell variable and an exported one is the most common source of confusion, so here is the proof. <code>zsh -c "…"</code> starts a new, separate shell (a child) that runs one command and exits:</p>
+<div class="code"><span class="cap">Terminal</span><pre>TEST_ENV=staging
+zsh -c 'echo "child sees: ($TEST_ENV)"'
+export TEST_ENV
+zsh -c 'echo "child sees: ($TEST_ENV)"'
+unset TEST_ENV
+echo "after unset: ($TEST_ENV)"</pre></div>
+<div class="code"><span class="cap">Output</span><pre>child sees: ()
+child sees: (staging)
+after unset: ()</pre></div>
+<p>Before <code>export</code>, the child saw nothing. After it, the child inherited the value. The single quotes stop <em>our</em> shell expanding <code>$TEST_ENV</code>, so the child does it. An unset or unknown variable is simply empty; there's no error.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A shell variable is a sticky note on your own monitor. Exporting it is photocopying the note and stapling it to every task you hand to someone else. They get a copy as it was at that moment. If they scribble on their copy, your note doesn't change, and a child process can never change its parent's variables.</p></div>
+<div class="box example"><span class="tag">Real-world example: one suite, many environments</span><p>A Playwright config can read <code>process.env.BASE_URL</code>, and a pytest fixture can read <code>os.environ["BASE_URL"]</code>. The same test code then runs against any environment: <code>BASE_URL=https://staging.example.test npx playwright test</code> locally, and CI sets <code>BASE_URL</code> for each stage. Secrets such as API tokens are passed the same way, so they never appear in the code (<a href="#ch98">Chapter 98</a> covers keys and secrets).</p></div>
+<div class="box warn"><span class="tag">Secrets in the terminal</span><p>Typing <code>export API_TOKEN=abc123</code> saves that line in your shell history file. Prefer reading secrets from a password manager or a <code>.env</code> file that is listed in <code>.gitignore</code>, and never paste the output of <code>env</code> into a ticket, chat or AI prompt without removing secrets first.</p></div>
+<div class="tbl"><table>
+<tr><th>System</th><th>Notes</th></tr>
+<tr><td>Linux</td><td>Identical in Bash and zsh.</td></tr>
+<tr><td>Windows PowerShell</td><td>Read with <code>$env:HOME</code> or <code>$env:USERPROFILE</code>; set for the session with <code>$env:TEST_ENV = "staging"</code>; list with <code>Get-ChildItem env:</code>. In Command Prompt: <code>set TEST_ENV=staging</code> and <code>%TEST_ENV%</code>. Permanent ones are set in System Properties → Environment Variables.</td></tr>
+</table></div>
+
+<h3 id="ch56-2"><span class="num">56.2</span>PATH and which</h3>
+<p>When you type <code>python3</code>, how does the shell know where that program is? It checks <a class="gl" href="#g-path">PATH</a>, an environment variable holding a list of folders separated by colons. The shell looks in each folder, in order, and runs the <strong>first</strong> match it finds. The output is hard to read as one long line, so swap the colons for new lines with <code>tr</code> ("translate characters"):</p>
+<div class="code"><span class="cap">Terminal</span><pre>echo $PATH | tr ":" "\n"</pre></div>
+<div class="code"><span class="cap">Output (shortened, from one Mac)</span><pre>/Users/alex/.local/bin
+/usr/local/bin
+/usr/bin
+/bin
+/usr/sbin
+/sbin</pre></div>
+<p><code>which</code> tells you which file will run. <code>which -a</code> lists every match on the PATH, in order:</p>
+<div class="code"><span class="cap">Terminal</span><pre>which git curl
+which -a python3
+type ls</pre></div>
+<div class="code"><span class="cap">Output</span><pre>/usr/bin/git
+/usr/bin/curl
+/usr/local/bin/python3
+/usr/bin/python3
+ls is /bin/ls</pre></div>
+<p>This Mac has two <code>python3</code> programs. Because <code>/usr/local/bin</code> comes earlier in PATH, that one wins. This is the classic cause of "I installed it but the old version still runs" or "it works in my terminal but not in CI". <code>type</code> is the more complete version: it also tells you when a name is an alias, a shell function or a built-in command rather than a file.</p>
+<p>If no folder on PATH contains the name, you get the message you'll see more than any other:</p>
+<div class="code"><span class="cap">Output</span><pre>zsh: command not found: nosuchtool</pre></div>
+<p>It means "not installed" or "installed in a folder that isn't on PATH". Installers often print a line telling you to add their folder.</p>
+<h4>Adding a folder to PATH</h4>
+<div class="code"><span class="cap">Terminal</span><pre>export PATH="$HOME/.local/bin:$PATH"   <span class="c"># put the new folder FIRST, keep the old list after it</span></pre></div>
+<p>The <code>$PATH</code> at the end keeps everything that was already there. Forgetting it (writing <code>export PATH="$HOME/.local/bin"</code>) replaces the whole list, and suddenly even <code>ls</code> is "command not found". If that happens, just close the terminal window and open a new one: the change only lived in that session.</p>
+<details class="deep"><summary>Under the hood: why the order is a security matter</summary><div class="body"><p>Because the first match wins, anyone who can write to a folder early in your PATH can make a program called <code>git</code> or <code>ls</code> that runs instead of the real one. That's why the current folder (<code>.</code>) is deliberately <em>not</em> on PATH on macOS and Linux, and why you must type <code>./run-tests.sh</code> rather than <code>run-tests.sh</code> to run a script in the current folder. Only add folders you own and trust.</p></div></details>
+<div class="tbl"><table>
+<tr><th>System</th><th>Notes</th></tr>
+<tr><td>Linux</td><td>Same idea. Some minimal systems lack <code>which</code>; <code>command -v git</code> works everywhere.</td></tr>
+<tr><td>Windows</td><td>PATH entries are separated by <code>;</code>. PowerShell: <code>$env:Path -split ";"</code> to list, <code>Get-Command git</code> instead of <code>which</code>. Command Prompt: <code>where git</code>.</td></tr>
+</table></div>
+
+<h3 id="ch56-3"><span class="num">56.3</span>Making settings permanent: .zshrc</h3>
+<p>Everything you <code>export</code> disappears when you close the window. To keep a setting, put the line in your shell's start-up file, which the shell runs every time a new interactive terminal opens.</p>
+<div class="tbl"><table>
+<tr><th>Shell</th><th>Main start-up file</th><th>Notes</th></tr>
+<tr><td>zsh (macOS default since 2019)</td><td><code>~/.zshrc</code></td><td><code>~/.zprofile</code> runs for login shells, and is where Homebrew's installer suggests adding its line</td></tr>
+<tr><td>Bash (default on most Linux)</td><td><code>~/.bashrc</code></td><td><code>~/.bash_profile</code> or <code>~/.profile</code> for login shells</td></tr>
+<tr><td>PowerShell</td><td>the file named by <code>$PROFILE</code></td><td>Create it with <code>New-Item -Force $PROFILE</code> if it doesn't exist</td></tr>
+</table></div>
+<p>The leading dot makes these <strong>hidden files</strong>, so use <code>ls -a ~</code> to see them. To add a line safely:</p>
+<div class="code"><span class="cap">Terminal</span><pre>cp ~/.zshrc ~/.zshrc.backup 2&gt; /dev/null   <span class="c"># keep a copy (no error if the file doesn't exist yet)</span>
+nano ~/.zshrc                              <span class="c"># add your line at the end, Ctrl+O to save, Ctrl+X to exit</span>
+source ~/.zshrc                            <span class="c"># re-read it in this window</span></pre></div>
+<p>Lines you might add:</p>
+<div class="code"><span class="cap">~/.zshrc (additions)</span><pre>export PATH="$HOME/.local/bin:$PATH"
+export TEST_ENV=staging
+alias qa='cd ~/qa-practice'      <span class="c"># an alias is a short nickname for a longer command</span></pre></div>
+<p><code>source</code> runs the file in the <em>current</em> shell, so the changes apply straight away. Opening a new terminal window does the same. If something breaks after an edit, restore the copy with <code>cp ~/.zshrc.backup ~/.zshrc</code> and open a new window.</p>
+<div class="box note"><span class="tag">Why CI doesn't see your settings</span><p>CI runners don't run your personal <code>.zshrc</code>. Anything your tests need (variables, PATH entries) must be set in the pipeline configuration. When a test passes locally but fails in CI with "command not found" or a missing variable, compare <code>env</code> on both.</p></div>
+
+<h3 id="ch56-4"><span class="num">56.4</span>Processes: ps, top and kill</h3>
+<p>A <a class="gl" href="#g-process">process</a> is a program that is currently running. Open the same app twice and you have two processes. Each gets a unique number, its <a class="gl" href="#g-process-id">process ID</a> or PID, and each knows its parent: the process that started it. Your terminal's shell is a process, and every command you run from it is a child process.</p>
+<h4>ps: a snapshot</h4>
+<div class="code"><span class="cap">Terminal</span><pre>ps</pre></div>
+<p>On its own, <code>ps</code> ("process status") lists processes belonging to your terminals, with four columns: <code>PID</code>, <code>TTY</code> (which terminal), <code>TIME</code> (CPU time used so far) and <code>CMD</code> (the command). To see everything on the machine, use the traditional options:</p>
+<div class="code"><span class="cap">Terminal</span><pre>ps aux | head -3                  <span class="c"># a = all users, u = user-friendly columns, x = include background processes</span>
+ps aux | grep -i chrome           <span class="c"># find a particular program</span>
+pgrep -l node                     <span class="c"># shortcut: PIDs and names of processes called node</span></pre></div>
+<div class="tbl"><table>
+<tr><th>Column in <code>ps aux</code></th><th>Meaning</th></tr>
+<tr><td><code>USER</code></td><td>Who owns the process</td></tr>
+<tr><td><code>PID</code></td><td>Its process ID</td></tr>
+<tr><td><code>%CPU</code>, <code>%MEM</code></td><td>Share of processor and memory it's using</td></tr>
+<tr><td><code>STAT</code></td><td>State: <code>R</code> running, <code>S</code> sleeping (waiting), <code>T</code> stopped, <code>Z</code> zombie (finished but not yet cleaned up)</td></tr>
+<tr><td><code>STARTED</code>, <code>TIME</code></td><td>When it started; total CPU time used</td></tr>
+<tr><td><code>COMMAND</code></td><td>The full command line, often very long</td></tr>
+</table></div>
+<h4>top: a live view</h4>
+<p><code>top</code> shows processes continuously, refreshing every second or so, with a summary of CPU and memory at the top. Press <code>q</code> to quit. On macOS, <code>top -o cpu</code> sorts by CPU and <code>top -o mem</code> by memory; inside Linux <code>top</code>, press <code>P</code> or <code>M</code>. Many people install <code>htop</code>, a friendlier version (<code>brew install htop</code> on macOS). macOS also has Activity Monitor, the graphical equivalent.</p>
+<div class="box example"><span class="tag">Real-world example: the runaway browser</span><p>After an interrupted Playwright run your laptop is slow. <code>ps aux | grep -i chrom</code> shows a dozen headless Chromium processes still alive. Their PIDs are in the second column, and you can stop them with <code>kill</code>. Leftover browsers, test servers still holding a port and stuck <code>node</code> processes are everyday QA debugging.</p></div>
+<h4>kill: ask a process to stop</h4>
+<p>Despite its name, <code>kill</code> sends a <strong>signal</strong>, a small message from the operating system, to a process by PID.</p>
+<div class="tbl"><table>
+<tr><th>Command</th><th>Signal</th><th>Effect</th></tr>
+<tr><td><code>kill 4321</code></td><td>TERM (15)</td><td>Polite request to finish. The program can tidy up first. Try this first.</td></tr>
+<tr><td>Ctrl+C in the terminal</td><td>INT (2)</td><td>Interrupt the program running in the foreground</td></tr>
+<tr><td><code>kill -9 4321</code></td><td>KILL (9)</td><td>Forced stop. The program gets no chance to save or clean up. Last resort.</td></tr>
+<tr><td><code>pkill -f playwright</code></td><td>TERM</td><td>Signal every process whose command line contains "playwright". Check first with <code>pgrep -fl playwright</code>.</td></tr>
+</table></div>
+<p>You can only signal your own processes unless you use <code>sudo</code>. If <code>kill</code> succeeds it prints nothing (and exit code 0); a wrong PID gives "No such process".</p>
+<div class="tbl"><table>
+<tr><th>System</th><th>Notes</th></tr>
+<tr><td>Linux</td><td><code>ps aux</code>, <code>kill</code>, <code>pgrep</code>, <code>pkill</code> are the same. For a one-off <code>top</code> snapshot: <code>top -b -n 1 | head</code>.</td></tr>
+<tr><td>Windows</td><td>PowerShell: <code>Get-Process</code> (alias <code>ps</code>), <code>Get-Process chrome</code>, <code>Stop-Process -Id 4321</code>. Command Prompt: <code>tasklist</code> and <code>taskkill /PID 4321</code>. Task Manager is the graphical view.</td></tr>
+</table></div>
+
+<h3 id="ch56-5"><span class="num">56.5</span>Background jobs: &amp;, jobs, fg and bg</h3>
+<p>Normally a command runs in the <strong>foreground</strong>: you wait until it finishes before you get the prompt back. Some commands, such as a local web server your tests need, never finish on their own. Put <code>&amp;</code> at the end to run it as a <a class="gl" href="#g-background-job">background job</a> and get your prompt straight back.</p>
+<div class="code"><span class="cap">Terminal</span><pre>sleep 300 &amp;      <span class="c"># sleep just waits for 300 seconds: a safe stand-in for a server</span>
+jobs</pre></div>
+<div class="code"><span class="cap">Output</span><pre>[1] 78216
+[1]  + running    sleep 300</pre></div>
+<p><code>[1]</code> is the <strong>job number</strong> (this shell's own short label) and <code>78216</code> is the PID (the system-wide number; yours will differ). <code>jobs</code> lists the jobs started from this shell; the <code>+</code> marks the current one.</p>
+<div class="tbl"><table>
+<tr><th>Command or key</th><th>What it does</th></tr>
+<tr><td><code>command &amp;</code></td><td>Start in the background</td></tr>
+<tr><td><code>jobs</code></td><td>List this shell's jobs (<code>jobs -l</code> adds PIDs)</td></tr>
+<tr><td><code>fg</code> or <code>fg %1</code></td><td>Bring job 1 to the foreground (then Ctrl+C stops it)</td></tr>
+<tr><td>Ctrl+Z</td><td>Pause (suspend) the foreground program and return to the prompt</td></tr>
+<tr><td><code>bg</code></td><td>Let the paused job carry on in the background</td></tr>
+<tr><td><code>kill %1</code></td><td>Send TERM to job 1 (the <code>%</code> means job number, not PID)</td></tr>
+<tr><td><code>$!</code></td><td>The PID of the most recent background job, handy in scripts</td></tr>
+</table></div>
+<p>A background job still writes its output to your terminal, which can scramble what you're typing. Redirect it: <code>npm run dev &gt; server.log 2&gt;&amp;1 &amp;</code>. Background jobs usually stop when you close the terminal window.</p>
+<div class="flow"><div><b>Start server</b><code>npm run dev &gt; server.log 2&gt;&amp;1 &amp;</code></div><div><b>Wait</b>until it answers (<code>curl</code>, section 56.7)</div><div class="hl"><b>Run tests</b><code>npx playwright test</code></div><div><b>Clean up</b><code>kill %1</code></div></div>
+<p><code>npm run dev</code> is the conventional script name in many JavaScript projects; use whatever starts your app. Playwright can also start and stop a server for you through the <code>webServer</code> option in its config.</p>
+
+<h3 id="ch56-6"><span class="num">56.6</span>File permissions, chmod and sudo</h3>
+<p>macOS and Linux record, for every file, who owns it and what each kind of user may do with it. <code>ls -l</code> shows this as the first column:</p>
+<div class="code"><span class="cap">Terminal</span><pre>ls -l hi.sh
+ls -ld logs</pre></div>
+<div class="code"><span class="cap">Output</span><pre>-rw-r--r--  1 alex  staff  21 Nov  9 14:42 hi.sh
+drwxr-xr-x  4 alex  staff  128 Nov  9 14:42 logs</pre></div>
+<p>(<code>-d</code> shows the folder itself rather than its contents. On macOS you may also see an <code>@</code> after the permissions, meaning the file has extra attributes, such as "downloaded from the internet"; ignore it for now.) The ten characters break down like this:</p>
+<div class="tbl"><table>
+<tr><th>Position</th><th>Characters in <code>-rw-r--r--</code></th><th>Meaning</th></tr>
+<tr><td>1</td><td><code>-</code></td><td>Type: <code>-</code> file, <code>d</code> directory, <code>l</code> link</td></tr>
+<tr><td>2–4</td><td><code>rw-</code></td><td><strong>User</strong> (owner, here <code>alex</code>): read, write, no execute</td></tr>
+<tr><td>5–7</td><td><code>r--</code></td><td><strong>Group</strong> (here <code>staff</code>): read only</td></tr>
+<tr><td>8–10</td><td><code>r--</code></td><td><strong>Others</strong> (everyone else): read only</td></tr>
+</table></div>
+<p><code>r</code> = read, <code>w</code> = write (change or delete), <code>x</code> = execute (run it as a program; for a folder, enter it). <code>-</code> means "not allowed". These are the <a class="gl" href="#g-file-permissions">file permissions</a>.</p>
+<h4>chmod: change mode</h4>
+<p>The file <code>hi.sh</code> is a tiny script. Without the <code>x</code> permission it can't be run:</p>
+<div class="code"><span class="cap">Terminal</span><pre>./hi.sh
+echo $?
+chmod +x hi.sh
+ls -l hi.sh
+./hi.sh</pre></div>
+<div class="code"><span class="cap">Output</span><pre>zsh: permission denied: ./hi.sh
+126
+-rwxr-xr-x  1 alex  staff  21 Nov  9 14:42 hi.sh
+hello</pre></div>
+<p>Exit code 126 is the shell's way of saying "found it, but couldn't run it". <code>chmod +x</code> added execute for everyone, and then it ran. <code>chmod</code> takes two styles of instruction:</p>
+<div class="cols2"><div><h4>Symbolic</h4><p><b>who</b> (<code>u</code> user, <code>g</code> group, <code>o</code> others, <code>a</code> all) + <b>action</b> (<code>+</code> add, <code>-</code> remove, <code>=</code> set exactly) + <b>what</b> (<code>r</code>, <code>w</code>, <code>x</code>).</p><p><code>chmod u+x run.sh</code> lets only you run it. <code>chmod go-w notes.txt</code> stops group and others changing it.</p></div><div><h4>Numeric</h4><p>Three digits for user, group, others. Each digit adds up read = 4, write = 2, execute = 1.</p><p><code>755</code> = <code>rwxr-xr-x</code> (scripts and folders). <code>644</code> = <code>rw-r--r--</code> (normal files). <code>600</code> = <code>rw-------</code> (private files such as keys).</p></div></div>
+<div class="box warn"><span class="tag">Don't "fix" errors with chmod 777</span><p><code>777</code> gives everyone on the machine permission to change and run the file. It makes "permission denied" go away and creates a security hole. Grant the smallest permission that works, usually <code>u+x</code> for a script or <code>600</code> for a file holding a secret.</p></div>
+<h4>sudo: run one command as the administrator</h4>
+<p><a class="gl" href="#g-sudo">sudo</a> ("superuser do") runs a single command with administrator (root) rights after asking for <em>your</em> password. Root can read, change and delete anything, so <code>sudo</code> switches off the safety net that permissions give you.</p>
+<ul>
+<li>Use it only when you understand why the command needs it, such as installing into a system folder when the instructions say so.</li>
+<li>Never paste a <code>sudo</code> command from a website, chat or AI answer that you can't explain line by line.</li>
+<li>Don't use it to work around "permission denied" in your own folders. If a tool wants <code>sudo</code> for something in your home folder, ownership is probably wrong; fix the cause instead. For example, npm's documentation fixes "permission denied" errors on global installs with a Node version manager or a folder you own, not with <code>sudo</code> (<a href="#ch58">Chapter 58</a>).</li>
+<li>Your password is not shown as you type it, not even as dots. That's normal. Your account must be an administrator to use <code>sudo</code>.</li>
+</ul>
+<div class="tbl"><table>
+<tr><th>System</th><th>Notes</th></tr>
+<tr><td>Linux</td><td>Same <code>rwx</code> model and <code>chmod</code>; groups vary by distribution. <code>sudo</code> is standard (your user must be in the <code>sudo</code> or <code>wheel</code> group).</td></tr>
+<tr><td>Windows</td><td>Uses access control lists instead (<code>icacls</code> shows them) and has no execute bit; PowerShell scripts are controlled by an execution policy (<a href="#ch57">Chapter 57</a>). The equivalent of <code>sudo</code> is "Run as administrator"; recent Windows 11 builds also offer a <code>sudo</code> command that you switch on in Settings. Inside WSL, Linux rules apply.</td></tr>
+</table></div>
+
+<h3 id="ch56-7"><span class="num">56.7</span>curl and wget: the web from the terminal</h3>
+<p><a class="gl" href="#g-curl">curl</a> sends a request to a URL and prints the reply. It's installed on macOS, most Linux systems and Windows 10 and 11. For testers it's the fastest way to check whether an environment is up, see a status code, or reproduce an API bug without opening Postman. (<a href="#ch85">Chapter 85</a> explains HTTP, status codes and JSON.)</p>
+<div class="code"><span class="cap">Terminal</span><pre>curl -s "https://httpbin.org/get?env=staging"</pre></div>
+<div class="code"><span class="cap">Output (origin removed)</span><pre>{
+  "args": {
+    "env": "staging"
+  },
+  "headers": {
+    "Accept": "*/*",
+    "Host": "httpbin.org",
+    "User-Agent": "curl/8.7.1"
+  },
+  "method": "GET",
+  "url": "https://httpbin.org/get?env=staging"
+}</pre></div>
+<p>httpbin.org is a free public service that echoes back what you send, which makes it ideal for practice. Quote URLs: in zsh an unquoted <code>?</code> is a wildcard and the command fails with <code>no matches found</code>.</p>
+<div class="tbl"><table>
+<tr><th>Option</th><th>Meaning</th></tr>
+<tr><td><code>-s</code></td><td>Silent: hide the progress meter</td></tr>
+<tr><td><code>-S</code></td><td>With <code>-s</code>, still show error messages</td></tr>
+<tr><td><code>-I</code></td><td>Fetch only the headers (a HEAD request); the first line shows the status, e.g. <code>HTTP/2 200</code></td></tr>
+<tr><td><code>-i</code></td><td>Include the response headers before the body</td></tr>
+<tr><td><code>-o FILE</code> / <code>-O</code></td><td>Save the body to FILE / to a file named like the URL</td></tr>
+<tr><td><code>-L</code></td><td>Follow redirects</td></tr>
+<tr><td><code>-X POST</code></td><td>Use another method (POST, PUT, DELETE)</td></tr>
+<tr><td><code>-H "Name: value"</code></td><td>Add a request header</td></tr>
+<tr><td><code>-d 'DATA'</code></td><td>Send a request body (implies POST)</td></tr>
+<tr><td><code>-w "%{http_code}\n"</code></td><td>Print chosen details after the transfer, such as the status code or <code>%{time_total}</code></td></tr>
+<tr><td><code>-f</code></td><td>Fail: exit with a non-zero code on HTTP errors (400 and above)</td></tr>
+</table></div>
+<div class="code"><span class="cap">Terminal</span><pre>curl -s -o /dev/null -w "%{http_code}\n" https://example.com
+curl -s -o /dev/null -w "%{http_code} %{time_total}s\n" https://httpbin.org/status/404
+curl -s -X POST -H "Content-Type: application/json" \
+     -d '{"test":"login_valid","status":"PASS"}' https://httpbin.org/post</pre></div>
+<div class="code"><span class="cap">Output (first two lines; the POST reply echoes your JSON back)</span><pre>200
+404 0.835841s</pre></div>
+<p>The first two lines are a smoke test in one line each: throw the body away (<code>-o /dev/null</code>) and print only the status code and time. The backslash <code>\</code> at the end of a line continues the command on the next line. With an authentication header, never type the token itself; use a variable: <code>-H "Authorization: Bearer $API_TOKEN"</code>.</p>
+<div class="box note"><span class="tag">Exit codes from curl</span><p>Without <code>-f</code>, curl exits 0 even for a 404 or 500 page, because the transfer itself worked. With <code>-f</code> it fails. curl documents exit code 22 for this; our Mac's curl 8.7.1 returned 22 over HTTP/1.1 (<code>--http1.1</code>) but 56 over HTTP/2. In scripts, test for "not zero" rather than one exact number. A host that doesn't exist gives exit code 6, "Could not resolve host".</p></div>
+<h4>wget</h4>
+<p><code>wget</code> is a download tool, standard on many Linux systems but not installed on macOS (<code>brew install wget</code> adds it). <code>wget URL</code> saves the file into the current folder; <code>wget -O name URL</code> chooses the file name; <code>-q</code> makes it quiet. It isn't on our test Mac, so no output is shown; on macOS <code>curl -L -O URL</code> does the same job.</p>
+<div class="tbl"><table>
+<tr><th>System</th><th>Notes</th></tr>
+<tr><td>Linux</td><td>curl and wget both commonly installed (<code>sudo apt install curl</code> on Ubuntu if not).</td></tr>
+<tr><td>Windows</td><td>In Windows PowerShell 5.1, <code>curl</code> is an alias for <code>Invoke-WebRequest</code>, which takes different options. Type <code>curl.exe</code> to get the real curl that ships with Windows 10 and 11.</td></tr>
+</table></div>
+
+<div class="lab"><div class="lab-h"><b>Configure, run, inspect and stop</b><span>30 min · macOS, Linux or WSL</span></div><ol>
+<li>Print three variables: <code>echo $HOME $SHELL $USER</code>.<span class="expect">your home folder, your shell (e.g. <code>/bin/zsh</code>) and your user name.</span></li>
+<li>Prove export works: run the four lines from section 56.1 (<code>TEST_ENV=staging</code>, <code>zsh -c …</code>, <code>export TEST_ENV</code>, <code>zsh -c …</code>). On Linux use <code>bash -c</code>.<span class="expect"><code>child sees: ()</code>, then <code>child sees: (staging)</code>.</span></li>
+<li>Try a one-command variable: <code>BASE_URL=https://example.test printenv BASE_URL</code>, then <code>echo "($BASE_URL)"</code>.<span class="expect"><code>https://example.test</code>, then <code>()</code>: it only existed for that one command.</span></li>
+<li>List your PATH, one folder per line: <code>echo $PATH | tr ":" "\n"</code>. Then run <code>which -a python3</code>.<span class="expect">a list of folders; one or more paths to <code>python3</code>. The first is the one that runs.</span></li>
+<li>Start a fake server: <code>sleep 300 &amp;</code>, then <code>jobs</code> and <code>ps</code>.<span class="expect"><code>[1]</code> and a PID; <code>jobs</code> shows it running; <code>ps</code> lists a <code>sleep 300</code> line with the same PID.</span></li>
+<li>Stop it: <code>kill %1</code>, then <code>jobs</code>.<span class="expect">a message that job 1 was terminated, then an empty list.</span></li>
+<li>Make a script: <code>printf '#!/bin/sh\necho hello\n' &gt; hi.sh</code>, then <code>./hi.sh</code>.<span class="expect"><code>permission denied</code>, and <code>echo $?</code> gives 126.</span></li>
+<li>Fix it: <code>chmod u+x hi.sh</code>, <code>ls -l hi.sh</code>, <code>./hi.sh</code>.<span class="expect"><code>-rwxr--r--</code>, then <code>hello</code>.</span></li>
+<li>Smoke-test two URLs: <code>curl -s -o /dev/null -w "%{http_code}\n" https://example.com</code> and the same for <code>https://httpbin.org/status/503</code>.<span class="expect"><code>200</code>, then <code>503</code>.</span></li>
+<li>Check failure detection: <code>curl -sf https://httpbin.org/status/503; echo $?</code>.<span class="expect">a non-zero number (22, or 56 on some curl versions).</span></li>
+</ol>
+<p><b>Troubleshooting.</b> No network or a company proxy blocks httpbin.org: use your own test environment's health URL instead. <code>kill %1</code> says "no such job": you're in a different window from the one where you started it; use <code>kill</code> with the PID. <code>zsh: no matches found</code> on a curl command: quote the URL.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"I set the variable, so my tests will see it."</dt><dd>Only if it's exported (or set on the same command line). A plain <code>NAME=value</code> stays inside your shell.</dd>
+<dt>"I added it to .zshrc but it doesn't work."</dt><dd>Already-open windows haven't re-read the file. Run <code>source ~/.zshrc</code> or open a new window. On Linux with Bash, the file is <code>~/.bashrc</code>.</dd>
+<dt>"kill -9 is the normal way to stop things."</dt><dd>It's the last resort. Plain <code>kill</code> lets the program clean up temporary files and close connections.</dd>
+<dt>"Permission denied means I need sudo."</dt><dd>Usually it means a script lacks <code>x</code>, or you're writing somewhere you shouldn't. Read the message and fix the cause.</dd>
+<dt>"curl's exit code tells me the page worked."</dt><dd>Without <code>-f</code>, a 500 error page is still a successful transfer. Use <code>-f</code> or check <code>%{http_code}</code>.</dd>
+</dl></div>
+
+<h3 id="ch56-r"><span class="num">56.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li><code>NAME=value</code> sets a shell variable; <code>export</code> passes it to child programs; <code>NAME=value command</code> sets it for one command; <code>env</code> lists them.</li>
+<li>PATH is the ordered list of folders searched for commands; the first match wins. <code>which -a</code> and <code>type</code> show what will run.</li>
+<li>Permanent settings go in <code>~/.zshrc</code> (macOS) or <code>~/.bashrc</code> (Linux). Back up before editing; <code>source</code> to reload.</li>
+<li>Every running program is a process with a PID. <code>ps aux</code> lists, <code>top</code> watches, <code>kill</code> asks politely, <code>kill -9</code> forces.</li>
+<li><code>&amp;</code> runs in the background; <code>jobs</code>, <code>fg</code>, <code>bg</code>, Ctrl+Z and <code>kill %1</code> manage jobs.</li>
+<li><code>rwx</code> for user, group and others; <code>chmod u+x</code> makes a script runnable; avoid <code>777</code>; use <code>sudo</code> only when you understand why.</li>
+<li><code>curl -s -o /dev/null -w "%{http_code}"</code> is a one-line smoke test; add <code>-f</code> to make HTTP errors fail.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">You run <code>BASE_URL=https://uat.example.test</code> on its own line, then <code>npx playwright test</code>. The tests don't see BASE_URL. Why?</p><div class="opts"><button>Playwright ignores environment variables</button><button data-ok>The variable wasn't exported, so child programs don't inherit it</button><button>URLs can't be stored in variables</button></div><p class="why" hidden>Use <code>export BASE_URL=…</code>, or put it on the same line as the command.</p></div>
+<div class="qz"><p class="q"><code>which -a node</code> prints two paths. Which one runs when you type <code>node</code>?</p><div class="opts"><button>The newest one</button><button data-ok>The first one listed, because it comes earlier in PATH</button><button>A random one</button></div><p class="why" hidden>The shell searches PATH in order and stops at the first match.</p></div>
+<div class="qz"><p class="q">What does <code>chmod 600 token.txt</code> do?</p><div class="opts"><button>Makes the file runnable by everyone</button><button data-ok>Lets only the owner read and write it; nobody else can access it</button><button>Deletes the file after 600 seconds</button></div><p class="why" hidden>6 = read (4) + write (2) for the user; 0 for group and others.</p></div>
+<div class="qz"><p class="q">A leftover test server is still running. What should you try first?</p><div class="opts"><button>sudo kill -9 on every process</button><button>Restart the computer</button><button data-ok>Find its PID with ps or pgrep, then use plain kill</button></div><p class="why" hidden>Plain <code>kill</code> sends TERM, letting it shut down cleanly. Keep <code>-9</code> for processes that ignore it.</p></div>
+<div class="qz"><p class="q">Why add <code>-f</code> to curl in a health-check script?</p><div class="opts"><button data-ok>So an HTTP error like 500 makes curl exit with a non-zero code</button><button>So it downloads faster</button><button>So it follows redirects</button></div><p class="why" hidden>Without <code>-f</code>, curl exits 0 whenever the transfer works, even if the server returned an error page. <code>-L</code> follows redirects.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Write a short "local setup" note for your test project. It should list every environment variable the tests read (names only, never values), the command to check the right Node or Python is first on PATH (<code>which -a</code>), how to start the app in the background with its output going to a log file, a one-line <code>curl</code> smoke test for its health URL, and how to stop it afterwards. Test the note on a colleague's machine.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Your shell carries named settings called environment variables. You set one with NAME=value and must export it before the programs you start can see it. PATH is the list of folders searched for commands, first match wins, and which shows you which one. Anything you want every time goes in .zshrc. Each running program is a process with a number; ps lists them and kill stops them. ls -l shows who may read, write or run a file, and chmod u+x makes a script runnable. And curl lets you hit any URL to check it's up."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>GNU, <a href="https://www.gnu.org/software/bash/manual/bash.html" target="_blank" rel="noopener">Bash Reference Manual</a> (environment, job control, startup files).</li>
+<li>Zsh, <a href="https://zsh.sourceforge.io/Doc/Release/Files.html" target="_blank" rel="noopener">Zsh manual: Startup/Shutdown Files</a> and <a href="https://zsh.sourceforge.io/Doc/Release/Jobs-_0026-Signals.html" target="_blank" rel="noopener">Jobs and Signals</a>.</li>
+<li>curl, <a href="https://curl.se/docs/manpage.html" target="_blank" rel="noopener">curl man page</a> (options, <code>--write-out</code> variables, exit codes).</li>
+<li>GNU, <a href="https://www.gnu.org/software/wget/manual/wget.html" target="_blank" rel="noopener">GNU Wget manual</a>.</li>
+<li>Microsoft, <a href="https://learn.microsoft.com/powershell/module/microsoft.powershell.core/about/about_environment_variables" target="_blank" rel="noopener">about_Environment_Variables</a> and <a href="https://learn.microsoft.com/windows/sudo/" target="_blank" rel="noopener">Sudo for Windows</a>.</li>
+<li>npm, <a href="https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally" target="_blank" rel="noopener">Resolving EACCES permissions errors when installing packages globally</a>.</li>
+<li>Local manual pages: <code>man ps</code>, <code>man kill</code>, <code>man chmod</code>, <code>man sudo</code>.</li>
+</ol><p class="verified">Verified 9 November 2026 by running the commands on macOS 26.6 (zsh 5.9, curl 8.7.1). User names and PIDs in outputs are illustrative of the real runs. wget output not shown (not installed on the test machine). Content type: established tools · Last reviewed 9 November 2026</p></div>

@@ -1,0 +1,34 @@
+{
+ "Plan mode": {
+  "d": "A Claude Code permission mode in which Claude can read and investigate but cannot edit files until you approve its proposed plan.",
+  "see": "ch67"
+ },
+ "Auto mode": {
+  "d": "A Claude Code permission mode in which Claude acts without routine prompts while a background classifier reviews each action and refuses risky ones. The default for interactive sessions since version 2.1.283.",
+  "see": "ch67"
+ },
+ "Classifier": {
+  "d": "An automatic checker that sorts inputs into categories, for example 'safe' or 'risky'. Claude Code's auto mode uses one to review actions before they run.",
+  "see": "ch67"
+ },
+ "Checkpoint": {
+  "d": "A saved snapshot of the files Claude Code's edit tools changed during a turn, which you can return to with /rewind. Changes made by shell commands are not included.",
+  "see": "ch67"
+ },
+ "Compaction": {
+  "d": "Replacing a long conversation with a shorter summary to free space in the context window, either automatically or with /compact.",
+  "see": "ch68"
+ },
+ "Effort level": {
+  "d": "How much reasoning a Claude model does before acting, from low to max. Higher effort is slower and uses more allowance but helps on hard problems.",
+  "see": "ch68"
+ },
+ "Session": {
+  "d": "One saved Claude Code conversation, stored on your computer so you can resume, rename, branch or delete it later.",
+  "see": "ch68"
+ },
+ "Worktree": {
+  "d": "A separate working copy of a Git repository on its own branch, letting you work on two things at once without them interfering.",
+  "see": "ch69"
+ }
+}

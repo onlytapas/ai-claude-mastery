@@ -1,0 +1,1314 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>Why deploying an AI <em>application</em> is a different job from deploying a <em>model</em>, and what changes between a prototype and a service your team relies on</li>
+<li>How to split the QA helper from Chapter 94 into a frontend, a backend, a database and a model API, and add sign-in, roles and per-user limits</li>
+<li>Where the Anthropic API key and other secrets live in development, in CI and on the server, and how to keep them out of code, images and logs</li>
+<li>How to package the app with a Dockerfile and Docker Compose, compare hosting options without vendor bias, and ship it with a GitHub Actions pipeline: tests, image, deploy</li>
+<li>How health checks, automatic rollback, backups, a kill switch and cost limits turn a bad day into a five-minute incident</li>
+<li>How to run a pre-launch checklist and decide, honestly, whether the app is ready</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> build the QA helper in <a href="#ch94">Chapter 94</a>; this chapter reuses its code unchanged. You'll also use ideas from <a href="#ch90">Chapter 90</a> (rate limits, spend limits and cost), <a href="#ch95">Chapter 95</a> (logging, eval gates and incident runbooks) and <a href="#ch98">Chapter 98</a> (keys, tokens and secrets). Git and GitHub basics: <a href="#ch61">Chapter 61</a>. You need Python 3.10 or later. Docker is needed for 96.9 onwards (Docker Desktop on macOS or Windows, Docker Engine on Linux); everything before that runs without it. No Anthropic API key is needed: the app keeps Chapter 94's fake model for tests.</div>
+
+<div class="bigidea"><p>A prototype answers "can this work?". A production application answers "can my team rely on it every day, safely, at a known cost?". The model is the smallest part of that second question. Around it you need a way to know who is using the app and what they may do, a place to keep data, a safe home for the API key, a repeatable way to build and ship it, a check that it's healthy, a way back when a release goes wrong, and limits so one bad loop can't spend a month's budget. In this chapter you add all of that to the QA helper from Chapter 94, test it offline, package it with Docker and deploy it with GitHub Actions.</p></div>
+
+<h3 id="ch96-1"><span class="num">96.1</span>Prototype, product, and why this isn't Chapter 139</h3>
+<p><a href="#ch139">Chapter 139</a> is about deploying a <em>model</em>: getting the weights onto GPUs, batching requests and making each token cheaper. That's what an AI lab or a platform team does. Most teams never do it. They call a model someone else hosts, through an API, and their job is to deploy an <em>application</em> that uses it. The hard parts of that job are ordinary software engineering: users, data, secrets, releases and recovery. The AI part adds a few twists: every request costs money, the provider can be slow or down, and the output is untrusted text.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Cooking a great curry at home is the prototype. Opening a small canteen is production. The recipe hardly changes, but now you need a door that only staff can open, a fridge with a thermometer, a till that stops when the cash float runs out, a supplier list, a fire drill and a way to close the kitchen quickly if the gas smells wrong. Chapter 139 is about building the gas supply. This chapter is about running the canteen.</p></div>
+<div class="tbl"><table>
+<tr><th>Question</th><th>Prototype (Chapter 94)</th><th>Production (this chapter)</th></tr>
+<tr><td>Who can use it?</td><td>Anyone who can reach <code>127.0.0.1</code>: just you</td><td>Named people with a token, each with a role</td></tr>
+<tr><td>What can they do?</td><td>Everything</td><td>Viewers read, testers generate, admins manage and switch AI off</td></tr>
+<tr><td>Where does data go?</td><td>A CSV file on your disk</td><td>A database on a persistent volume, with backups and a retention rule</td></tr>
+<tr><td>Where is the API key?</td><td><code>export</code> in your terminal</td><td>A secret file mounted into the container; never in code, image or logs</td></tr>
+<tr><td>How is it shipped?</td><td><code>uvicorn api:app --reload</code></td><td>Tests → image → deploy, automatically, with an approval step</td></tr>
+<tr><td>How do we know it works?</td><td>You look at it</td><td>Health and readiness checks, smoke tests, logs</td></tr>
+<tr><td>What if a release is bad?</td><td>Fix it and rerun</td><td>Automatic rollback to the last good version</td></tr>
+<tr><td>What stops runaway cost?</td><td>Nothing</td><td>Story size limit, per-user quota, team budget, kill switch, Console spend limit</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A QA lead demos the Chapter 94 helper on her laptop and the team loves it. Two weeks later twelve testers want it, the product owner asks whether stories leave the company network, finance asks what it will cost, and security asks where the API key is stored. None of those questions is about the model. This chapter gives you an answer to each one.</p></div>
+
+<h3 id="ch96-2"><span class="num">96.2</span>The architecture: who does what</h3>
+<p>A web application usually has a <strong>frontend</strong> (what runs in the user's browser: the page, buttons and table) and a <strong>backend</strong> (what runs on a server: the rules, the data and the secrets). The golden rule: <em>the browser is never trusted</em>. Anything the browser holds, the user can read and change, so the API key, the permission checks and the limits all live in the backend.</p>
+<div class="flow">
+<div><b>Browser</b>One HTML page: token box, story box, results table</div>
+<div><b>Reverse proxy</b>HTTPS for the outside world (Caddy, or your platform's load balancer)</div>
+<div class="hl"><b>Backend (FastAPI)</b>Checks token and role, applies limits, calls the model, validates, stores</div>
+<div><b>Database (SQLite)</b>Users, runs, usage, settings, on a persistent volume</div>
+<div><b>Claude API</b>Or the fake model in tests</div>
+</div>
+<div class="tbl"><table>
+<tr><th>File</th><th>New or reused?</th><th>What it does</th></tr>
+<tr><td><code>qahelper.py</code></td><td>Reused from Chapter 94, unchanged</td><td>Schema, prompt, live and fake generators, validator, CSV rows</td></tr>
+<tr><td><code>api.py</code>, <code>app.py</code>, <code>eval_qahelper.py</code>, <code>eval/stories.json</code>, <code>tests/test_qahelper.py</code>, <code>story-register.txt</code></td><td>Reused, unchanged</td><td>The prototype API, CLI, eval and its 8 tests keep working</td></tr>
+<tr><td><code>store.py</code></td><td>New</td><td>SQLite storage: users, runs, settings</td></tr>
+<tr><td><code>server.py</code></td><td>New</td><td>The production web service: sign-in, roles, limits, health, kill switch</td></tr>
+<tr><td><code>static/index.html</code></td><td>New</td><td>The frontend page</td></tr>
+<tr><td><code>manage.py</code>, <code>backup.py</code></td><td>New</td><td>Admin commands; backup and restore</td></tr>
+<tr><td><code>tests/test_server.py</code></td><td>New</td><td>10 tests for the production behaviour</td></tr>
+<tr><td><code>requirements.txt</code>, <code>requirements-dev.txt</code></td><td>New</td><td>Pinned dependency versions</td></tr>
+<tr><td><code>Dockerfile</code>, <code>.dockerignore</code>, <code>compose.yaml</code>, <code>compose.proxy.yaml</code>, <code>caddy/Caddyfile</code>, <code>app.env.example</code>, <code>.gitignore</code></td><td>New</td><td>Packaging and running</td></tr>
+<tr><td><code>.github/workflows/deploy.yml</code>, <code>deploy/deploy.sh</code>, <code>deploy/rollback.sh</code></td><td>New</td><td>The pipeline, the server-side deploy with automatic rollback</td></tr>
+</table></div>
+<p>Notice what <em>didn't</em> change: <code>qahelper.py</code>. The model call, the schema and the validator stay exactly as Chapter 94 left them. Production work wraps the core; it doesn't rewrite it. That also means the core's 8 tests still protect it.</p>
+<div class="box note"><span class="tag">What was actually run</span><p>On 9 November 2026, with Python 3.11.9, <code>anthropic</code> 2.6.0, FastAPI 0.162.2 and uvicorn 0.54.0, in fake-model mode: all 18 tests passed; the server ran under uvicorn and every <code>curl</code> call shown returned the output shown; backup and restore ran; and <code>deploy.sh</code>, including its automatic rollback, ran against a local stand-in for <code>docker compose</code> (a small script that starts uvicorn instead of a container). The live path was run as far as Anthropic's authentication check with a dummy key. <strong>Docker itself was not available</strong>, so the image was never built and Compose never ran; <code>compose.yaml</code> and the workflow were checked against their official JSON schemas, and the Docker output in 96.9 is described from Docker's documentation, not copied. The GitHub Actions workflow was not run on GitHub.</p></div>
+
+<h3 id="ch96-3"><span class="num">96.3</span>Setup</h3>
+<p>Start from your finished Chapter 94 folder, so <code>qahelper.py</code> and friends are already there. Then add the new folders and pin the dependencies.</p>
+<div class="code"><span class="cap">Terminal (macOS / Linux)</span><pre>cd qa-helper
+source .venv/bin/activate              <span class="c"># Windows PowerShell: .venv\Scripts\Activate.ps1</span>
+mkdir -p static deploy caddy .github/workflows
+python -m pytest -q                    <span class="c"># the 8 Chapter 94 tests must still pass first</span></pre></div>
+<p>A prototype installs "whatever is newest today". Production pins exact versions, so the image you build next month contains exactly what you tested. Upgrade on purpose, in a pull request, with the tests running.</p>
+<div class="code"><span class="cap">requirements.txt</span><pre>anthropic==2.6.0
+fastapi==0.162.2
+uvicorn==0.54.0</pre></div>
+<div class="code"><span class="cap">requirements-dev.txt</span><pre>pytest==9.2.0</pre></div>
+<div class="code"><span class="cap">Terminal</span><pre>pip install -r requirements.txt -r requirements-dev.txt</pre></div>
+<p>Also save <code>.gitignore</code> now, before you create any secret or database file, so git never sees them:</p>
+<div class="code"><span class="cap">.gitignore</span><pre>.venv/
+__pycache__/
+.pytest_cache/
+data/
+secrets/
+app.env
+.env
+*.csv</pre></div>
+
+<h3 id="ch96-4"><span class="num">96.4</span>Database and storage</h3>
+<p>The prototype wrote a CSV and forgot about it. A shared service needs to remember things: who the users are, what each person generated (so they can download it again), how much each person used today (for limits and cost reports), and switches such as "AI on or off". That's a <strong>database</strong>.</p>
+<p>We use <strong>SQLite</strong>, a database stored in one file and built into Python, so there's nothing extra to install or run. It's a sound choice for an internal tool with a single server and a modest number of users. Move to a database server such as PostgreSQL when you need several app servers sharing one database, or a hosting platform with no persistent disk (96.10). The functions in <code>store.py</code> are the only place SQL lives, so that move touches one file.</p>
+<div class="code"><span class="cap">store.py</span><pre>"""store: SQLite storage for users, runs and settings. Standard library only."""
+import hashlib
+import json
+import os
+import secrets
+import sqlite3
+from contextlib import closing
+from datetime import datetime, timezone
+
+ROLES = ("viewer", "tester", "admin")
+
+TABLES = """
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY,
+    name TEXT UNIQUE NOT NULL,
+    role TEXT NOT NULL,
+    token_hash TEXT UNIQUE NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS runs (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL,
+    day TEXT NOT NULL,
+    mode TEXT NOT NULL,
+    story_chars INTEGER NOT NULL,
+    input_tokens INTEGER NOT NULL,
+    output_tokens INTEGER NOT NULL,
+    cases INTEGER NOT NULL,
+    status TEXT NOT NULL,
+    result_json TEXT
+);
+CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+"""
+
+
+def db_path():
+    return os.path.join(os.environ.get("DATA_DIR", "data"), "qa-helper.db")
+
+
+def connect():
+    os.makedirs(os.path.dirname(db_path()), exist_ok=True)
+    conn = sqlite3.connect(db_path(), timeout=10)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.executescript(TABLES)
+    return conn
+
+
+def now():
+    return datetime.now(timezone.utc)
+
+
+def hash_token(token):
+    # Tokens are long random strings, so a plain SHA-256 is enough.
+    # Human-chosen passwords would need a slow hash such as argon2 or bcrypt.
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def ping():
+    with closing(connect()) as conn:
+        conn.execute("SELECT 1").fetchone()
+
+
+def add_user(name, role):
+    if role not in ROLES:
+        raise ValueError(f"role must be one of {ROLES}")
+    token = "qah_" + secrets.token_urlsafe(32)
+    with closing(connect()) as conn, conn:
+        conn.execute("INSERT INTO users (name, role, token_hash, created_at) VALUES (?, ?, ?, ?)",
+                     (name, role, hash_token(token), now().isoformat()))
+    return token
+
+
+def revoke_user(name):
+    with closing(connect()) as conn, conn:
+        return conn.execute("UPDATE users SET active = 0 WHERE name = ?", (name,)).rowcount == 1
+
+
+def list_users():
+    with closing(connect()) as conn:
+        return [dict(r) for r in conn.execute(
+            "SELECT name, role, active, created_at FROM users ORDER BY name")]
+
+
+def user_for_token(token):
+    with closing(connect()) as conn:
+        row = conn.execute("SELECT * FROM users WHERE token_hash = ? AND active = 1",
+                           (hash_token(token),)).fetchone()
+        return dict(row) if row else None
+
+
+def record_run(user_id, mode, story_chars, usage, cases, status, result=None):
+    t = now()
+    with closing(connect()) as conn, conn:
+        cur = conn.execute(
+            "INSERT INTO runs (user_id, created_at, day, mode, story_chars, input_tokens,"
+            " output_tokens, cases, status, result_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (user_id, t.isoformat(), t.date().isoformat(), mode, story_chars,
+             usage.get("input_tokens", 0), usage.get("output_tokens", 0), cases, status,
+             json.dumps(result) if result is not None else None))
+        return cur.lastrowid
+
+
+def usage_today(user_id=None):
+    sql = ("SELECT COUNT(*) AS requests, COALESCE(SUM(input_tokens), 0) AS input_tokens,"
+           " COALESCE(SUM(output_tokens), 0) AS output_tokens FROM runs WHERE day = ?")
+    args = [now().date().isoformat()]
+    if user_id is not None:
+        sql += " AND user_id = ?"
+        args.append(user_id)
+    with closing(connect()) as conn:
+        return dict(conn.execute(sql, args).fetchone())
+
+
+def usage_by_user_today():
+    with closing(connect()) as conn:
+        return [dict(r) for r in conn.execute(
+            "SELECT u.name, COUNT(*) AS requests, SUM(r.input_tokens) AS input_tokens,"
+            " SUM(r.output_tokens) AS output_tokens FROM runs r JOIN users u ON u.id = r.user_id"
+            " WHERE r.day = ? GROUP BY u.name ORDER BY u.name", (now().date().isoformat(),))]
+
+
+def recent_runs(user_id=None, limit=20):
+    sql = ("SELECT r.id, u.name AS user, r.created_at, r.mode, r.cases, r.status,"
+           " r.input_tokens, r.output_tokens FROM runs r JOIN users u ON u.id = r.user_id")
+    args = []
+    if user_id is not None:
+        sql += " WHERE r.user_id = ?"
+        args.append(user_id)
+    sql += " ORDER BY r.id DESC LIMIT ?"
+    args.append(limit)
+    with closing(connect()) as conn:
+        return [dict(r) for r in conn.execute(sql, args)]
+
+
+def purge_results(days):
+    """Delete stored results (not the usage numbers) older than `days` days."""
+    cutoff = (now().date().toordinal() - days)
+    cutoff_day = datetime.fromordinal(cutoff).date().isoformat()
+    with closing(connect()) as conn, conn:
+        return conn.execute("UPDATE runs SET result_json = NULL WHERE day &lt; ? AND result_json"
+                            " IS NOT NULL", (cutoff_day,)).rowcount
+
+
+def get_setting(key, default):
+    with closing(connect()) as conn:
+        row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row else default
+
+
+def set_setting(key, value):
+    with closing(connect()) as conn, conn:
+        conn.execute("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key)"
+                     " DO UPDATE SET value = excluded.value", (key, value))
+
+
+def get_run(run_id):
+    with closing(connect()) as conn:
+        row = conn.execute("SELECT id, user_id, result_json FROM runs WHERE id = ?", (run_id,)).fetchone()
+        return dict(row) if row else None</pre></div>
+<p>Three design decisions are worth copying:</p>
+<ul>
+<li><strong>Tokens are stored as hashes.</strong> The database keeps a SHA-256 fingerprint of each token, not the token. If someone steals a backup, they can't sign in with what's in it. A long random token makes a fast hash acceptable; passwords that people choose would need a deliberately slow hash such as argon2 or bcrypt.</li>
+<li><strong>Usage numbers and results are separate.</strong> <code>purge_results</code> deletes stored test cases after a retention period but keeps the token counts, so cost reports still work. Stories can contain customer details or unreleased features; agree the retention period with whoever owns data protection (<a href="#ch132">Chapter 132</a>).</li>
+<li><strong>Write-ahead logging</strong> (<code>PRAGMA journal_mode=WAL</code>) lets readers and a writer work at the same time, which suits a web app with a few users.</li>
+</ul>
+<div class="box warn"><span class="tag">Where the file lives matters</span><p>A container's own filesystem is thrown away when the container is replaced, which happens on every deploy. The database must live on a <strong>persistent volume</strong>: storage that outlives containers. That's why <code>DATA_DIR</code> is a setting, and why <code>compose.yaml</code> mounts a volume at <code>/data</code>. Forgetting this is the classic "all our users disappeared after the release" incident.</p></div>
+
+<h3 id="ch96-5"><span class="num">96.5</span>Authentication and permissions</h3>
+<p>Two different questions, often confused:</p>
+<ul>
+<li><strong>Authentication</strong>: who are you? The app answers it by checking a token. No token, or a wrong one, gives <a class="gl" href="#g-status-code">status code</a> <strong>401 Unauthorized</strong>.</li>
+<li><strong>Authorisation (permissions)</strong>: are you allowed to do this? The app answers it by checking the user's role. A valid user without the right role gets <strong>403 Forbidden</strong>.</li>
+</ul>
+<p>We use <a class="gl" href="#g-role-based-access-control">role-based access control</a>: permissions belong to roles, and each user has one role. It's easy to explain to an auditor and easy to test.</p>
+<div class="tbl"><table>
+<tr><th>Action</th><th>viewer</th><th>tester</th><th>admin</th></tr>
+<tr><td>See own name, role and usage (<code>GET /api/me</code>)</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>List own runs, download own CSVs</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>Generate test cases (costs money)</td><td>No</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>See everyone's runs and today's usage per person</td><td>No</td><td>No</td><td>Yes</td></tr>
+<tr><td>Switch AI generation off and on (kill switch)</td><td>No</td><td>No</td><td>Yes</td></tr>
+<tr><td>Create and revoke users</td><td colspan="3">Only someone with shell access to the server, using <code>manage.py</code></td></tr>
+</table></div>
+<p>Here is the whole backend. Read the sections in order: authentication, health, generation with its limits, reading data, admin, and the frontend route.</p>
+<div class="code"><span class="cap">server.py</span><pre>"""server: the QA helper (Chapter 94) with login, roles, limits, storage and health checks.
+Local run:  QA_FAKE_MODEL=1 uvicorn server:app --port 8000"""
+import csv
+import io
+import json
+import logging
+import os
+import time
+from pathlib import Path
+
+from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
+from pydantic import BaseModel
+
+import qahelper
+import store
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+log = logging.getLogger("qa-helper")
+STATIC = Path(__file__).resolve().parent / "static"
+
+
+def load_api_key():
+    """Read the key from a mounted secret file if one is given (Docker secrets)."""
+    path = os.environ.get("ANTHROPIC_API_KEY_FILE")
+    if not path:
+        return
+    try:
+        key = Path(path).read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        log.warning("can't read key file %s: %s", path, type(exc).__name__)
+        return
+    if key:
+        os.environ["ANTHROPIC_API_KEY"] = key
+
+
+load_api_key()
+
+
+def env_int(name, default):
+    return int(os.environ.get(name, default))
+
+
+def fake_mode():
+    return os.environ.get("QA_FAKE_MODEL") == "1"
+
+
+def version():
+    return os.environ.get("APP_VERSION", "dev")
+
+
+app = FastAPI(title="QA helper", version=version())
+
+
+# ---------- Authentication and permissions ----------
+def current_user(authorization: str = Header(default="")):
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        raise HTTPException(401, "Missing token. Send 'Authorization: Bearer &lt;token&gt;'.",
+                            headers={"WWW-Authenticate": "Bearer"})
+    user = store.user_for_token(token.strip())
+    if user is None:
+        raise HTTPException(401, "Invalid or revoked token.", headers={"WWW-Authenticate": "Bearer"})
+    return user
+
+
+def require(*roles):
+    def check(user: dict = Depends(current_user)):
+        if user["role"] not in roles:
+            raise HTTPException(403, f"Your role ({user['role']}) can't do this.")
+        return user
+    return check
+
+
+# ---------- Health ----------
+@app.get("/healthz")
+def healthz():
+    """Liveness: the process is up. Cheap, no dependencies."""
+    return {"status": "ok"}
+
+
+@app.get("/readyz")
+def readyz():
+    """Readiness: can we serve real requests? Checks the database and configuration,
+    but never calls Claude (that would cost money on every probe)."""
+    problems = []
+    try:
+        store.ping()
+    except Exception as exc:  # noqa: BLE001
+        problems.append(f"database: {type(exc).__name__}")
+    if not fake_mode() and not os.environ.get("ANTHROPIC_API_KEY"):
+        problems.append("no API key configured")
+    if problems:
+        return JSONResponse({"status": "not ready", "problems": problems}, status_code=503)
+    return {"status": "ready", "version": version(), "mode": "fake" if fake_mode() else "live"}
+
+
+# ---------- Generation ----------
+class StoryIn(BaseModel):
+    story: str
+
+
+def generate_for(user, body: StoryIn):
+    story = body.story
+    if not story.strip():
+        raise HTTPException(422, "story is empty")
+    limit = env_int("MAX_STORY_CHARS", 8000)
+    if len(story) &gt; limit:
+        raise HTTPException(413, f"Story is {len(story)} characters; the limit is {limit}.")
+    if store.get_setting("ai_enabled", "1") != "1":
+        raise HTTPException(503, "AI generation is switched off by an admin. Try again later.")
+    per_user = env_int("DAILY_REQUESTS_PER_USER", 40)
+    if store.usage_today(user["id"])["requests"] &gt;= per_user:
+        raise HTTPException(429, f"You've used today's {per_user} generations. Limits reset at 00:00 UTC.")
+    team = store.usage_today()
+    if team["input_tokens"] + team["output_tokens"] &gt;= env_int("DAILY_TOKEN_BUDGET", 2_000_000):
+        raise HTTPException(503, "The team's daily AI budget is used up. Limits reset at 00:00 UTC.")
+
+    mode = "fake" if fake_mode() else "live"
+    started = time.monotonic()
+    try:
+        result, usage = (qahelper.fake_generate if mode == "fake" else qahelper.generate)(story)
+    except Exception as exc:  # noqa: BLE001
+        log.error("generate failed user=%s mode=%s error=%s", user["name"], mode, type(exc).__name__)
+        store.record_run(user["id"], mode, len(story), {}, 0, "error")
+        raise HTTPException(502, "The AI service didn't return a usable answer. Try again in a minute.")
+    problems = qahelper.validate(result)
+    status = "ok" if not problems else "invalid"
+    run_id = store.record_run(user["id"], mode, len(story), usage, len(result.get("test_cases", [])),
+                              status, result)
+    ms = int((time.monotonic() - started) * 1000)
+    # Log numbers, never the story text: stories can be confidential.
+    log.info("generate user=%s mode=%s status=%s ms=%d in=%d out=%d run=%d", user["name"], mode,
+             status, ms, usage["input_tokens"], usage["output_tokens"], run_id)
+    if problems:
+        raise HTTPException(502, {"message": "Output failed validation", "problems": problems})
+    return run_id, mode, usage, result
+
+
+@app.post("/api/generate")
+def api_generate(body: StoryIn, user: dict = Depends(require("tester", "admin"))):
+    run_id, mode, usage, result = generate_for(user, body)
+    return {"run_id": run_id, "mode": mode, "usage": usage, "result": result}
+
+
+def csv_text(result):
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(qahelper.COLUMNS)
+    writer.writerows(qahelper.to_rows(result))
+    return PlainTextResponse(buf.getvalue(), media_type="text/csv")
+
+
+@app.post("/api/generate.csv", response_class=PlainTextResponse)
+def api_generate_csv(body: StoryIn, user: dict = Depends(require("tester", "admin"))):
+    return csv_text(generate_for(user, body)[3])
+
+
+# ---------- Reading data ----------
+@app.get("/api/me")
+def me(user: dict = Depends(current_user)):
+    return {"name": user["name"], "role": user["role"], "today": store.usage_today(user["id"]),
+            "daily_limit": env_int("DAILY_REQUESTS_PER_USER", 40)}
+
+
+@app.get("/api/runs")
+def runs(all: bool = False, user: dict = Depends(current_user)):
+    if all and user["role"] != "admin":
+        raise HTTPException(403, "Only admins can see everyone's runs.")
+    return store.recent_runs(None if all else user["id"])
+
+
+@app.get("/api/runs/{run_id}.csv", response_class=PlainTextResponse)
+def run_csv(run_id: int, user: dict = Depends(current_user)):
+    run = store.get_run(run_id)
+    # Same answer for "not yours" and "doesn't exist", so IDs can't be probed.
+    if run is None or (run["user_id"] != user["id"] and user["role"] != "admin"):
+        raise HTTPException(404, "No such run.")
+    if run["result_json"] is None:
+        raise HTTPException(410, "This run's result was deleted by the retention policy.")
+    return csv_text(json.loads(run["result_json"]))
+
+
+# ---------- Admin ----------
+class AiSwitch(BaseModel):
+    enabled: bool
+
+
+@app.get("/admin/usage")
+def admin_usage(user: dict = Depends(require("admin"))):
+    return {"team_today": store.usage_today(), "by_user": store.usage_by_user_today(),
+            "ai_enabled": store.get_setting("ai_enabled", "1") == "1"}
+
+
+@app.post("/admin/ai")
+def admin_ai(body: AiSwitch, user: dict = Depends(require("admin"))):
+    store.set_setting("ai_enabled", "1" if body.enabled else "0")
+    log.warning("kill switch: ai_enabled=%s by %s", body.enabled, user["name"])
+    return {"ai_enabled": body.enabled}
+
+
+# ---------- Frontend ----------
+@app.get("/", include_in_schema=False)
+def index():
+    return FileResponse(STATIC / "index.html")</pre></div>
+<h4>How it works</h4>
+<ul>
+<li><code>current_user</code> is a FastAPI <em>dependency</em>: any endpoint that lists it can't run until it has returned a user. It reads the <a class="gl" href="#g-bearer-token">bearer token</a> from the <code>Authorization</code> header, the same pattern as most APIs (<a href="#ch98">Chapter 98</a>).</li>
+<li><code>require("tester", "admin")</code> builds a dependency that also checks the role. Permission rules sit next to each endpoint, where a reviewer can see them.</li>
+<li>Asking for someone else's run returns <strong>404</strong>, not 403. A 403 would confirm the run exists, letting a curious user count everyone's activity by trying numbers.</li>
+<li><code>generate_for</code> checks the cheapest things first (empty story, size, kill switch, quotas) and only then calls the model. Every refusal happens before any money is spent.</li>
+<li>The log line records who, which mode, how long and how many tokens, but never the story. Logs are copied to many places and kept for a long time; they're the wrong home for confidential text (<a href="#ch95">Chapter 95</a> covers logging in depth).</li>
+</ul>
+<p>Users are created on the server, and the token is shown once:</p>
+<div class="code"><span class="cap">manage.py</span><pre>"""Usage:
+  python manage.py add-user NAME ROLE      (ROLE: viewer, tester or admin; prints the token once)
+  python manage.py revoke-user NAME
+  python manage.py list-users
+  python manage.py purge-results DAYS      (delete stored results older than DAYS days)"""
+import sys
+import store
+
+args = sys.argv[1:]
+if args[:1] == ["add-user"] and len(args) == 3:
+    token = store.add_user(args[1], args[2])
+    print(f"Created {args[1]} ({args[2]}). Token, shown only once:\n{token}")
+elif args[:1] == ["revoke-user"] and len(args) == 2:
+    print("Revoked." if store.revoke_user(args[1]) else "No such user.")
+elif args == ["list-users"]:
+    for u in store.list_users():
+        print(f"{u['name']:&lt;16} {u['role']:&lt;7} {'active' if u['active'] else 'revoked':&lt;8} {u['created_at'][:10]}")
+elif args[:1] == ["purge-results"] and len(args) == 2:
+    print(f"Cleared stored results from {store.purge_results(int(args[1]))} runs.")
+else:
+    sys.exit(__doc__)</pre></div>
+<div class="box note"><span class="tag">In a real company: use single sign-on</span><p>Hand-issued tokens are fine for learning and for a small team. In most companies the better answer is <strong>single sign-on (SSO)</strong>: people sign in with their normal work account through your identity provider, and leavers lose access automatically when HR closes their account. Your platform or security team will tell you which method to use (often OpenID Connect, an identity layer built on <a class="gl" href="#g-oauth">OAuth</a>). The role checks in <code>server.py</code> stay the same; only <code>current_user</code> changes to read the identity SSO provides. If you later add document retrieval, permissions must also apply to <em>documents</em>: a user must never get an answer built from a page they couldn't open themselves (<a href="#ch92">Chapter 92</a>).</p></div>
+
+<h3 id="ch96-6"><span class="num">96.6</span>The frontend</h3>
+<p>The frontend is one HTML file the backend serves at <code>/</code>. Because the page and the API come from the same address, the browser needs no special cross-site permissions, and there's no separate frontend build to deploy. A bigger team might use a framework such as React; the architecture and the rules stay the same.</p>
+<div class="code"><span class="cap">static/index.html</span><pre>&lt;!doctype html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;meta name="viewport" content="width=device-width, initial-scale=1"&gt;
+&lt;title&gt;QA helper&lt;/title&gt;
+&lt;style&gt;
+  body { font-family: system-ui, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
+  textarea { width: 100%; height: 10rem; }
+  input[type=password] { width: 22rem; max-width: 100%; }
+  table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+  th, td { border: 1px solid #ccc; padding: .3rem; text-align: left; vertical-align: top; }
+  #error { color: #b00020; }
+  #status { color: #555; }
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;QA helper&lt;/h1&gt;
+&lt;p&gt;&lt;label&gt;Your access token &lt;input id="token" type="password" autocomplete="off"&gt;&lt;/label&gt;
+   &lt;button id="save"&gt;Use token&lt;/button&gt; &lt;span id="who"&gt;&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;label for="story"&gt;User story with acceptance criteria (bullets starting with "-")&lt;/label&gt;&lt;/p&gt;
+&lt;textarea id="story"&gt;&lt;/textarea&gt;
+&lt;p&gt;&lt;button id="go"&gt;Generate test cases&lt;/button&gt; &lt;button id="csv"&gt;Download CSV&lt;/button&gt;
+   &lt;span id="status"&gt;&lt;/span&gt;&lt;/p&gt;
+&lt;p id="error" role="alert"&gt;&lt;/p&gt;
+&lt;h2&gt;Ambiguities&lt;/h2&gt;&lt;ul id="amb"&gt;&lt;/ul&gt;
+&lt;h2&gt;Test cases&lt;/h2&gt;&lt;table id="cases"&gt;&lt;/table&gt;
+&lt;script&gt;
+// Everything the model returns is shown with textContent, never innerHTML:
+// model output is untrusted text, just like user input.
+const $ = (id) =&gt; document.getElementById(id);
+const token = () =&gt; sessionStorage.getItem("qa-token") || "";
+let lastRun = null;
+
+async function call(path, options = {}) {
+  const res = await fetch(path, { ...options, headers: { "content-type": "application/json",
+    "authorization": "Bearer " + token(), ...(options.headers || {}) } });
+  if (!res.ok) {
+    let detail = res.statusText;
+    try { detail = JSON.stringify((await res.json()).detail); } catch (e) {}
+    throw new Error(res.status + ": " + detail);
+  }
+  return res;
+}
+
+async function whoAmI() {
+  try {
+    const me = await (await call("/api/me")).json();
+    $("who").textContent = `${me.name} (${me.role}), ${me.today.requests}/${me.daily_limit} today`;
+  } catch (e) { $("who").textContent = "not signed in"; }
+}
+
+function cell(row, text, tag = "td") {
+  const c = document.createElement(tag); c.textContent = text; row.appendChild(c);
+}
+
+function show(data) {
+  lastRun = data.run_id;
+  $("amb").replaceChildren(); $("cases").replaceChildren();
+  for (const a of data.result.ambiguities) {
+    const li = document.createElement("li");
+    li.textContent = `"${a.quote}": ${a.question}`; $("amb").appendChild(li);
+  }
+  const head = document.createElement("tr");
+  ["ID", "Title", "Type", "Priority", "Steps", "Expected result"].forEach((h) =&gt; cell(head, h, "th"));
+  $("cases").appendChild(head);
+  for (const c of data.result.test_cases) {
+    const tr = document.createElement("tr");
+    [c.id, c.title, c.type, c.priority, c.steps.join(" / "), c.expected_result].forEach((v) =&gt; cell(tr, v));
+    $("cases").appendChild(tr);
+  }
+  $("status").textContent = `${data.result.test_cases.length} cases, mode ${data.mode}, ` +
+    `tokens ${data.usage.input_tokens}/${data.usage.output_tokens}. Review before use.`;
+}
+
+$("save").onclick = () =&gt; { sessionStorage.setItem("qa-token", $("token").value.trim());
+  $("token").value = ""; whoAmI(); };
+$("go").onclick = async () =&gt; {
+  $("error").textContent = ""; $("status").textContent = "Working...";
+  try {
+    show(await (await call("/api/generate", { method: "POST",
+      body: JSON.stringify({ story: $("story").value }) })).json());
+    whoAmI();
+  } catch (e) { $("error").textContent = e.message; $("status").textContent = ""; }
+};
+$("csv").onclick = async () =&gt; {
+  $("error").textContent = "";
+  try {
+    if (!lastRun) throw new Error("Generate first, then download.");
+    const res = await call(`/api/runs/${lastRun}.csv`);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(await res.blob()); a.download = `cases-run-${lastRun}.csv`; a.click();
+  } catch (e) { $("error").textContent = e.message; }
+};
+whoAmI();
+&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre></div>
+<p>Two details carry most of the security weight:</p>
+<ul>
+<li><strong>Model output is shown with <code>textContent</code>, never <code>innerHTML</code>.</strong> A story pasted from Jira could contain <code>&lt;img src=x onerror=...&gt;</code>, and the model might copy it into a test case title. With <code>innerHTML</code> the browser would run it (cross-site scripting); with <code>textContent</code> it's just text. Treat AI output exactly like user input.</li>
+<li><strong>The token lives in <code>sessionStorage</code></strong>, which is cleared when the tab closes, and is sent only in the <code>Authorization</code> header. Download CSV fetches the stored run by ID, so it doesn't pay for a second generation.</li>
+</ul>
+
+<h3 id="ch96-7"><span class="num">96.7</span>API keys and other secrets</h3>
+<p>A <a class="gl" href="#g-secret">secret</a> is anything that grants access. This app has four, and each has exactly one home in each place it runs. <a href="#ch98">Chapter 98</a> explains the general rules; here is how they apply to a deployed app.</p>
+<div class="tbl"><table>
+<tr><th>Secret</th><th>On your laptop</th><th>In GitHub Actions</th><th>On the server</th></tr>
+<tr><td>Anthropic <a class="gl" href="#g-api-key">API key</a></td><td>Not needed (fake mode), or <code>export ANTHROPIC_API_KEY=...</code> for a manual live test</td><td><strong>Not needed</strong>: tests use the fake model</td><td><code>secrets/anthropic_api_key.txt</code>, readable only by the app's user, mounted at <code>/run/secrets/anthropic_api_key</code></td></tr>
+<tr><td>User tokens</td><td>Test tokens in a throwaway database</td><td>None</td><td>Only their hashes, in the database</td></tr>
+<tr><td>Registry login for pulling the image</td><td>None</td><td>The automatic <code>GITHUB_TOKEN</code></td><td>A classic personal access token with only <code>read:packages</code>, stored by <code>docker login</code></td></tr>
+<tr><td>SSH key that lets the pipeline deploy</td><td>None</td><td>Environment secret <code>DEPLOY_SSH_KEY</code></td><td>The matching public key in the <code>deploy</code> user's <code>authorized_keys</code></td></tr>
+</table></div>
+<p>Why a <em>file</em> for the API key, rather than an <a class="gl" href="#g-environment-variable">environment variable</a>? Both work. Environment variables are visible to anyone who can run <code>docker inspect</code> on the container and are easy to print by accident in a debug log. Docker Compose's <code>secrets:</code> mounts a file at <code>/run/secrets/&lt;name&gt;</code> instead. Compose itself doesn't define a "<code>_FILE</code>" convention, but many images follow one, and <code>server.py</code> does too: it reads <code>ANTHROPIC_API_KEY_FILE</code> at start-up and hands the key to the SDK.</p>
+<div class="box warn"><span class="tag">The key never goes in these places</span><p>Not in the code, not in <code>compose.yaml</code>, not in <code>app.env</code>, not in the image (that's why <code>.dockerignore</code> excludes <code>secrets</code> and <code>.env</code>), not in CI logs, not in the frontend, and never pasted into a chat with an AI. An image pushed to a registry is a file anyone with pull access can unpack layer by layer.</p></div>
+<p>Three more habits for the Anthropic key specifically:</p>
+<ul>
+<li><strong>A dedicated key in a dedicated workspace.</strong> In the Claude Console, create a workspace for this app and a key inside it. Workspaces group keys, members and limits, so you can give this app its own spend and rate limits without affecting anything else (<a href="#ch90">Chapter 90</a>).</li>
+<li><strong>Rotate on a schedule and on any doubt.</strong> To rotate: create a new key, write it to the secret file, restart the app (<code>docker compose up -d --force-recreate app</code>), check <code>/readyz</code>, then delete the old key in the Console.</li>
+<li><strong>Least privilege everywhere.</strong> The registry token can only read packages; the deploy SSH key belongs to a user that can only run Docker in one folder (<a class="gl" href="#g-least-privilege">least privilege</a>).</li>
+</ul>
+
+<h3 id="ch96-8"><span class="num">96.8</span>Cost and rate-limit protection</h3>
+<p>Every generation costs money, and the provider limits how fast you can call it (<a class="gl" href="#g-rate-limit">rate limits</a>). One person pasting a 200-page specification, a browser tab stuck in a retry loop, or a script someone writes against your API can each burn a month's budget or starve everyone else. The defence is layers, each cheap, from the request inwards:</p>
+<div class="tbl"><table>
+<tr><th>Layer</th><th>Where</th><th>What it stops</th><th>What the user sees</th></tr>
+<tr><td>Story size limit (<code>MAX_STORY_CHARS</code>)</td><td><code>server.py</code></td><td>Huge inputs that cost a lot and rarely help</td><td>413 "Story is N characters; the limit is 8000."</td></tr>
+<tr><td>Per-user daily quota (<code>DAILY_REQUESTS_PER_USER</code>)</td><td><code>server.py</code></td><td>One person or script dominating</td><td>429 "You've used today's 40 generations."</td></tr>
+<tr><td>Team daily token budget (<code>DAILY_TOKEN_BUDGET</code>)</td><td><code>server.py</code></td><td>Slow, steady overspend across everyone</td><td>503 "The team's daily AI budget is used up."</td></tr>
+<tr><td><a class="gl" href="#g-kill-switch">Kill switch</a></td><td>Admin, <code>POST /admin/ai</code></td><td>Anything unexpected, instantly, without a deploy</td><td>503 "AI generation is switched off by an admin."</td></tr>
+<tr><td>Output cap (<code>max_tokens</code>) and <code>stop_reason</code> check</td><td><code>qahelper.py</code> (Chapter 94)</td><td>Runaway answers</td><td>502, logged</td></tr>
+<tr><td>Workspace <a class="gl" href="#g-spend-limit">spend limit</a> and rate limits</td><td>Claude Console</td><td>Everything above failing at once: the last line of defence</td><td>Errors from the API, logged as 502</td></tr>
+</table></div>
+<p>A worked example, illustrative: Chapter 94 estimated about $0.084 per story with Opus 5.5 at $4 / $20 per million input / output tokens. A team budget of 2,000,000 tokens a day costs at most $40 even if every token were billed at the output price, and in practice about $34 at roughly 400 stories. Set the Console spend limit a little above your app's own monthly ceiling, so the app's friendly limits normally trigger first and the Console limit only catches bugs in them. Prices change, so check the pricing page before you set the numbers.</p>
+<div class="box note"><span class="tag">Make limits visible</span><p><code>GET /api/me</code> returns today's usage and the limit, and the page shows "3/40 today". People ration what they can see. <code>GET /admin/usage</code> gives the admin a per-person view, which is usually the first thing a manager asks for.</p></div>
+<details class="deep"><summary>Under the hood: why these limits live in the database, not in memory</summary><div class="body">
+<p>A counter in a Python variable resets every time the app restarts, and every deploy restarts it, so a user could reset their quota by waiting for a release. It also breaks as soon as you run two copies of the app. Counting rows in the <code>runs</code> table survives restarts and works for every copy that shares the database. The cost is one small query per request, which is nothing next to a model call. For a high-traffic public API you'd use a dedicated rate limiter (often a <a class="gl" href="#g-token-bucket">token bucket</a> in a shared cache, <a href="#ch90">Chapter 90</a>); for an internal tool the database is enough.</p>
+<p>Failed calls count towards the user's quota on purpose. Otherwise a broken client retrying in a loop would hit the provider without ever being slowed down.</p>
+</div></details>
+
+<h3 id="ch96-9"><span class="num">96.9</span>Tests, backups and a local run</h3>
+<p>Before any container, prove the behaviour with tests. They use FastAPI's <code>TestClient</code>, a temporary database per test and the fake model, so they need no key, no network and no Docker.</p>
+<div class="code"><span class="cap">tests/test_server.py</span><pre>import sys
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import backup  # noqa: E402
+import store  # noqa: E402
+
+STORY = Path(__file__).resolve().parent.parent.joinpath("story-register.txt").read_text()
+
+
+@pytest.fixture
+def env(tmp_path, monkeypatch):
+    """A fresh database and fake-model mode for every test."""
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("QA_FAKE_MODEL", "1")
+    monkeypatch.setenv("APP_VERSION", "test-1")
+    from fastapi.testclient import TestClient
+    import server
+    tokens = {role: store.add_user(f"{role}-user", role) for role in store.ROLES}
+    return TestClient(server.app), tokens
+
+
+def auth(token):
+    return {"authorization": f"Bearer {token}"}
+
+
+def test_health_and_ready(env):
+    client, _ = env
+    assert client.get("/healthz").json() == {"status": "ok"}
+    assert client.get("/readyz").json() == {"status": "ready", "version": "test-1", "mode": "fake"}
+
+
+def test_not_ready_in_live_mode_without_key(env, monkeypatch):
+    client, _ = env
+    monkeypatch.delenv("QA_FAKE_MODEL")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    r = client.get("/readyz")
+    assert r.status_code == 503 and "no API key configured" in r.json()["problems"]
+
+
+def test_login_required(env):
+    client, _ = env
+    assert client.post("/api/generate", json={"story": STORY}).status_code == 401
+    assert client.post("/api/generate", json={"story": STORY},
+                       headers=auth("qah_wrong")).status_code == 401
+
+
+def test_viewer_cannot_generate(env):
+    client, tokens = env
+    r = client.post("/api/generate", json={"story": STORY}, headers=auth(tokens["viewer"]))
+    assert r.status_code == 403
+
+
+def test_tester_generates_and_run_is_stored(env):
+    client, tokens = env
+    r = client.post("/api/generate", json={"story": STORY}, headers=auth(tokens["tester"]))
+    assert r.status_code == 200 and len(r.json()["result"]["test_cases"]) == 12
+    run_id = r.json()["run_id"]
+    runs = client.get("/api/runs", headers=auth(tokens["tester"])).json()
+    assert [x["id"] for x in runs] == [run_id]
+    csv = client.get(f"/api/runs/{run_id}.csv", headers=auth(tokens["tester"]))
+    assert csv.text.startswith("ID,Title,Type")
+    # another non-admin user can't read it; an admin can
+    assert client.get(f"/api/runs/{run_id}.csv", headers=auth(tokens["viewer"])).status_code == 404
+    assert client.get(f"/api/runs/{run_id}.csv", headers=auth(tokens["admin"])).status_code == 200
+
+
+def test_story_too_long(env, monkeypatch):
+    client, tokens = env
+    monkeypatch.setenv("MAX_STORY_CHARS", "50")
+    r = client.post("/api/generate", json={"story": STORY}, headers=auth(tokens["tester"]))
+    assert r.status_code == 413
+
+
+def test_daily_limit(env, monkeypatch):
+    client, tokens = env
+    monkeypatch.setenv("DAILY_REQUESTS_PER_USER", "2")
+    codes = [client.post("/api/generate", json={"story": STORY},
+                         headers=auth(tokens["tester"])).status_code for _ in range(3)]
+    assert codes == [200, 200, 429]
+
+
+def test_kill_switch(env):
+    client, tokens = env
+    assert client.post("/admin/ai", json={"enabled": False},
+                       headers=auth(tokens["tester"])).status_code == 403
+    assert client.post("/admin/ai", json={"enabled": False},
+                       headers=auth(tokens["admin"])).status_code == 200
+    r = client.post("/api/generate", json={"story": STORY}, headers=auth(tokens["tester"]))
+    assert r.status_code == 503
+
+
+def test_revoked_token_stops_working(env):
+    client, tokens = env
+    store.revoke_user("tester-user")
+    assert client.get("/api/me", headers=auth(tokens["tester"])).status_code == 401
+
+
+def test_backup_and_restore(env):
+    client, tokens = env
+    client.post("/api/generate", json={"story": STORY}, headers=auth(tokens["tester"]))
+    path, counts = backup.make_backup()
+    assert counts == {"users": 3, "runs": 1}
+    client.post("/api/generate", json={"story": STORY}, headers=auth(tokens["tester"]))
+    assert backup.restore(path) == {"users": 3, "runs": 1}
+    assert len(store.recent_runs()) == 1          # the second run is gone: back to the backup</pre></div>
+<div class="code"><span class="cap">Terminal and expected output</span><pre>python -m pytest -q
+..................                                                       [100%]
+18 passed in 0.35s</pre></div>
+<p>That's Chapter 94's 8 tests plus 10 new ones. (The time will differ.) Each production promise has a test: no token, wrong role, too long, over quota, kill switch, revoked token, and a backup that really restores.</p>
+<h4>Backups</h4>
+<div class="code"><span class="cap">backup.py</span><pre>"""Usage:
+  python backup.py [--keep 14]      copy the live database to DATA_DIR/backups and check it
+  python backup.py --restore FILE   replace the live database with FILE (stop the app first)"""
+import argparse
+import sqlite3
+from contextlib import closing
+from datetime import datetime, timezone
+from pathlib import Path
+
+import store
+
+
+def check(path):
+    with closing(sqlite3.connect(path)) as conn:
+        if conn.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+            raise SystemExit(f"{path} failed the integrity check")
+        return {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in ("users", "runs")}
+
+
+def make_backup(keep=14):
+    folder = Path(store.db_path()).parent / "backups"
+    folder.mkdir(parents=True, exist_ok=True)
+    dest = folder / f"qa-helper-{datetime.now(timezone.utc):%Y%m%d-%H%M%S}.db"
+    with closing(store.connect()) as src, closing(sqlite3.connect(dest)) as out:
+        src.backup(out)                      # safe while the app is running
+    counts = check(dest)
+    for old in sorted(folder.glob("qa-helper-*.db"))[:-keep]:
+        old.unlink()
+    return dest, counts
+
+
+def restore(path):
+    counts = check(path)                     # never restore a broken file
+    with closing(sqlite3.connect(path)) as src, closing(store.connect()) as live:
+        src.backup(live)
+    return counts
+
+
+if __name__ == "__main__":
+    p = argparse.ArgumentParser()
+    p.add_argument("--keep", type=int, default=14)
+    p.add_argument("--restore")
+    a = p.parse_args()
+    if a.restore:
+        print(f"Restored {a.restore}: {restore(a.restore)}")
+    else:
+        dest, counts = make_backup(a.keep)
+        print(f"Backup OK: {dest} ({dest.stat().st_size} bytes) {counts}")</pre></div>
+<p>Python's <code>sqlite3</code> backup function copies a live database safely while the app keeps running; copying the file with <code>cp</code> while it's being written can produce a corrupt copy. Every backup is checked with <code>PRAGMA integrity_check</code> and its row counts printed, and <code>--restore</code> refuses a file that fails the check.</p>
+<h4>Run it locally, without Docker</h4>
+<div class="code"><span class="cap">Terminal 1</span><pre>export DATA_DIR="$PWD/data" QA_FAKE_MODEL=1 APP_VERSION=local
+python manage.py add-user asha tester
+python manage.py add-user lead admin
+python manage.py add-user pm viewer
+python manage.py list-users
+uvicorn server:app --port 8000</pre></div>
+<div class="code"><span class="cap">Expected output (your tokens will differ)</span><pre>Created asha (tester). Token, shown only once:
+qah_ppxp-6MNpkl2dTWIkxZcaKVLfWnxjErXFFyzdoct4DE
+...
+asha             tester  active   2026-11-09
+lead             admin   active   2026-11-09
+pm               viewer  active   2026-11-09
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)</pre></div>
+<p>Open <code>http://127.0.0.1:8000</code>, paste asha's token, paste the story from <code>story-register.txt</code> and press Generate. Or use a second terminal, putting the tokens you were given in place of the placeholders:</p>
+<div class="code"><span class="cap">Terminal 2</span><pre>T="qah_paste-ashas-token"; A="qah_paste-leads-token"
+curl -s localhost:8000/healthz
+curl -s localhost:8000/readyz
+curl -s -o /dev/null -w "%{http_code}\n" -X POST localhost:8000/api/generate \
+  -H 'content-type: application/json' -d '{"story": "x"}'
+curl -s -X POST localhost:8000/api/generate -H "authorization: Bearer $T" \
+  -H 'content-type: application/json' \
+  -d '{"story": "As a user I want to log in.\n- Password must be at least 8 characters."}'
+curl -s localhost:8000/api/me -H "authorization: Bearer $T"
+curl -s localhost:8000/admin/usage -H "authorization: Bearer $T"
+curl -s -X POST localhost:8000/admin/ai -H "authorization: Bearer $A" \
+  -H 'content-type: application/json' -d '{"enabled": false}'
+python backup.py</pre></div>
+<div class="code"><span class="cap">Expected output (trimmed; the generate call returns the full JSON result)</span><pre>{"status":"ok"}
+{"status":"ready","version":"local","mode":"fake"}
+401
+{"run_id":1,"mode":"fake","usage":{"input_tokens":0,"output_tokens":0},"result":{...}}
+{"name":"asha","role":"tester","today":{"requests":1,"input_tokens":0,"output_tokens":0},"daily_limit":40}
+{"detail":"Your role (tester) can't do this."}
+{"ai_enabled":false}
+Backup OK: /path/to/qa-helper/data/backups/qa-helper-20261109-105051.db (32768 bytes) {'users': 3, 'runs': 1}</pre></div>
+<p>The server log shows one line per generation, with numbers but no story text:</p>
+<div class="code"><span class="cap">Server log</span><pre>2026-11-09 16:20:51,299 INFO qa-helper generate user=asha mode=fake status=ok ms=2 in=0 out=0 run=1
+2026-11-09 16:20:51,393 WARNING qa-helper kill switch: ai_enabled=False by lead</pre></div>
+<p>Switch AI back on with <code>-d '{"enabled": true}'</code> before you continue.</p>
+
+<h3 id="ch96-10"><span class="num">96.10</span>Packaging with Docker</h3>
+<p>"It works on my machine" is the oldest excuse in software. A <a class="gl" href="#g-container">container</a> fixes it by packaging the app with its exact Python version and libraries. You describe the package in a <strong>Dockerfile</strong>; Docker builds it into a <a class="gl" href="#g-container-image">container image</a>, a read-only snapshot you can run anywhere Docker runs. The same image goes to the test run, the registry and the server, so what you tested is what you ship.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>An image is a sealed meal kit: recipe, ingredients and quantities, identical every time. A container is one meal cooked from the kit. You can cook ten from the same kit, and throwing one away doesn't change the kit. Anything you want to keep, like the database, goes in the fridge (a volume), not on the plate.</p></div>
+<div class="code"><span class="cap">Dockerfile</span><pre># One small image that runs the QA helper web service.
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    DATA_DIR=/data
+
+WORKDIR /app
+
+# Dependencies first: this layer is cached until requirements.txt changes.
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Then the application code.
+COPY qahelper.py store.py server.py manage.py backup.py ./
+COPY static ./static
+
+# Run as an ordinary user, not root, and give it a folder for the database.
+RUN useradd --create-home --uid 10001 appuser \
+    &amp;&amp; mkdir -p /data \
+    &amp;&amp; chown appuser /data
+USER appuser
+
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)"]
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]</pre></div>
+<p>Line by line, the decisions that matter:</p>
+<ul>
+<li><code>python:3.12-slim</code>: an official Python image based on a small Debian. It's smaller than the full image, so faster to pull and with fewer packages to patch.</li>
+<li>Copying <code>requirements.txt</code> and installing <em>before</em> copying the code means Docker reuses the dependency layer when only your code changes. Rebuilds take seconds, not minutes.</li>
+<li>The container runs as <code>appuser</code>, not root, so a bug in the app can't change the system inside the container.</li>
+<li><code>HEALTHCHECK</code> asks <code>/healthz</code> every 30 seconds; after 3 failures in a row Docker marks the container <em>unhealthy</em>. The command uses Python's standard library because the slim image has no <code>curl</code>.</li>
+<li><code>--host 0.0.0.0</code>: inside a container the app must listen on all network interfaces, or nothing outside the container can reach it.</li>
+</ul>
+<div class="code"><span class="cap">.dockerignore</span><pre>.venv
+.git
+.github
+__pycache__
+*.pyc
+.pytest_cache
+tests
+data
+secrets
+.env
+app.env
+*.csv
+result.json</pre></div>
+<p><a class="gl" href="#g-docker-compose">Docker Compose</a> describes how to run one or more containers together, with their settings, secrets and volumes, in a single YAML file:</p>
+<div class="code"><span class="cap">compose.yaml</span><pre>services:
+  app:
+    image: ${IMAGE:-qa-helper}:${IMAGE_TAG:-local}
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"          # only reachable from this machine; the proxy faces the internet
+    env_file: app.env                  # settings that are not secret
+    environment:
+      APP_VERSION: ${IMAGE_TAG:-local}
+      ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic_api_key
+    secrets:
+      - anthropic_api_key
+    volumes:
+      - qa-data:/data                  # the database survives container replacement
+
+secrets:
+  anthropic_api_key:
+    file: ./secrets/anthropic_api_key.txt
+
+volumes:
+  qa-data:</pre></div>
+<div class="code"><span class="cap">app.env.example</span><pre># Copy to app.env and edit. Nothing in this file is secret.
+QA_FAKE_MODEL=1
+QA_MODEL=claude-opus-5-5
+MAX_STORY_CHARS=8000
+DAILY_REQUESTS_PER_USER=40
+DAILY_TOKEN_BUDGET=2000000</pre></div>
+<ul>
+<li><code>image: ${IMAGE:-qa-helper}:${IMAGE_TAG:-local}</code>: Compose fills these from your shell or a <code>.env</code> file, with defaults after <code>:-</code>. Locally you get <code>qa-helper:local</code>; on the server the deploy script sets the exact version.</li>
+<li><code>127.0.0.1:8000:8000</code> publishes the port only on the machine itself. The internet reaches the app through the reverse proxy, never directly.</li>
+<li><code>env_file</code> holds settings that aren't secret; <code>secrets</code> holds the key. Keeping them apart means you can share <code>app.env</code> in a ticket without a second thought.</li>
+<li>The named volume <code>qa-data</code> holds the database and backups. Replacing the container keeps the volume.</li>
+</ul>
+<div class="code"><span class="cap">Terminal: build and run locally</span><pre>cp app.env.example app.env
+mkdir -p secrets &amp;&amp; touch secrets/anthropic_api_key.txt   <span class="c"># empty is fine in fake mode</span>
+docker compose up -d --build
+docker compose ps                                            <span class="c"># wait for (healthy)</span>
+curl -s localhost:8000/readyz
+docker compose exec app python manage.py add-user asha tester
+docker compose logs --tail 20 app</pre></div>
+<p><strong>What you should see</strong> (described, not captured: Docker wasn't available when this chapter was tested): the build pulls <code>python:3.12-slim</code> and installs the three pinned packages; <code>docker compose ps</code> lists the <code>app</code> service as "Up", first with "(health: starting)" and then "(healthy)" within about 40 seconds; <code>/readyz</code> returns <code>{"status":"ready","version":"local","mode":"fake"}</code>; and <code>manage.py</code> prints a new token, exactly as in 96.9 but now inside the container. Run <code>docker compose down</code> and <code>up -d</code> again: asha's token still works, because the database is on the volume. <code>docker compose down -v</code> deletes the volume too, so use it only when you mean "erase everything".</p>
+<div class="box warn"><span class="tag">Going live with Claude</span><p>On the server, put the real key in <code>secrets/anthropic_api_key.txt</code> and set <code>QA_FAKE_MODEL=0</code> in <code>app.env</code>. The container runs as user ID 10001, and the secret file keeps its owner and permissions from the host, so make it readable by that user only: <code>sudo chown 10001 secrets/anthropic_api_key.txt &amp;&amp; sudo chmod 600 secrets/anthropic_api_key.txt</code>. If <code>/readyz</code> then says "no API key configured", the file is empty or the container can't read it; the app log names the problem.</p></div>
+
+<h3 id="ch96-11"><span class="num">96.11</span>Choosing where to host it</h3>
+<p>"Hosting" means renting or borrowing a computer that runs your container day and night, reachable by your users. There's no single right answer, and every major option can run this image. The decision usually turns on three questions: what does your company already run and support, who patches and watches the machine, and where does the database file live?</p>
+<div class="tbl"><table>
+<tr><th>Option</th><th>Good fit when</th><th>Persistent storage for the SQLite file</th><th>You look after</th></tr>
+<tr><td><strong>Your company's internal platform</strong> (often Kubernetes-based, run by a platform team)</td><td>It exists. Ask first: it usually comes with SSO, networking, logging and security review already solved.</td><td>Ask the platform team; many offer persistent volumes or a managed database.</td><td>Your app; the team runs the platform</td></tr>
+<tr><td><strong>One virtual machine with Docker Compose</strong> (from any cloud provider, or on-premises)</td><td>A small internal tool, a dozen users, and nobody to hand it to. This chapter's pipeline targets it.</td><td>A Docker volume on the machine's disk. Simple, but the machine is a single point of failure, so off-site backups matter.</td><td>Everything: OS updates, firewall, HTTPS, Docker, backups</td></tr>
+<tr><td><strong>A managed container service</strong> (for example Google Cloud Run or Azure Container Apps)</td><td>You want no servers to patch, automatic scaling, and you're already on that cloud.</td><td><strong>Not the container's disk.</strong> Cloud Run's filesystem is in memory and is lost when the instance stops. Azure Container Apps' container storage is temporary; persistent files need an Azure Files mount. In practice, move to a managed database.</td><td>The app and its configuration; the provider runs the machines</td></tr>
+<tr><td><strong>An app platform with disks</strong> (for example Render or Fly.io)</td><td>You want "push and it's live" with little setup.</td><td>Render: the filesystem is temporary by default; a persistent disk is available on paid services, with daily snapshots kept for 7 days, but limits the service to one instance and rules out zero-downtime deploys. Fly.io: volumes are local disks on one machine, not replicated automatically, with daily snapshots kept 5 days by default.</td><td>The app; some settings; your own backups</td></tr>
+</table></div>
+<p>The details in the table were checked against each provider's documentation on 9 November 2026 and change often; read the current pages before you choose. Other clouds, including AWS, offer similar managed container services: ask the same storage question of each. Whatever you choose, read the provider's container contract: Cloud Run, for example, tells the app which port to listen on through a <code>PORT</code> environment variable (8080 by default), so you'd change the <code>CMD</code> to use it.</p>
+<div class="box opinion"><span class="tag">Opinion · this book</span><p>For an internal QA tool, the best host is usually the one your company already supports, because sign-in, networking and security review come with it. If there isn't one, a single small VM with Compose is the easiest option to understand and debug, and it's what this chapter builds. Move to a managed service with a managed database when you need more than one copy of the app or nobody wants to patch a server. Keep the tool on the company network or VPN unless there's a real reason to put it on the public internet: the safest public exposure is none.</p></div>
+<h4>HTTPS on a VM: a reverse proxy</h4>
+<p>Passwords and tokens must never cross a network in plain text, so the app needs HTTPS. Managed platforms provide it. On a VM, a <a class="gl" href="#g-reverse-proxy">reverse proxy</a> sits in front of the app, holds the certificate and forwards requests. Caddy is one such proxy that obtains and renews certificates automatically when it knows the domain name; nginx and others work too, with more setup.</p>
+<div class="code"><span class="cap">compose.proxy.yaml</span><pre># Only on a server with a public domain name: adds HTTPS in front of the app.
+services:
+  proxy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy:/etc/caddy:ro          # folder holding the Caddyfile
+      - caddy-data:/data               # certificates and keys: never treat as a cache
+      - caddy-config:/config
+    depends_on:
+      - app
+
+volumes:
+  caddy-data:
+  caddy-config:</pre></div>
+<div class="code"><span class="cap">caddy/Caddyfile</span><pre>qa-helper.example.com
+
+reverse_proxy app:8000</pre></div>
+<p>Replace the domain with yours, point its DNS record at the server, and open ports 80 and 443 in the firewall so the certificate can be issued. On the server, a <code>.env</code> file next to <code>compose.yaml</code> tells Compose to load both files and which image to use:</p>
+<div class="code"><span class="cap">/opt/qa-helper/.env (on the server; not secret)</span><pre>COMPOSE_FILE=compose.yaml:compose.proxy.yaml
+IMAGE=ghcr.io/your-org/qa-helper</pre></div>
+
+<h3 id="ch96-12"><span class="num">96.12</span>CI/CD with GitHub Actions: tests → image → deploy</h3>
+<p><a class="gl" href="#g-continuous-integration">Continuous integration</a> runs the tests on every change. <a class="gl" href="#g-continuous-deployment">Continuous deployment</a> goes further: a change that passes is built and shipped by the pipeline, not by someone typing commands on a server. Nobody "forgets a step" at 6 p.m. on a Friday, and every release is traceable to a commit.</p>
+<div class="flow">
+<div><b>test</b>Every pull request and push: pytest and the dry-run eval</div>
+<div><b>build</b>main only: build image, start it, check <code>/readyz</code>, push to the registry</div>
+<div class="hl"><b>approve</b>A named reviewer approves the production environment</div>
+<div><b>deploy</b>SSH to the server: back up, start, wait for ready, or roll back</div>
+<div><b>verify</b>Check the public URL reports the new version</div>
+</div>
+<div class="code"><span class="cap">.github/workflows/deploy.yml</span><pre>name: test-build-deploy
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      QA_FAKE_MODEL: "1"            # tests never call Claude and need no key
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: python -m pytest -q
+      - run: python eval_qahelper.py --dry-run
+
+  build:
+    needs: test
+    if: github.event_name != 'pull_request' &amp;&amp; github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write               # lets GITHUB_TOKEN push to ghcr.io
+    steps:
+      - uses: actions/checkout@v7
+      - name: Image name (registry names must be lower case)
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" &gt;&gt; "$GITHUB_ENV"
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build
+        run: docker build -t "$IMAGE:$GITHUB_SHA" .
+      - name: Smoke-test the image before publishing it
+        run: |
+          docker run -d --name smoke -p 8000:8000 \
+            -e QA_FAKE_MODEL=1 -e APP_VERSION="$GITHUB_SHA" "$IMAGE:$GITHUB_SHA"
+          for i in $(seq 1 20); do
+            curl -fsS http://127.0.0.1:8000/readyz &amp;&amp; break
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8000/readyz | grep "\"version\":\"$GITHUB_SHA\""
+      - name: Show container logs if the smoke test failed
+        if: failure()
+        run: docker logs smoke
+      - name: Push
+        run: docker push "$IMAGE:$GITHUB_SHA"
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production          # add required reviewers to this environment
+    concurrency:
+      group: production
+      cancel-in-progress: false      # never stop a deploy half-way
+    steps:
+      - name: Deploy over SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" &gt; ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" &gt; ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key "deploy@$DEPLOY_HOST" "/opt/qa-helper/deploy.sh $GITHUB_SHA"
+      - name: Check it from the outside
+        env:
+          PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+        run: curl -fsS "$PUBLIC_URL/readyz" | grep "\"version\":\"$GITHUB_SHA\""</pre></div>
+<h4>How it works</h4>
+<ul>
+<li><strong>The test job needs no API key.</strong> <code>QA_FAKE_MODEL=1</code> means the pipeline never calls Claude, costs nothing and can't leak a key. If you want a live quality check, add <a href="#ch95">Chapter 95</a>'s eval gate as a separate, manually triggered job with its own key in an environment secret.</li>
+<li><strong>The image is tagged with the commit SHA</strong> (<code>$GITHUB_SHA</code>), never just <code>latest</code>. A tag that names one exact commit is what makes rollback possible: "go back to <code>a1b2c3d</code>" is precise; "go back to the previous latest" isn't.</li>
+<li><strong>The image is smoke-tested before it's pushed.</strong> A broken image never reaches the registry.</li>
+<li><strong>Permissions are minimal.</strong> The workflow can only read the repository; only the build job may write packages. GitHub's container registry, <code>ghcr.io</code>, accepts the automatic <code>GITHUB_TOKEN</code> for this, so there's no long-lived registry password to manage.</li>
+<li><strong>The deploy job uses an <em>environment</em></strong> called <code>production</code>. Environments can require approval from named reviewers before the job runs, and environment secrets are only released to jobs that pass those rules. <code>concurrency</code> stops two deploys from running at once.</li>
+</ul>
+<h4>One-time setup on GitHub</h4>
+<ol>
+<li>Settings → Environments → New environment <code>production</code>. Add yourself and one other person as required reviewers, and tick "Prevent self-review" if your team has two or more people who can approve. (On GitHub's Free plan, environments are only available for public repositories; private repositories need GitHub Pro or Team.)</li>
+<li>In that environment, add secrets <code>DEPLOY_SSH_KEY</code> (a private key made only for deploying) and <code>DEPLOY_KNOWN_HOSTS</code> (the server's host key line, so the runner can't be tricked into talking to another machine), and variables <code>DEPLOY_HOST</code> (the server's address) and <code>PUBLIC_URL</code> (for example <code>https://qa-helper.example.com</code>).</li>
+</ol>
+<h4>One-time setup on the server</h4>
+<div class="code"><span class="cap">Terminal, on the server (Linux with Docker Engine and the Compose plugin installed)</span><pre>sudo useradd --create-home --groups docker deploy      <span class="c"># the user the pipeline signs in as</span>
+sudo mkdir -p /opt/qa-helper &amp;&amp; sudo chown deploy /opt/qa-helper
+<span class="c"># copy into /opt/qa-helper from the repository: compose.yaml, compose.proxy.yaml,</span>
+<span class="c"># the caddy/ folder, app.env.example, and deploy/deploy.sh + deploy/rollback.sh (into the top level)</span>
+cd /opt/qa-helper
+chmod +x deploy.sh rollback.sh
+cp app.env.example app.env                               <span class="c"># then set QA_FAKE_MODEL=0</span>
+mkdir -p secrets                                         <span class="c"># put the key in secrets/anthropic_api_key.txt</span>
+echo "$CR_PAT" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
+<span class="c"># add the deploy public key to ~deploy/.ssh/authorized_keys, and create .env (96.11)</span></pre></div>
+<p>The registry login uses a classic personal access token with only the <code>read:packages</code> scope; GitHub's container registry accepts only classic tokens for this. Membership of the <code>docker</code> group is powerful (it's effectively root on that machine), which is one more reason to use a dedicated server and a dedicated user.</p>
+<p>The two scripts that run on the server:</p>
+<div class="code"><span class="cap">deploy/deploy.sh</span><pre>#!/usr/bin/env bash
+# Usage (on the server, in /opt/qa-helper):  ./deploy.sh IMAGE_TAG
+# Backs up, starts the new version, waits until it reports ready, or rolls back.
+set -euo pipefail
+cd "$(dirname "$0")"
+NEW_TAG="${1:?usage: ./deploy.sh IMAGE_TAG}"
+HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8000/readyz}"
+TRIES="${TRIES:-30}"
+PREV_TAG="$(cat .current-tag 2&gt;/dev/null || true)"
+
+start() {
+  IMAGE_TAG="$1" docker compose pull app
+  IMAGE_TAG="$1" docker compose up -d
+}
+
+ready() {   # ready TAG: true when /readyz answers with that exact version
+  for _ in $(seq 1 "$TRIES"); do
+    if curl -fsS "$HEALTH_URL" 2&gt;/dev/null | grep -q "\"version\":\"$1\""; then
+      return 0
+    fi
+    sleep 2
+  done
+  return 1
+}
+
+echo "== Backing up the database before deploying $NEW_TAG"
+docker compose exec -T app python backup.py || echo "WARNING: no backup (first deploy, or app down)"
+
+echo "== Starting $NEW_TAG (currently live: ${PREV_TAG:-nothing})"
+start "$NEW_TAG"
+if ready "$NEW_TAG"; then
+  if [ -n "$PREV_TAG" ] &amp;&amp; [ "$PREV_TAG" != "$NEW_TAG" ]; then
+    echo "$PREV_TAG" &gt; .previous-tag
+  fi
+  echo "$NEW_TAG" &gt; .current-tag
+  echo "== OK: $NEW_TAG is live"
+  exit 0
+fi
+
+echo "== FAILED: $NEW_TAG did not become ready"
+docker compose logs --tail 30 app || true
+if [ -n "$PREV_TAG" ]; then
+  echo "== Rolling back to $PREV_TAG"
+  start "$PREV_TAG"
+  if ready "$PREV_TAG"; then
+    echo "== Rolled back: $PREV_TAG is live again"
+  else
+    echo "== Rollback is ALSO unhealthy: call a human now"
+  fi
+fi
+exit 1</pre></div>
+<div class="code"><span class="cap">deploy/rollback.sh</span><pre>#!/usr/bin/env bash
+# Usage: ./rollback.sh   puts the previous version back (it swaps the last two versions)
+set -euo pipefail
+cd "$(dirname "$0")"
+PREV="$(cat .previous-tag 2&gt;/dev/null || true)"
+if [ -z "$PREV" ]; then
+  echo "No previous version recorded. Run ./deploy.sh with a known-good tag instead."
+  exit 1
+fi
+echo "Rolling back from $(cat .current-tag) to $PREV"
+exec ./deploy.sh "$PREV"</pre></div>
+<p>A push to <code>main</code> now runs: test (about a minute), build and smoke test, then waits in the Actions tab with "Waiting for review" on the deploy job. A reviewer clicks Approve; the deploy job signs in, runs <code>deploy.sh</code> with the commit SHA, and the final step checks the public URL reports that SHA.</p>
+
+<h3 id="ch96-13"><span class="num">96.13</span>Health checks and rollbacks</h3>
+<p>A <a class="gl" href="#g-health-check">health check</a> is a small, cheap request that tells a machine whether the app is OK. There are two kinds, and mixing them up causes real outages:</p>
+<div class="tbl"><table>
+<tr><th></th><th>Liveness: <code>/healthz</code></th><th><a class="gl" href="#g-readiness-check">Readiness</a>: <code>/readyz</code></th></tr>
+<tr><td>Question</td><td>Is the process alive?</td><td>Can it serve real requests right now?</td></tr>
+<tr><td>Checks</td><td>Nothing; just answers</td><td>Database reachable; API key present (or fake mode); reports version</td></tr>
+<tr><td>Used by</td><td>Docker's <code>HEALTHCHECK</code>: restart if dead</td><td><code>deploy.sh</code>, the pipeline, load balancers: send traffic only when ready</td></tr>
+<tr><td>If it fails</td><td>Restart the container</td><td>Don't switch to this version; roll back</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Never call the model in a health check</span><p>Health checks run every few seconds, forever. A check that called Claude would cost money on every probe, use up rate limits, and, worse, mark your app "down" whenever the provider is slow, causing restarts that make things worse. <code>/readyz</code> checks that a key is <em>configured</em>, not that it's <em>valid</em>. After a key change, make one manual live generation as a smoke test.</p></div>
+<p><code>deploy.sh</code> uses readiness to decide. It doesn't just wait for "ready": it waits for "ready <em>and reporting the new version</em>", so it can't be fooled by the old container still answering. Here is a real run against the stand-in for <code>docker compose</code> described in 96.2: a good deploy, a second good deploy, a bad release (configured for live mode with no key, so it never becomes ready), and a manual rollback.</p>
+<div class="code"><span class="cap">Output (real run with a local stand-in for Docker; shortened)</span><pre>--- second deploy
+== Backing up the database before deploying e4f5a6b
+Backup OK: .../data/backups/qa-helper-20261109-105121.db (32768 bytes) {'users': 3, 'runs': 2}
+== Starting e4f5a6b (currently live: a1b2c3d)
+== OK: e4f5a6b is live
+--- bad deploy
+== Backing up the database before deploying bad9999
+== Starting bad9999 (currently live: e4f5a6b)
+== FAILED: bad9999 did not become ready
+INFO:     127.0.0.1:59235 - "GET /readyz HTTP/1.1" 503 Service Unavailable
+== Rolling back to e4f5a6b
+== Rolled back: e4f5a6b is live again
+--- rollback
+Rolling back from e4f5a6b to a1b2c3d
+== OK: a1b2c3d is live</pre></div>
+<p>The bad deploy exits with status 1, so the GitHub Actions job goes red and the team is told, while users keep using the good version. Users may see errors for up to a minute while the bad version is tried; avoiding even that needs two copies running side by side (blue-green deployment) or a <a class="gl" href="#g-canary-release">canary release</a>, which most managed platforms offer and which is overkill for a dozen internal users.</p>
+<details class="deep"><summary>Under the hood: what a rollback does <em>not</em> undo</summary><div class="body">
+<p>Rolling back the image puts the old <em>code</em> back. It doesn't undo changes to <em>data</em>. If version B adds a database column and writes to it, version A must still work with that column present. The safe habit is "expand, then contract": first release a version that adds new things without removing old ones, and only remove the old ones in a later release once nobody will roll back past it. <code>store.py</code> uses <code>CREATE TABLE IF NOT EXISTS</code>, which is enough for this small app; bigger apps use a migration tool. This is also why <code>deploy.sh</code> takes a backup <em>before</em> starting the new version: if a release damages data, you have a copy from the minute before.</p>
+</div></details>
+
+<h3 id="ch96-14"><span class="num">96.14</span>Backups and production incidents</h3>
+<p>A backup you haven't restored is a hope, not a backup. Three rules:</p>
+<ol>
+<li><strong>Automatic and frequent.</strong> <code>deploy.sh</code> backs up before every release; add a nightly one with cron on the server: <code>15 2 * * * cd /opt/qa-helper &amp;&amp; docker compose exec -T app python backup.py</code>.</li>
+<li><strong>Off the machine.</strong> Backups on the same volume die with the server. Copy them out with <code>docker compose cp app:/data/backups ./backups-copy</code> and send that folder to storage your company backs up (an object storage bucket, a backed-up file share). Provider snapshots of disks (as on Render and Fly.io) help, but their own documentation says to keep your own backups too.</li>
+<li><strong>Restore drill, monthly.</strong> Restore the latest backup into a scratch copy and check the counts. Write down how long it took: that's your real recovery time.</li>
+</ol>
+<div class="code"><span class="cap">Terminal, on the server: restoring</span><pre>docker compose stop app
+docker compose run --rm app python backup.py --restore /data/backups/qa-helper-20261109-105121.db
+docker compose start app
+curl -s 127.0.0.1:8000/readyz</pre></div>
+<p>When something goes wrong, the first goal is to stop the harm, not to find the cause. Here's a first-response table for this app; copy it into your <a class="gl" href="#g-runbook">runbook</a> (<a href="#ch95">Chapter 95</a> has a full runbook template).</p>
+<div class="tbl"><table>
+<tr><th>Incident</th><th>How you notice</th><th>First move</th><th>Then</th></tr>
+<tr><td>Bad release</td><td>Deploy job red, or users report errors after a deploy</td><td><code>./rollback.sh</code> (or it already happened automatically)</td><td>Reproduce in a test; add one that would have caught it</td></tr>
+<tr><td>App down</td><td><code>/healthz</code> fails; <code>docker compose ps</code> shows unhealthy or restarting</td><td><code>docker compose logs --tail 100 app</code>; restart; check disk space</td><td>Fix the cause; add monitoring of <code>/healthz</code> from outside</td></tr>
+<tr><td>Claude API errors or very slow</td><td>Many 502s in logs with <code>RateLimitError</code>, <code>InternalServerError</code> or timeouts</td><td>Check status.claude.com; if it's the provider, use the kill switch so users get a clear message</td><td>Switch back on when the status page is green</td></tr>
+<tr><td>Cost spike</td><td><code>/admin/usage</code> shows one user or script with huge usage</td><td>Kill switch, or <code>manage.py revoke-user</code></td><td>Lower limits; talk to the person; review the Console spend limit</td></tr>
+<tr><td>API key leaked</td><td>Key seen in a log, ticket, chat or repository; or unexpected Console usage</td><td>Create a new key, swap the secret file, restart, <strong>then delete the old key</strong></td><td>Find how it leaked; follow <a href="#ch98">Chapter 98</a>'s leak steps</td></tr>
+<tr><td>User token leaked or a leaver still has access</td><td>Report, or a review of <code>list-users</code></td><td><code>manage.py revoke-user NAME</code>; issue a new token if needed</td><td>Move to SSO so leavers lose access automatically</td></tr>
+<tr><td>Database lost or corrupt</td><td><code>/readyz</code> reports a database error; data missing</td><td>Stop the app; restore the latest good backup</td><td>Tell users which window of history was lost; check the off-site copy worked</td></tr>
+<tr><td>Confidential data exposed</td><td>A story or result seen by someone who shouldn't</td><td>Revoke the access involved; preserve logs</td><td>Involve security or data protection as your process requires (<a href="#ch132">Chapter 132</a>)</td></tr>
+</table></div>
+<div class="box note"><span class="tag">After every incident</span><p>Write five lines: what happened, how you noticed, what you did, how long users were affected, and one change that makes it less likely. Then make that change. Blameless notes like these are how a small tool becomes a reliable one.</p></div>
+
+<h3 id="ch96-15"><span class="num">96.15</span>The pre-launch checklist</h3>
+<p>Go through this with someone who didn't build the app. Every "no" is either fixed before launch or written down as an accepted risk with an owner's name next to it.</p>
+<div class="tbl"><table>
+<tr><th>Area</th><th>Check</th><th>How to prove it</th></tr>
+<tr><td>Tests</td><td>All tests pass in CI on the commit being deployed</td><td>Green test job for that SHA</td></tr>
+<tr><td>Quality</td><td>Live eval run and recorded for the current prompt and model</td><td><code>python eval_qahelper.py</code> score in the release notes (<a href="#ch95">Chapter 95</a>)</td></tr>
+<tr><td>Sign-in</td><td>No endpoint except <code>/</code>, <code>/healthz</code> and <code>/readyz</code> works without a token</td><td><code>test_login_required</code>; try <code>curl</code> without a token</td></tr>
+<tr><td>Permissions</td><td>Viewers can't generate; testers can't use admin endpoints; users can't read each other's runs</td><td>The role tests; one manual try per role</td></tr>
+<tr><td>Secrets</td><td>No key in git history, image, <code>app.env</code> or logs; key file readable only by the app user</td><td>Search the repository for <code>sk-ant</code>; <code>ls -l secrets/</code></td></tr>
+<tr><td>Key</td><td>Dedicated workspace and key, with spend and rate limits set in the Console</td><td>Screenshot of the workspace limits</td></tr>
+<tr><td>Cost</td><td>Story size, per-user and team limits set; worst-case daily cost calculated</td><td><code>app.env</code> values and the calculation</td></tr>
+<tr><td>Kill switch</td><td>An admin can switch AI off and on, and users see a clear message</td><td><code>test_kill_switch</code>, then a manual try</td></tr>
+<tr><td>Network</td><td>HTTPS only; app port bound to <code>127.0.0.1</code>; reachable only from where it should be</td><td>Browser padlock; port scan from outside shows only 80 and 443 (or nothing, if internal)</td></tr>
+<tr><td>Data</td><td>Agreed what stories may be sent to the API, and how long results are kept</td><td>Written approval; <code>purge-results</code> scheduled</td></tr>
+<tr><td>Backups</td><td>Nightly and pre-deploy backups exist, are copied off the server, and a restore was tested</td><td>Restore drill notes with the time taken</td></tr>
+<tr><td>Rollback</td><td>A rollback was performed once on purpose</td><td><code>./rollback.sh</code> output</td></tr>
+<tr><td>Monitoring</td><td>Someone is told if <code>/healthz</code> fails from outside</td><td>An uptime check or your platform's alerting</td></tr>
+<tr><td>People</td><td>Owner, backup owner and runbook named; users know where to report problems</td><td>Runbook link in the app's page or team wiki</td></tr>
+<tr><td>Human review</td><td>Users know generated test cases are drafts to review</td><td>The message under the results; team briefing</td></tr>
+</table></div>
+
+<div class="lab"><div class="lab-h"><b>Take the QA helper to production</b><span>90 min · terminal · Docker and a GitHub repository for steps 6–9 · API key optional</span></div><ol>
+<li>Add the new files from this chapter to your Chapter 94 folder and run <code>python -m pytest -q</code>.<span class="expect"><code>18 passed</code>.</span></li>
+<li>Create three users with <code>manage.py</code> (a viewer, a tester and an admin) and start <code>uvicorn server:app</code> with <code>QA_FAKE_MODEL=1</code>. Open <code>http://127.0.0.1:8000</code> and generate with the tester's token.<span class="expect">12 test cases and 2 ambiguities in the table; the header shows "1/40 today".</span></li>
+<li>Try the same with the viewer's token, then with no token.<span class="expect">a 403 message "Your role (viewer) can't do this.", then a 401 "Missing token".</span></li>
+<li>Paste <code>&lt;img src=x onerror=alert(1)&gt;</code> as a bullet in a story and generate.<span class="expect">the text appears literally in the table and no alert box opens: output is shown as text, not HTML.</span></li>
+<li>As admin, switch AI off with <code>curl</code>, try to generate as the tester, then switch it on. Run <code>python backup.py</code>.<span class="expect">a 503 with the kill-switch message, then normal service; "Backup OK" with row counts.</span></li>
+<li>With Docker: <code>cp app.env.example app.env</code>, create the empty secret file, then <code>docker compose up -d --build</code> and <code>docker compose ps</code>.<span class="expect">the app service shows "(healthy)" within about a minute; <code>curl -s localhost:8000/readyz</code> reports <code>"mode":"fake"</code>.</span></li>
+<li>Create a user inside the container, run <code>docker compose down</code> then <code>docker compose up -d</code>, and call <code>/api/me</code> with that token.<span class="expect">the token still works: the database lives on the volume, not in the container.</span></li>
+<li>Push the project to a GitHub repository (check <code>git status</code> shows no <code>app.env</code>, <code>secrets/</code> or <code>data/</code> first). Open a pull request.<span class="expect">only the test job runs, and it passes without any API key.</span></li>
+<li>Merge to <code>main</code>.<span class="expect">the build job pushes <code>ghcr.io/&lt;you&gt;/&lt;repo&gt;:&lt;sha&gt;</code> (see your repository's Packages). Without a server and the <code>production</code> environment set up, the deploy job waits or fails at SSH: that's expected. If you have a VM, complete 96.12's server setup and approve the deploy.</span></li>
+<li>Fill in the pre-launch checklist (96.15) honestly for your setup.<span class="expect">a list of "yes" items with evidence, and a short list of gaps, each with an owner or a reason it's acceptable.</span></li>
+</ol></div>
+<p><b>No Docker or no company GitHub access?</b> Steps 1–5 need only Python. For steps 6–9, use a personal GitHub account and a public test repository with no real data, or ask your platform team for a sandbox. Never use a real API key in a public repository's workflow.</p>
+
+<h4>Troubleshooting</h4>
+<div class="tbl"><table>
+<tr><th>Symptom</th><th>Likely cause</th><th>Fix</th></tr>
+<tr><td><code>401 Missing token</code> although you pasted it</td><td>Extra spaces, or the header is missing <code>Bearer </code></td><td>Use <code>-H "authorization: Bearer $T"</code>; on the page, click "Use token" again</td></tr>
+<tr><td><code>401 Invalid or revoked token</code></td><td>Token from a different database (<code>DATA_DIR</code> differs), or revoked</td><td>Check <code>DATA_DIR</code>; run <code>manage.py list-users</code> in the same place the app runs</td></tr>
+<tr><td><code>/readyz</code>: "no API key configured"</td><td>Live mode with an empty or unreadable secret file</td><td>Put the key in the file; <code>chown 10001</code> it; or set <code>QA_FAKE_MODEL=1</code></td></tr>
+<tr><td>Generation returns 502 in live mode</td><td>Wrong key, spend limit reached, provider problem</td><td><code>docker compose logs app</code> shows the error type, such as <code>AuthenticationError</code></td></tr>
+<tr><td>Compose: secret file not found</td><td><code>secrets/anthropic_api_key.txt</code> doesn't exist</td><td><code>mkdir -p secrets &amp;&amp; touch secrets/anthropic_api_key.txt</code></td></tr>
+<tr><td>Container keeps restarting; log shows <code>unable to open database file</code></td><td>Volume not writable by user 10001 (often a bind mount from the host instead of a named volume)</td><td>Use the named volume as in <code>compose.yaml</code>, or <code>chown 10001</code> the host folder</td></tr>
+<tr><td>Users vanished after a deploy</td><td>The database was inside the container, not on a volume</td><td>Mount the volume at <code>/data</code>; restore the latest backup</td></tr>
+<tr><td>Build job: <code>denied</code> pushing to ghcr.io</td><td>Missing <code>packages: write</code>, or the package belongs to another repository</td><td>Check the job's <code>permissions</code>; in the package settings, give this repository write access</td></tr>
+<tr><td>Image name rejected (<code>repository name must be lowercase</code>)</td><td>Uppercase letters in the owner or repository</td><td>Keep the <code>${GITHUB_REPOSITORY,,}</code> step, which lower-cases it</td></tr>
+<tr><td>Deploy job: <code>Host key verification failed</code></td><td><code>DEPLOY_KNOWN_HOSTS</code> missing or for a different host</td><td>On a trusted machine, get the server's host key and check its fingerprint with the server's owner</td></tr>
+<tr><td>Deploy job never starts: "Waiting for review"</td><td>Working as designed</td><td>A required reviewer approves it in the Actions tab</td></tr>
+<tr><td>Server can't pull the image (<code>unauthorized</code>)</td><td><code>docker login ghcr.io</code> not done for the <code>deploy</code> user, or the token lacks <code>read:packages</code></td><td>Log in as <code>deploy</code> with a classic token that has <code>read:packages</code></td></tr>
+<tr><td><code>deploy.sh</code> always rolls back</td><td>The new version never reports its own SHA in <code>/readyz</code></td><td>Check <code>APP_VERSION</code> comes from <code>IMAGE_TAG</code> in <code>compose.yaml</code>; read <code>docker compose logs app</code></td></tr>
+<tr><td>HTTPS certificate not issued</td><td>DNS doesn't point at the server yet, or ports 80 and 443 are blocked</td><td>Fix DNS and the firewall; <code>docker compose logs proxy</code> explains</td></tr>
+</table></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Deploying an AI app means hosting a model."</dt><dd>Most teams call a hosted model through an API. Deploying the <em>application</em> is about users, data, secrets, releases and recovery; model serving is a different job (Chapter 139).</dd>
+<dt>"The API key is safe in the frontend if we minify the code."</dt><dd>Anything sent to the browser can be read. The key stays on the server; the browser only ever holds the user's own token.</dd>
+<dt>"Environment variables in the Dockerfile are a fine place for the key."</dt><dd>They're baked into the image, which anyone with pull access can unpack. Secrets are supplied at run time, never at build time.</dd>
+<dt>"The health check should test that Claude answers."</dt><dd>That costs money every few seconds and marks your app down whenever the provider is slow. Health checks test your app; a manual smoke test checks the model after changes.</dd>
+<dt>"We have backups, so we're safe."</dt><dd>Only if they're off the machine and you've restored one. Test the restore and time it.</dd>
+<dt>"Rollback undoes everything."</dt><dd>It restores the code, not the data. Design changes so the old version still works with the new data, and back up before each release.</dd>
+<dt>"The Console spend limit is all the cost control we need."</dt><dd>It's the last line. When it triggers, everyone is blocked at once. Per-user and team limits in the app fail gently and fairly first.</dd>
+</dl></div>
+
+<h3 id="ch96-r"><span class="num">96.16</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Deploying an AI application is mostly ordinary engineering around a model API: users, permissions, data, secrets, releases, recovery and cost.</li>
+<li>Wrap the prototype's core instead of rewriting it; its tests keep protecting it.</li>
+<li>Check identity (401) and role (403) on the server, for every endpoint; show model output as text, never as HTML.</li>
+<li>Keep the API key in a mounted secret file on the server, in a dedicated workspace with Console limits; never in code, images, CI or logs.</li>
+<li>Layer cost protection: input size, per-user quota, team budget, kill switch, then the Console spend limit.</li>
+<li>Package with a Dockerfile and Compose, keep data on a volume, tag images with the commit SHA, and deploy through a pipeline with approval.</li>
+<li>Separate liveness from readiness, never call the model in a health check, and let the deploy script roll back automatically.</li>
+<li>Back up before every release and nightly, copy off the machine, and rehearse the restore.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">A tester with a valid token calls <code>POST /admin/ai</code>. What should the server return?</p><div class="opts"><button>401, because the token is wrong for that endpoint</button><button data-ok>403, because the user is known but their role isn't allowed</button><button>404, so the endpoint stays hidden</button></div><p class="why" hidden>401 means "I don't know who you are". The tester is authenticated; they lack permission, which is 403. (404 is used for other people's runs, so their existence isn't revealed.)</p></div>
+<div class="qz"><p class="q">Where should the Anthropic API key live for the deployed app?</p><div class="opts"><button>In <code>compose.yaml</code>, so the deploy is self-contained</button><button>In a <code>ENV</code> line in the Dockerfile</button><button data-ok>In a secret file on the server, mounted into the container at run time</button></div><p class="why" hidden>Compose files and images get shared and pushed. A secret supplied at run time, readable only by the app's user, never enters git or the registry.</p></div>
+<div class="qz"><p class="q">Why doesn't <code>/readyz</code> make a small call to Claude to prove the key works?</p><div class="opts"><button>Because the SDK can't make calls from a health check</button><button data-ok>Health checks run constantly, so it would cost money, use rate limits, and mark the app down whenever the provider is slow</button><button>Because readiness checks must not touch the network</button></div><p class="why" hidden>Readiness checks your app's own dependencies cheaply. Check the model with a manual smoke test after key or model changes.</p></div>
+<div class="qz"><p class="q">Why are images tagged with the commit SHA instead of <code>latest</code>?</p><div class="opts"><button>Registries reject the tag <code>latest</code></button><button>SHA tags make images smaller</button><button data-ok>A SHA names one exact build, so you can tell what's running and roll back to a precise version</button></div><p class="why" hidden><code>latest</code> moves with every push. <code>deploy.sh</code> records the current and previous SHAs, which is what makes rollback precise.</p></div>
+<div class="qz"><p class="q">You plan to host on a managed container service whose container filesystem is temporary. What happens to the SQLite file?</p><div class="opts"><button>It's kept, because the service restarts the same container</button><button data-ok>It's lost when the instance stops, so you need a mounted persistent store or, better, a managed database</button><button>It's automatically copied to the provider's backup system</button></div><p class="why" hidden>Cloud Run's filesystem is in memory, and Azure Container Apps' container storage is temporary. Check each platform's storage model before choosing it.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Prepare the QA helper for your own team. (1) Decide where it would be hosted at your company and write three sentences on why, using the questions in 96.11. (2) Set the three limits in <code>app.env</code> for your team size, and calculate the worst-case daily and monthly cost with today's prices. (3) Add a test proving a viewer can't download a tester's CSV, and one proving <code>purge-results</code> keeps usage numbers. (4) Do a restore drill: back up, generate twice, restore, and record the time and the row counts. (5) Fill in the pre-launch checklist and send it, with your gaps and their owners, to your lead.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"The model was the easy part. To let the whole team use our QA helper, we wrapped it in a small web service. Everyone signs in with their own token, and their role decides what they can do: viewers read, testers generate, admins can switch the AI off. The API key sits in a secret file on the server, never in code or the browser. Each person has a daily limit and the team has a token budget, with a Console spend limit behind that. We package it with Docker, and GitHub Actions tests it, builds an image tagged with the commit, and deploys it after someone approves. The deploy script backs up the database, checks the new version reports ready, and rolls back by itself if it doesn't. We back up nightly, copy backups off the server, and we've practised a restore."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Docker Docs, <a href="https://docs.docker.com/reference/dockerfile/" target="_blank" rel="noopener">Dockerfile reference</a> (including <code>HEALTHCHECK</code> options and defaults).</li>
+<li>Docker Docs, <a href="https://docs.docker.com/compose/how-tos/use-secrets/" target="_blank" rel="noopener">Manage secrets securely in Docker Compose</a>, <a href="https://docs.docker.com/compose/how-tos/environment-variables/envvars/" target="_blank" rel="noopener">Pre-defined environment variables</a> (<code>COMPOSE_FILE</code>) and <a href="https://docs.docker.com/reference/cli/docker/compose/cp/" target="_blank" rel="noopener">docker compose cp</a>.</li>
+<li>Compose Specification, <a href="https://github.com/compose-spec/compose-spec" target="_blank" rel="noopener">compose-spec repository</a> (JSON schema used to validate the Compose files).</li>
+<li>GitHub Docs, <a href="https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments" target="_blank" rel="noopener">Managing environments for deployment</a> and <a href="https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry" target="_blank" rel="noopener">Working with the Container registry</a>.</li>
+<li>Docker, <a href="https://github.com/docker/login-action" target="_blank" rel="noopener">docker/login-action</a> (GitHub Container Registry example); GitHub, <a href="https://github.com/actions/checkout" target="_blank" rel="noopener">actions/checkout</a> and <a href="https://github.com/actions/setup-python" target="_blank" rel="noopener">actions/setup-python</a>.</li>
+<li>Google Cloud, <a href="https://docs.cloud.google.com/run/docs/container-contract" target="_blank" rel="noopener">Cloud Run container runtime contract</a>; Microsoft Learn, <a href="https://learn.microsoft.com/en-us/azure/container-apps/storage-mounts" target="_blank" rel="noopener">Use storage mounts in Azure Container Apps</a>; Render, <a href="https://render.com/docs/disks" target="_blank" rel="noopener">Persistent disks</a>; Fly.io, <a href="https://docs.fly.io/volumes/overview" target="_blank" rel="noopener">Fly Volumes overview</a>.</li>
+<li>Caddy, <a href="https://caddyserver.com/docs/quick-starts/reverse-proxy" target="_blank" rel="noopener">Reverse proxy quick-start</a> and the <a href="https://hub.docker.com/_/caddy" target="_blank" rel="noopener">official Docker image</a> (volume guidance).</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/manage-claude/workspaces" target="_blank" rel="noopener">Workspaces</a>, <a href="https://platform.claude.com/docs/en/api/rate-limits" target="_blank" rel="noopener">Rate limits</a> and <a href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Pricing</a>.</li>
+<li>FastAPI, <a href="https://fastapi.tiangolo.com/tutorial/dependencies/" target="_blank" rel="noopener">Dependencies</a> and <a href="https://fastapi.tiangolo.com/tutorial/testing/" target="_blank" rel="noopener">Testing</a>; Python, <a href="https://docs.python.org/3/library/sqlite3.html" target="_blank" rel="noopener">sqlite3</a> (including <code>Connection.backup</code>).</li>
+</ol><p class="verified">Verified 9 November 2026: Python code run on Python 3.11.9 with anthropic 2.6.0, FastAPI 0.162.2 and uvicorn 0.54.0 in fake-model mode (18 tests passed; live path checked to the authentication step); <code>deploy.sh</code> and its rollback run against a local stand-in for Docker; <code>compose.yaml</code> and <code>compose.proxy.yaml</code> validated against the Compose Specification schema and the workflow against the GitHub Actions workflow schema. Docker was not available, so the image was not built and Compose was not run; the workflow was not run on GitHub. Action versions (checkout v7, setup-python v7, login-action v4), image tags (<code>python:3.12-slim</code>, <code>caddy:2</code>) and hosting details checked against official sources on that date.</p></div>

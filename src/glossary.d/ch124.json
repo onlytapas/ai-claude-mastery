@@ -1,0 +1,38 @@
+{
+ "Eval": {
+  "d": "Short for evaluation: a set of test cases plus a way of grading the answers, used to measure how well an AI system behaves and to catch regressions when a prompt or model changes.",
+  "see": "ch125"
+ },
+ "LLM-as-judge": {
+  "d": "Using a second AI model to grade another model's answers against a written rubric. Useful for judging meaning, but it must be checked against human grading.",
+  "see": "ch125"
+ },
+ "Golden answer": {
+  "d": "The agreed correct (or ideal) answer for an eval case, which outputs are compared against.",
+  "see": "ch125"
+ },
+ "Non-deterministic": {
+  "d": "Able to give different outputs for the same input. AI models are non-deterministic, so they are tested with pass rates over several runs.",
+  "see": "ch125"
+ },
+ "Rubric": {
+  "d": "A written set of criteria for grading an answer, such as 'answers both questions and states the 30-day limit'.",
+  "see": "ch125"
+ },
+ "Exploratory testing": {
+  "d": "Testing where you learn about the product, design tests and run them at the same time, guided by what you discover, usually in time-boxed sessions with a charter.",
+  "see": "ch124"
+ },
+ "Test charter": {
+  "d": "A short mission for an exploratory session, often written as 'Explore [target] with [resources] to discover [information]'.",
+  "see": "ch124"
+ },
+ "Stack trace": {
+  "d": "The list of functions a program was running when an error happened, read from the bottom (where the action started) to the top (where it failed).",
+  "see": "ch124"
+ },
+ "Severity": {
+  "d": "How serious a bug's impact is. Different from priority, which is how soon it should be fixed.",
+  "see": "ch124"
+ }
+}

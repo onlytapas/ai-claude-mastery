@@ -1,0 +1,253 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What twelve everyday QA tasks look like done the traditional way, and done with Claude</li>
+<li>Which Claude features do the heavy lifting in each case, with example prompts you can reuse</li>
+<li>What still needs a human in every scenario, and why</li>
+<li>The patterns behind the gains, so you can spot new opportunities yourself</li>
+<li>How to write your own before-and-after comparison for an internal pitch</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 118 (the AI-powered QA engineer) and Chapter 119 (the ideas catalogue). The scenarios refer to features explained in Parts VI, VIII, X and XII; you don't need to have read them all to follow along.</div>
+
+<div class="bigidea"><p>The quickest way to understand what AI changes in QA is to watch the same job done twice. This chapter takes twelve common situations, such as refining a story, testing a hotfix, chasing a flaky suite or writing a release report, and shows the "before" (traditional) and "after" (AI-assisted) versions side by side. In every case Claude takes over the slow, repetitive parts: reading, drafting, searching, typing. The tester keeps the parts that need judgement: deciding what matters, checking the work and taking responsibility for the result.</p></div>
+
+<h3 id="ch129-1"><span class="num">129.1</span>How to read this chapter</h3>
+<div class="box warn"><span class="tag">Illustrative, not measured</span><p>Every scenario here is an <strong>illustrative composite</strong>: a typical situation assembled for teaching, not a real company or a real project. The time comparisons are <strong>illustrative estimates</strong> to show the shape of the change. They are not measured data, and your results will depend on your product, your team and how well your tools are set up. To measure real gains in your own team, use the methods in Chapter 126.</p></div>
+<p>Each scenario follows the same pattern:</p>
+<div class="tbl"><table>
+<tr><th>Part</th><th>What it shows</th></tr>
+<tr><td>Situation</td><td>The job to be done</td></tr>
+<tr><td>Before</td><td>How it's typically done by hand</td></tr>
+<tr><td>After</td><td>How it's done with Claude, the features used, and an example prompt</td></tr>
+<tr><td>Still needs a human</td><td>The judgement and accountability that stay with you</td></tr>
+<tr><td>Time</td><td>An illustrative estimate, including time to review Claude's work</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a satnav. Before, you planned a route with a paper map, wrote down the turns and hoped for no roadworks. After, the satnav does the planning and recalculates instantly. But you still drive, watch the road and decide whether that "shortcut" down a farm track is sensible. AI in QA is the same: it plans and recalculates; you drive.</p></div>
+
+<h3 id="ch129-2"><span class="num">129.2</span>Planning and design</h3>
+
+<h4>Scenario 1: Sprint refinement</h4>
+<p><b>Situation.</b> Twelve new user stories arrive for next sprint's refinement meeting. QA is expected to raise testability concerns.</p>
+<div class="cols2">
+<div><h4>Before</h4><ul><li>Read each story the night before</li><li>Jot down questions in a notebook</li><li>Most gaps are found in the meeting, or later during testing</li><li>Concerns are raised verbally and often lost</li></ul></div>
+<div><h4>After</h4><ul><li>A Claude Project holds the product spec and past decisions (Chapter 47), or the Atlassian connector reads the stories directly (Chapter 101)</li><li>Claude lists ambiguities, missing acceptance criteria and risky dependencies per story</li><li>You pick the ones that matter and post them as comments before the meeting</li></ul></div>
+</div>
+<div class="code"><span class="cap">Example prompt</span><pre>For each story in sprint 42, list: (1) acceptance criteria that are ambiguous
+or untestable, as questions for the product owner; (2) missing negative and
+error cases; (3) dependencies on other teams. Keep each story under 8 bullets.</pre></div>
+<p><b>Still needs a human:</b> knowing which questions really matter to the business, and asking them diplomatically.</p>
+<p><span class="vchip">Illustrative estimate</span> Before: about 2–3 hours of reading. After: about 45 minutes, most of it reviewing and choosing questions.</p>
+
+<h4>Scenario 2: Test cases for a new feature</h4>
+<p><b>Situation.</b> A new "save for later" basket feature needs a full set of test cases.</p>
+<div class="cols2">
+<div><h4>Before</h4><ul><li>Write cases one by one in a spreadsheet</li><li>Coverage depends on the tester's experience that day</li><li>Boundary and negative cases are often thin</li></ul></div>
+<div><h4>After</h4><ul><li>The team's <code>/test-plan</code> skill (Chapter 127) drafts risks and a full table of cases</li><li>Claude is asked to apply boundary values, equivalence classes and state transitions explicitly</li><li>You review, merge duplicates and add the cases only your product knowledge suggests</li></ul></div>
+</div>
+<div class="code"><span class="cap">Example prompt</span><pre>/test-plan SHOP-381 save for later
+Then add a section of state-transition cases: item in basket → saved → out of
+stock → back in stock → price changed. Flag cases that need test data we don't have.</pre></div>
+<p><b>Still needs a human:</b> deciding priorities, removing cases that don't fit how real customers behave, and spotting the business rule Claude couldn't know about.</p>
+<p><span class="vchip">Illustrative estimate</span> Before: most of a day. After: about 2 hours including review.</p>
+
+<h4>Scenario 3: An API contract change</h4>
+<p><b>Situation.</b> The orders API adds a required field and changes an error code. Which tests break, and what's untested?</p>
+<div class="cols2">
+<div><h4>Before</h4><ul><li>Compare the old and new API specs by eye</li><li>Search the test code for affected endpoints</li><li>Update tests one at a time; discover misses when CI fails</li></ul></div>
+<div><h4>After</h4><ul><li>In Claude Code, ask for a diff of the two OpenAPI files, explained in plain words</li><li>Claude searches the test suite for every use of the affected endpoints and lists what must change</li><li>In plan mode, it proposes the test updates and new negative tests; you approve, it edits, then runs the API suite</li></ul></div>
+</div>
+<div class="code"><span class="cap">Example prompt</span><pre>Compare api/openapi-v1.yaml with api/openapi-v2.yaml. Explain each change to
+POST /orders. Then find every test that calls that endpoint and list what must
+change. Don't edit anything yet: give me a plan.</pre></div>
+<p><b>Still needs a human:</b> confirming with developers that the change is intended, and agreeing how old clients should behave.</p>
+<p><span class="vchip">Illustrative estimate</span> Before: about a day. After: about 2–3 hours.</p>
+
+<h3 id="ch129-3"><span class="num">129.3</span>Execution and automation</h3>
+
+<h4>Scenario 4: Regression after a hotfix</h4>
+<p><b>Situation.</b> A payment hotfix must ship today. Running the full <a class="gl" href="#g-regression-testing">regression</a> suite takes four hours.</p>
+<div class="cols2">
+<div><h4>Before</h4><ul><li>Either run everything and wait, or guess which suites matter</li><li>Guessing is fast but risky; running everything delays the fix</li></ul></div>
+<div><h4>After</h4><ul><li>The <code>/risk-review</code> skill reads the branch's changed files and suggests must-run, should-run and safe-to-skip suites (Chapter 127)</li><li><code>/code-review</code> checks the fix itself for likely bugs</li><li>You run the must-run set now and the rest overnight</li></ul></div>
+</div>
+<div class="code"><span class="cap">Example prompt</span><pre>/risk-review
+Also: which of our Playwright specs touch the payment confirmation page?
+List them with the reason, so I can run them first.</pre></div>
+<p><b>Still needs a human:</b> the final go/no-go decision and the risk sign-off.</p>
+<p><span class="vchip">Illustrative estimate</span> Before: 4 hours waiting, or a risky guess. After: a focused 1–1.5 hour run with a written rationale.</p>
+
+<h4>Scenario 5: The flaky nightly suite</h4>
+<p><b>Situation.</b> Every morning, 8–15 nightly tests are red. Most are "known <a class="gl" href="#g-flaky-test">flaky</a>", but nobody is sure which.</p>
+<div class="cols2">
+<div><h4>Before</h4><ul><li>Someone spends the first hour reading logs and re-running tests</li><li>Real failures hide among the flaky ones</li></ul></div>
+<div><h4>After</h4><ul><li>The nightly CI job uses <code>claude -p</code> to group failures by likely cause and label each as product bug, test bug or flakiness (Chapter 127)</li><li>The test-results MCP server lets you ask follow-up questions in Claude Code (Chapter 104)</li><li>The test-reviewer subagent checks the repeat offenders for hard-coded waits and shared state</li></ul></div>
+</div>
+<div class="code"><span class="cap">Example prompt</span><pre>Which tests failed in at least 3 of the last 7 nightly reports but passed on
+re-run? For each, show the error and ask the test-reviewer subagent what in the
+test code could cause intermittent failure.</pre></div>
+<p><b>Still needs a human:</b> deciding whether to fix, quarantine or delete a test, and confirming a "flaky" label isn't hiding a real bug.</p>
+<p><span class="vchip">Illustrative estimate</span> Before: about an hour every morning. After: about 15 minutes to read the summary and decide.</p>
+
+<h4>Scenario 6: Migrating a test framework</h4>
+<p><b>Situation.</b> The team is moving 300 UI tests from an older framework to Playwright.</p>
+<div class="cols2">
+<div><h4>Before</h4><ul><li>A multi-month project rewriting tests by hand</li><li>Inconsistent style; old bad habits copied across</li></ul></div>
+<div><h4>After</h4><ul><li>A CLAUDE.md sets the target style: page objects, test ids, web-first assertions (Chapter 77)</li><li>Claude Code converts a pilot batch in plan mode; the hook from Chapter 127 lints and runs each converted file</li><li>Once the pattern is proven, batches are converted in parallel sessions or worktrees (Chapter 69), each reviewed by a person</li></ul></div>
+</div>
+<div class="code"><span class="cap">Example prompt</span><pre>Convert tests/legacy/checkout/*.js to Playwright following CLAUDE.md.
+Keep the same coverage, replace sleeps with web-first assertions, and list
+anything you couldn't convert one-to-one.</pre></div>
+<p><b>Still needs a human:</b> choosing what to keep, merge or drop; reviewing every converted test; checking coverage hasn't silently shrunk.</p>
+<p><span class="vchip">Illustrative estimate</span> Before: months. After: weeks, with review the main effort.</p>
+
+<h3 id="ch129-4"><span class="num">129.4</span>Defects and releases</h3>
+
+<h4>Scenario 7: A vague production bug from a customer</h4>
+<p><b>Situation.</b> Support forwards a customer complaint: "the discount disappeared at checkout", with a blurry screenshot.</p>
+<div class="cols2">
+<div><h4>Before</h4><ul><li>Guess at the steps; try several browsers by hand</li><li>Write the bug report from memory</li><li>Developers come back asking for details</li></ul></div>
+<div><h4>After</h4><ul><li>Paste the screenshot into Claude: it describes what's on screen and suggests likely paths</li><li>Playwright MCP tries each path in a real browser and captures what happens (Chapter 102)</li><li>Once reproduced, <code>/bug-report</code> writes the report in the team format and the Atlassian connector drafts the Jira issue for you to approve</li></ul></div>
+</div>
+<div class="code"><span class="cap">Example prompt</span><pre>Here's a customer screenshot. Suggest 3 ways a discount could disappear at
+checkout. Then use the browser to try each on staging with the test account,
+and tell me which reproduces it. Then /bug-report it.</pre></div>
+<p><b>Still needs a human:</b> confirming the reproduction is the same issue the customer saw, setting severity, and approving anything written to Jira.</p>
+<p><span class="vchip">Illustrative estimate</span> Before: 2–4 hours. After: about an hour.</p>
+
+<h4>Scenario 8: The release-readiness report</h4>
+<p><b>Situation.</b> Before every release, QA writes a report: what was tested, open defects, risks and a recommendation.</p>
+<div class="cols2">
+<div><h4>Before</h4><ul><li>Copy numbers from three tools into a document</li><li>Write the narrative under time pressure on release day</li></ul></div>
+<div><h4>After</h4><ul><li>The dashboard script gives up-to-date test numbers (Chapter 127)</li><li>The Atlassian connector lists open defects by severity</li><li>Claude drafts the report in your template; an Artifact turns it into a shareable one-pager (Chapter 48)</li></ul></div>
+</div>
+<div class="code"><span class="cap">Example prompt</span><pre>Using dashboard.html and the open S1–S2 bugs for release 4.2, draft our
+release-readiness report: scope tested, results, open risks with impact,
+and a recommendation with conditions. Mark anything you're unsure about.</pre></div>
+<p><b>Still needs a human:</b> the recommendation itself. Claude can draft it; you own it.</p>
+<p><span class="vchip">Illustrative estimate</span> Before: about 3 hours. After: about 45 minutes, mostly checking numbers and wording.</p>
+
+<h3 id="ch129-5"><span class="num">129.5</span>Specialist testing</h3>
+
+<h4>Scenario 9: An accessibility audit request</h4>
+<p><b>Situation.</b> A customer asks whether the checkout meets accessibility standards. Nobody on the team is an accessibility specialist.</p>
+<div class="cols2">
+<div><h4>Before</h4><ul><li>Run an automated checker; get a long, confusing list</li><li>Struggle to explain the findings or prioritise them</li></ul></div>
+<div><h4>After</h4><ul><li>Run the automated checker, then ask Claude to explain each finding in plain words, map it to the relevant guideline and suggest a fix</li><li>Playwright MCP's accessibility snapshot shows how a screen reader would describe each page (Chapter 102)</li><li>Claude drafts keyboard-only and screen-reader test charters for you to run (Chapter 123)</li></ul></div>
+</div>
+<p><b>Still needs a human:</b> manual testing with real assistive technology, and ideally review by an accessibility specialist or disabled users. Automated checks and AI catch only part of the problem.</p>
+<p><span class="vchip">Illustrative estimate</span> Before: days of research. After: a solid first pass in about half a day, with clear gaps for a specialist.</p>
+
+<h4>Scenario 10: Test data for a new market</h4>
+<p><b>Situation.</b> The product launches in Japan. Tests need realistic names, addresses, phone numbers and payment formats.</p>
+<div class="cols2">
+<div><h4>Before</h4><ul><li>Search the web for examples; copy a few by hand</li><li>Edge cases (long names, unusual characters) are missed</li><li>Someone is tempted to copy real customer data</li></ul></div>
+<div><h4>After</h4><ul><li>Claude generates fake but realistic records as CSV, including edge cases you specify</li><li>Claude Code writes a small generator script so the data can be recreated on demand (Chapter 122)</li></ul></div>
+</div>
+<div class="code"><span class="cap">Example prompt</span><pre>Generate 50 fake Japanese customer records as CSV: name in kanji and katakana,
+postal code, prefecture, address, phone. Include 10 edge cases: very long names,
+missing optional fields, half-width vs full-width characters. No real people.</pre></div>
+<p><b>Still needs a human:</b> checking the formats with someone who knows the market, and confirming no real personal data is used.</p>
+<p><span class="vchip">Illustrative estimate</span> Before: about a day. After: about an hour.</p>
+
+<h4>Scenario 11: Testing a new chatbot feature</h4>
+<p><b>Situation.</b> The company adds an AI assistant to its help pages. QA is asked to "test it", and traditional pass/fail scripts don't fit.</p>
+<div class="cols2">
+<div><h4>Before</h4><ul><li>A few people chat with it informally and report impressions</li><li>No repeatable way to tell if a change made it better or worse</li></ul></div>
+<div><h4>After</h4><ul><li>Build an eval set: normal, edge and adversarial questions with pass criteria (Chapter 125)</li><li>Include prompt-injection and data-leak cases (Chapter 131)</li><li>Automate grading with code checks where possible and a model-graded rubric where not, then re-run on every change</li></ul></div>
+</div>
+<p><b>Still needs a human:</b> defining what "good" means for the business, spot-checking the model grader, and deciding what failure rate is acceptable.</p>
+<p><span class="vchip">Illustrative estimate</span> Before: open-ended, with weak evidence. After: about 2 days to build a reusable eval suite, then minutes per re-run.</p>
+
+<h3 id="ch129-6"><span class="num">129.6</span>People</h3>
+
+<h4>Scenario 12: Onboarding a new tester</h4>
+<p><b>Situation.</b> A new tester joins. They need to learn the product, the test suite and the team's ways of working.</p>
+<div class="cols2">
+<div><h4>Before</h4><ul><li>Weeks of shadowing and reading out-of-date wiki pages</li><li>Senior testers are interrupted with the same questions</li></ul></div>
+<div><h4>After</h4><ul><li>The new tester asks Claude Code to explain the test repository: structure, how to run things, what each suite covers</li><li>A Claude Project with the product docs answers "how does X work?" questions</li><li>The team plugin (Chapter 127) gives them the same skills and reviewer as everyone else on day one</li></ul></div>
+</div>
+<div class="code"><span class="cap">Example prompt</span><pre>I'm new to this repository. Explain how the tests are organised, how to run
+one test and the whole suite, what CLAUDE.md asks of me, and the five things
+a new tester most often gets wrong here.</pre></div>
+<p><b>Still needs a human:</b> mentoring, context about people and history, and the judgement that only comes from experience.</p>
+<p><span class="vchip">Illustrative estimate</span> Before: weeks to become productive. After: noticeably faster, with seniors interrupted less. This one is hard to put a number on; measure it with your next hire.</p>
+
+<h3 id="ch129-7"><span class="num">129.7</span>The patterns behind the gains</h3>
+<p>Look across the twelve scenarios and the same few patterns appear:</p>
+<div class="tbl"><table>
+<tr><th>Pattern</th><th>What AI takes over</th><th>Scenarios</th></tr>
+<tr><td>Read and summarise</td><td>Going through specs, stories, logs and reports</td><td>1, 3, 5, 8</td></tr>
+<tr><td>Draft from a template</td><td>Test plans, bug reports, release reports</td><td>2, 7, 8</td></tr>
+<tr><td>Search and connect</td><td>Finding affected tests, related bugs, duplicate issues</td><td>3, 4, 5</td></tr>
+<tr><td>Generate at volume</td><td>Test cases, test data, eval questions</td><td>2, 10, 11</td></tr>
+<tr><td>Act in tools</td><td>Driving a browser, running suites, editing code</td><td>6, 7</td></tr>
+<tr><td>Explain</td><td>Turning jargon and findings into plain words</td><td>9, 12</td></tr>
+</table></div>
+<p>And in every scenario, the same things stay with people:</p>
+<ul>
+<li><strong>Deciding what matters</strong>: priorities, risks, what "good enough" means.</li>
+<li><strong>Checking the work</strong>: AI drafts are reviewed, not trusted blindly.</li>
+<li><strong>Owning the outcome</strong>: release decisions, severity and sign-off.</li>
+<li><strong>Talking to people</strong>: product owners, developers and customers.</li>
+</ul>
+<div class="box example"><span class="tag">What the time saved buys</span><p>The point isn't only finishing the same work faster. Time saved on reading and typing can go into more exploratory testing, testing earlier in the sprint, covering areas that never had time before, and improving the test suite itself. That's how a team does more with the same people.</p></div>
+
+<h3 id="ch129-8"><span class="num">129.8</span>How to write your own before/after</h3>
+<p>A clear before/after is one of the most convincing things you can show a manager. Use this structure:</p>
+<ol>
+<li><strong>Pick a real, repeated task</strong> that people recognise and dislike.</li>
+<li><strong>Describe "before" honestly</strong>: the steps, who does them and how often.</li>
+<li><strong>Do the "after" for real</strong>, at least three times, and keep the prompts and outputs.</li>
+<li><strong>Time both</strong>, including review time for the AI version. If you can't measure, say "estimate".</li>
+<li><strong>List what still needs a human.</strong> This builds trust; it shows you aren't overselling.</li>
+<li><strong>Note the risks and controls</strong>: data used, permissions, how mistakes are caught.</li>
+<li><strong>Show the second-order gain</strong>: what the saved time will be used for.</li>
+<li><strong>Ask for something small</strong>: a two-week pilot, one tool, one team.</li>
+</ol>
+<div class="code"><span class="cap">A one-slide template</span><pre>TASK:            Morning triage of nightly test failures (daily, 1 person)
+BEFORE:          Read logs, re-run, decide: ~60 min/day (measured over 2 weeks)
+AFTER:           Read AI summary, decide: ~15 min/day (measured over 2 weeks)
+STILL HUMAN:     Fix/quarantine decisions; confirming "flaky" isn't a real bug
+CONTROLS:        Read-only CI job, spending cap, no customer data in reports
+SAVED TIME FOR:  Exploratory testing of the new checkout
+ASK:             Keep the CI job; extend to the API suite next sprint</pre></div>
+
+<div class="lab"><div class="lab-h"><b>Run one scenario for real</b><span>About 30 minutes</span></div><ol>
+<li>Choose the scenario above that's closest to something you did last week.<span class="expect">a specific task with real material you can use (non-confidential, or allowed by your company's AI policy).</span></li>
+<li>Write down how long it took you the traditional way, from memory or your notes.<span class="expect">a "before" time and a list of steps.</span></li>
+<li>Redo it with Claude using the example prompt, adapted to your case. Time everything, including checking the output.<span class="expect">a usable result and an "after" time that includes review.</span></li>
+<li>Note every correction you had to make to Claude's output.<span class="expect">a short list. This is your "still needs a human" evidence.</span></li>
+<li>Fill in the one-slide template from 120.8.<span class="expect">an honest, specific before/after you could show your lead.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"AI makes testers unnecessary."</dt><dd>In every scenario the judgement, accountability and communication stay with people. What changes is how their time is spent.</dd>
+<dt>"The time savings in this chapter are what we'll get."</dt><dd>They're illustrative estimates. Measure your own, including review time (Chapter 126).</dd>
+<dt>"Leave out review time to make the case stronger."</dt><dd>Managers will notice. Honest numbers that include review are far more convincing and sustainable.</dd>
+<dt>"Start with the biggest, most impressive task."</dt><dd>Start with a small, frequent, disliked task. Quick, visible wins build trust for bigger changes.</dd>
+</dl></div>
+
+<h3 id="ch129-r"><span class="num">129.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Across planning, automation, defects, releases, specialist testing and onboarding, Claude takes over reading, drafting, searching, generating and typing.</li>
+<li>People keep deciding what matters, checking the work, owning the outcome and talking to others.</li>
+<li>The biggest gains come from combining features: Projects, connectors, skills, subagents, hooks, MCP servers and headless runs.</li>
+<li>All times here are illustrative estimates; measure your own, including review time.</li>
+<li>A good internal before/after is honest, specific, includes what stays human, and asks for a small next step.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">How should you treat the time comparisons in this chapter?</p><div class="opts"><button>As measured industry averages</button><button data-ok>As illustrative estimates to show the shape of the change</button><button>As guaranteed savings</button></div><p class="why" hidden>They're illustrations. Measure real gains in your own context.</p></div>
+<div class="qz"><p class="q">In the hotfix scenario, what stays with the human?</p><div class="opts"><button>Listing changed files</button><button>Suggesting which suites to run</button><button data-ok>The final go/no-go decision and risk sign-off</button></div><p class="why" hidden>Claude can inform the decision; accountability stays with people.</p></div>
+<div class="qz"><p class="q">Why does the test-data scenario ask Claude to write a generator script as well as data?</p><div class="opts"><button>Scripts are always more accurate than AI</button><button data-ok>So the same data can be recreated on demand, consistently</button><button>Because Claude can't produce CSV directly</button></div><p class="why" hidden>Repeatable jobs are best done by a tool Claude builds once.</p></div>
+<div class="qz"><p class="q">What makes an internal before/after most convincing?</p><div class="opts"><button>Showing the biggest possible time saving</button><button data-ok>Honest, measured times including review, plus what still needs a human</button><button>Leaving out risks so it looks simpler</button></div><p class="why" hidden>Honesty builds trust, and trust gets pilots approved.</p></div>
+<div class="qz"><p class="q">In the accessibility scenario, what can AI not replace?</p><div class="opts"><button>Explaining checker findings in plain words</button><button>Drafting keyboard-only test charters</button><button data-ok>Manual testing with real assistive technology and expert or user review</button></div><p class="why" hidden>Automated checks and AI cover only part of accessibility.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Write three before/after comparisons for real tasks in your team, using the template in 120.8, each based on at least three real runs. Present them to your lead or team in ten minutes, and ask for one small pilot. Afterwards, note the questions people asked; they'll tell you what to measure next (Chapter 126) and what to build (Chapter 127).</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Take any QA task and do it twice. Before, you read, search and type everything yourself. After, Claude reads the specs and logs, drafts the plan or report, searches the code and even drives the browser, while you decide what matters, check the work and own the result. Our numbers are estimates until we measure them, so let's pick one task, measure it honestly and start small."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>The Claude features used in each scenario are documented in this book: Projects (Chapter 47), Artifacts (Chapter 48), connectors and MCP (Chapters 100–103), Claude Code plan mode and sessions (Chapters 67–69), skills, subagents and hooks (Chapters 80–82, 127), evals (Chapter 125).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs" target="_blank" rel="noopener">Claude Code documentation</a>.</li>
+<li>Microsoft, <a href="https://github.com/microsoft/playwright-mcp" target="_blank" rel="noopener">Playwright MCP</a>.</li>
+<li>W3C, <a href="https://www.w3.org/WAI/standards-guidelines/wcag/" target="_blank" rel="noopener">Web Content Accessibility Guidelines (WCAG) overview</a>.</li>
+<li>Anthropic, <a href="https://www.anthropic.com/research/the-anthropic-economic-index" target="_blank" rel="noopener">The Anthropic Economic Index</a>: research into how AI is used across real tasks, a useful counterweight to anecdotes.</li>
+</ol><p class="verified">Scenarios are illustrative composites; time comparisons are illustrative estimates, not measured data. Features referenced verified 9 November 2026 against Claude Code 2.1.319.</p></div>

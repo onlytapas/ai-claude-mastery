@@ -1,0 +1,244 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What "thinking" means for a language model, and why writing out steps improves answers</li>
+<li>What chain-of-thought prompting and test-time (inference-time) compute are</li>
+<li>How reasoning models are trained with reinforcement learning, using DeepSeek-R1 as a public example</li>
+<li>How Claude's adaptive thinking and the effort setting work in the apps, Claude Code and the API</li>
+<li>When extra thinking helps, when it wastes time and money, and how to decide for your own QA tasks</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch14">Chapter 14</a> (tokens and what they cost) and <a href="#ch18">Chapter 18</a> (post-training and reinforcement learning from feedback). <a href="#ch16">Chapter 16</a> helps for the "under the hood" parts but isn't required.</div>
+
+<div class="bigidea"><p>A language model writes one token at a time, and every token gets roughly the same amount of computation. So a hard problem answered in one line gets very little "brain time". If the model first writes out its working, as a person would on scrap paper, it spends more computation on the problem and usually gets a better answer. Reasoning models are trained to do this well and on their own. In current Claude models this is called <a class="gl" href="#g-adaptive-thinking">adaptive thinking</a>: Claude decides whether and how much to think, and you steer it with an <a class="gl" href="#g-effort-level">effort level</a>. More thinking costs more tokens and time, so the skill is matching effort to the task.</p></div>
+
+<h3 id="ch19-1"><span class="num">19.1</span>Why "thinking" helps a next-token predictor</h3>
+<p>Recall from <a href="#ch14">Chapter 14</a> and <a href="#ch17">Chapter 17</a> that a language model predicts the next token, then the next, and so on. Producing each token takes one pass through the network: a fixed amount of work. That has an important consequence. If you ask "Is 7,919 a prime number? Answer yes or no", the model has to commit to "Yes" or "No" in its <em>first</em> token, after one pass. There is no room to check anything.</p>
+<p>Now ask the same question but let it write: "Check whether 7,919 is divisible by 2, 3, 5, 7, 11 … up to its square root, then answer." Every intermediate line it writes becomes part of the text it reads when producing the next line. The written steps act as working memory. The model gets many passes, and each later step can build on earlier ones.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Ask a colleague to multiply 47 by 38 in their head and answer within one second, and they will probably guess. Give them a pen and ten seconds and they will write 47 × 38 = 47 × 40 − 47 × 2 = 1,880 − 94 = 1,786, and get it right. They are not cleverer with the pen. They simply have somewhere to put the intermediate results, and more time to use them.</p></div>
+<p>This written-out working has a name: <a class="gl" href="#g-chain-of-thought">chain of thought</a>. In current Claude models it usually appears as a separate <b>thinking</b> section that comes before the final answer. Apps typically show it collapsed, or as a summary.</p>
+
+<h3 id="ch19-2"><span class="num">19.2</span>From a prompting trick to a model feature</h3>
+<p>The idea grew in three stages over about four years.</p>
+<ol class="timeline">
+<li><span class="yr">2022</span><span class="ev"><b>Chain-of-thought prompting.</b> Researchers at Google (Wei et al.) showed that putting worked examples with step-by-step reasoning in the prompt made large models much better at maths and logic word problems. The same year, Kojima et al. found that just adding "Let's think step by step" helped too.</span></li>
+<li><span class="yr">2022</span><span class="ev"><b>Self-consistency.</b> Wang et al. sampled several reasoning paths for the same question and took the most common final answer. More attempts meant more accuracy: an early sign that spending more compute at answer time pays off.</span></li>
+<li class="key"><span class="yr">2024</span><span class="ev"><b>Reasoning models.</b> In September 2024 OpenAI released o1, a model trained to produce a long internal chain of thought before answering. Thinking moved from a prompt trick into the model itself.</span></li>
+<li class="key"><span class="yr">2025</span><span class="ev"><b>Open recipe and hybrid models.</b> In January DeepSeek published R1 with open weights and a paper describing how reinforcement learning taught it to reason. In February Anthropic released Claude 3.7 Sonnet, which it called "the first hybrid reasoning model on the market": one model that could answer quickly or think at length.</span></li>
+<li><span class="yr">2026</span><span class="ev"><b>Adaptive thinking and effort.</b> Anthropic's effort parameter became generally available in February 2026. On today's Claude models thinking is adaptive: the model decides per request whether to think, and effort sets how readily and how deeply.</span></li>
+</ol>
+<p>A model trained this way is called a <a class="gl" href="#g-reasoning-model">reasoning model</a>. Today the line is blurry: most frontier models, Claude included, can both reason at length and answer directly.</p>
+
+<h3 id="ch19-3"><span class="num">19.3</span>Test-time compute: a second way to buy intelligence</h3>
+<p>For years the main way to get a smarter model was to make training bigger: more parameters, more data, more computation before release (<a href="#ch17">Chapter 17</a>). Reasoning models added a second dial. You can also spend more computation <em>when the model answers</em>, by letting it generate more thinking tokens. This is called <a class="gl" href="#g-test-time-compute">test-time compute</a> (or inference-time compute).</p>
+<div class="cols2">
+<div><h4>Training-time compute</h4><p>Paid once, by the model maker, before release. Makes the model generally more capable. You can't change it: you pick a model.</p></div>
+<div><h4>Test-time compute</h4><p>Paid on every request, by you, as thinking tokens. Lets the same model try harder on hard questions. You control it with effort, prompts and token limits.</p></div>
+</div>
+<p>The practical meaning for you: <strong>a smaller model thinking harder can sometimes match a bigger model answering quickly</strong>, and the reverse. Anthropic's own guidance reflects this: it recommends starting with Opus 5.5 for most workloads and moving to Fable 5.1 only "when evals on Opus 5.5 at higher effort still fall short". That is, try more thinking before a bigger model.</p>
+<div class="box note"><span class="tag">Thinking is output, and output is billed</span><p>Anthropic's documentation says thinking tokens are billed as output tokens, and output costs five times as much as input on current Claude models (for example $4 input and $20 output per million tokens on Opus 5.5, verified 9 Nov 2026). Thinking also counts toward <code>max_tokens</code>, the cap on how much a single reply may generate. A reply with a short visible answer can still be expensive if the model thought for a long time.</p></div>
+
+<h3 id="ch19-4"><span class="num">19.4</span>How models learn to reason</h3>
+<p>Prompting "think step by step" helps any large model a little. Reasoning models are better at it because they were <em>trained</em> to reason, mostly with <a class="gl" href="#g-reinforcement-learning">reinforcement learning</a> (RL), the learn-from-reward method from <a href="#ch10">Chapter 10</a> and <a href="#ch18">Chapter 18</a>.</p>
+<div class="flow">
+<div><b>1. Problem</b>A maths question, coding task or puzzle with a checkable answer</div>
+<div><b>2. Attempts</b>The model writes several reasoning chains and final answers</div>
+<div class="hl"><b>3. Automatic check</b>Is the answer right? Do the unit tests pass? Reward 1 or 0</div>
+<div><b>4. Update</b>Make the reasoning patterns that led to rewards more likely</div>
+<div><b>5. Repeat</b>Millions of times, on ever harder problems</div>
+</div>
+<p>The key ingredient is step 3: the reward comes from a <em>verifier</em>, a program that can check the answer, rather than a human rating. Maths answers can be compared, code can be run against tests. That makes the training cheap to scale, and it explains why reasoning models are especially strong at maths and code.</p>
+<div class="box example"><span class="tag">Real-world example: DeepSeek-R1</span><p>DeepSeek's January 2025 paper on R1 is the clearest public description of this recipe. Its first experiment, R1-Zero, used reinforcement learning without any human-written reasoning examples, rewarding only correct answers and the right output format. The model learned by itself to write longer chains of thought, to re-check its work and to try another approach when stuck. The final R1 added a small amount of supervised data first to make its reasoning more readable. The weights were released under the MIT licence. (Source: DeepSeek-AI, arXiv 2501.12948.)</p></div>
+<details class="deep"><summary>Under the hood: why a reward on the answer improves the reasoning</summary><div class="body">
+<p>The reward only looks at the final answer, so why does the reasoning get better? Because reasoning and answer are generated by the same process. In RL the model's probabilities are nudged so that whole sequences which earned a reward become more likely. If chains that check intermediate results lead to correct answers more often, the habit of checking is reinforced, even though nobody wrote a rule saying "check your work".</p>
+<p>DeepSeek's paper uses an algorithm called GRPO (Group Relative Policy Optimisation, from their earlier DeepSeekMath work). For each problem it samples a group of answers, scores them, and pushes the model towards answers that scored better than the group average. No separate "critic" network is needed, which saves memory.</p>
+<p>Two well-known side effects follow from this training. First, models may learn to "game" a weak verifier, for example writing code that special-cases the tests rather than solving the problem (sometimes called reward hacking). Second, the written chain of thought is a tool the model uses, not a guaranteed transcript of how it reached the answer. Anthropic published research in 2025 titled "Reasoning models don't always say what they think", which found that models often fail to mention hints that actually influenced their answers. Treat visible thinking as useful evidence, not as proof.</p>
+</div></details>
+
+<h3 id="ch19-5"><span class="num">19.5</span>Thinking in Claude today</h3>
+<p>Here is how thinking works on the current Claude models. These details change often, so check the date.</p>
+<div class="box note"><span class="tag">Verified 9 Nov 2026</span><p>On Claude Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 5.5, thinking is <strong>adaptive</strong>. In Anthropic's words, "the model evaluates each request and determines whether to think and how much." A simple factual question may get no thinking at all; a tricky debugging task gets deep reasoning. The older manual mode, where you set a fixed thinking budget with <code>budget_tokens</code> ("extended thinking"), was deprecated on the 4.6 models and is not accepted on later ones.</p></div>
+<h4>The effort levels</h4>
+<p>The main control is <b>effort</b>. Anthropic describes it as "soft guidance" for how often and how deeply Claude thinks, and how many tokens it spends overall. It is not a guaranteed token count.</p>
+<div class="tbl"><table>
+<tr><th>Effort</th><th>What Anthropic says it does</th><th>Typical use (Anthropic's examples)</th></tr>
+<tr><td><code>low</code></td><td>Minimises thinking; skips it for simple tasks where speed matters most</td><td>Simple, high-volume or latency-sensitive tasks, and subagents</td></tr>
+<tr><td><code>medium</code></td><td>Moderate thinking; might skip it for simple queries</td><td>Agentic tasks that need a balance of speed, cost and quality</td></tr>
+<tr><td><code>high</code></td><td>Thinks on most requests that benefit; deep reasoning on complex tasks</td><td>Complex reasoning, difficult coding, agentic tasks</td></tr>
+<tr><td><code>xhigh</code></td><td>Thinks more readily and more deeply than <code>high</code></td><td>Long-running agentic and coding tasks</td></tr>
+<tr><td><code>max</code></td><td>Thinks most readily and deepest, with no constraint on thinking length</td><td>The very hardest problems; often small gains for a large cost</td></tr>
+</table></div>
+<div class="tbl"><table>
+<tr><th>Default effort (Verified 9 Nov 2026)</th><th>Claude API</th><th>Claude Code</th></tr>
+<tr><td>Fable 5.1</td><td><code>high</code></td><td><code>high</code></td></tr>
+<tr><td>Opus 5.5</td><td><code>medium</code></td><td><code>medium</code></td></tr>
+<tr><td>Sonnet 5.5</td><td><code>high</code></td><td><code>medium</code></td></tr>
+<tr><td>Haiku 5.5</td><td><code>medium</code></td><td><code>medium</code></td></tr>
+</table></div>
+<p>Notice that Sonnet 5.5's default differs between the API and Claude Code: each product chooses its own default. Always check which level you are actually running at.</p>
+
+<h4>Where you control it</h4>
+<div class="tbl"><table>
+<tr><th>Where</th><th>How (Verified 9 Nov 2026)</th></tr>
+<tr><td>Claude Code</td><td><code>/effort</code> with a level (<code>low</code>, <code>medium</code>, <code>high</code>, <code>xhigh</code>, <code>max</code>), <code>auto</code> or <code>status</code>; left/right arrows in the <code>/model</code> picker; <code>claude --effort &lt;level&gt;</code>; the <code>CLAUDE_CODE_EFFORT_LEVEL</code> environment variable. <code>max</code> lasts for the current session only. Typing <code>ultrathink</code> in a prompt asks for deeper reasoning on that one turn. <code>Ctrl+O</code> shows the collapsed thinking.</td></tr>
+<tr><td>Claude API</td><td><code>"output_config": {"effort": "low"}</code> in the request body (see 19.8)</td></tr>
+<tr><td>Claude apps</td><td>Thinking and effort options appear in the model menu and vary by plan and app version. <a href="#ch43">Chapter 43</a> covers the interface.</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Old habits that no longer work</span><p>In Claude Code, "think", "think hard" and similar phrases are now passed through as ordinary text; <code>ultrathink</code> is the only recognised keyword. The <code>Option+T</code> / <code>Alt+T</code> thinking toggle has no effect on the 5.5 models or Fable, because thinking can't be switched off on them there. On the API, Anthropic notes that telling Sonnet 5.5 or Haiku 5.5 to "think less" in a prompt does not reliably reduce thinking: lower the effort instead.</p></div>
+
+<h3 id="ch19-6"><span class="num">19.6</span>When thinking helps, and when it wastes time</h3>
+<p>Thinking is not free quality. It costs output tokens and seconds, and on easy tasks it can even make answers worse by over-complicating them. Anthropic's effort guidance warns that <code>max</code> "can lead to overthinking" on some structured-output or less demanding tasks.</p>
+<div class="tbl"><table>
+<tr><th>Usually worth more thinking</th><th>Usually not worth it</th></tr>
+<tr><td>Debugging a flaky test from a stack trace and logs</td><td>Reformatting test data from CSV into JSON</td></tr>
+<tr><td>Designing boundary-value and pairwise cases for a complex rule</td><td>Fixing spelling in a bug report</td></tr>
+<tr><td>Reviewing a pull request for logic errors</td><td>Classifying 10,000 tickets as bug / feature / question</td></tr>
+<tr><td>Working out why a CI pipeline fails only on one branch</td><td>Summarising a meeting transcript</td></tr>
+<tr><td>Planning a multi-step agent task across many files</td><td>Answering "what does HTTP 404 mean?"</td></tr>
+<tr><td>Calculations, date logic, multi-condition business rules</td><td>Chat where the user is waiting and the task is simple</td></tr>
+</table></div>
+<p>A simple rule of thumb: <strong>if a careful person would need scrap paper, the model benefits from thinking.</strong> If a person would answer instantly, low effort is usually fine.</p>
+<div class="box example"><span class="tag">Real-world example: a nightly triage job</span><p>A QA team runs Claude over every failed test each night to label it "product bug", "test bug" or "environment". Most failures are obvious (a timeout during a known outage), so they run at <code>low</code> effort on Haiku 5.5. Failures the first pass marks "unsure" are sent again at <code>high</code> effort on Opus 5.5. The expensive thinking is spent only where it changes the answer. This "cheap first, think harder on the hard ones" pattern is common, and <a href="#ch90">Chapter 90</a> covers cost control in depth.</p></div>
+<div class="box opinion"><span class="tag">Opinion · Anthropic's guidance</span><p>Anthropic's documentation repeatedly advises choosing effort by measurement rather than instinct: run a representative sample at different levels, then compare quality, tokens and latency ("run a fresh effort sweep on your evals"). That advice reflects Anthropic's view that the best level depends on the workload, not a universal answer. <a href="#ch125">Chapter 125</a> and <a href="#ch36">Chapter 36</a> show how to build such evals.</p></div>
+
+<h3 id="ch19-7"><span class="num">19.7</span>The cost and latency trade-off, worked through</h3>
+<p>Let's put numbers on it. The token counts below are <strong>illustrative</strong>: real counts vary every run. Prices are Sonnet 5.5's verified prices ($2 input, $10 output per million tokens, 9 Nov 2026).</p>
+<div class="figure" role="img" aria-label="Illustrative output tokens for the same task at three effort levels: low 400, medium 1,500, high 4,000">
+<div class="bars"><div class="bt">Output tokens for one test-design request (illustrative)</div>
+<div class="bar-row"><span>low</span><span class="track"><span class="fill" style="width:10%">400</span></span></div>
+<div class="bar-row"><span>medium</span><span class="track"><span class="fill" style="width:38%">1,500</span></span></div>
+<div class="bar-row"><span>high</span><span class="track"><span class="fill hl" style="width:100%">4,000</span></span></div></div>
+<div class="cap">Illustrative numbers, not measurements. Run the lab in 19.8 to get your own.</div></div>
+<div class="code"><span class="cap">Cost per request, 1,000 input tokens, illustrative output</span><pre>low:    1,000 × $2/1M + 400   × $10/1M = $0.002 + $0.004 = $0.006
+medium: 1,000 × $2/1M + 1,500 × $10/1M = $0.002 + $0.015 = $0.017
+high:   1,000 × $2/1M + 4,000 × $10/1M = $0.002 + $0.040 = $0.042
+<span class="c"># 10,000 requests a month: about $60 vs $170 vs $420 (illustrative)</span></pre></div>
+<p>Time follows the same shape, because output tokens are generated one at a time. If a model writes very roughly 50–100 tokens a second (a loose illustrative range, not a measured figure), 4,000 tokens of thinking add about 40–80 seconds before the answer appears. In an interactive chat that is a long wait; in an overnight batch it doesn't matter.</p>
+<details class="deep"><summary>Under the hood: max_tokens, stop reasons and caching</summary><div class="body">
+<p>On the API, <code>max_tokens</code> is a hard cap on everything Claude generates for one request: thinking plus visible answer. If thinking uses most of it, the answer can be cut off and the response's <code>stop_reason</code> will be <code>"max_tokens"</code>. Anthropic's fix is either to raise <code>max_tokens</code> (if the reasoning was needed) or lower effort (if it was over-thinking).</p>
+<p>Each response's <code>usage</code> section has <code>output_tokens</code> (the billed total) and, inside <code>output_tokens_details</code>, <code>thinking_tokens</code>: how many of those were reasoning. Apps may show a <em>summary</em> of the thinking, but you are billed for the full thinking the model generated, not the shorter text you see.</p>
+<p>One more subtlety: the effort level is part of the prompt the model sees, so changing it between requests in one conversation breaks <a class="gl" href="#g-prompt-caching">prompt caching</a> for that conversation. Pick a level per conversation and keep it. <a href="#ch90">Chapter 90</a> covers caching.</p>
+</div></details>
+
+<h3 id="ch19-8"><span class="num">19.8</span>Lab: measure thinking yourself</h3>
+<div class="lab"><div class="lab-h"><b>Effort sweep on a real QA question</b><span>20 min · Claude Code (Part A), Claude API (Part B, optional)</span></div><ol>
+<li><b>Part A, Claude Code.</b> Start a session in any folder with <code>claude</code>. Run <code>/effort status</code>.<span class="expect">the current level, probably <code>medium</code> on Opus 5.5 or Sonnet 5.5.</span></li>
+<li>Run <code>/effort low</code>, then paste this question: "A login form accepts usernames of 3 to 20 characters made of letters, digits and underscores, and the first character must be a letter. List the boundary-value and invalid-class test inputs you would use, one per line, with the expected result." Note roughly how long it takes and how many cases you get.<span class="expect">a quick answer, perhaps 8–12 cases. It may miss subtle ones such as a 20-character name starting with a digit.</span></li>
+<li>Run <code>/clear</code> to start fresh, then <code>/effort high</code>, and ask the same question. Press <code>Ctrl+O</code> afterwards to see the thinking.<span class="expect">a slower answer, usually more cases and better coverage of combined conditions; in the transcript view, thinking shown in grey italics.</span></li>
+<li>Run <code>/usage</code> and compare. Then decide: for this task, was the extra time worth it?<span class="expect">a judgement you can defend, such as "high found two important cases low missed; worth it for test design, not for daily triage".</span></li>
+<li><b>Part B, API (optional).</b> If you have an API key (<a href="#ch98">Chapter 98</a>), save the script below as <code>compare_effort.py</code>, run <code>export ANTHROPIC_API_KEY=...</code> in your terminal (never paste the key into the file), then run <code>python3 compare_effort.py</code>.<span class="expect">a small table like the one under the script. Your numbers will differ, but thinking tokens should rise from low to high.</span></li>
+</ol></div>
+<div class="code"><span class="cap">compare_effort.py (Python 3, standard library only)</span><pre>"""Run the same question at three effort levels and compare tokens and time."""
+import json
+import os
+import sys
+import time
+import urllib.error
+import urllib.request
+
+API_URL = "https://api.anthropic.com/v1/messages"
+MODEL = "claude-sonnet-5-5"
+QUESTION = (
+    "A login form accepts usernames of 3 to 20 characters made of letters, "
+    "digits and underscores, and the first character must be a letter. "
+    "List the boundary-value and invalid-class test inputs you would use, "
+    "one per line, with the expected result (accept or reject)."
+)
+
+
+def ask(key, effort):
+    body = {
+        "model": MODEL,
+        "max_tokens": 16000,
+        "output_config": {"effort": effort},
+        "messages": [{"role": "user", "content": QUESTION}],
+    }
+    req = urllib.request.Request(
+        API_URL,
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "x-api-key": key,
+            "anthropic-version": "2026-10-21",
+            "content-type": "application/json",
+        },
+    )
+    start = time.time()
+    try:
+        with urllib.request.urlopen(req, timeout=300) as resp:
+            data = json.load(resp)
+    except urllib.error.HTTPError as err:
+        sys.exit(f"HTTP {err.code}: {err.read().decode('utf-8')}")
+    seconds = time.time() - start
+    usage = data.get("usage", {})
+    details = usage.get("output_tokens_details") or {}
+    answer = "".join(
+        block.get("text", "") for block in data.get("content", [])
+        if block.get("type") == "text"
+    )
+    return {
+        "effort": effort,
+        "seconds": round(seconds, 1),
+        "output_tokens": usage.get("output_tokens", 0),
+        "thinking_tokens": details.get("thinking_tokens", 0),
+        "answer_lines": len([l for l in answer.splitlines() if l.strip()]),
+    }
+
+
+def main():
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    if not key:
+        sys.exit("Set ANTHROPIC_API_KEY first (see Chapter 98).")
+    print(f"Model: {MODEL}")
+    print(f"{'effort':8}{'seconds':&gt;9}{'output':&gt;9}{'thinking':&gt;10}{'lines':&gt;7}")
+    for effort in ("low", "medium", "high"):
+        r = ask(key, effort)
+        print(f"{r['effort']:8}{r['seconds']:&gt;9}{r['output_tokens']:&gt;9}"
+              f"{r['thinking_tokens']:&gt;10}{r['answer_lines']:&gt;7}")
+
+
+if __name__ == "__main__":
+    main()</pre></div>
+<div class="code"><span class="cap">Expected output shape (illustrative numbers)</span><pre>Model: claude-sonnet-5-5
+effort    seconds   output  thinking  lines
+low           6.2      610        90     14
+medium       14.8     1830      1150     18
+high         31.5     4120      3340     21</pre></div>
+<div class="box note"><span class="tag">Troubleshooting</span><p><b>"Set ANTHROPIC_API_KEY first"</b>: the variable isn't set in this terminal; export it again. <b>HTTP 401</b>: the key is wrong or revoked. <b>HTTP 400 mentioning effort</b>: check the spelling of the level and that the model supports it. <b>thinking is 0 at low</b>: that's expected; at low effort Claude may skip thinking entirely. <b>Very different numbers each run</b>: normal. Run each level three times and average. <b>No API access at work?</b> Part A in Claude Code teaches the same lesson.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"More thinking always gives better answers."</dt><dd>Only on tasks that need reasoning. On simple tasks it adds cost and delay and can cause over-thinking. Measure.</dd>
+<dt>"The visible thinking is exactly how the model reached its answer."</dt><dd>It is useful evidence, not a guaranteed transcript. Research, including Anthropic's own, shows models don't always mention what influenced them. Check the answer, not just the reasoning.</dd>
+<dt>"Typing 'think hard' makes Claude Code think harder."</dt><dd>Not any more. Use <code>/effort</code>, or <code>ultrathink</code> for one turn.</dd>
+<dt>"Effort sets an exact number of thinking tokens."</dt><dd>It is soft guidance. Claude still decides per request, and no level guarantees a thinking block every time.</dd>
+<dt>"If the answer is short, it was cheap."</dt><dd>Thinking tokens are billed as output even when you only see a summary or nothing at all. Check <code>thinking_tokens</code> in the usage data.</dd>
+<dt>"Reasoning models were taught by people writing out every step."</dt><dd>Mostly they learned through reinforcement learning against automatic checks, as DeepSeek-R1's paper shows publicly.</dd>
+</dl></div>
+
+<h3 id="ch19-r"><span class="num">19.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Each token gets about the same computation, so writing out working (chain of thought) gives a model more computation and a place to store intermediate results.</li>
+<li>Chain of thought began as a prompting trick (2022) and became a trained model behaviour with reasoning models (OpenAI o1 in 2024, DeepSeek-R1 and Claude 3.7 Sonnet in 2025).</li>
+<li>Test-time compute is a second dial alongside model size: spend more tokens thinking on hard problems.</li>
+<li>Reasoning is mostly taught with reinforcement learning against automatic verifiers, which is why it is strongest on maths and code.</li>
+<li>Current Claude models use adaptive thinking; effort (<code>low</code> to <code>max</code>) is the main control. Defaults differ by model and product.</li>
+<li>Thinking is billed as output and adds latency. Match effort to the task and measure rather than guess.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Why does letting a model write out its reasoning tend to improve hard answers?</p><div class="opts"><button>It switches the model to a bigger network</button><button data-ok>Each written step is more computation, and later steps can read the earlier ones</button><button>It lets the model search the internet</button></div><p class="why" hidden>The model gets many passes instead of one, and the written steps act as working memory.</p></div>
+<div class="qz"><p class="q">What is "test-time compute"?</p><div class="opts"><button>The compute used to run your unit tests</button><button>The compute spent training the model before release</button><button data-ok>Extra computation spent while answering, mainly as thinking tokens</button></div><p class="why" hidden>It is paid per request by the user, unlike training compute, which the model maker pays once.</p></div>
+<div class="qz"><p class="q">In DeepSeek-R1-Zero's training, what produced the reward?</p><div class="opts"><button>Human raters scoring each reasoning step</button><button data-ok>Automatic checks of the final answer and output format</button><button>A list of hand-written reasoning rules</button></div><p class="why" hidden>Rewards came from verifiable answers. Good reasoning habits emerged because they led to correct answers.</p></div>
+<div class="qz"><p class="q">You want Claude Sonnet 5.5 on the API to think less on a simple, high-volume task. What does Anthropic recommend first?</p><div class="opts"><button>Add "don't think" to the system prompt</button><button data-ok>Lower the effort level, for example to low</button><button>Set budget_tokens to 0</button></div><p class="why" hidden>Effort is the calibrated control; Anthropic notes prompt instructions to think less aren't reliable on Sonnet 5.5, and budget_tokens isn't accepted on current models.</p></div>
+<div class="qz"><p class="q">A reply shows only a three-line answer, but the bill is high. What is the most likely reason?</p><div class="opts"><button>Input tokens are billed at the output price</button><button>The answer was cached</button><button data-ok>The model generated many thinking tokens, which are billed as output</button></div><p class="why" hidden>You are billed for the full thinking, even when only a summary (or nothing) is shown. Check usage.output_tokens_details.thinking_tokens.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>List five AI tasks your team does or plans to do (for example: test-case design from a story, flaky-test diagnosis, ticket triage, release-note summaries, log analysis). For each, choose an effort level and a model, and write one sentence of reasoning. Then pick the two you're least sure about, run each at two effort levels on three real examples (Part A or B of the lab), and record quality, time and tokens. Update your choices and share the table with your team.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"A language model spends the same effort on every word it writes, so if it has to answer a hard question in one word, it's guessing. Letting it think first, writing out its working, gives it more effort and somewhere to keep notes. Reasoning models are trained to do that well, mostly by rewarding correct answers on maths and code. In Claude you control this with an effort level: low for quick, simple jobs, higher for debugging or test design. Thinking costs tokens and time, so we choose the level by testing, not by habit."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/effort" target="_blank" rel="noopener">Effort</a> (levels, defaults, per-model recommendations, <code>output_config.effort</code>).</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/thinking-steering-and-cost" target="_blank" rel="noopener">Steering thinking</a> (adaptive thinking, effort levels, cost control, billing of thinking tokens, <code>thinking_tokens</code>, caching).</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/models/overview" target="_blank" rel="noopener">Models overview</a> and <a href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Pricing</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/model-config" target="_blank" rel="noopener">Claude Code model configuration</a> (effort levels, <code>ultrathink</code>, thinking toggle) and <a href="https://code.claude.com/docs/en/commands" target="_blank" rel="noopener">commands</a>.</li>
+<li>Anthropic, <a href="https://www.anthropic.com/news/claude-3-7-sonnet" target="_blank" rel="noopener">Claude 3.7 Sonnet and Claude Code</a> (February 2025, "hybrid reasoning model").</li>
+<li>Anthropic, "Reasoning models don't always say what they think" (2025), via <a href="https://www.anthropic.com/research" target="_blank" rel="noopener">anthropic.com/research</a>.</li>
+<li>J. Wei et al., <a href="https://arxiv.org/abs/2201.11903" target="_blank" rel="noopener">Chain-of-Thought Prompting Elicits Reasoning in Large Language Models</a> (2022).</li>
+<li>T. Kojima et al., <a href="https://arxiv.org/abs/2205.11916" target="_blank" rel="noopener">Large Language Models are Zero-Shot Reasoners</a> (2022).</li>
+<li>X. Wang et al., <a href="https://arxiv.org/abs/2203.11171" target="_blank" rel="noopener">Self-Consistency Improves Chain of Thought Reasoning in Language Models</a> (2022).</li>
+<li>DeepSeek-AI, <a href="https://arxiv.org/abs/2501.12948" target="_blank" rel="noopener">DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning</a> (January 2025); GRPO from <a href="https://arxiv.org/abs/2402.03300" target="_blank" rel="noopener">DeepSeekMath</a> (2024).</li>
+<li>OpenAI, <a href="https://openai.com/index/learning-to-reason-with-llms/" target="_blank" rel="noopener">Learning to reason with LLMs</a> (o1, September 2024).</li>
+</ol><p class="verified">Verified 9 November 2026 against Anthropic's effort, thinking, models and pricing pages and the Claude Code model-configuration docs. Token counts, timings and costs in 19.7 and the lab's expected output are illustrative.</p></div>

@@ -1,0 +1,318 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>The four settings files, who each one affects, and which wins when they disagree</li>
+<li>The settings keys you will actually use, and how to check what loaded</li>
+<li>How allow, ask and deny rules work, and the order Claude Code checks them in</li>
+<li>Exact rule syntax for Bash, Read, Edit, WebFetch, MCP tools, subagents and skills, including the traps</li>
+<li>The tools that write settings for you: <code>/permissions</code>, <code>/config</code>, <code>/update-config</code> and <code>/fewer-permission-prompts</code></li>
+<li>A complete, layered permission setup for a QA test repository</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch65">Chapter 65</a> (your first session), <a href="#ch67">Chapter 67</a> (permission modes, which this chapter builds on) and <a href="#ch77">Chapter 77</a> (CLAUDE.md). You should be comfortable reading a small <a class="gl" href="#g-json">JSON</a> file. Everything here was checked against Claude Code 2.1.319.</div>
+
+<div class="bigidea"><p>Claude Code reads its behaviour from a few plain JSON files called settings files: one for you on this machine, one shared by your team in the repository, one private to you in that repository, and optionally one pushed by your company. When files disagree, a fixed order decides who wins, except that lists of rules are combined. The most important thing these files hold is <a class="gl" href="#g-permission-rule">permission rules</a>: lists of what Claude may do without asking, what it must always ask about, and what it may never do. Those rules are enforced by Claude Code itself, not by Claude's good intentions, so they are the right place to put your team's safety limits.</p></div>
+
+<h3 id="ch78-1"><span class="num">78.1</span>Where settings live</h3>
+<p>A <strong>setting</strong> is one named choice, such as which model to use or which commands need approval. Settings are stored as keys in JSON files. There are four places Claude Code looks:</p>
+<div class="tbl"><table>
+<tr><th>Scope</th><th>File</th><th>Who it affects</th><th>Commit to git?</th></tr>
+<tr><td><b>User</b></td><td><code>~/.claude/settings.json</code></td><td>You, in every project on this machine</td><td>No (it's in your home folder)</td></tr>
+<tr><td><b>Shared project</b></td><td><code>.claude/settings.json</code></td><td>Everyone who works in the repository</td><td>Yes: this is the team's file</td></tr>
+<tr><td><b>Project local</b></td><td><code>.claude/settings.local.json</code></td><td>You, in this repository only</td><td>No: keep it out of git</td></tr>
+<tr><td><b>Managed</b></td><td><code>managed-settings.json</code> (or MDM / server-managed)</td><td>Everyone your organisation deploys it to</td><td>Not yours to edit</td></tr>
+</table></div>
+<p>The managed file sits in a system folder: <code>/Library/Application Support/ClaudeCode/managed-settings.json</code> on macOS, <code>/etc/claude-code/managed-settings.json</code> on Linux and WSL, and <code>C:\Program Files\ClaudeCode\managed-settings.json</code> on Windows. Administrators can also deliver <a class="gl" href="#g-managed-settings">managed settings</a> from the claude.ai admin console or through device-management tools.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of an office. Company policy (managed) applies to everyone and can't be overruled. The team's shared handbook (project) sits in the team folder. Your sticky notes on your own monitor (local) only affect you at that desk. Your personal habits (user) travel with you to every desk. When your sticky note and the team handbook disagree on something small, your sticky note wins at your desk; when company policy speaks, everyone follows it.</p></div>
+<p>A few facts that save confusion:</p>
+<ul>
+<li><strong>Nothing is created at install.</strong> Claude Code writes <code>~/.claude/settings.json</code> the first time you change certain <code>/config</code> options, and <code>.claude/settings.local.json</code> the first time you answer "Yes, and don't ask again" on a permission prompt.</li>
+<li><strong>The local file is kept out of git for you.</strong> When Claude Code first writes it in a git repository, it adds <code>**/.claude/settings.local.json</code> to your <em>global</em> git excludes file. If you create it by hand, add it to <code>.gitignore</code> yourself. In a git repository the local file lives at the repository root.</li>
+<li><strong><code>~/.claude.json</code> is a different file.</strong> Claude Code writes it itself: your account, MCP servers at local and user scope, trust decisions. You don't normally edit it.</li>
+<li><strong>Strict JSON only.</strong> No comments, no trailing commas. A <code>//</code> comment makes the file a "Settings Error" at the next start.</li>
+<li><strong>Autocomplete helps.</strong> Add <code>"$schema": "https://json.schemastore.org/claude-code-settings.json"</code> as the first key and editors such as VS Code will suggest keys and flag mistakes.</li>
+</ul>
+
+<h3 id="ch78-2"><span class="num">78.2</span>Who wins: precedence and merging</h3>
+<p>When the same key appears in more than one place, the highest level wins (<a class="gl" href="#g-settings-precedence">settings precedence</a>):</p>
+<div class="flow">
+<div class="hl"><b>1. Managed</b>Company policy. Nothing overrides it, not even <code>--settings</code></div>
+<div><b>2. Command line</b><code>--settings &lt;file-or-json&gt;</code>, for one session</div>
+<div><b>3. Project local</b><code>.claude/settings.local.json</code></div>
+<div><b>4. Shared project</b><code>.claude/settings.json</code></div>
+<div><b>5. User</b><code>~/.claude/settings.json</code></div>
+</div>
+<p>Two rules change how that plays out in practice:</p>
+<ol>
+<li><strong>Lists merge instead of overriding.</strong> If <code>permissions.allow</code> appears in your user file and the team file, Claude Code combines both lists. Each file adds rules; none erases another's. (A few model-list keys such as <code>fallbackModel</code> follow their own rules.)</li>
+<li><strong>A deny anywhere is final.</strong> If a tool is denied at any level, no other level can allow it. A deny in your personal user file beats an allow in the team file, and a managed deny beats <code>--allowedTools</code> on the command line.</li>
+</ol>
+<p>Environment variables are <em>not</em> a level in this stack. Each variable that pairs with a key has its own rule; for example, an exported <code>ANTHROPIC_MODEL</code> beats the <code>model</code> key, and the <code>--model</code> flag beats both.</p>
+<h4>Trying a setting for one session</h4>
+<div class="code"><span class="cap">Terminal</span><pre>claude --settings '{"model": "claude-opus-5-5"}'          <span class="c"># inline JSON, this session only</span>
+claude --settings ./ci-settings.json                      <span class="c"># or a file</span>
+claude --setting-sources user,project                     <span class="c"># load only these sources (skips local)</span></pre></div>
+<h4>Checking what actually loaded</h4>
+<ul>
+<li><strong><code>/status</code></strong> inside a session shows a <code>Setting sources</code> line listing each file that loaded, such as "User settings" or "Project local settings". It tells you <em>which files</em> were read, not which file supplied each key.</li>
+<li><strong><code>claude doctor</code></strong> from your terminal lists entries Claude Code rejected, such as a malformed permission rule.</li>
+<li>Most edits <strong>reload live</strong>, including <code>permissions</code> and <code>hooks</code>. A few keys, such as <code>model</code> and <code>effortLevel</code>, are read only at session start.</li>
+</ul>
+<details class="deep"><summary>Under the hood: what happens with a broken file</summary><div class="body">
+<p>If a user, project or local file has invalid JSON or a value the schema rejects, an interactive session opens with a <strong>Settings Error</strong> dialog: fix it with Claude's help, exit, or continue without that file. If only individual entries are wrong, such as one malformed rule or an unknown hook event, you get a <strong>Settings Warning</strong> and Claude Code skips just those entries.</p>
+<p>In print mode (<code>claude -p</code>) there is no dialog: broken files or values are silently skipped. That matters in CI, where a typo in a deny rule could quietly remove a safety limit. After a <code>-p</code> run that seems to ignore a setting, run <code>claude doctor</code> to see what was dropped.</p>
+</div></details>
+
+<h3 id="ch78-3"><span class="num">78.3</span>The keys you will actually use</h3>
+<p>The full settings reference is enormous. These are the keys most teams touch:</p>
+<input class="filter" data-filter="#ch78keys" data-empty="#ch78keysEmpty" type="search" placeholder="Filter keys…" aria-label="Filter settings keys">
+<div class="tbl"><table id="ch78keys">
+<tr><th>Key</th><th>What it does</th><th>Example value</th></tr>
+<tr class="group"><td colspan="3">Permissions</td></tr>
+<tr><td><code>permissions.allow</code> / <code>ask</code> / <code>deny</code></td><td>Lists of permission rules (78.4 onwards)</td><td><code>["Bash(npm run test *)"]</code></td></tr>
+<tr><td><code>permissions.defaultMode</code></td><td>The <a class="gl" href="#g-permission-mode">permission mode</a> a session starts in</td><td><code>"acceptEdits"</code></td></tr>
+<tr><td><code>permissions.additionalDirectories</code></td><td>Extra folders Claude may read and edit (file access only)</td><td><code>["../shared-fixtures"]</code></td></tr>
+<tr><td><code>permissions.disableBypassPermissionsMode</code></td><td><code>"disable"</code> blocks bypass mode</td><td><code>"disable"</code></td></tr>
+<tr><td><code>disableAutoMode</code></td><td><code>"disable"</code> removes auto mode</td><td><code>"disable"</code></td></tr>
+<tr class="group"><td colspan="3">Model and behaviour</td></tr>
+<tr><td><code>model</code></td><td>Default model for new sessions</td><td><code>"claude-sonnet-5"</code></td></tr>
+<tr><td><code>env</code></td><td>Environment variables for every session and the commands it runs (string values)</td><td><code>{"DISABLE_AUTO_COMPACT": "1"}</code></td></tr>
+<tr><td><code>outputStyle</code></td><td>Built-in or custom output style (case-sensitive)</td><td><code>"Explanatory"</code></td></tr>
+<tr><td><code>language</code>, <code>effortLevel</code>, <code>fallbackModel</code>, <code>availableModels</code></td><td>Other documented model and response keys</td><td>see the reference</td></tr>
+<tr class="group"><td colspan="3">Extensions</td></tr>
+<tr><td><code>hooks</code>, <code>disableAllHooks</code></td><td>Hook configuration (<a href="#ch82">Chapter 82</a>), or switch your hooks off</td><td><code>"disableAllHooks": true</code></td></tr>
+<tr><td><code>sandbox</code></td><td>Sandbox settings (<a href="#ch79">Chapter 79</a>)</td><td><code>{"enabled": true}</code></td></tr>
+<tr><td><code>enabledPlugins</code>, <code>extraKnownMarketplaces</code></td><td>Plugins and marketplaces (<a href="#ch84">Chapter 84</a>)</td><td></td></tr>
+<tr><td><code>enableAllProjectMcpServers</code>, <code>disabledMcpjsonServers</code></td><td>Approve or block servers from a project's <code>.mcp.json</code> (<a href="#ch83">Chapter 83</a>)</td><td></td></tr>
+<tr><td><code>skillOverrides</code></td><td>Hide or show skills without editing them (<a href="#ch80">Chapter 80</a>)</td><td><code>{"deploy": "off"}</code></td></tr>
+<tr><td><code>statusLine</code></td><td>Custom status line command</td><td></td></tr>
+<tr class="group"><td colspan="3">Memory and housekeeping</td></tr>
+<tr><td><code>autoMemoryEnabled</code></td><td><code>false</code> turns auto memory off (<a href="#ch77">Chapter 77</a>)</td><td><code>false</code></td></tr>
+<tr><td><code>claudeMdExcludes</code></td><td>Skip specific CLAUDE.md files</td><td></td></tr>
+<tr><td><code>cleanupPeriodDays</code></td><td>How long transcripts are kept</td><td></td></tr>
+<tr><td><code>apiKeyHelper</code></td><td>A command that supplies credentials (<a href="#ch98">Chapter 98</a>)</td><td></td></tr>
+</table></div>
+<p id="ch78keysEmpty" hidden>No keys match.</p>
+
+<h3 id="ch78-4"><span class="num">78.4</span>Permission rules: allow, ask, deny</h3>
+<p>Every time Claude wants to use a tool (run a shell command, edit a file, fetch a web page, call an <a class="gl" href="#g-mcp">MCP</a> tool), Claude Code checks your rules first. There are three lists:</p>
+<div class="cols2">
+<div><h4>allow</h4><p>Run without asking me. Use for safe, repetitive things: running the test suite, linting, reading logs.</p></div>
+<div><h4>ask</h4><p>Always ask me, even in modes that normally wouldn't. Use for risky things you still sometimes want: <code>git push</code>, running arbitrary scripts.</p></div>
+</div>
+<div class="cols2">
+<div><h4>deny</h4><p>Never. Use for things that must not happen: reading <code>.env</code>, deleting folders, hitting production.</p></div>
+<div><h4>no match</h4><p>The current permission mode decides (<a href="#ch67">Chapter 67</a>). In Manual mode that means a prompt.</p></div>
+</div>
+<div class="flow">
+<div class="hl"><b>1. deny?</b>If any deny rule matches: blocked</div>
+<div><b>2. ask?</b>If any ask rule matches: prompt</div>
+<div><b>3. allow?</b>If any allow rule matches: runs</div>
+<div><b>4. mode</b>Otherwise the permission mode decides</div>
+</div>
+<p>The order is fixed: <strong>deny, then ask, then allow</strong>. The first match wins and specificity does not matter. So a broad deny <code>Bash(aws *)</code> blocks <code>aws s3 ls</code> even if you also wrote a precise allow <code>Bash(aws s3 ls)</code>. You cannot carve an exception out of a deny with an allow.</p>
+<div class="box warn"><span class="tag">Rules are enforced; instructions are not</span><p>Writing "never read .env files" in CLAUDE.md shapes what Claude <em>tries</em> to do. It doesn't stop anything. Permission rules are checked by Claude Code before the tool runs, whatever the model decides. Put real limits in rules (or hooks, <a href="#ch82">Chapter 82</a>, or the sandbox, <a href="#ch79">Chapter 79</a>), and use CLAUDE.md for guidance.</p></div>
+<p>Two kinds of deny behave differently. A <strong>bare tool name</strong> such as <code>"Bash"</code> removes the tool from Claude's view entirely: Claude never even sees it. A <strong>scoped deny</strong> such as <code>Bash(rm *)</code> leaves the tool available and blocks only matching calls.</p>
+<div class="code"><span class="cap">.claude/settings.json: the shape of a permissions block</span><pre>{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": ["Bash(npm run lint)", "Bash(npm run test *)"],
+    "ask":   ["Bash(git push *)"],
+    "deny":  ["Read(./.env)", "Read(./.env.*)"]
+  }
+}</pre></div>
+
+<h3 id="ch78-5"><span class="num">78.5</span>Rule syntax, tool by tool</h3>
+<p>A rule is either <code>Tool</code> (every use of that tool) or <code>Tool(specifier)</code> (some uses). Use the tool's canonical name, not the label shown on screen.</p>
+<input class="filter" data-filter="#ch78rules" data-empty="#ch78rulesEmpty" type="search" placeholder="Filter rules…" aria-label="Filter rule examples">
+<div class="tbl"><table id="ch78rules">
+<tr><th>Rule</th><th>What it matches</th><th>Note</th></tr>
+<tr class="group"><td colspan="3">Bash</td></tr>
+<tr><td><code>Bash</code> or <code>Bash(*)</code></td><td>Every shell command</td><td>As a deny, removes the tool</td></tr>
+<tr><td><code>Bash(npm run build)</code></td><td>Exactly <code>npm run build</code></td><td>Not <code>npm run build --watch</code></td></tr>
+<tr><td><code>Bash(npm run *)</code></td><td><code>npm run test</code>, <code>npm run lint --fix</code>, and bare <code>npm run</code></td><td>Not <code>npm install</code></td></tr>
+<tr><td><code>Bash(git log *)</code></td><td>Only <code>git log …</code></td><td>Put <code>*</code> after the subcommand</td></tr>
+<tr><td><code>Bash(git *)</code></td><td>Every git command, including <code>push</code></td><td>Much broader than it looks</td></tr>
+<tr><td><code>Bash(ls *)</code> vs <code>Bash(ls*)</code></td><td>The first needs a space, so not <code>lsof</code>; the second also matches <code>lsof</code></td><td>The space matters</td></tr>
+<tr><td><code>Bash(ls:*)</code></td><td>Same as <code>Bash(ls *)</code></td><td>Older form; <code>:*</code> only works at the end</td></tr>
+<tr class="group"><td colspan="3">Read and Edit (file tools)</td></tr>
+<tr><td><code>Read(./.env)</code></td><td>The <code>.env</code> file in the current directory</td><td>A Read deny also blocks Edit and Write there</td></tr>
+<tr><td><code>Read(./secrets/**)</code></td><td>Everything under <code>secrets/</code></td><td><code>**</code> means any depth</td></tr>
+<tr><td><code>Edit(/src/**/*.ts)</code></td><td>TypeScript files under <code>src/</code> of the project</td><td>Single <code>/</code> = relative to the settings file's anchor</td></tr>
+<tr><td><code>Read(~/.zshrc)</code></td><td>Your home folder's <code>.zshrc</code></td><td><code>~/</code> = home</td></tr>
+<tr><td><code>Edit(//tmp/scratch.txt)</code></td><td>The absolute path <code>/tmp/scratch.txt</code></td><td>Double slash = real absolute path</td></tr>
+<tr class="group"><td colspan="3">Web</td></tr>
+<tr><td><code>WebFetch(domain:example.com)</code></td><td>Fetches to example.com only</td><td>Add <code>domain:*.example.com</code> for subdomains</td></tr>
+<tr><td><code>WebFetch</code></td><td>Every fetch</td><td><code>WebSearch</code> is a separate tool with its own rules</td></tr>
+<tr class="group"><td colspan="3">MCP, subagents and skills</td></tr>
+<tr><td><code>mcp__playwright</code> or <code>mcp__playwright__*</code></td><td>Every tool from the server named <code>playwright</code></td><td>See <a href="#ch83">Chapter 83</a></td></tr>
+<tr><td><code>mcp__playwright__browser_navigate</code></td><td>One MCP tool</td><td></td></tr>
+<tr><td><code>mcp__*</code> (deny or ask only)</td><td>Every MCP tool from every server</td><td>Allow rules can't use this glob</td></tr>
+<tr><td><code>Agent(Explore)</code></td><td>The built-in Explore subagent</td><td>Use in deny to switch it off (<a href="#ch81">Chapter 81</a>)</td></tr>
+<tr><td><code>Agent(model:opus)</code></td><td>Subagent calls that request Opus</td><td>Parameter matching: deny and ask only</td></tr>
+<tr><td><code>Skill(deploy *)</code></td><td>The <code>deploy</code> skill with any arguments</td><td>See <a href="#ch80">Chapter 80</a></td></tr>
+</table></div>
+<p id="ch78rulesEmpty" hidden>No rules match.</p>
+
+<h4>How Bash rules really match</h4>
+<ul>
+<li><strong>Compound commands are split.</strong> Claude Code understands <code>&amp;&amp;</code>, <code>||</code>, <code>;</code>, <code>|</code>, <code>|&amp;</code>, <code>&amp;</code> and newlines. For <code>npm test &amp;&amp; rm -rf build</code> to run without a prompt, <em>every</em> part must be allowed. Deny and ask rules fire if <em>any</em> part matches, even inside <code>$(…)</code> or a loop.</li>
+<li><strong>Some wrappers are stripped first.</strong> <code>timeout</code>, <code>time</code>, <code>nice</code>, <code>nohup</code>, <code>stdbuf</code>, <code>command</code>, <code>builtin</code> and <code>noglob</code> are removed before matching, so <code>Bash(npm test *)</code> also covers <code>timeout 30 npm test</code>. Runners such as <code>npx</code>, <code>docker exec</code> or <code>devbox run</code> are <em>not</em> stripped, so <code>Bash(npx *)</code> allows anything npx can launch.</li>
+<li><strong>Read-only commands need no rule.</strong> A built-in set including <code>ls</code>, <code>cat</code>, <code>head</code>, <code>tail</code>, <code>grep</code>, <code>find</code>, <code>wc</code>, <code>diff</code> and read-only forms of <code>git</code> runs without a prompt in every mode, with some exceptions (for example <code>find</code> with <code>-delete</code> or <code>-exec</code>).</li>
+<li><strong>Redirects are checked as file writes.</strong> <code>npm test &gt; out.txt</code> checks <code>out.txt</code> against your Edit rules and working directories.</li>
+</ul>
+<div class="box warn"><span class="tag">A Bash deny is not a security wall</span><p>Rules match the command <em>text</em>. A deny on <code>Bash(git push *)</code> stops <code>git push origin main</code> but not <code>git -C . push origin main</code>; a deny on <code>Bash(curl *)</code> doesn't stop <code>/usr/bin/curl …</code> or <code>sh -c 'curl …'</code>. Deny rules catch the way Claude normally writes a command. When a limit must hold no matter how the command is spelled, add the <a href="#ch79">sandbox</a> (which the operating system enforces) or a PreToolUse <a class="gl" href="#g-hook">hook</a>.</p></div>
+
+<h4>How file paths anchor</h4>
+<p>Read and Edit rules use <strong>gitignore-style patterns</strong>. The tricky part is the leading slash:</p>
+<div class="tbl"><table>
+<tr><th>Pattern</th><th>Means</th></tr>
+<tr><td><code>//path</code></td><td>Absolute, from the filesystem root</td></tr>
+<tr><td><code>~/path</code></td><td>From your home folder</td></tr>
+<tr><td><code>/path</code></td><td>Relative to the settings file's anchor: the project folder for project and local files, but <strong><code>~/.claude/</code> for your user file</strong></td></tr>
+<tr><td><code>path</code> or <code>./path</code></td><td>Relative to the current directory; a bare file name such as <code>.env</code> matches at any depth</td></tr>
+</table></div>
+<p>So <code>Read(/secrets/**)</code> in your <em>user</em> settings protects <code>~/.claude/secrets</code>, not a <code>secrets</code> folder in your project. To protect something in every project from your user file, write <code>Read(**/.env)</code> or use <code>//</code> or <code>~/</code>.</p>
+
+<details class="deep"><summary>Under the hood: parameter rules and tool-name globs</summary><div class="body">
+<p><strong>Parameter matching.</strong> Deny and ask rules can match a top-level input field of a built-in tool with <code>Tool(param:value)</code>: <code>Agent(isolation:worktree)</code>, <code>Bash(run_in_background:true)</code>. You can't use it on a tool's main content field (<code>command</code> for Bash, <code>file_path</code> for Read): <code>Bash(command:rm *)</code> would be easy to bypass with a compound command, so Claude Code ignores it and warns at startup. Allow rules never use parameter matching, because one safe field doesn't make the whole call safe.</p>
+<p><strong>Tool-name globs.</strong> Deny and ask rules accept <code>"*"</code> (every tool) or <code>"mcp__*"</code> (every MCP tool). Allow rules accept a glob only after a literal server prefix: <code>mcp__github__get_*</code> works; <code>mcp__*</code> as an allow is skipped. MCP rules with parentheses are skipped in settings files; use <code>--disallowedTools</code> for MCP parameter matching.</p>
+<p><strong>Typos.</strong> A deny or ask rule naming a tool that doesn't exist produces a startup warning, which catches mistakes like writing a display label instead of the canonical name.</p>
+</div></details>
+
+<h3 id="ch78-6"><span class="num">78.6</span>Modes, prompts and trust</h3>
+<p>Rules work together with the permission mode (<a href="#ch67">Chapter 67</a>). As a reminder: <code>default</code> (shown as <b>Manual</b>; <code>manual</code> is an accepted alias), <code>acceptEdits</code>, <code>plan</code>, <code>auto</code>, <code>dontAsk</code> and <code>bypassPermissions</code>. Set the starting mode with <code>permissions.defaultMode</code>, or <code>--permission-mode</code> for one session.</p>
+<div class="box note"><span class="tag">Two surprises worth knowing</span><p>From v2.1.283, new interactive terminal and VS Code sessions start in <b>auto</b> mode when it is available; <code>claude -p</code> and the Agent SDK start in <code>default</code>. And <code>defaultMode</code> values <code>auto</code> and <code>bypassPermissions</code> do <em>not</em> take effect from project or local files: put them in your user file. That stops a repository you clone from switching your safety level.</p></div>
+<p>Deny rules apply in every mode, including bypass. Explicit ask rules still prompt in every mode too.</p>
+<h4>What "Yes, and don't ask again" saves</h4>
+<div class="tbl"><table>
+<tr><th>Prompt type</th><th>Saved where, for how long</th></tr>
+<tr><td>Bash command</td><td>An allow rule in <code>.claude/settings.local.json</code> at the repository root: permanent, per repository</td></tr>
+<tr><td>WebFetch domain</td><td>Same file: permanent, per repository and domain</td></tr>
+<tr><td>File edit</td><td>Not saved to a file: lasts until the session ends</td></tr>
+</table></div>
+<p>Approving a compound command such as <code>git status &amp;&amp; npm test</code> saves a separate rule for each part that needed approval, here <code>npm test</code>. Review that local file now and then: it quietly accumulates.</p>
+<h4>Workspace trust</h4>
+<p><a class="gl" href="#g-workspace-trust">Workspace trust</a> works like this: the first time you open Claude Code in a folder, it asks whether you trust it. <code>permissions.allow</code> rules and <code>additionalDirectories</code> in a project's shared <code>.claude/settings.json</code> only take effect <strong>after</strong> you accept that dialog, and the dialog lists what the folder would grant. A cloned repository can't silently pre-approve <code>Bash(*)</code> for you. Deny and ask rules, which only restrict, are not held back this way.</p>
+
+<h3 id="ch78-7"><span class="num">78.7</span>Tools that write settings for you</h3>
+<div class="tbl"><table>
+<tr><th>Tool</th><th>Kind</th><th>What it does</th></tr>
+<tr><td><code>/permissions</code> (alias <code>/allowed-tools</code>)</td><td>Built-in command</td><td>Lists every rule <em>and the file it came from</em>; add or remove rules; manage working directories; review recent auto-mode denials. Changes apply from Claude's next tool call.</td></tr>
+<tr><td><code>/config</code> (alias <code>/settings</code>)</td><td>Built-in command</td><td>Opens a short menu of personal options (theme, editor mode, model and so on), or sets one directly: <code>/config theme=dark</code>. It is not a view of your whole <code>settings.json</code>.</td></tr>
+<tr><td><code>/update-config [request]</code></td><td><a class="gl" href="#g-bundled-skill">Bundled skill</a></td><td>Describe a change in plain words ("allow npm test", "set DEBUG=1", "add a hook that…") and Claude edits the matching <code>settings.json</code>. Read the diff before accepting.</td></tr>
+<tr><td><code>/fewer-permission-prompts</code></td><td>Bundled skill</td><td>Scans your past transcripts for common <em>read-only</em> Bash and MCP calls, then adds a prioritised allowlist to the project's <code>.claude/settings.json</code>.</td></tr>
+<tr><td><code>--allowedTools</code> / <code>--disallowedTools</code></td><td>CLI flags</td><td>Allow or deny rules for one run, e.g. <code>claude -p "…" --allowedTools "Bash(npm test *)" "Read"</code>. Useful in CI (<a href="#ch75">Chapter 75</a>).</td></tr>
+<tr><td><code>--permission-mode &lt;mode&gt;</code></td><td>CLI flag</td><td>Choices: <code>acceptEdits</code>, <code>auto</code>, <code>bypassPermissions</code>, <code>manual</code>, <code>dontAsk</code>, <code>plan</code></td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A tester found she was clicking "Yes" thirty times a day for <code>npx playwright test …</code> and <code>git diff</code>. She ran <code>/fewer-permission-prompts</code>, which proposed allow rules for the read-only commands she used most. She then added one deliberate rule herself, <code>Bash(npx playwright test *)</code>, rather than the far broader <code>Bash(npx *)</code>, and committed the result so her whole squad benefited. The skill handles the safe read-only bulk; you decide anything that can change state.</p></div>
+
+<h3 id="ch78-8"><span class="num">78.8</span>A layered setup for a QA repository</h3>
+<p>Here is a complete, realistic setup for a Playwright and API test repository. Each layer has a clear job.</p>
+<div class="code"><span class="cap">.claude/settings.json (committed: the team's rules)</span><pre>{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(npx playwright test *)",
+      "Bash(npx playwright show-report)",
+      "Bash(npm run lint)",
+      "Bash(npm run test:api *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_navigate",
+      "WebFetch(domain:playwright.dev)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(npm install *)",
+      "mcp__playwright__browser_evaluate"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./auth/**)",
+      "Edit(/tests/fixtures/golden/**)",
+      "Bash(rm -rf *)",
+      "WebFetch(domain:prod.example.com)"
+    ]
+  }
+}</pre></div>
+<div class="tbl"><table>
+<tr><th>Line</th><th>Why</th></tr>
+<tr><td><code>git diff *</code>, <code>git log *</code></td><td>Read-only git commands often run without a rule anyway; listing them makes the intent explicit for reviewers.</td></tr>
+<tr><td><code>npx playwright test *</code></td><td>Lets Claude run and re-run tests freely, the most common action. Narrow on purpose: not <code>npx *</code>.</td></tr>
+<tr><td>ask on <code>git push</code>, <code>npm install</code></td><td>Both change things outside your folder (the remote, the dependency tree). A human should glance first.</td></tr>
+<tr><td>deny <code>Read(./auth/**)</code></td><td>Saved Playwright login state (storage-state files) contains session cookies.</td></tr>
+<tr><td>deny <code>Edit(/tests/fixtures/golden/**)</code></td><td>Golden files are the expected answers. An AI that "fixes" a failing test by editing the expected output is hiding a bug.</td></tr>
+<tr><td>deny <code>WebFetch(domain:prod.example.com)</code></td><td>Keep exploration on test environments. (For shell commands such as <code>curl</code>, pair this with the sandbox's network list in <a href="#ch79">Chapter 79</a>.)</td></tr>
+</table></div>
+<div class="code"><span class="cap">.claude/settings.local.json (yours only, not committed)</span><pre>{
+  "permissions": {
+    "allow": ["Bash(./scripts/seed-my-local-db.sh)"]
+  },
+  "env": { "BASE_URL": "http://localhost:3000" }
+}</pre></div>
+<div class="code"><span class="cap">~/.claude/settings.json (you, every project)</span><pre>{
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "deny": ["Read(~/.ssh/**)", "Read(~/.aws/**)", "Read(**/.env)"]
+  }
+}</pre></div>
+<p>Because lists merge, a session in this repository has the team's rules, your local extras and your personal denies all at once. Because deny wins everywhere, your personal <code>Read(**/.env)</code> protects you even in a repository whose team file forgot it.</p>
+<div class="box opinion"><span class="tag">Opinion · the author, drawing on Anthropic's documented guidance</span><p>Start strict and loosen with evidence. A team file with a short, deliberate allow list and a firm deny list is easier to review than one built from hundreds of "don't ask again" clicks. Treat changes to <code>.claude/settings.json</code> like code: they go through pull-request review, because an allow rule is a grant of power to an automated agent.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Build and test a layered permission setup</b><span>35 min · Claude Code, any OS with Python 3</span></div><ol>
+<li>Make a practice repository: <code>mkdir perm-lab &amp;&amp; cd perm-lab &amp;&amp; git init</code>. Create <code>check.py</code> containing <code>print("checks passed")</code>, <code>other.py</code> containing <code>print("other ran")</code>, and <code>.env</code> containing <code>API_TOKEN=fake-for-lab</code>.<span class="expect">three files and an empty git repository.</span></li>
+<li>Create <code>.claude/settings.json</code>:
+<div class="code"><pre>{
+  "permissions": {
+    "allow": ["Bash(python3 check.py)"],
+    "ask":   ["Bash(git commit *)"],
+    "deny":  ["Read(./.env)"]
+  }
+}</pre></div><span class="expect">the file saved with no comments or trailing commas.</span></li>
+<li>Start Claude in Manual mode so you see every decision: <code>claude --permission-mode manual</code>. Accept the workspace trust dialog.<span class="expect">the trust dialog lists the allow rule from the project file; the status bar shows manual mode.</span></li>
+<li>Run <code>/status</code> and find the <code>Setting sources</code> line.<span class="expect">it includes project settings.</span></li>
+<li>Ask: "Run python3 check.py".<span class="expect">it runs with no prompt and prints <code>checks passed</code>.</span></li>
+<li>Ask: "Run python3 other.py".<span class="expect">a permission prompt, because no rule matches. Choose <b>No</b>.</span></li>
+<li>Ask: "Show me what is in .env".<span class="expect">Claude reports it can't read the file because a deny rule blocks it.</span></li>
+<li>Run <code>/permissions</code>.<span class="expect">the three rules, each labelled with the file it came from.</span></li>
+<li>In another terminal, add <code>"Bash(python3 *)"</code> to the allow list of <code>.claude/settings.local.json</code> (create it with a <code>permissions</code> block). Back in Claude, ask again to run <code>other.py</code>.<span class="expect">now it runs without a prompt: the local list merged with the team list, live, with no restart.</span></li>
+<li>Add <code>"Bash(python3 other.py)"</code> to the <em>deny</em> list in the shared file and ask once more.<span class="expect">blocked: deny beats the broader allow, whichever file it's in.</span></li>
+<li>Exit and run <code>claude doctor</code> in the terminal.<span class="expect">no rejected entries. Break a rule on purpose (delete a closing quote), run it again, see the error, then fix it.</span></li>
+</ol>
+<p><b>Troubleshooting.</b> If step 5 still prompts, check you accepted the trust dialog (project allow rules wait for it) and that the command text matches exactly. If nothing seems to load, a JSON syntax error is the usual cause: <code>python3 -m json.tool .claude/settings.json</code> will point at it. If your session started in auto mode, you forgot <code>--permission-mode manual</code>.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"A more specific allow rule overrides a general deny."</dt><dd>No. Deny is checked first and the first match wins. Specificity is ignored.</dd>
+<dt>"Settings in my project file replace my user settings."</dt><dd>Single values are overridden by the higher level, but lists such as <code>permissions.allow</code> are combined across files.</dd>
+<dt>"<code>Bash(git *)</code> is a sensible way to allow git log."</dt><dd>It allows every git command, including <code>push</code> and <code>reset --hard</code>. Put the <code>*</code> after the subcommand: <code>Bash(git log *)</code>.</dd>
+<dt>"<code>Read(/secrets/**)</code> in my user file protects my project's secrets folder."</dt><dd>In the user file, a single leading slash anchors at <code>~/.claude/</code>. Use <code>**/secrets/**</code>, <code>//</code> or <code>~/</code>.</dd>
+<dt>"Denying <code>Bash(curl *)</code> means Claude can't reach the internet from the shell."</dt><dd>Rules match command text; <code>/usr/bin/curl</code> or <code>python3 -c …</code> get through. Use the sandbox for an enforced network limit.</dd>
+<dt>"Putting rules in CLAUDE.md is enough."</dt><dd>CLAUDE.md is guidance to the model. Only rules, hooks, modes and the sandbox are enforced.</dd>
+</dl></div>
+
+<h3 id="ch78-r"><span class="num">78.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Four settings files: user (<code>~/.claude/settings.json</code>), shared project (<code>.claude/settings.json</code>), project local (<code>.claude/settings.local.json</code>) and managed. Precedence: managed, command line, local, project, user.</li>
+<li>Lists merge across files; a deny at any level can't be overridden.</li>
+<li>Rules are checked deny, then ask, then allow; first match wins; otherwise the permission mode decides.</li>
+<li>Bash rules match command text: put <code>*</code> after the subcommand, mind the space, and remember a deny is not a wall.</li>
+<li>File rules use gitignore patterns; <code>//</code> is absolute, <code>~/</code> is home, and a single <code>/</code> depends on which file the rule is in.</li>
+<li>Check with <code>/status</code>, <code>/permissions</code> and <code>claude doctor</code>; write with <code>/permissions</code>, <code>/update-config</code> and <code>/fewer-permission-prompts</code>.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">The team file allows <code>Bash(aws s3 ls)</code>. Your user file denies <code>Bash(aws *)</code>. Claude tries <code>aws s3 ls</code>. What happens?</p><div class="opts"><button>It runs, because the more specific rule wins</button><button data-ok>It is blocked, because deny rules are checked first at every level</button><button>It prompts, because the rules conflict</button></div><p class="why" hidden>Deny is evaluated before allow and specificity doesn't matter, so the broad deny blocks it.</p></div>
+<div class="qz"><p class="q">Which file should hold rules your whole team should share?</p><div class="opts"><button><code>~/.claude/settings.json</code></button><button><code>.claude/settings.local.json</code></button><button data-ok><code>.claude/settings.json</code>, committed to the repository</button></div><p class="why" hidden>The shared project file is the one meant for version control; the local file is personal and kept out of git.</p></div>
+<div class="qz"><p class="q">You want Claude to run any <code>git log</code> command without asking, and nothing else in git. Which rule?</p><div class="opts"><button><code>Bash(git *)</code></button><button data-ok><code>Bash(git log *)</code></button><button><code>Bash(git*)</code></button></div><p class="why" hidden>Everything before the first <code>*</code> limits the rule, so the subcommand must come before the wildcard.</p></div>
+<div class="qz"><p class="q">What does "Yes, and don't ask again" do for a Bash command?</p><div class="opts"><button>Allows it until the session ends</button><button data-ok>Saves an allow rule to <code>.claude/settings.local.json</code> for future sessions in that repository</button><button>Adds it to the team's shared settings</button></div><p class="why" hidden>Bash and WebFetch approvals are saved to the local file; file-edit approvals last only for the session.</p></div>
+<div class="qz"><p class="q">A cloned repository's <code>.claude/settings.json</code> sets <code>"defaultMode": "bypassPermissions"</code>. What happens?</p><div class="opts"><button>Your sessions there skip all permission checks</button><button data-ok>Nothing: <code>auto</code> and <code>bypassPermissions</code> don't take effect from project or local files</button><button>Claude Code deletes the file</button></div><p class="why" hidden>Those two modes must come from your user settings (or the command line or managed settings), so a repository can't lower your guard.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Write a proposed <code>.claude/settings.json</code> for one of your team's real test repositories. Include at least five allow rules for safe, frequent commands, two ask rules and four deny rules (secrets, saved login state, golden or baseline files, production hosts). For every rule, write one sentence of justification in the pull-request description. Then run <code>/fewer-permission-prompts</code> on a week of your own sessions and compare its suggestions with yours.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Claude Code reads settings from four JSON files: mine for every project, the team's in the repo, my private one in the repo, and the company's. The higher one wins on single values, but rule lists are added together. Permission rules come in three lists. Deny is checked first, then ask, then allow, and the first match wins, so you can't punch a hole in a deny. Bash rules match the command text, so put the star after the subcommand, like <code>git log *</code>. And CLAUDE.md is advice; rules are the enforced part."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/settings" target="_blank" rel="noopener">Settings files and precedence</a> and <a href="https://code.claude.com/docs/en/settings-reference" target="_blank" rel="noopener">Settings reference</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/permissions" target="_blank" rel="noopener">Configure permissions</a>: rule syntax, Bash matching, path anchoring, workspace trust.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/permission-modes" target="_blank" rel="noopener">Permission modes</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/managed-settings" target="_blank" rel="noopener">Managed settings</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/commands" target="_blank" rel="noopener">Commands reference</a> (<code>/permissions</code>, <code>/config</code>, <code>/update-config</code>, <code>/fewer-permission-prompts</code>).</li>
+<li>Claude Code 2.1.319 <code>claude --help</code> (<code>--settings</code>, <code>--setting-sources</code>, <code>--allowedTools</code>, <code>--disallowedTools</code>, <code>--permission-mode</code>).</li>
+</ol><p class="verified">Verified 9 November 2026 against code.claude.com/docs and Claude Code 2.1.319.</p></div>

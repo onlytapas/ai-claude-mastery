@@ -1,0 +1,550 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>An eight-step framework for comparing models on your own work, which you can repeat every time a new model appears</li>
+<li>How to build a small but representative dataset, including "trap" questions that catch made-up answers</li>
+<li>Three ways to grade answers (code checks, rubrics and an LLM judge) and when to trust each</li>
+<li>What to measure: accuracy, reasoning quality, hallucination rate, latency, tokens, cost and consistency</li>
+<li>How to run a complete Python harness that compares two Claude models (and optionally another provider), read its results and use it as a regression test</li>
+<li>How to write a decision record that others can check</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch24">Chapter 24</a> (evaluations and benchmarks), <a href="#ch33">Chapter 33</a> (reading benchmarks critically) and <a href="#ch35">Chapter 35</a> (choosing a model). For the lab you need Python 3.9 or newer (<a href="#ch58">Chapter 58</a>); <a href="#ch86">Chapter 86</a> shows how to get a Claude API key. You can do most of the lab offline, with no key at all.</div>
+
+<div class="bigidea"><p>Public benchmarks tell you how models do on someone else's tasks. To choose a model for your team, you need to know how it does on yours. The method is ordinary testing: write down what "good" looks like, collect realistic examples with expected answers, run every model on exactly the same inputs several times, grade the answers the same way, and compare accuracy, made-up answers, speed and cost. Save the results, so that when a new model or version arrives you can rerun the same test and see what got better or worse. This chapter gives you the method and a complete harness you can run today.</p></div>
+
+<h3 id="ch36-1"><span class="num">36.1</span>Why test models yourself</h3>
+<p>A vendor's launch post might show its new model beating rivals on a dozen benchmarks. None of those benchmarks is "label our Jira bugs using our severity rules" or "extract the build number from our CI logs". Benchmarks also suffer from contamination and saturation, and they're run with settings you won't use (<a href="#ch33">Chapter 33</a>). The only evidence that answers <em>your</em> question is a test on <em>your</em> tasks.</p>
+<p>Testers already have the right instincts. A model comparison is a test campaign: you have a system under test (each model), test cases (your examples), a <a class="gl" href="#g-test-oracle">test oracle</a> (the grading), and a report. The new parts are that the system is <a class="gl" href="#g-non-deterministic">non-deterministic</a>, so you repeat runs, and that some answers are free text, so grading needs more thought.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A restaurant choosing a new supplier doesn't just read the supplier's brochure. The chef orders samples, cooks the restaurant's own dishes with them several times, has the same tasters score them blind, and checks the price per plate. A month later, when the supplier changes its recipe, the chef cooks the same dishes again. That's this whole chapter.</p></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A QA team uses a model to suggest severities for incoming bug reports. A new, cheaper model is released, and the team wants to switch. Rather than argue about benchmarks, they run 120 past bug reports, with severities agreed by the triage group, through both models three times each. The cheaper model matches on most cases, but it marks two data-loss bugs as "Minor". The team switches anyway, adding a rule that any report mentioning data loss goes to a person. The decision took an afternoon and was backed by evidence anyone could rerun.</p></div>
+
+<h3 id="ch36-2"><span class="num">36.2</span>The framework in eight steps</h3>
+<div class="flow">
+<div><b>1. Decision</b>What are we choosing, and what would change our mind?</div>
+<div><b>2. Tasks</b>The real jobs, with success criteria</div>
+<div><b>3. Dataset</b>Representative examples with expected answers</div>
+<div><b>4. Fixed set-up</b>Identical prompts and settings for every model</div>
+<div class="hl"><b>5. Grade</b>Code checks first, rubric or judge for free text</div>
+<div><b>6. Measure</b>Accuracy, hallucination, latency, tokens, cost</div>
+<div><b>7. Repeat</b>Several runs per case for consistency</div>
+<div><b>8. Record and regress</b>Write the decision; rerun when models change</div>
+</div>
+<p><strong>Step 1, the decision.</strong> Write one sentence: "Should our bug-triage job move from Model A to Model B?" Add your pass criteria before you see results, for example "B must be within 3 points of A's accuracy, have no more made-up answers, and cost less." Deciding the bar first stops you moving it afterwards.</p>
+<p><strong>Step 2, the tasks.</strong> List the jobs the model will actually do and what "correct" means for each. "Summarise a bug" isn't testable; "give a one-word severity from Critical, Major, Minor, Trivial using our definitions" is.</p>
+<p><strong>Step 4, a fixed set-up.</strong> Every model gets the same <a class="gl" href="#g-system-prompt">system prompt</a>, the same user prompt and the same output limit. Record the model ID, date and settings. If one model needs a different prompt to work well, test that too, but label it as a separate configuration. You're comparing <em>model plus prompt</em>, so say so.</p>
+<div class="box warn"><span class="tag">Don't tune on your test set</span><p>If you keep rewriting the prompt until Model B passes your 50 examples, you've trained the prompt on the test, and the score will look better than real life. Keep a separate handful of examples for prompt tweaking, and use the main set only for scoring.</p></div>
+
+<h3 id="ch36-3"><span class="num">36.3</span>Building a representative dataset</h3>
+<p>Your <a class="gl" href="#g-dataset">dataset</a> is a list of test cases: an input and the answer you'd accept (a <a class="gl" href="#g-golden-answer">golden answer</a>). It should look like the real traffic, including the awkward parts.</p>
+<div class="tbl"><table>
+<tr><th>Ingredient</th><th>What it means</th><th>QA example</th></tr>
+<tr><td>Typical cases</td><td>The everyday bulk of the work</td><td>Clear bug reports with an obvious severity</td></tr>
+<tr><td>Hard cases</td><td>Ones people argue about</td><td>A cosmetic bug on the payment page: Minor or Major?</td></tr>
+<tr><td>Edge cases</td><td>Unusual formats and lengths</td><td>A report written in German; a 5,000-line stack trace</td></tr>
+<tr><td>Trap cases</td><td>The answer is <em>not</em> in the input</td><td>"Which build was tested?" when no build is mentioned. The right answer is UNKNOWN.</td></tr>
+<tr><td>Past failures</td><td>Cases where a model got it wrong before</td><td>The data-loss bug labelled "Minor" last month</td></tr>
+</table></div>
+<p>Trap cases measure <a class="gl" href="#g-hallucination">hallucination</a> directly: any answer other than "UNKNOWN" is invented (<a href="#ch22">Chapter 22</a>). They're cheap to write and very revealing.</p>
+<p><strong>How many cases?</strong> Start with 20–50 to find obvious differences, and aim for 100 or more before a decision that matters. Small sets can only show big differences (see the deeper note in 36.7). <strong>Where from?</strong> Past tickets, test cases and logs, with the agreed answers. <strong>Privacy:</strong> remove or replace personal and customer data before any of it goes to an external API, and check your company's AI policy.</p>
+<details class="deep"><summary>Getting golden answers people agree on</summary><div class="body">
+<p>If two experienced testers would give different severities for the same bug, a model can't be "wrong" on that case in any useful sense. Before scoring models, have two people label a sample independently and compare. Where they disagree, either sharpen the definition ("Critical means no workaround and affects payment or data") or drop the case. The share of cases where people agree is a ceiling: don't expect a model to beat the agreement level of your own team.</p>
+</div></details>
+
+<h3 id="ch36-4"><span class="num">36.4</span>Grading: code checks, rubrics and LLM judges</h3>
+<p>Grading is the <a class="gl" href="#g-test-oracle">test oracle</a>. Use the simplest grader that works for each task.</p>
+<div class="tbl"><table>
+<tr><th>Grader</th><th>How it works</th><th>Good for</th><th>Watch out for</th></tr>
+<tr><td>Exact or label match</td><td>Code compares the answer to the expected label</td><td>Classification, yes/no, severities</td><td>Formatting noise ("Critical." versus "critical"): normalise first</td></tr>
+<tr><td>Structured check</td><td>Parse the JSON and compare fields</td><td>Extraction from bug reports and stories</td><td>Models wrapping JSON in code fences: strip them</td></tr>
+<tr><td>Contains / regex</td><td>Required values must appear</td><td>Boundary values, IDs, error codes</td><td>Passing answers that also contain wrong extras</td></tr>
+<tr><td><a class="gl" href="#g-rubric">Rubric</a> scored by a person</td><td>A checklist of what a good answer includes, scored 1–5</td><td>Explanations, summaries, test ideas</td><td>Slow; scorers drift. Use two scorers on a sample</td></tr>
+<tr><td><a class="gl" href="#g-llm-as-judge">LLM judge</a></td><td>A model scores the answer against the rubric</td><td>Free text at scale</td><td>Judges favour longer answers and their own family's style. Check against human scores</td></tr>
+</table></div>
+<p>An LLM judge is itself a model that can be wrong. Three habits keep it honest. Give it a specific rubric, not "is this good?" Ask for a fixed output format ("SCORE: 4") that code can parse. And before trusting it, score 20 answers yourself and check that the judge agrees with you on most of them. If possible, use a judge from a different family, or at least a different model, from the ones being compared.</p>
+<div class="box note"><span class="tag">Reasoning quality</span><p>"Did it reason well?" is a rubric question. Write down what good reasoning looks like for the task (cites the evidence in the report, considers impact and workaround, doesn't invent facts) and score against that. Don't grade the model's hidden "thinking"; grade the answer it gives and the reasons it states.</p></div>
+
+<h3 id="ch36-5"><span class="num">36.5</span>What to measure</h3>
+<div class="tbl"><table>
+<tr><th>Metric</th><th>Definition used in the harness</th><th>Why it matters</th></tr>
+<tr><td>Accuracy</td><td>Share of all runs that passed their grader</td><td>The headline quality figure</td></tr>
+<tr><td>Reasoning quality</td><td>Rubric score from the judge (pass at 4 or 5 out of 5)</td><td>Quality of free-text answers</td></tr>
+<tr><td>Hallucination rate</td><td>Share of trap-case runs where the model invented an answer instead of saying UNKNOWN</td><td>Made-up facts in a bug report or test result are dangerous</td></tr>
+<tr><td><a class="gl" href="#g-latency">Latency</a> p50 / p95</td><td>Median and 95th <a class="gl" href="#g-percentile">percentile</a> seconds per request</td><td>p95 shows the slow cases users notice</td></tr>
+<tr><td>Tokens</td><td>Average input and output tokens reported by the API</td><td>Different tokenizers and thinking change these</td></tr>
+<tr><td>Cost</td><td>Tokens × list price, including the judge; also per 1,000 tasks</td><td>Scales your test to production volume</td></tr>
+<tr><td>Consistency</td><td>Share of cases where every repeat got the same pass/fail result</td><td>A model that is right two times out of three is a flaky test</td></tr>
+</table></div>
+
+<h3 id="ch36-6"><span class="num">36.6</span>The harness</h3>
+<p>A <a class="gl" href="#g-test-harness">test harness</a> is the code that feeds test cases to the system under test, collects the results and reports them. This one is two files: a dataset (<code>tasks.jsonl</code>) and a script (<code>compare.py</code>). The script uses only the Python standard library, plus Anthropic's official <code>anthropic</code> package for Claude. It has three kinds of provider:</p>
+<ul>
+<li><code>anthropic:</code> any Claude model ID, for example <code>anthropic:claude-sonnet-5-5</code>.</li>
+<li><code>other:</code> any provider that offers an OpenAI-compatible "chat completions" endpoint. Mistral's model card, for example, lists <code>/v1/chat/completions</code>. Check your provider's documentation for the base URL and model ID.</li>
+<li><code>mock:</code> two pretend models, <code>careful</code> and <code>hasty</code>, plus a pretend judge. They need no key and no internet, so you can see how everything works before spending anything.</li>
+</ul>
+<h4>Setup</h4>
+<div class="code"><span class="cap">Terminal (macOS / Linux)</span><pre>mkdir model-compare &amp;&amp; cd model-compare
+python3 -m venv .venv                 <span class="c"># a private Python environment for this project</span>
+source .venv/bin/activate             <span class="c"># Windows PowerShell: .venv\Scripts\Activate.ps1</span>
+pip install anthropic                 <span class="c"># only needed for real Claude runs</span></pre></div>
+<p>Now create the two files below in that folder, exactly as shown.</p>
+<h4>The dataset: tasks.jsonl</h4>
+<p>One JSON object per line. Each has an <code>id</code>, a <code>type</code> that picks the grader (<code>label</code>, <code>json</code>, <code>unanswerable</code>, <code>contains_all</code> or <code>rubric</code>), the <code>prompt</code>, the <code>expected</code> answer and, for rubric tasks, the <code>rubric</code>. Replace these ten examples with your own once the harness works.</p>
+<div class="code"><span class="cap">tasks.jsonl</span><pre>{"id": "sev-01", "type": "label", "prompt": "Bug: the Pay button on checkout returns HTTP 500 for every user in production. No workaround. Classify the severity. Reply with exactly one word: Critical, Major, Minor or Trivial.", "expected": "Critical"}
+{"id": "sev-02", "type": "label", "prompt": "Bug: the footer says 'Copyrigth 2026' on every page. Classify the severity. Reply with exactly one word: Critical, Major, Minor or Trivial.", "expected": "Trivial"}
+{"id": "kind-01", "type": "label", "prompt": "Is the following text a TESTCASE or a BUGREPORT? Reply with exactly one word.\n\nGiven a logged-in user with an empty basket, when they add one item, then the basket badge shows 1.", "expected": "TESTCASE"}
+{"id": "extract-01", "type": "json", "prompt": "Extract fields from this bug report as JSON with keys browser, environment, steps_count. Use the string UNKNOWN for anything not stated. Reply with JSON only.\n\nTitle: Login spinner never stops\nEnvironment: staging\nBrowser: Firefox 128\nSteps:\n1. Open /login\n2. Enter valid credentials\n3. Click Sign in", "expected": {"browser": "Firefox 128", "environment": "staging", "steps_count": 3}}
+{"id": "extract-02", "type": "json", "prompt": "Extract fields from this Jira story as JSON with keys story_id, priority, fix_version. Use the string UNKNOWN for anything not stated. Reply with JSON only.\n\nPAY-142 (Priority: High) As a customer I want to save my card so that checkout is faster. Acceptance criteria: card is stored tokenised; CVV is never stored.", "expected": {"story_id": "PAY-142", "priority": "High", "fix_version": "UNKNOWN"}}
+{"id": "trap-01", "type": "unanswerable", "prompt": "Bug report: 'Export to CSV drops the last row. Seen on Chrome, staging.' Which build number was tested? Reply with the build number only, or UNKNOWN if it is not stated.", "expected": "UNKNOWN"}
+{"id": "trap-02", "type": "unanswerable", "prompt": "Release note: 'v4.2 adds dark mode and fixes the login timeout.' How many automated tests were added in v4.2? Reply with a number only, or UNKNOWN if it is not stated.", "expected": "UNKNOWN"}
+{"id": "bva-01", "type": "contains_all", "prompt": "An age field accepts whole numbers from 18 to 65 inclusive. List the four classic boundary values to test, one per line, numbers only.", "expected": ["17", "18", "65", "66"]}
+{"id": "explain-01", "type": "rubric", "prompt": "In no more than three sentences, explain to a product manager why a flaky test is a problem.", "expected": "Flaky tests pass and fail on the same code, so the team stops trusting failures. Real bugs then get ignored as 'just flaky', and time is wasted re-running pipelines. Fixing or quarantining them keeps the test suite a reliable release signal.", "rubric": "Score 5 if the answer (a) says a flaky test gives different results on unchanged code, (b) names the loss of trust or ignored real failures, (c) names a cost such as wasted time or slower releases, and (d) uses at most three sentences and plain words. Deduct one point for each missing item. Score 1 if it is wrong or off-topic."}
+{"id": "explain-02", "type": "rubric", "prompt": "In no more than three sentences, tell a new tester what a regression test is.", "expected": "A regression test re-checks features that already worked, to make sure a new change has not broken them. Teams run them after every change, often automatically in CI. They catch side effects that the developer did not expect.", "rubric": "Score 5 if the answer (a) says it re-checks existing behaviour after a change, (b) says the aim is to catch things the change broke, (c) mentions when they run (for example after changes or in CI), and (d) uses at most three sentences. Deduct one point for each missing item. Score 1 if it is wrong."}</pre></div>
+<h4>The script: compare.py</h4>
+<div class="code"><span class="cap">compare.py</span><pre>#!/usr/bin/env python3
+"""compare.py - run the same tasks against several models and compare them.
+
+Usage examples:
+  python3 compare.py --models mock:careful mock:hasty
+  python3 compare.py --models anthropic:claude-sonnet-5-5 anthropic:claude-haiku-5-5
+  python3 compare.py --models anthropic:claude-sonnet-5-5 --baseline results/run-OLD.csv
+
+Model specs are provider:model-id. Providers: anthropic, other (any
+OpenAI-compatible chat completions endpoint) and mock (offline, no key needed).
+"""
+import argparse
+import csv
+import json
+import math
+import os
+import re
+import statistics
+import sys
+import time
+import urllib.request
+from datetime import datetime
+
+# USD per million tokens: (input, output). Copied from the vendors' pricing
+# pages on 9 Nov 2026. Prices change: check them before you trust a cost figure.
+PRICES = {
+    "claude-opus-5-5": (4.00, 20.00),
+    "claude-sonnet-5-5": (2.00, 10.00),
+    "claude-haiku-5-5": (0.10, 0.50),  # prompts up to 100K tokens
+}
+# Add other providers' prices here, e.g. via env: OTHER_PRICE_IN, OTHER_PRICE_OUT.
+
+SYSTEM = ("You are a careful QA assistant. Follow the requested output format "
+          "exactly. If the input does not contain the information asked for, "
+          "answer UNKNOWN. Never guess.")
+
+MAX_TOKENS = int(os.environ.get("MAX_TOKENS", "4000"))
+
+
+# ---------------------------------------------------------------- providers
+_anthropic_client = None
+
+
+def call_anthropic(model, prompt, case):
+    global _anthropic_client
+    import anthropic  # pip install anthropic
+    if _anthropic_client is None:
+        _anthropic_client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY
+    start = time.perf_counter()
+    resp = _anthropic_client.messages.create(
+        model=model, max_tokens=MAX_TOKENS, system=SYSTEM,
+        messages=[{"role": "user", "content": prompt}])
+    secs = time.perf_counter() - start
+    # Keep only the visible answer; skip any thinking blocks.
+    text = "".join(b.text for b in resp.content if b.type == "text")
+    return text, resp.usage.input_tokens, resp.usage.output_tokens, secs
+
+
+def call_other(model, prompt, case):
+    base = os.environ["OTHER_BASE_URL"].rstrip("/")
+    key = os.environ["OTHER_API_KEY"]
+    field = os.environ.get("OTHER_MAX_TOKENS_FIELD", "max_tokens")
+    body = {"model": model, field: MAX_TOKENS,
+            "messages": [{"role": "system", "content": SYSTEM},
+                         {"role": "user", "content": prompt}]}
+    req = urllib.request.Request(
+        base + "/chat/completions", data=json.dumps(body).encode(),
+        headers={"Authorization": "Bearer " + key,
+                 "Content-Type": "application/json"})
+    start = time.perf_counter()
+    with urllib.request.urlopen(req, timeout=180) as r:
+        data = json.load(r)
+    secs = time.perf_counter() - start
+    text = data["choices"][0]["message"].get("content") or ""
+    usage = data.get("usage", {})
+    return (text, usage.get("prompt_tokens", 0),
+            usage.get("completion_tokens", 0), secs)
+
+
+def call_mock(model, prompt, case):
+    """Fake models so you can test the harness offline. Deterministic."""
+    exp = case.get("expected")
+    rep = case.get("_repeat", 0)
+    if model == "judge":  # pretend judge: 5 for the reference answer, else 2
+        return ("SCORE: 5" if case["_answer"] == case["expected"]
+                else "SCORE: 2"), 200, 5, 0.40
+    if model == "careful":
+        text = json.dumps(exp) if isinstance(exp, dict) else (
+            "\n".join(exp) if isinstance(exp, list) else exp)
+        return text, len(prompt) // 4 + 40, 30, 1.20
+    # "hasty": fast, mostly right, invents answers, wobbles on one case
+    wrong = {"sev-02": "Minor", "trap-01": "4.2.17", "trap-02": "12",
+             "explain-02": "It is a test."}
+    if case["id"] == "kind-01" and rep == 1:
+        return "BUGREPORT", len(prompt) // 4 + 40, 5, 0.30
+    if case["id"] in wrong:
+        return wrong[case["id"]], len(prompt) // 4 + 40, 8, 0.30
+    if isinstance(exp, dict):
+        return "```json\n" + json.dumps(exp) + "\n```", len(prompt) // 4, 25, 0.35
+    if isinstance(exp, list):
+        return "\n".join(exp), len(prompt) // 4 + 40, 10, 0.30
+    return exp, len(prompt) // 4 + 40, 20, 0.30
+
+
+PROVIDERS = {"anthropic": call_anthropic, "other": call_other, "mock": call_mock}
+
+
+def call(spec, prompt, case):
+    provider, _, model = spec.partition(":")
+    if provider not in PROVIDERS or not model:
+        sys.exit(f"Bad model spec '{spec}'. Use provider:model-id, "
+                 f"provider one of {sorted(PROVIDERS)}")
+    return PROVIDERS[provider](model, prompt, case)
+
+
+def cost_usd(spec, tok_in, tok_out):
+    provider, _, model = spec.partition(":")
+    if provider == "mock":
+        return 0.0
+    if model in PRICES:
+        p_in, p_out = PRICES[model]
+    elif provider == "other" and "OTHER_PRICE_IN" in os.environ:
+        p_in = float(os.environ["OTHER_PRICE_IN"])
+        p_out = float(os.environ["OTHER_PRICE_OUT"])
+    else:
+        return float("nan")  # unknown price: shown as n/a
+    return (tok_in * p_in + tok_out * p_out) / 1_000_000
+
+
+# ---------------------------------------------------------------- graders
+def first_word(text):
+    words = re.findall(r"[A-Za-z0-9.]+", text)
+    return words[0].strip(".").upper() if words else ""
+
+
+def parse_json(text):
+    text = re.sub(r"^```(json)?|```$", "", text.strip(), flags=re.M).strip()
+    return json.loads(text)
+
+
+def grade(case, answer, judge_spec):
+    """Return (passed, hallucinated or None, note, judge_cost)."""
+    kind, exp = case["type"], case["expected"]
+    if kind == "label":
+        got = first_word(answer)
+        return got == exp.upper(), None, got, 0.0
+    if kind == "unanswerable":
+        said_unknown = "UNKNOWN" in answer.upper()
+        return said_unknown, not said_unknown, answer.strip()[:40], 0.0
+    if kind == "contains_all":
+        missing = [s for s in exp if not re.search(rf"\b{re.escape(s)}\b", answer)]
+        return not missing, None, "missing " + ",".join(missing) if missing else "all present", 0.0
+    if kind == "json":
+        try:
+            got = parse_json(answer)
+        except (ValueError, TypeError):
+            return False, None, "not valid JSON", 0.0
+        bad = [k for k, v in exp.items() if str(got.get(k)).lower() != str(v).lower()]
+        invented = any(exp[k] == "UNKNOWN" and str(got.get(k)).upper() != "UNKNOWN"
+                       for k in bad)
+        return not bad, (True if invented else None), "wrong " + ",".join(bad) if bad else "ok", 0.0
+    if kind == "rubric":
+        judge_prompt = (
+            "You are grading an answer. Use only this rubric.\n\n"
+            f"&lt;rubric&gt;{case['rubric']}&lt;/rubric&gt;\n&lt;question&gt;{case['prompt']}&lt;/question&gt;\n"
+            f"&lt;answer&gt;{answer}&lt;/answer&gt;\n\nReply with one line: SCORE: &lt;1-5&gt;")
+        judge_case = dict(case, _answer=answer)
+        text, t_in, t_out, _ = call(judge_spec, judge_prompt, judge_case)
+        m = re.search(r"SCORE:\s*([1-5])", text)
+        score = int(m.group(1)) if m else 0
+        return score &gt;= 4, None, f"judge score {score}", cost_usd(judge_spec, t_in, t_out)
+    raise ValueError(f"unknown task type {kind}")
+
+
+# ---------------------------------------------------------------- helpers
+def percentile(values, pct):
+    """Nearest-rank percentile; fine for small samples."""
+    if not values:
+        return float("nan")
+    ordered = sorted(values)
+    rank = max(1, math.ceil(pct / 100 * len(ordered)))
+    return ordered[rank - 1]
+
+
+def fmt(x, spec="{:.2f}"):
+    return "n/a" if isinstance(x, float) and math.isnan(x) else spec.format(x)
+
+
+def load_cases(path):
+    with open(path, encoding="utf-8") as f:
+        return [json.loads(line) for line in f if line.strip()]
+
+
+# ---------------------------------------------------------------- main
+def run(args):
+    cases = load_cases(args.tasks)
+    rows = []
+    for spec in args.models:
+        for case in cases:
+            for rep in range(args.repeats):
+                c = dict(case, _repeat=rep)
+                try:
+                    answer, t_in, t_out, secs = call(spec, case["prompt"], c)
+                    passed, halluc, note, judge_cost = grade(c, answer, args.judge)
+                    error = ""
+                except Exception as e:  # keep going; record the failure
+                    answer, t_in, t_out, secs = "", 0, 0, float("nan")
+                    passed, halluc, note, judge_cost = False, None, "", 0.0
+                    error = f"{type(e).__name__}: {e}"[:200]
+                rows.append({
+                    "model": spec, "case": case["id"], "type": case["type"],
+                    "repeat": rep, "passed": int(passed),
+                    "hallucinated": "" if halluc is None else int(halluc),
+                    "latency_s": round(secs, 3), "tokens_in": t_in,
+                    "tokens_out": t_out, "cost_usd": cost_usd(spec, t_in, t_out),
+                    "judge_cost_usd": judge_cost, "note": note, "error": error,
+                    "answer": answer.replace("\n", " ")[:300]})
+                print(f"{spec:32} {case['id']:11} rep {rep}  "
+                      f"{'PASS' if passed else 'FAIL'}  {error or note}")
+    return rows
+
+
+def summarise(rows, models):
+    print("\nSUMMARY (per model)")
+    head = (f"{'model':32} {'acc%':&gt;5} {'consist%':&gt;8} {'halluc%':&gt;7} "
+            f"{'p50 s':&gt;6} {'p95 s':&gt;6} {'in tok':&gt;7} {'out tok':&gt;7} "
+            f"{'total $':&gt;8} {'$/1k tasks':&gt;10} {'errors':&gt;6}")
+    print(head)
+    print("-" * len(head))
+    for spec in models:
+        r = [x for x in rows if x["model"] == spec]
+        ok = [x for x in r if not x["error"]]
+        acc = 100 * sum(x["passed"] for x in r) / len(r)
+        by_case = {}
+        for x in r:
+            by_case.setdefault(x["case"], set()).add(x["passed"])
+        consist = 100 * sum(len(v) == 1 for v in by_case.values()) / len(by_case)
+        traps = [x for x in r if x["hallucinated"] != ""]
+        halluc = (100 * sum(x["hallucinated"] for x in traps) / len(traps)
+                  if traps else float("nan"))
+        lat = [x["latency_s"] for x in ok]
+        total = sum(x["cost_usd"] + x["judge_cost_usd"] for x in r)
+        print(f"{spec:32} {acc:5.0f} {consist:8.0f} {fmt(halluc, '{:.0f}'):&gt;7} "
+              f"{fmt(percentile(lat, 50)):&gt;6} {fmt(percentile(lat, 95)):&gt;6} "
+              f"{statistics.mean(x['tokens_in'] for x in r):7.0f} "
+              f"{statistics.mean(x['tokens_out'] for x in r):7.0f} "
+              f"{fmt(total, '{:.4f}'):&gt;8} {fmt(1000 * total / len(r), '{:.2f}'):&gt;10} "
+              f"{len(r) - len(ok):6d}")
+
+
+def compare_baseline(rows, path):
+    with open(path, newline="", encoding="utf-8") as f:
+        old = list(csv.DictReader(f))
+
+    def rates(rs):
+        out = {}
+        for x in rs:
+            out.setdefault(x["case"], []).append(int(x["passed"]))
+        return {k: sum(v) / len(v) for k, v in out.items()}
+
+    before, now = rates(old), rates(rows)
+    print(f"\nREGRESSION CHECK against {path}")
+    worse = [(c, before[c], now[c]) for c in now if c in before and now[c] &lt; before[c]]
+    better = [(c, before[c], now[c]) for c in now if c in before and now[c] &gt; before[c]]
+    for c, b, n in worse:
+        print(f"  WORSE   {c:11} pass rate {b:.0%} -&gt; {n:.0%}")
+    for c, b, n in better:
+        print(f"  BETTER  {c:11} pass rate {b:.0%} -&gt; {n:.0%}")
+    if not worse and not better:
+        print("  No case changed pass rate.")
+    return len(worse)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--models", nargs="+", required=True)
+    ap.add_argument("--tasks", default="tasks.jsonl")
+    ap.add_argument("--repeats", type=int, default=3)
+    ap.add_argument("--judge", help="model that grades rubric tasks "
+                    "(default: mock:judge for mock runs, else anthropic:claude-opus-5-5)")
+    ap.add_argument("--baseline", help="earlier results CSV to compare against")
+    args = ap.parse_args()
+    if args.judge is None:
+        all_mock = all(m.startswith("mock:") for m in args.models)
+        args.judge = "mock:judge" if all_mock else "anthropic:claude-opus-5-5"
+
+    if any(m.startswith("anthropic:") for m in args.models + [args.judge]) \
+            and not os.environ.get("ANTHROPIC_API_KEY"):
+        sys.exit("Set ANTHROPIC_API_KEY first (see the setup steps).")
+    if args.baseline and not os.path.exists(args.baseline):
+        sys.exit(f"Baseline file not found: {args.baseline}")
+    rows = run(args)
+    os.makedirs("results", exist_ok=True)
+    out = datetime.now().strftime("results/run-%Y%m%d-%H%M%S-%f.csv")
+    with open(out, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=list(rows[0]))
+        w.writeheader()
+        w.writerows(rows)
+    summarise(rows, args.models)
+    print(f"\nRaw results: {out}")
+    if args.baseline:
+        sys.exit(1 if compare_baseline(rows, args.baseline) else 0)
+
+
+if __name__ == "__main__":
+    main()</pre></div>
+<details class="deep"><summary>How the script works, section by section</summary><div class="body">
+<p><strong>Providers.</strong> Each <code>call_*</code> function takes a model ID, a prompt and the test case, and returns the answer text, input tokens, output tokens and seconds taken. <code>call_anthropic</code> uses the Messages API through the official SDK; it keeps only the text blocks of the reply, because current Claude models may also return "thinking" blocks. <code>call_other</code> sends a plain HTTPS request to <code>{OTHER_BASE_URL}/chat/completions</code> with a Bearer token. <code>call_mock</code> returns scripted answers so the output is predictable.</p>
+<p><strong>Graders.</strong> <code>grade()</code> picks a grader by task type. Label tasks compare the first word. JSON tasks strip code fences, parse, and compare each expected field; if a field should be UNKNOWN but the model filled it in, that counts as a hallucination. Trap tasks pass only if the answer contains UNKNOWN. Rubric tasks send the question, rubric and answer to the judge model and parse "SCORE: n".</p>
+<p><strong>Runner.</strong> For every model, case and repeat, it calls the model, grades the answer and appends a row. Exceptions such as a network error are caught and recorded in the <code>error</code> column, so one failure doesn't stop the run.</p>
+<p><strong>Reporting.</strong> Every row goes to a timestamped CSV in <code>results/</code>, which you can open in a spreadsheet. The summary computes the metrics from 36.5. With <code>--baseline</code>, it compares the pass rate of each case with an earlier CSV and exits with code 1 if any case got worse, which is what a CI job needs (<a class="gl" href="#g-exit-code">exit code</a>).</p>
+</div></details>
+<div class="box warn"><span class="tag">Prices in the script</span><p>The <code>PRICES</code> table holds Anthropic's list prices on 9 November 2026: Opus 5.5 $4 / $20, Sonnet 5.5 $2 / $10 and Haiku 5.5 $0.10 / $0.50 per million tokens (Haiku's rate rises for prompts over 100K tokens, which these tests never reach). Check the pricing page and update the table before you rely on a cost figure. For an <code>other:</code> model, set <code>OTHER_PRICE_IN</code> and <code>OTHER_PRICE_OUT</code>; otherwise its cost shows as n/a.</p></div>
+
+<h3 id="ch36-7"><span class="num">36.7</span>Running it and reading the results</h3>
+<h4>First, offline</h4>
+<div class="code"><span class="cap">Terminal</span><pre>python3 compare.py --models mock:careful mock:hasty</pre></div>
+<p>You'll see one line per call, then the summary. This is the exact output (the run lines are shortened here):</p>
+<div class="code"><span class="cap">Expected output (mock models)</span><pre>mock:careful                     sev-01      rep 0  PASS  CRITICAL
+mock:careful                     sev-01      rep 1  PASS  CRITICAL
+mock:careful                     sev-01      rep 2  PASS  CRITICAL
+...
+mock:hasty                       trap-01     rep 0  FAIL  4.2.17
+...
+
+SUMMARY (per model)
+model                             acc% consist% halluc%  p50 s  p95 s  in tok out tok  total $ $/1k tasks errors
+----------------------------------------------------------------------------------------------------------------
+mock:careful                       100      100       0   1.20   1.20      83      30   0.0000       0.00      0
+mock:hasty                          57       90     100   0.30   0.35      75      15   0.0000       0.00      0
+
+Raw results: results/run-20261109-101500-123456.csv</pre></div>
+<p>Read it like a test report. <code>mock:hasty</code> is four times faster but passes only 57% of runs. Its hallucination rate is 100%: it invented a build number ("4.2.17") and a test count ("12") instead of saying UNKNOWN. Its consistency is 90% because it gave different answers to <code>kind-01</code> on different repeats, which a single run would have hidden. The token columns are the averages per call, and the cost is zero because mock models are free.</p>
+<h4>Then, with real Claude models</h4>
+<div class="code"><span class="cap">Terminal</span><pre>read -s ANTHROPIC_API_KEY &amp;&amp; export ANTHROPIC_API_KEY   <span class="c"># paste the key; it won't show</span>
+python3 compare.py --models anthropic:claude-sonnet-5-5 anthropic:claude-haiku-5-5</pre></div>
+<p>That makes 60 calls (10 cases × 3 repeats × 2 models), plus 12 judge calls to <code>claude-opus-5-5</code> for the rubric tasks. With these short prompts the whole run should cost well under one US dollar at list prices (an illustrative estimate; the summary prints the real figure). Your numbers will differ from run to run and from any table in this book, which is the point: they're your numbers.</p>
+<div class="box note"><span class="tag">What to expect (illustrative, not measured)</span><p>On a set this small, both models will probably get most label and extraction cases right, so the interesting columns are hallucination rate, consistency, p95 latency and cost per 1,000 tasks. If both score 100%, your dataset is too easy: add harder and trap cases until the models differ.</p></div>
+<h4>Optionally, another provider</h4>
+<div class="code"><span class="cap">Terminal</span><pre>export OTHER_BASE_URL="https://api.example-provider.com/v1"   <span class="c"># from the provider's docs</span>
+read -s OTHER_API_KEY &amp;&amp; export OTHER_API_KEY
+export OTHER_PRICE_IN=0.70 OTHER_PRICE_OUT=2.10                <span class="c"># that model's list prices</span>
+python3 compare.py --models anthropic:claude-sonnet-5-5 other:MODEL-ID-FROM-DOCS</pre></div>
+<p>Replace the URL and <code>MODEL-ID-FROM-DOCS</code> with the values from the provider's API documentation. The judge stays a Claude model unless you pass <code>--judge</code>.</p>
+<details class="deep"><summary>How many cases do you need to trust a difference?</summary><div class="body">
+<p>With 10 cases, one case is worth 10 percentage points, so "80% versus 90%" can be one unlucky example. A common rough guide for a pass rate measured on <em>n</em> independent cases is that the 95% margin of error is at most about 1 ÷ √<em>n</em>: about ±32 points for 10 cases, ±14 for 50 and ±10 for 100. Repeats help with consistency but don't replace more cases, because three runs of the same case aren't independent evidence about other cases. Practical rule: use small sets to find big differences quickly, and grow the set before a close call. When two models are within the margin, decide on cost, speed or risk instead.</p>
+</div></details>
+<h4>Troubleshooting</h4>
+<div class="tbl"><table>
+<tr><th>Symptom</th><th>Likely cause and fix</th></tr>
+<tr><td><code>Set ANTHROPIC_API_KEY first</code></td><td>The key isn't in this terminal session. Export it again; new terminal windows don't inherit it.</td></tr>
+<tr><td><code>ModuleNotFoundError: No module named 'anthropic'</code></td><td>The virtual environment isn't active, or the package isn't installed. Run <code>source .venv/bin/activate</code> then <code>pip install anthropic</code>.</td></tr>
+<tr><td>Every row shows <code>AuthenticationError</code></td><td>The key is wrong or revoked. Create a new one in the Claude Console.</td></tr>
+<tr><td><code>NotFoundError</code> mentioning the model</td><td>A typo in the model ID, or the model isn't available to your account. Copy IDs from the models overview page.</td></tr>
+<tr><td><code>RateLimitError</code> or HTTP 429 on some rows</td><td>Too many requests too fast. Use fewer repeats, or rerun later; the errors column shows which rows failed (<a href="#ch90">Chapter 90</a>).</td></tr>
+<tr><td><code>other:</code> rows fail with HTTP 400 about <code>max_tokens</code></td><td>Some APIs want a different field name. Set <code>OTHER_MAX_TOKENS_FIELD</code> to the name in their docs (for example <code>max_completion_tokens</code>).</td></tr>
+<tr><td>JSON tasks fail with "not valid JSON"</td><td>Open the CSV and read the <code>answer</code> column: often the model added a sentence before the JSON. Tighten the prompt, or use the provider's structured output feature (<a href="#ch89">Chapter 89</a>).</td></tr>
+<tr><td>Rubric tasks show <code>judge score 0</code></td><td>The judge didn't reply in the <code>SCORE: n</code> format. Check the answer text, and make sure the judge's <code>MAX_TOKENS</code> is high enough.</td></tr>
+</table></div>
+
+<h3 id="ch36-8"><span class="num">36.8</span>Regression testing when models change, and the decision record</h3>
+<p>Models change under you. Versions are retired (Anthropic's deprecations page lists Claude Sonnet 4.5 retiring on 30 November 2026), new ones arrive every few weeks, and a vendor can change behaviour behind an <a class="gl" href="#g-alias">alias</a>. Your saved results are the <a class="gl" href="#g-baseline">baseline</a>. Rerun the same dataset whenever you change model, prompt or settings, and compare case by case. This is <a class="gl" href="#g-regression-testing">regression testing</a> for AI.</p>
+<div class="code"><span class="cap">Terminal</span><pre>python3 compare.py --models mock:careful
+mv "$(ls -t results/run-*.csv | head -1)" results/baseline.csv   <span class="c"># keep the newest run as the baseline</span>
+python3 compare.py --models mock:hasty --baseline results/baseline.csv
+echo $?                                             <span class="c"># 1 means at least one case got worse</span></pre></div>
+<div class="code"><span class="cap">Expected output (end of the second run)</span><pre>REGRESSION CHECK against results/baseline.csv
+  WORSE   sev-02      pass rate 100% -&gt; 0%
+  WORSE   kind-01     pass rate 100% -&gt; 67%
+  WORSE   trap-01     pass rate 100% -&gt; 0%
+  WORSE   trap-02     pass rate 100% -&gt; 0%
+  WORSE   explain-02  pass rate 100% -&gt; 0%</pre></div>
+<p>Because the script exits with 1 when any case gets worse, you can put it in a CI pipeline (<a href="#ch125">Chapter 125</a>). A failing pipeline then means "the new model or prompt broke something that used to work", with the exact cases named. Keep the dataset in version control alongside the prompts.</p>
+<h4>The decision record</h4>
+<p>A <a class="gl" href="#g-decision-record">decision record</a> is a short document that captures what was decided, why, and on what evidence, so someone can challenge it later or redo it when things change. Keep it next to the dataset.</p>
+<div class="code"><span class="cap">decision-record.md (template)</span><pre># Model decision: bug-severity suggestions
+Date: 2026-11-09            Owner: QA lead            Review by: 2027-02-09
+
+## Decision
+Move from MODEL A to MODEL B for severity suggestions.
+
+## Pass criteria (written before testing)
+- Accuracy within 3 points of current model
+- Hallucination rate on trap cases no higher than current
+- Cost per 1,000 tasks lower than current
+
+## Evidence
+- Dataset: tasks-severity-v3.jsonl (120 cases, 15 traps), commit abc1234
+- Results: results/run-....csv (3 repeats per case)
+- Summary: accuracy, hallucination %, p95 latency, $/1k tasks for each model
+
+## Options considered
+- MODEL C: rejected, data cannot leave our cloud region
+
+## Risks and mitigations
+- Two data-loss bugs scored Minor: route reports mentioning data loss to a person
+
+## Re-test triggers
+New model version, prompt change, vendor retirement notice, or review date</pre></div>
+<div class="box opinion"><span class="tag">Opinion · this textbook's authors</span><p>The dataset is the most valuable thing this chapter produces, more than any single result. Models will keep changing; a well-kept set of 100 real cases with agreed answers lets your team judge every new model in an afternoon. That's an editorial view, not a measured finding.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Compare two models on your own tasks</b><span>60 min · Python 3, optional Claude API key</span></div><ol>
+<li>Do the setup steps in 36.6 and create <code>tasks.jsonl</code> and <code>compare.py</code>.<span class="expect"><code>ls</code> shows both files and a <code>.venv</code> folder.</span></li>
+<li>Run <code>python3 compare.py --models mock:careful mock:hasty</code>.<span class="expect">60 run lines, then a summary in which <code>mock:careful</code> scores 100% accuracy and <code>mock:hasty</code> 57%, with a 100% hallucination rate. A CSV appears in <code>results/</code>.</span></li>
+<li>Open the CSV in a spreadsheet and find the rows where <code>mock:hasty</code> failed <code>trap-01</code>.<span class="expect">The <code>answer</code> column shows the invented build number 4.2.17, and <code>hallucinated</code> is 1.</span></li>
+<li>Do the baseline run from 36.8 and check the exit code.<span class="expect">Five WORSE lines and <code>echo $?</code> prints 1.</span></li>
+<li>Replace three of the example cases with real, anonymised tasks from your team, including one trap case. Rerun with the mock models to check the file is valid.<span class="expect">The run completes. If a line of the file is broken, Python reports a JSON error with the line content.</span></li>
+<li>If you have an API key: export it and run <code>python3 compare.py --models anthropic:claude-sonnet-5-5 anthropic:claude-haiku-5-5</code>.<span class="expect">Real latencies (seconds, varying by call), token counts, and a total cost of cents, not dollars. Pass rates will vary; note which cases differ between the two models.</span></li>
+<li>Fill in the decision record template with your results, even if the decision is "not enough evidence yet".<span class="expect">A dated record that names the dataset, the results file and the next step.</span></li>
+</ol>
+<p><strong>No API key?</strong> Steps 1–5 and 7 work fully offline. You can also do a manual version of step 6: paste the ten prompts into the Claude app with two different models selected, and record the answers in the spreadsheet by hand.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"One run per case is enough."</dt><dd>Models are non-deterministic. Repeats reveal flaky answers that a single run hides, as <code>kind-01</code> showed.</dd>
+<dt>"An LLM judge is objective."</dt><dd>It's another model with its own biases, such as preferring longer answers. Check it against human scores first.</dd>
+<dt>"Higher accuracy wins."</dt><dd>Not if the difference is within the margin of error, or if the winner costs ten times more. Decide on pre-written criteria.</dd>
+<dt>"We tested it, so it's settled."</dt><dd>Models, prices and versions change. Rerun the same dataset on every change and on a schedule.</dd>
+<dt>"The public benchmark already answered this."</dt><dd>Benchmarks test other people's tasks with other settings. Use them for a shortlist, not the decision.</dd>
+</dl></div>
+
+<h3 id="ch36-r"><span class="num">36.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Treat a model comparison as a test campaign: decision, tasks, dataset, fixed set-up, grading, metrics, repeats, record.</li>
+<li>Write the pass criteria before you see results.</li>
+<li>Include trap cases whose correct answer is UNKNOWN; they measure hallucination directly.</li>
+<li>Grade with code wherever possible; use rubrics and an LLM judge for free text, checked against human scores.</li>
+<li>Measure accuracy, hallucination rate, consistency, p50/p95 latency, tokens and cost per 1,000 tasks.</li>
+<li>Small datasets only reveal big differences; grow the set before close calls.</li>
+<li>Save results as a baseline and rerun on every model, prompt or setting change, ideally in CI.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Why write the pass criteria before running the comparison?</p><div class="opts"><button>The harness needs them as input</button><button data-ok>So you can't move the bar to fit the result you hoped for</button><button>Vendors require it</button></div><p class="why" hidden>Deciding the bar first keeps the decision honest, as with any test plan.</p></div>
+<div class="qz"><p class="q">A trap case asks for a build number that isn't in the report. The model answers "4.2.17". What does this measure?</p><div class="opts"><button>Latency</button><button>Consistency</button><button data-ok>Hallucination</button></div><p class="why" hidden>The right answer was UNKNOWN; any specific value is invented.</p></div>
+<div class="qz"><p class="q">Model A passes 9 of 10 cases and Model B passes 8 of 10. What's the soundest conclusion?</p><div class="opts"><button>A is clearly better</button><button data-ok>The difference may be noise; add cases or decide on cost and risk</button><button>B is better because it is probably cheaper</button></div><p class="why" hidden>With 10 cases, one case is 10 points, well within the margin of error.</p></div>
+<div class="qz"><p class="q">What is the best first grader for "reply with one word: Critical, Major, Minor or Trivial"?</p><div class="opts"><button data-ok>A code check that compares the normalised label</button><button>An LLM judge with a rubric</button><button>A person reading every answer</button></div><p class="why" hidden>Use the simplest grader that works; a label match is fast, free and repeatable.</p></div>
+<div class="qz"><p class="q">Why does <code>compare.py --baseline</code> exit with code 1 when a case gets worse?</p><div class="opts"><button>To delete the old results</button><button data-ok>So a CI pipeline fails and flags the regression</button><button>Because the API returned an error</button></div><p class="why" hidden>A non-zero exit code is how scripts tell CI that something failed.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Build a dataset of at least 30 real, anonymised cases for one AI task your team runs, including at least five trap cases and five hard cases, with golden answers agreed by two people. Run it against two models with three repeats. Write a decision record with pass criteria set beforehand, the summary table, the cases where the models differed, and a review date. Commit the dataset, script and record to a repository so the comparison can be rerun.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Choosing a model is just testing. Decide what we're choosing and what 'good enough' means before we look. Collect real examples with agreed answers, including trick questions where the right answer is 'unknown', because those catch made-up answers. Give every model exactly the same prompts, run each case three times, grade with code where we can and with a rubric where we can't, and compare accuracy, invented answers, speed and cost per thousand tasks. Save the results, and when a new model comes out, rerun the same set and see what got worse."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/api/messages" target="_blank" rel="noopener">Messages API reference</a> (request fields <code>model</code>, <code>max_tokens</code>, <code>messages</code>, <code>system</code>; usage token counts).</li>
+<li>Anthropic, <a href="https://github.com/anthropics/anthropic-sdk-python" target="_blank" rel="noopener">Python SDK (anthropic)</a>; harness tested against version 2.6.0 for request handling and error types.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/models/overview" target="_blank" rel="noopener">Models overview</a> (model IDs) and <a href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Pricing</a>.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/model-deprecations" target="_blank" rel="noopener">Model deprecations</a>.</li>
+<li>Mistral AI, <a href="https://docs.mistral.ai/models/mistral-large-4-0" target="_blank" rel="noopener">Mistral Large 4 model card</a> (chat completions endpoint, used as an example of an OpenAI-compatible API).</li>
+<li>Zheng et al., <a href="https://arxiv.org/abs/2306.05685" target="_blank" rel="noopener">Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena</a> (2023): position, verbosity and self-enhancement biases in LLM judges.</li>
+<li>OpenAI, <a href="https://openai.com/index/why-we-no-longer-evaluate-swe-bench-verified/" target="_blank" rel="noopener">Why we no longer evaluate SWE-bench Verified</a> (an example of benchmark contamination).</li>
+</ol><p class="verified">Verified 9 November 2026. The harness was run offline with the mock models (output shown is exact) and its Anthropic path was checked against the live API with the anthropic package 2.6.0 using an invalid key (requests and error handling only). Results with real models were not measured for this chapter.</p></div>

@@ -1,0 +1,261 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What Claude Code's sandbox is, and why it lets you approve fewer commands safely</li>
+<li>Exactly what it restricts by default: writes, reads, network and environment</li>
+<li>What it does <em>not</em> cover, including file tools, hooks and local MCP servers</li>
+<li>How to turn it on, prove it works, and widen it carefully for real test suites</li>
+<li>How it fits with permission rules, permission modes and auto mode</li>
+<li>Its documented limits, and when you need a container instead</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch67">Chapter 67</a> (permission modes) and <a href="#ch78">Chapter 78</a> (settings and permission rules). The sandbox runs on macOS, Linux and WSL2; on native Windows, use WSL2. Checked against Claude Code 2.1.319.</div>
+
+<div class="bigidea"><p>A <a class="gl" href="#g-sandbox">sandbox</a> is a fence the operating system puts around the shell commands Claude runs. Inside the fence, commands can write only to your project folder and a temp folder, and can reach only the internet hosts you've approved. Because the operating system enforces the fence while each command runs, it holds even if Claude, or a malicious file Claude read, tries something unexpected. That is why Claude Code can safely run sandboxed commands without asking you each time. But the fence surrounds only shell commands: Claude's own file tools, hooks and local MCP servers sit outside it.</p></div>
+
+<h3 id="ch79-1"><span class="num">79.1</span>Why a sandbox?</h3>
+<p>Permission prompts protect you, but they wear you down. After the fortieth "Allow <code>npm test</code>?" most people click Yes without reading, which is no protection at all. Permission rules (<a href="#ch78">Chapter 78</a>) help, but they match <em>command text</em>: a deny on <code>Bash(curl *)</code> doesn't stop <code>/usr/bin/curl</code>, and an allowed <code>npm test</code> might run a test script that does far more than its name suggests.</p>
+<p>The sandbox takes a different approach. Instead of judging the command before it runs, it limits what <em>any</em> command can reach while it runs. A test script that tries to write to your home folder or post data to an unknown server simply fails.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A laboratory glovebox. A chemist can do anything they like with what's inside the box, quickly and without filling in a form for each step, because the box itself stops anything escaping. The safety comes from the box, not from checking each movement of their hands. But the glovebox only contains what's inside it: the chemist's coffee cup on the bench is not protected by it.</p></div>
+<p>Anthropic built the sandbox on its open-source <code>@anthropic-ai/sandbox-runtime</code> package. On macOS it uses Apple's built-in <b>Seatbelt</b> framework; on Linux and WSL2 it uses <b>bubblewrap</b> (an unprivileged isolation tool) plus <b>socat</b> (a network relay).</p>
+
+<h3 id="ch79-2"><span class="num">79.2</span>What it restricts by default</h3>
+<p>The sandbox is <strong>off by default</strong>. Once on, every shell command Claude runs (Bash, PowerShell and Monitor commands), and every process those commands start, lives inside these limits:</p>
+<div class="tbl"><table>
+<tr><th>Access</th><th>Default inside the sandbox</th><th>Change it with</th></tr>
+<tr><td><b>Writes</b></td><td>Only the working directory, a per-user temp directory, and directories you added (<code>--add-dir</code>, <code>/add-dir</code>, <code>permissions.additionalDirectories</code>). Protected paths stay write-denied.</td><td><code>sandbox.filesystem.allowWrite</code>, <code>denyWrite</code></td></tr>
+<tr><td><b>Reads</b></td><td>Most of the machine, <strong>including credential files such as <code>~/.ssh</code> and <code>~/.aws/credentials</code></strong></td><td><code>sandbox.filesystem.denyRead</code>, <code>allowRead</code>, <code>sandbox.credentials</code></td></tr>
+<tr><td><b>Network</b></td><td>No direct route out. Traffic goes through a local proxy that checks each host against your allowed domains, which start empty.</td><td><code>sandbox.network.allowedDomains</code>, <code>deniedDomains</code></td></tr>
+<tr><td><b>Environment variables</b></td><td>Inherited from Claude Code, including any secrets in it</td><td><code>sandbox.credentials</code></td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Read the "Reads" row twice</span><p>The default sandbox stops commands <em>writing</em> almost anywhere and <em>sending</em> almost anywhere, but it lets them <em>read</em> most files, including SSH keys. The network limit is what stops a stolen key leaving your machine. If you widen the network list, protect credentials explicitly (79.5).</p></div>
+<details class="deep"><summary>Under the hood: how the network fence works</summary><div class="body">
+<p>On Linux and WSL2 a sandboxed command runs in its own network namespace with no connection to your network. On macOS, Seatbelt blocks every connection except the one to the sandbox proxy. Claude Code runs that proxy on your machine, outside the sandbox, and points commands at it with <code>HTTP_PROXY</code>, <code>HTTPS_PROXY</code> and related variables. The proxy checks the hostname of each connection against your allowed and denied domains.</p>
+<p>Consequences: tools that honour proxy variables (<code>curl</code>, <code>npm</code>, <code>git</code> over HTTPS) work once their host is allowed. Tools that ignore them, such as plain <code>ssh</code> and most database drivers, can't connect even to an allowed host. Anything that isn't TCP (UDP, HTTP/3 over QUIC, <code>ping</code>) can't leave at all. The proxy also refuses an allowed hostname that resolves only to a local address such as <code>127.0.0.1</code> or the <code>169.254.169.254</code> cloud metadata endpoint, which blocks a classic trick for stealing cloud credentials.</p>
+<p>By default the proxy decides from the hostname and does <em>not</em> inspect encrypted (TLS) traffic.</p>
+</div></details>
+
+<h3 id="ch79-3"><span class="num">79.3</span>What runs outside the sandbox</h3>
+<p>This is the part most people get wrong. The sandbox wraps <strong>shell commands only</strong>. These run outside it:</p>
+<div class="tbl"><table>
+<tr><th>Outside the sandbox</th><th>What governs it instead</th></tr>
+<tr><td>Claude's built-in file and web tools: Read, Edit, Write, WebFetch, WebSearch</td><td>Permission rules. A <code>denyRead</code> entry doesn't stop the Read tool; <code>allowedDomains</code> doesn't limit WebFetch.</td></tr>
+<tr><td>Command <a class="gl" href="#g-hook">hooks</a></td><td>Runs with your full access. Review hook scripts (<a href="#ch82">Chapter 82</a>).</td></tr>
+<tr><td><strong>Local <a class="gl" href="#g-mcp-server">MCP servers</a></strong></td><td>Run with your full access. A local Playwright or database MCP server is not fenced (<a href="#ch105">Chapter 105</a>).</td></tr>
+<tr><td>Plugin monitors, LSP servers, mods, your status line command, <code>apiKeyHelper</code></td><td>Your full access</td></tr>
+<tr><td>Commands you type yourself at the <code>!</code> prompt</td><td>Unsandboxed in most sessions</td></tr>
+<tr><td>Commands matching <code>sandbox.excludedCommands</code></td><td>The normal permission flow</td></tr>
+<tr><td>Unsandboxed retries that you (or a mode) approve</td><td>The normal permission flow (79.4)</td></tr>
+</table></div>
+<p>Subagents run in the same process as your session and share its sandbox, so their Bash commands are sandboxed too. To put <em>everything</em> behind one boundary, run the whole Claude Code process inside a container, a virtual machine, a dev container or the sandbox runtime itself (79.8).</p>
+
+<h3 id="ch79-4"><span class="num">79.4</span>Turning it on and proving it works</h3>
+<h4>Step 1: dependencies (Linux and WSL2 only)</h4>
+<div class="code"><span class="cap">Terminal (Ubuntu or Debian)</span><pre>sudo apt-get install bubblewrap socat</pre></div>
+<div class="code"><span class="cap">Terminal (Fedora)</span><pre>sudo dnf install bubblewrap socat</pre></div>
+<p>macOS needs nothing extra. On WSL, the sandbox needs WSL2, not WSL1 (<code>wsl -l -v</code> in PowerShell tells you which).</p>
+<h4>Step 2: run <code>/sandbox</code></h4>
+<p>Inside a session, <code>/sandbox</code> opens a panel with tabs:</p>
+<ul>
+<li><b>Mode</b>: auto-allow or regular permissions (below).</li>
+<li><b>Overrides</b>: whether failed commands may fall back to running unsandboxed. It shows the <code>allowUnsandboxedCommands</code> setting as "Strict sandbox mode".</li>
+<li><b>Config</b>: the resolved settings, including protected paths under "Denied within allowed".</li>
+<li><b>Dependencies</b> (Linux): appears when something is missing. If it's the <em>only</em> tab, the sandbox can't start yet.</li>
+</ul>
+<p>Choosing a mode saves <code>sandbox.enabled</code> to <code>.claude/settings.local.json</code>, for this project. To sandbox every project, put it in your user file:</p>
+<div class="code"><span class="cap">~/.claude/settings.json</span><pre>{ "sandbox": { "enabled": true } }</pre></div>
+<p>Or try it for one session without saving anything:</p>
+<div class="code"><span class="cap">Terminal</span><pre>claude --settings '{"sandbox": {"enabled": true, "allowUnsandboxedCommands": false}}'</pre></div>
+<div class="box warn"><span class="tag">Silent fallback</span><p>If the platform doesn't support the sandbox or a dependency is missing, Claude Code by default runs commands <em>unsandboxed</em>. If you rely on the sandbox, set <code>"failIfUnavailable": true</code> inside the <code>sandbox</code> block so Claude Code refuses to start instead.</p></div>
+<h4>Step 3: prove it</h4>
+<p>Ask Claude to run these. (Don't type them yourself after <code>!</code>: your own commands usually run outside the sandbox.)</p>
+<div class="tbl"><table>
+<tr><th>Ask Claude to run</th><th>Expected result inside the sandbox</th></tr>
+<tr><td><code>touch ~/sandbox-probe</code></td><td>Fails: <code>Operation not permitted</code> on macOS, <code>Read-only file system</code> on Linux and WSL2</td></tr>
+<tr><td><code>curl --noproxy '*' https://example.com</code></td><td>Fails: <code>Could not resolve host</code>, because there is no route around the proxy</td></tr>
+</table></div>
+<p>If Claude offers to retry outside the sandbox, say no. If <code>touch</code> succeeded, delete <code>~/sandbox-probe</code> and run <code>/sandbox</code> to check it's really on.</p>
+
+<h4>The two sandbox modes</h4>
+<div class="cols2">
+<div><h4>Auto-allow (default)</h4><p>A command that runs inside the sandbox is approved automatically, with no prompt, because the fence contains it. Commands that run outside it (excluded or retried) go through normal permissions.</p></div>
+<div><h4>Regular permissions</h4><p>Every Bash command still goes through the normal permission flow, even though it's sandboxed. More control, more prompts.</p></div>
+</div>
+<p>Even in auto-allow, some things still stop: commands matching a Bash <strong>deny</strong> rule, content-scoped <strong>ask</strong> rules such as <code>Bash(git push *)</code>, <code>rm</code> or <code>rmdir</code> aimed at critical paths, and Monitor commands. Commands where a leading variable assignment could change what runs, such as <code>FOO=bar npm test</code>, also go through normal permissions (but still run sandboxed).</p>
+<div class="box note"><span class="tag">Auto-allow works even in Manual mode</span><p>With auto-allow on, sandboxed Bash commands that modify files inside the fence run without prompting even in Manual mode, where the Edit tool would still prompt. The fence, not you, is the safeguard for those commands. Plan mode is the exception: auto-allow doesn't widen approvals there.</p></div>
+
+<h4>The escape hatch</h4>
+<p>When a command fails inside the sandbox, Claude may retry it with a <code>dangerouslyDisableSandbox</code> flag. That retry runs <em>unsandboxed</em>. Who approves it depends on your mode: in Manual and acceptEdits you see a prompt titled "Bash command (unsandboxed)"; in auto mode the classifier judges it; in <code>dontAsk</code> it's denied; in <code>bypassPermissions</code> it just runs. A matching allow rule such as <code>Bash(curl *)</code> also approves the unsandboxed retry, so be careful with broad allows. To remove the hatch entirely, set <code>"allowUnsandboxedCommands": false</code> (strict sandbox mode).</p>
+
+<h3 id="ch79-5"><span class="num">79.5</span>Configuring the fence</h3>
+<p>All sandbox settings live under the <code>sandbox</code> key. Filesystem lists from different settings files merge, and edits apply to the next command without a restart.</p>
+<div class="box note"><span class="tag">Different path style from permission rules</span><p>Sandbox paths use ordinary conventions: <code>/tmp/build</code> is absolute and <code>~/.kube</code> is in your home folder. Permission rules use <code>//path</code> for absolute and <code>/path</code> for project-relative. Same idea, different spelling: easy to get wrong.</p></div>
+<h4>Files</h4>
+<div class="code"><span class="cap">Let a tool write outside the project</span><pre>{
+  "sandbox": {
+    "enabled": true,
+    "filesystem": { "allowWrite": ["~/.kube", "/tmp/build"] }
+  }
+}</pre></div>
+<div class="code"><span class="cap">.claude/settings.json: block reading the home folder except this project</span><pre>{
+  "sandbox": {
+    "enabled": true,
+    "filesystem": { "denyRead": ["~/"], "allowRead": ["."] }
+  }
+}</pre></div>
+<p>When read rules overlap, the narrower path wins. In a project file, <code>.</code> means the project root; in your user file it would mean <code>~/.claude</code>, so that example belongs in the project file.</p>
+<h4>Credentials</h4>
+<div class="code"><span class="cap">Hide credential files and secret variables from sandboxed commands</span><pre>{
+  "sandbox": {
+    "enabled": true,
+    "credentials": {
+      "files": [
+        { "path": "~/.aws/credentials", "mode": "deny" },
+        { "path": "~/.ssh", "mode": "deny" }
+      ],
+      "envVars": [
+        { "name": "GITHUB_TOKEN", "mode": "deny" },
+        { "name": "NPM_TOKEN", "mode": "deny" }
+      ]
+    }
+  }
+}</pre></div>
+<p>Denied files can't be read inside the sandbox, and denied variables are unset before each sandboxed command. Deny entries from all settings files merge, and no file can remove one another file added.</p>
+<h4>Network</h4>
+<div class="code"><span class="cap">Pre-approve the hosts your tests need</span><pre>{
+  "sandbox": {
+    "enabled": true,
+    "network": {
+      "allowedDomains": ["registry.npmjs.org", "api.test.example.com"],
+      "deniedDomains": ["prod.example.com"]
+    }
+  }
+}</pre></div>
+<p>The first time a command needs a host that isn't listed, Claude Code prompts in Manual or acceptEdits mode. "Yes" allows it for this session; "Yes, and don't ask again" saves a <code>WebFetch(domain:…)</code> allow rule to your local settings, and the sandbox honours those rules too. Domains in <code>WebFetch(domain:…)</code> allow rules are also pre-allowed for the sandbox.</p>
+<p>The test host above is illustrative. When the sandbox blocks a connection, Claude Code names the denied host in the command's result, so run your suite once and read which hosts your tools actually need.</p>
+<h4>Excluding a command</h4>
+<div class="code"><span class="cap">~/.claude/settings.json</span><pre>{
+  "sandbox": {
+    "enabled": true,
+    "excludedCommands": ["docker compose *"]
+  }
+}</pre></div>
+<p>Excluded commands run with <strong>no</strong> filesystem or network limits, through the normal permission flow. Every part of a chained command must match, and matching is on the command text. Prefer <code>allowWrite</code> or <code>allowedDomains</code> when a tool just needs one more folder or host: those keep it fenced.</p>
+<div class="box warn"><span class="tag">Exclusions can be turned into an escape</span><p>The documentation warns that if you exclude a tool that acts on a file in your working directory, as <code>docker compose</code> does with its compose file, Claude can write that file and then run it outside the sandbox. Keep exclusion patterns narrow.</p></div>
+
+<h3 id="ch79-6"><span class="num">79.6</span>Protected paths</h3>
+<p>Even inside the folders where sandboxed commands may write, some files stay write-denied, because changing them could let a command give itself more power. They include:</p>
+<ul>
+<li>In your working directory and the folders above it: the <code>.claude</code> settings files; <code>.claude/skills</code>, <code>.claude/agents</code>, <code>.claude/commands</code> and <code>.claude/hooks</code>; <code>.mcp.json</code>.</li>
+<li>In your working directory: shell startup files such as <code>.bashrc</code> and <code>.zshrc</code>, <code>.gitconfig</code>, <code>.vscode</code> and <code>.idea</code>, and <code>hooks</code> and <code>config</code> inside <code>.git</code>.</li>
+<li>Most of <code>~/.claude</code>, plus <code>~/.claude.json</code> and the credential store.</li>
+</ul>
+<p>Without this, a sandboxed script could add a hook or an MCP server to your settings, and that hook would run <em>outside</em> the sandbox next time. An <code>allowWrite</code> entry doesn't remove the protection.</p>
+
+<h3 id="ch79-7"><span class="num">79.7</span>How the sandbox fits with permissions and modes</h3>
+<p>Three layers, each answering a different question:</p>
+<div class="tbl"><table>
+<tr><th>Layer</th><th>Question it answers</th><th>Covers</th><th>Enforced by</th></tr>
+<tr><td>Permission rules</td><td>May this tool call happen?</td><td>Every tool</td><td>Claude Code, before the call, from the command text</td></tr>
+<tr><td>Permission mode</td><td>Who approves calls no rule decides?</td><td>Every tool</td><td>Claude Code (you, a classifier, or nobody)</td></tr>
+<tr><td>Sandbox</td><td>What can a running shell command reach?</td><td>Shell commands and their child processes</td><td>The operating system, while it runs</td></tr>
+</table></div>
+<p><code>/sandbox</code> is not a permission mode, and the sandbox's <em>auto-allow</em> is not the same as <a class="gl" href="#g-auto-mode">auto mode</a>. Auto-allow approves Bash commands because the fence contains them; auto mode uses a classifier to review actions. They work independently and combine well.</p>
+<h4>With auto mode</h4>
+<p>In auto mode with the sandbox on, Claude names the extra hosts a command needs <em>on the command itself</em> (for example <code>registry.npmjs.org</code>), and the classifier reviews the hosts together with the command. An approved list opens those hosts for that one command only; nothing is added to your settings. A host that no approved command listed is refused without a prompt. <code>deniedDomains</code> still block, and strict allowlist settings switch per-command lists off.</p>
+<div class="tbl"><table>
+<tr><th>Mode</th><th>A sandboxed command reaches an unlisted host</th></tr>
+<tr><td>Manual, acceptEdits (and plan, usually)</td><td>You get a prompt</td></tr>
+<tr><td>Auto</td><td>Refused unless the command listed the host and the classifier approved</td></tr>
+<tr><td>dontAsk</td><td>Refused</td></tr>
+<tr><td>bypassPermissions</td><td>Allowed, unless a strict allowlist setting is on</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example: a QA pairing</span><p>A test lead wanted Claude to iterate on a flaky API suite unattended for an hour. She used auto mode for fewer interruptions, the sandbox in auto-allow so test runs didn't need approval, <code>allowedDomains</code> limited to the package registry and the staging API host, <code>deniedDomains</code> for production, and a deny rule on <code>Edit</code> of the expected-results folder. The classifier judged intent, the fence limited reach, and the deny rule protected the oracle. No single layer would have been enough.</p></div>
+
+<h3 id="ch79-8"><span class="num">79.8</span>Test suites, organisations and limits</h3>
+<h4>Common QA snags (from the documented troubleshooting)</h4>
+<div class="tbl"><table>
+<tr><th>Symptom</th><th>Documented fix</th></tr>
+<tr><td>Tests can't reach your dev server on <code>localhost</code></td><td>macOS: set <code>sandbox.network.allowLocalBinding</code> to <code>true</code> (this exposes every localhost port to sandboxed commands). Linux/WSL2: a sandboxed command's localhost is private, so run that command via <code>excludedCommands</code>, or have the test command start the server itself.</td></tr>
+<tr><td><code>jest</code> hangs or fails</td><td><code>watchman</code> is incompatible: run <code>jest --no-watchman</code>.</td></tr>
+<tr><td>Chromium says <code>No usable sandbox!</code> on Linux</td><td>Start the browser with <code>--no-sandbox</code>, exclude the <em>test command</em>, or set <code>allowNestedUserNamespaces</code> in your user file (which the docs warn turns off a security boundary).</td></tr>
+<tr><td><code>docker</code> commands fail</td><td>Docker is incompatible; exclude the specific commands you need, e.g. <code>docker compose *</code>.</td></tr>
+<tr><td>A host-not-allowed error</td><td>Approve the host or add it to <code>allowedDomains</code>.</td></tr>
+<tr><td><code>gh</code> or other Go-based CLIs fail TLS checks on macOS</td><td>Exclude that tool, e.g. <code>gh *</code>, accepting that it runs with your full access.</td></tr>
+</table></div>
+<h4>For organisations</h4>
+<p>Administrators can require the sandbox through managed settings:</p>
+<div class="code"><span class="cap">managed-settings.json</span><pre>{
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "allowUnsandboxedCommands": false
+  }
+}</pre></div>
+<p>With the retry disabled in managed settings (or with <code>--settings</code>), the sandbox becomes "admin-required" and Claude Code ignores repository settings that would loosen it, including <code>excludedCommands</code> in project files. Because the sandbox doesn't run on native Windows, <code>failIfUnavailable</code> makes Claude Code exit there, so Windows users need WSL2 or a container.</p>
+<h4>Documented limits</h4>
+<ul>
+<li><strong>Broad domains leak.</strong> The proxy decides from the hostname without inspecting TLS, so allowing something as broad as <code>github.com</code> can open paths for data exfiltration, including "domain fronting" tricks.</li>
+<li><strong>Unix sockets.</strong> Allowing a socket such as <code>/var/run/docker.sock</code> effectively grants access to the host.</li>
+<li><strong>Over-broad writes.</strong> Allowing writes to folders on your <code>PATH</code> or to shell startup files can lead to code running outside the fence later.</li>
+<li><strong>Weaker modes.</strong> <code>enableWeakerNestedSandbox</code> (for Docker without privileged namespaces) and <code>allowNestedUserNamespaces</code> considerably weaken isolation.</li>
+<li><strong>Both halves matter.</strong> Without network isolation a compromised command could send out your SSH keys; without filesystem isolation it could plant a backdoor. Check that a widening on one side doesn't undo the other.</li>
+</ul>
+<div class="box opinion"><span class="tag">Opinion · the author, following Anthropic's documentation</span><p>Use the sandbox on every developer machine where Claude runs tests, and pair it with deny rules for file tools. For truly unattended or risky work (untrusted repositories, long autonomous runs, <code>bypassPermissions</code>), go one level up and run the whole of Claude Code in a container or VM, because hooks and local MCP servers sit outside the built-in sandbox.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Fence a test run and watch it hold</b><span>25 min · macOS, Linux or WSL2 with Python 3</span></div><ol>
+<li>Create a practice folder: <code>mkdir sandbox-lab &amp;&amp; cd sandbox-lab &amp;&amp; git init</code>. On Linux/WSL2, install <code>bubblewrap</code> and <code>socat</code> first.<span class="expect">an empty repository.</span></li>
+<li>Create <code>probe.py</code>:
+<div class="code"><pre>import os, pathlib, urllib.request
+
+def attempt(label, fn):
+    try:
+        fn()
+        print(f"{label}: ALLOWED")
+    except Exception as e:
+        print(f"{label}: BLOCKED ({type(e).__name__})")
+
+attempt("write in project", lambda: pathlib.Path("inside.txt").write_text("ok"))
+attempt("write in home", lambda: (pathlib.Path.home() / "sandbox-probe.txt").write_text("x"))
+attempt("network to example.com",
+        lambda: urllib.request.urlopen("https://example.com", timeout=10).read(10))
+print("GITHUB_TOKEN visible:", "GITHUB_TOKEN" in os.environ)</pre></div><span class="expect">a script that tries three things and reports each.</span></li>
+<li>Outside Claude, run <code>GITHUB_TOKEN=fake python3 probe.py</code> as a baseline, then delete <code>~/sandbox-probe.txt</code> and <code>inside.txt</code>.<span class="expect">all three ALLOWED (network needs internet) and the token visible.</span></li>
+<li>Start a sandboxed session for this run only: <code>GITHUB_TOKEN=fake claude --permission-mode manual --settings '{"sandbox": {"enabled": true, "allowUnsandboxedCommands": false}}'</code>.<span class="expect">a normal session in manual mode.</span></li>
+<li>Run <code>/sandbox</code> and look at the Mode and Config tabs.<span class="expect">sandbox enabled; protected paths listed under "Denied within allowed".</span></li>
+<li>Ask Claude: "Run python3 probe.py".<span class="expect"><code>write in project: ALLOWED</code>, <code>write in home: BLOCKED</code>. For the network line, you may get a prompt to allow <code>example.com</code>: choose <b>No</b>, and the line reports BLOCKED. The token is still visible.</span></li>
+<li>Exit. Start again, adding credential protection: <code>--settings '{"sandbox": {"enabled": true, "allowUnsandboxedCommands": false, "credentials": {"envVars": [{"name": "GITHUB_TOKEN", "mode": "deny"}]}}}'</code> (keep <code>GITHUB_TOKEN=fake</code> and <code>--permission-mode manual</code> in front). Run the probe again.<span class="expect"><code>GITHUB_TOKEN visible: False</code>.</span></li>
+<li>Ask Claude to read <code>~/.bashrc</code> (or any file in your home folder) using its file tools, not a shell command.<span class="expect">it can, subject to permission prompts, because the Read tool is outside the sandbox. This is the boundary in action.</span></li>
+</ol>
+<p><b>Troubleshooting.</b> If home writes are ALLOWED, the sandbox isn't running: check <code>/sandbox</code> for a Dependencies tab, and on WSL confirm WSL2. If the network line hangs, the default 10-second timeout will end it. If you see no prompt and the network line is ALLOWED, check whether you previously saved a <code>WebFetch(domain:example.com)</code> allow rule (run <code>/permissions</code>).</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"With the sandbox on, Claude can't touch anything outside my project."</dt><dd>Only shell commands are fenced. Claude's Read, Edit and Write tools, hooks and local MCP servers are not; permission rules govern the file tools.</dd>
+<dt>"The sandbox stops commands reading my SSH keys."</dt><dd>Not by default: reads are allowed almost everywhere. Add <code>credentials</code> or <code>denyRead</code> entries.</dd>
+<dt>"If the sandbox can't start, Claude Code won't run commands."</dt><dd>By default it falls back to running them unsandboxed. Set <code>failIfUnavailable</code> if you depend on it.</dd>
+<dt>"Sandbox auto-allow and auto mode are the same thing."</dt><dd>Auto-allow trusts the fence; auto mode uses a classifier. They're independent and can be combined.</dd>
+<dt>"Allowing github.com is harmless."</dt><dd>The docs warn that broad domains can be used to exfiltrate data. Allow the narrowest hosts you can.</dd>
+</dl></div>
+
+<h3 id="ch79-r"><span class="num">79.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>The sandbox is an operating-system fence around shell commands and their child processes: Seatbelt on macOS, bubblewrap and socat on Linux and WSL2, nothing on native Windows.</li>
+<li>Off by default. Turn it on with <code>/sandbox</code> or <code>"sandbox": {"enabled": true}</code>; set <code>failIfUnavailable</code> if you rely on it.</li>
+<li>Defaults: writes only to the project, temp and added folders; reads almost everywhere; network only via a proxy to allowed domains (initially none).</li>
+<li>File and web tools, hooks, local MCP servers and your own <code>!</code> commands run outside it.</li>
+<li>Widen with <code>allowWrite</code> and <code>allowedDomains</code> before reaching for <code>excludedCommands</code>; protect secrets with <code>credentials</code>; turn off the unsandboxed retry with <code>allowUnsandboxedCommands: false</code>.</li>
+<li>Rules, modes and sandbox are complementary layers; for full isolation, run Claude Code in a container or VM.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">With the sandbox enabled, which of these runs inside it?</p><div class="opts"><button>A local Playwright MCP server</button><button data-ok>An <code>npm test</code> command Claude runs, and the processes it starts</button><button>Claude's Edit tool</button></div><p class="why" hidden>The sandbox wraps shell commands and their children. MCP servers, hooks and the built-in file tools run outside it.</p></div>
+<div class="qz"><p class="q">By default, can a sandboxed command read <code>~/.ssh/id_ed25519</code>?</p><div class="opts"><button data-ok>Yes: reads are allowed almost everywhere unless you add <code>credentials</code> or <code>denyRead</code> entries</button><button>No: the sandbox blocks all reads outside the project</button><button>Only in auto mode</button></div><p class="why" hidden>The default read policy is broad; the network limit is what stops the key leaving. Protect credentials explicitly.</p></div>
+<div class="qz"><p class="q">Your test tool needs to write to <code>/tmp/build</code>. What's the preferred fix?</p><div class="opts"><button>Add the tool to <code>excludedCommands</code></button><button data-ok>Add <code>/tmp/build</code> to <code>sandbox.filesystem.allowWrite</code></button><button>Turn the sandbox off</button></div><p class="why" hidden><code>allowWrite</code> keeps the tool fenced and widens only one path; exclusion removes all limits.</p></div>
+<div class="qz"><p class="q">What does <code>"allowUnsandboxedCommands": false</code> do?</p><div class="opts"><button>Blocks all commands</button><button data-ok>Removes the escape hatch, so Claude can't retry a failed command outside the sandbox</button><button>Disables the network proxy</button></div><p class="why" hidden>It makes Claude Code ignore the <code>dangerouslyDisableSandbox</code> retry; commands stay sandboxed unless they match <code>excludedCommands</code>.</p></div>
+<div class="qz"><p class="q">On Linux, your sandboxed test command can't reach a dev server you started on localhost. Why?</p><div class="opts"><button>The proxy blocks all HTTP</button><button data-ok>A sandboxed command's localhost is private on Linux, so it doesn't reach servers on the host</button><button>Dev servers need <code>allowedDomains: ["*"]</code></button></div><p class="why" hidden>On Linux and WSL2 the command runs in its own network namespace. Exclude that command, or have it start the server itself.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Enable the sandbox for one real test repository. Run the full suite through Claude and record every failure the sandbox causes. For each, choose the narrowest documented fix (<code>allowWrite</code>, <code>allowedDomains</code>, a narrow <code>excludedCommands</code> pattern) and write down what isolation it gives up. Add <code>credentials</code> entries for any tokens in your environment. Present the final <code>sandbox</code> block and your list of trade-offs to your team.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"The sandbox is a fence the operating system builds around the shell commands Claude runs. Inside it, commands can only write to the project and temp folders and can only reach internet hosts we've approved, so Claude can run tests without asking each time. Two catches: it still lets commands read most files, so we hide credentials explicitly, and it only covers shell commands. Claude's own file tools, hooks and MCP servers are outside it, so we still need permission rules."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/sandboxing" target="_blank" rel="noopener">Configure the sandboxed Bash tool</a>: defaults, what runs outside, modes, escape hatch, configuration, protected paths, auto mode, organisations, troubleshooting, limitations.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/settings-reference" target="_blank" rel="noopener">Settings reference: sandbox settings</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/permissions" target="_blank" rel="noopener">Configure permissions</a> (how permissions interact with sandboxing).</li>
+<li>Anthropic, <a href="https://github.com/anthropics/sandbox-runtime" target="_blank" rel="noopener">sandbox-runtime</a> (open-source package).</li>
+<li><a href="https://github.com/containers/bubblewrap" target="_blank" rel="noopener">bubblewrap</a> (Linux isolation tool).</li>
+</ol><p class="verified">Verified 9 November 2026 against code.claude.com/docs and Claude Code 2.1.319.</p></div>

@@ -1,0 +1,42 @@
+{
+ "JSON-RPC": {
+  "d": "A simple, long-established format for 'please run this procedure' messages written in JSON. Every MCP message is a JSON-RPC request, response or notification; requests and responses are matched by an id.",
+  "see": "ch99"
+ },
+ "MCP host": {
+  "d": "The AI application you use, such as Claude Code, claude.ai or the Claude desktop app. It holds the conversation, talks to the model, runs one MCP client per server and enforces your permissions.",
+  "see": "ch99"
+ },
+ "MCP client": {
+  "d": "A connector inside the host application that keeps one line of communication open to one MCP server and sends it requests.",
+  "see": "ch99"
+ },
+ "MCP server": {
+  "d": "A program that offers tools, resources or prompts for a particular system (for example Jira, a browser or a database) to AI applications, using the Model Context Protocol.",
+  "see": "ch99"
+ },
+ "Transport": {
+  "d": "In MCP, the method used to deliver messages between client and server. The two standard transports are stdio (a local program) and Streamable HTTP (a remote web address).",
+  "see": "ch99"
+ },
+ "stdio": {
+  "d": "Short for 'standard input and output'. As an MCP transport, the host starts the server as a program on your computer and exchanges messages through its input and output, one per line.",
+  "see": "ch99"
+ },
+ "Streamable HTTP": {
+  "d": "The standard MCP transport for remote servers: each message is sent as an HTTP POST to one web address, and replies come back as JSON or a short stream. It replaced the older HTTP+SSE transport.",
+  "see": "ch99"
+ },
+ "Connector": {
+  "d": "The name claude.ai and the Claude desktop app use for an MCP server you've connected, from the Connectors directory or added by URL.",
+  "see": "ch100"
+ },
+ "OAuth": {
+  "d": "An open standard for letting one application act on your behalf in another without giving it your password: you sign in and approve access, and the application receives a limited, revocable access token. MCP uses OAuth 2.1 for remote servers.",
+  "see": "ch98"
+ },
+ "MCP Bundle": {
+  "d": "A .mcpb file: a zip containing a local MCP server and a manifest, which the Claude desktop app installs in one click as a desktop extension.",
+  "see": "ch100"
+ }
+}

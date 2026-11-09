@@ -1,0 +1,58 @@
+{
+ "Ollama": {
+  "d": "A free tool that downloads open-weight models and runs them on your own computer, with a simple command line and a local HTTP API on port 11434.",
+  "see": "ch137"
+ },
+ "llama.cpp": {
+  "d": "An open-source C/C++ engine for running language models efficiently on laptops, workstations and servers, using CPUs or GPUs. It reads models in the GGUF format.",
+  "see": "ch137"
+ },
+ "GGUF": {
+  "d": "The single-file model format used by llama.cpp. It holds the (usually quantised) weights plus the tokenizer, model settings and chat template needed to run them.",
+  "see": "ch137"
+ },
+ "Modelfile": {
+  "d": "A small text file used by Ollama to build a named variant of a model with a fixed system prompt and settings such as temperature and context length.",
+  "see": "ch137"
+ },
+ "Data parallelism": {
+  "d": "Splitting training across chips by giving each chip a copy of the model and different training examples, then averaging their gradients after every step.",
+  "see": "ch138"
+ },
+ "Pipeline parallelism": {
+  "d": "Splitting a model across chips by layers, so each chip handles one stage and passes its results to the next, like an assembly line.",
+  "see": "ch138"
+ },
+ "Tensor parallelism": {
+  "d": "Splitting each layer's large matrices across several chips that compute their parts at the same time and combine the results. It needs very fast links between chips.",
+  "see": "ch138"
+ },
+ "Mixed-precision training": {
+  "d": "Training with fast 16-bit (or lower) numbers for most calculations while keeping a 32-bit master copy of the weights so small updates aren't lost.",
+  "see": "ch138"
+ },
+ "Compute-optimal training": {
+  "d": "Choosing model size and amount of training data to get the best model for a fixed training compute budget. The 2022 Chinchilla paper found both should grow together, often summarised as about 20 tokens per parameter.",
+  "see": "ch138"
+ },
+ "Continuous batching": {
+  "d": "A serving technique that re-forms the batch at every decoding step, so finished requests leave and waiting ones join immediately, keeping the GPU busy.",
+  "see": "ch139"
+ },
+ "PagedAttention": {
+  "d": "A method, introduced with vLLM in 2023, that stores each request's KV cache in small fixed-size pages allocated on demand, nearly eliminating wasted memory.",
+  "see": "ch139"
+ },
+ "Prefix caching": {
+  "d": "Reusing the stored KV cache for text that many requests start with, such as a long system prompt, so it doesn't have to be processed again. The server-side idea behind prompt caching.",
+  "see": "ch139"
+ },
+ "Speculative decoding": {
+  "d": "Speeding up text generation by letting a small model draft several tokens that the large model then checks in one pass, keeping the large model's output unchanged.",
+  "see": "ch139"
+ },
+ "vLLM": {
+  "d": "A widely used open-source engine for serving language models at high throughput, known for PagedAttention and continuous batching, with an OpenAI-compatible API.",
+  "see": "ch139"
+ }
+}

@@ -1,0 +1,177 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>A simple, repeatable method for diagnosing any Claude Code problem</li>
+<li>The built-in diagnostic tools: <code>claude doctor</code>, <code>/doctor</code>, <code>/status</code>, debug logs, safe mode and bare mode</li>
+<li>Fixes for the most common real problems: installation, sign-in, limits, poor answers, permissions, settings, CLAUDE.md, MCP, hooks, IDE and network</li>
+<li>How to write a bug report for Claude Code itself that gets taken seriously</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch62">Chapter 62</a> (reading terminal errors), <a href="#ch64">Chapter 64</a> (installing and signing in) and <a href="#ch68">Chapter 68</a> (context and sessions).</div>
+
+<div class="bigidea"><p>When Claude Code misbehaves, the cause is almost always one of a few things: it isn't installed where your terminal looks, it's signed in with the wrong credentials, its context is overloaded, a setting or customisation is interfering, or the network is in the way. Testers already know how to troubleshoot: reproduce, isolate, check one variable at a time. Claude Code gives you tools for each of those steps. This chapter turns your QA instincts into a fast fix routine.</p></div>
+
+<h3 id="ch72-1"><span class="num">72.1</span>The method: symptom, check, fix</h3>
+<div class="flow">
+<div><b>1 · Describe the symptom</b>Exact error text, when it happens, what you expected</div>
+<div><b>2 · Gather facts</b><code>/status</code>, <code>claude doctor</code>, the version</div>
+<div><b>3 · Isolate</b>Does it happen in <code>--safe-mode</code>? In another folder? With <code>/clear</code>?</div>
+<div><b>4 · Look closer</b>Debug logs for the area: mcp, hooks, startup…</div>
+<div class="hl"><b>5 · Fix and verify</b>Change one thing, retry the exact same steps</div>
+</div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A car won't start. A good mechanic doesn't replace the engine first. They check: is there fuel? Is the battery charged? Does it start with the extra gadgets unplugged? Claude Code troubleshooting is the same: start with the cheap, obvious checks, and change one thing at a time so you know what actually fixed it.</p></div>
+<div class="box note"><span class="tag">Ask Claude first</span><p>If Claude Code is running at all, the fastest first step is often to ask it: "I'm getting this error: [paste]. What does it mean and how do I check?" Claude can read its own documentation. Treat its answer as a hypothesis to test, not a verdict.</p></div>
+
+<h3 id="ch72-2"><span class="num">72.2</span>Your diagnostic toolkit</h3>
+<div class="tbl"><table>
+<tr><th>Tool</th><th>Where you run it</th><th>What it does</th></tr>
+<tr><td><code>claude --version</code></td><td>Shell</td><td>Prints the installed version. Always include it in bug reports.</td></tr>
+<tr><td><code>claude doctor</code></td><td>Shell</td><td>Read-only health check of the installation and settings, without starting a session. Use it when <code>claude</code> won't start.</td></tr>
+<tr><td><code>/doctor</code></td><td>In a session</td><td>A fuller checkup of installation, settings, extensions and CLAUDE.md that offers fixes Claude applies after you confirm. It's a bundled skill (alias <code>/checkup</code>).</td></tr>
+<tr><td><code>/status</code></td><td>In a session</td><td>Version, model, account, which credential is active, connectivity</td></tr>
+<tr><td><code>/context</code></td><td>In a session</td><td>What's filling the context window</td></tr>
+<tr><td><code>/usage</code></td><td>In a session</td><td>Session cost, plan limits and activity (aliases <code>/cost</code>, <code>/stats</code>)</td></tr>
+<tr><td><code>/mcp</code>, <code>/hooks</code>, <code>/memory</code>, <code>/ide</code>, <code>/permissions</code></td><td>In a session</td><td>Status of MCP servers, configured hooks, loaded CLAUDE.md files, IDE connection, and permission rules (including auto-mode denials)</td></tr>
+<tr><td><code>/debug [description]</code></td><td>In a session</td><td>A bundled skill that turns on debug logging and troubleshoots using the log</td></tr>
+<tr><td><code>claude --debug</code> / <code>-d</code></td><td>Shell</td><td>Starts with debug logging; filter by area with the <code>=</code> form, e.g. <code>--debug=mcp,hooks</code></td></tr>
+<tr><td><code>claude --debug-file &lt;path&gt;</code></td><td>Shell</td><td>Writes the debug log to a file (and turns debug mode on)</td></tr>
+<tr><td><code>claude --safe-mode</code></td><td>Shell</td><td>Starts with all customisations off: CLAUDE.md, skills, plugins, hooks, MCP servers, custom agents, output styles and more. Admin policy still applies.</td></tr>
+<tr><td><code>claude --bare</code></td><td>Shell</td><td>Minimal mode: skips hooks, plugins, auto memory and CLAUDE.md discovery. Signs in only with <code>ANTHROPIC_API_KEY</code> or an <code>apiKeyHelper</code>. Mostly for scripts.</td></tr>
+<tr><td><code>claude update</code></td><td>Shell</td><td>Checks for and installs updates</td></tr>
+</table></div>
+<details class="deep"><summary>Safe mode vs bare mode: which to use?</summary><div class="body">
+<p><strong>Safe mode</strong> is the troubleshooting switch. It keeps your normal sign-in, model and permissions, but turns off everything you or your team added. If a problem disappears in safe mode, a customisation is the cause; turn things back on one at a time to find which.</p>
+<p><strong>Bare mode</strong> is a minimal, predictable mode designed for scripts and automation. It doesn't read your subscription login at all: authentication must come from <code>ANTHROPIC_API_KEY</code> or an <code>apiKeyHelper</code> passed through <code>--settings</code>. If you use it to troubleshoot and suddenly get an authentication error, that's why.</p>
+</div></details>
+
+<h3 id="ch72-3"><span class="num">72.3</span>Installation and startup problems</h3>
+<div class="tbl"><table>
+<tr><th>Symptom</th><th>Likely cause</th><th>Fix</th></tr>
+<tr><td><code>command not found: claude</code> (Mac/Linux) or <code>'claude' is not recognized</code> (Windows)</td><td>The install folder isn't on your <a class="gl" href="#g-path">PATH</a></td><td>Open a new terminal. If it persists, add the install folder (<code>~/.local/bin</code> on macOS/Linux) to PATH; see <a href="#ch56">Chapter 56</a>.</td></tr>
+<tr><td><code>syntax error near unexpected token '&lt;'</code> or <code>curl: (22) … 403</code> while installing</td><td>The install script download returned a web page instead (network, proxy or region)</td><td>Check proxy settings and access; see Anthropic's install troubleshooting page.</td></tr>
+<tr><td><code>irm is not recognized</code> / <code>The token '&amp;&amp;' is not a valid statement separator</code></td><td>Windows command for the wrong shell</td><td>Use the PowerShell command in PowerShell and the CMD command in Command Prompt.</td></tr>
+<tr><td><code>EACCES: permission denied</code> with npm</td><td>npm global folder permissions</td><td>Fix npm permissions; don't use <code>sudo npm install -g</code>. The native installer avoids this.</td></tr>
+<tr><td><code>Killed</code> during install on Linux</td><td>Out of memory</td><td>Add swap or free memory, then retry.</td></tr>
+<tr><td><code>Auto-update failed · Run claude doctor</code></td><td>Updater couldn't finish</td><td>Run <code>claude update</code> from the shell.</td></tr>
+<tr><td><code>App unavailable in region</code></td><td>Claude Code isn't offered in your country</td><td>No local fix.</td></tr>
+<tr><td><code>unable to get local issuer certificate</code> or TLS errors</td><td>A corporate proxy or company certificate</td><td>Configure your company's certificate per Anthropic's network-configuration page; ask IT for the proxy details.</td></tr>
+<tr><td>Search or <code>@file</code> doesn't find files</td><td>The bundled search tool (ripgrep) failing on your system</td><td>Install the system <code>ripgrep</code> and set <code>USE_BUILTIN_RIPGREP=0</code>.</td></tr>
+</table></div>
+
+<h3 id="ch72-4"><span class="num">72.4</span>Sign-in and the wrong-account trap</h3>
+<p>Claude Code can sign in several ways, and it picks between them in a fixed order. Environment variables come <em>before</em> your subscription login. The documented order is: cloud-provider variables, then <code>ANTHROPIC_AUTH_TOKEN</code>, then <code>ANTHROPIC_API_KEY</code>, then <code>apiKeyHelper</code>, then <code>CLAUDE_CODE_OAUTH_TOKEN</code>, then other credentials, and finally your <code>/login</code> subscription.</p>
+<div class="box example"><span class="tag">Real-world example: "my organisation has been disabled"</span><p>A tester with an active company subscription suddenly saw <code>This organization has been disabled</code>. The cause: months earlier they had exported an old personal <code>ANTHROPIC_API_KEY</code> in their shell profile for an experiment. That key was overriding the company login. The fix was <code>unset ANTHROPIC_API_KEY</code> and removing the line from <code>~/.zshrc</code>. <code>/status</code> shows which credential is active; check it first.</p></div>
+<div class="tbl"><table>
+<tr><th>Symptom</th><th>Fix</th></tr>
+<tr><td>Login loops or fails without a clear reason</td><td>Run <code>/logout</code>, close Claude Code, run <code>claude</code> and sign in again. Press <code>c</code> to copy the sign-in link if the browser doesn't open.</td></tr>
+<tr><td><code>OAuth error: Invalid code</code></td><td>The code expired or was cut off. Retry quickly; over SSH, open the link in your local browser.</td></tr>
+<tr><td><code>API Error: 403 Request not allowed</code></td><td>Check the subscription is active, or that your Console account has the right role, or your proxy settings.</td></tr>
+<tr><td><code>Login expired · Please run /login</code></td><td>Run <code>/login</code>. You're warned three days before it expires.</td></tr>
+<tr><td>Using API billing when you expected your subscription</td><td><code>ANTHROPIC_API_KEY</code> is set. In <code>-p</code> mode it's always used. Unset it to return to the subscription.</td></tr>
+</table></div>
+
+<h3 id="ch72-5"><span class="num">72.5</span>Usage limits, slowness and poor answers</h3>
+<div class="tbl"><table>
+<tr><th>Symptom</th><th>Likely cause</th><th>Fix</th></tr>
+<tr><td>Blocked by a usage limit</td><td>Plan limits reached</td><td><code>/usage</code> shows where you are; <code>/rate-limit-options</code> shows the choices (wait, add credits, upgrade). Use smaller models for simple work.</td></tr>
+<tr><td>Answers getting vague, repetitive or forgetful</td><td>The context window is crowded</td><td><code>/context</code> to see what's using it; <code>/compact</code> with a focus, or <code>/clear</code> for a new task (<a href="#ch68">Chapter 68</a>).</td></tr>
+<tr><td><code>Autocompact is thrashing</code></td><td>Huge files or outputs keep refilling the context</td><td>Read large files in chunks, run a focused <code>/compact</code>, use a subagent, or <code>/clear</code>.</td></tr>
+<tr><td>High CPU or memory</td><td>Very long session or a heavy plugin</td><td><code>/compact</code>, restart between tasks, resume with <code>claude --continue</code> in a fresh process, or test with <code>--safe-mode</code>.</td></tr>
+<tr><td>Session seems stuck</td><td>A long command or a hang</td><td>Press <code>Ctrl+C</code>. If that fails, restart and run <code>claude --resume</code>; nothing is lost.</td></tr>
+<tr><td>API errors like <code>429</code>, <code>5xx</code> or <code>529 Overloaded</code></td><td>Rate limits or temporary service load</td><td>Wait and retry; see Anthropic's errors page. A fallback model can be set with <code>--fallback-model</code>.</td></tr>
+</table></div>
+
+<h3 id="ch72-6"><span class="num">72.6</span>Permissions and "why is it (not) asking me?"</h3>
+<div class="tbl"><table>
+<tr><th>Symptom</th><th>Likely cause</th><th>Fix</th></tr>
+<tr><td>Claude acts without asking, unexpectedly</td><td>Since version 2.1.283, interactive sessions start in <strong>auto mode</strong>, where a background check approves routine actions</td><td>Set <code>permissions.defaultMode</code> in settings, or start with <code>--permission-mode default</code> (shown as "Manual") to be asked again. See <a href="#ch67">Chapter 67</a>.</td></tr>
+<tr><td>Too many permission prompts</td><td>No allow rules for safe, repeated commands</td><td>Approve with "don't ask again", use <code>/permissions</code>, or run <code>/fewer-permission-prompts</code>.</td></tr>
+<tr><td>A command is always refused</td><td>A deny rule matches it, possibly at user, project or company level</td><td><code>/permissions</code> lists rules and auto-mode denials. A deny at any level can't be overridden by an allow.</td></tr>
+<tr><td>Claude can't read files outside the project</td><td>Access is limited to the working directories</td><td>Start with <code>--add-dir &lt;path&gt;</code>, or add the folder in settings.</td></tr>
+</table></div>
+
+<h3 id="ch72-7"><span class="num">72.7</span>Settings, CLAUDE.md and customisations</h3>
+<div class="tbl"><table>
+<tr><th>Symptom</th><th>Likely cause</th><th>Fix</th></tr>
+<tr><td>A setting seems to have no effect</td><td>A higher-priority file overrides it. Order, highest first: managed (company) → command-line <code>--settings</code> → <code>.claude/settings.local.json</code> → <code>.claude/settings.json</code> → <code>~/.claude/settings.json</code></td><td>Check each file in that order (<a href="#ch78">Chapter 78</a>). Note that some settings, such as <code>model</code>, are read only when a session starts.</td></tr>
+<tr><td>Setting ignored, especially in scripts</td><td>Invalid JSON. Settings files are strict JSON (no comments, no trailing commas). In <code>-p</code> mode, invalid settings files are <em>silently ignored</em>.</td><td>Validate the file (paste it into Claude and ask, or use a JSON checker). Adding the documented <code>$schema</code> line gives editor checking.</td></tr>
+<tr><td>CLAUDE.md instructions ignored</td><td>Started in a different folder; the file isn't loaded; or the rule is vague</td><td>Run <code>/memory</code> to see which files are loaded. Start <code>claude</code> in the project root. Make the rule short and specific; for must-never rules use a deny rule or a hook.</td></tr>
+<tr><td>Something odd started after installing a plugin or skill</td><td>A customisation interferes</td><td>Restart with <code>--safe-mode</code>. If the problem disappears, re-enable customisations one by one.</td></tr>
+<tr><td>A hook fails or blocks everything</td><td>Script error, wrong path, or a non-zero exit code that blocks</td><td><code>/hooks</code> to view them; <code>claude --debug=hooks</code> to see hook runs; test the hook's command on its own in the shell (<a href="#ch82">Chapter 82</a>).</td></tr>
+<tr><td>MCP server not working</td><td>Many causes: approval pending, sign-in expired, missing Node.js, timeouts</td><td><code>/mcp</code>, <code>claude mcp list</code>, <code>claude --debug=mcp</code>. Full table in <a href="#ch105">Chapter 105</a>.</td></tr>
+</table></div>
+
+<h3 id="ch72-8"><span class="num">72.8</span>IDE, terminal, network and Windows</h3>
+<div class="tbl"><table>
+<tr><th>Symptom</th><th>Fix</th></tr>
+<tr><td>Terminal session doesn't see your editor</td><td>Run <code>/ide</code> inside the session to connect and see status, or start with <code>claude --ide</code> to auto-connect when one editor is available.</td></tr>
+<tr><td>Garbled text in the VS Code or Cursor terminal</td><td>Run <code>/terminal-setup</code> (it turns off GPU acceleration in the terminal).</td></tr>
+<tr><td>Display looks corrupted</td><td><code>Ctrl+L</code> redraws the screen. It doesn't clear your conversation.</td></tr>
+<tr><td>Behind a company proxy</td><td>Set <code>HTTPS_PROXY</code> (and <code>HTTP_PROXY</code> if needed). Company gateways may use <code>ANTHROPIC_BASE_URL</code>; ask IT for the values.</td></tr>
+<tr><td><code>/feedback</code> or updates don't work</td><td>Check whether <code>CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC</code> is set; it turns off updates, feedback and more.</td></tr>
+<tr><td>Pasting an image doesn't work</td><td>Use <code>Ctrl+V</code> on Mac (also <code>Cmd+V</code> in iTerm2) and <code>Alt+V</code> on Windows/WSL.</td></tr>
+<tr><td>Windows install commands fail</td><td>Make sure you use the command for your shell (PowerShell vs CMD), or install inside WSL with the Linux command.</td></tr>
+</table></div>
+
+<h3 id="ch72-9"><span class="num">72.9</span>Reporting a bug in Claude Code itself</h3>
+<p>Sometimes it really is a bug. Claude Code has two built-in commands that open the same reporting dialog: <code>/feedback</code> and <code>/bug</code> (alias <code>/share</code>), which can include the conversation after a consent screen. Your QA skills make you exactly the kind of reporter product teams love.</p>
+<div class="code"><span class="cap">A good Claude Code bug report</span><pre>Title: /mcp shows "connected" but Playwright tools are missing after resume
+
+Version: 2.1.319 (claude --version)   OS: macOS 15, zsh   Install: native
+Account: Team subscription (/status)  Model: Opus 5.5
+
+Steps to reproduce:
+1. claude mcp add playwright -- npx @playwright/mcp@latest
+2. Start claude, run /mcp → playwright connected, tools listed
+3. Exit, then claude --continue
+4. Run /mcp
+
+Expected: Playwright tools listed after resume
+Actual:   Server shows connected, tool list empty
+Frequency: 4 out of 4 attempts
+Isolation: also happens with --safe-mode plus only this server; not in a new session
+Logs: claude --debug=mcp output attached (secrets removed)</pre></div>
+<div class="box warn"><span class="tag">Before you send</span><p>Debug logs and conversations can contain file contents, paths, tokens and company data. Read what you're sharing, remove secrets, and follow your company's policy on what may leave the organisation.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Troubleshooting drill</b><span>40 min · any project</span></div><ol>
+<li>Run <code>claude --version</code> and <code>claude doctor</code> in a normal terminal.<span class="expect">a version number and a health summary with any warnings.</span></li>
+<li>Start <code>claude</code> and run <code>/status</code>. Note the active credential and model.<span class="expect">your account and how you're signed in.</span></li>
+<li>Break a setting on purpose: in a practice project, add a trailing comma to <code>.claude/settings.json</code>. Run <code>claude -p "say hi"</code>, then start an interactive session.<span class="expect">the print-mode run proceeds without complaint (invalid settings are silently ignored there), while the interactive session reports the problem. Undo the change afterwards.</span></li>
+<li>Run <code>/doctor</code> inside a session.<span class="expect">a checkup listing anything worth fixing, with offers to fix after you confirm.</span></li>
+<li>Start once with <code>claude --safe-mode</code> and run <code>/memory</code> and <code>/mcp</code>.<span class="expect">customisations such as CLAUDE.md and MCP servers turned off.</span></li>
+<li>Start with <code>claude --debug-file ./claude-debug.log</code>, run one command, exit and skim the log.<span class="expect">a log file with timestamped entries. Delete it afterwards if it contains anything sensitive.</span></li>
+<li>Write a bug report for any small oddity you found, using the template in 69.9 (you don't need to send it).</li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Reinstalling fixes everything."</dt><dd>Most problems are credentials, settings, context or network. Reinstalling changes none of those. Diagnose first.</dd>
+<dt>"<code>claude doctor</code> and <code>/doctor</code> are the same."</dt><dd><code>claude doctor</code> is a read-only check from the shell; <code>/doctor</code> is a fuller in-session checkup that can apply fixes after you confirm.</dd>
+<dt>"Ctrl+L clears the conversation."</dt><dd>It only redraws the screen. Use <code>/clear</code> to start fresh.</dd>
+<dt>"My subscription is used whenever I'm logged in."</dt><dd>An <code>ANTHROPIC_API_KEY</code> environment variable takes priority, and is always used with <code>-p</code>.</dd>
+</dl></div>
+
+<h3 id="ch72-r"><span class="num">72.10</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Troubleshoot like a tester: describe the symptom, gather facts, isolate, look at logs, change one thing.</li>
+<li>Start with <code>/status</code>, <code>claude doctor</code> and <code>/doctor</code>; isolate customisations with <code>--safe-mode</code>; dig in with <code>--debug=area</code> or <code>--debug-file</code>.</li>
+<li>Most sign-in mysteries are a stale <code>ANTHROPIC_API_KEY</code> overriding the subscription.</li>
+<li>Poor answers usually mean a crowded context: <code>/context</code>, then <code>/compact</code> or <code>/clear</code>.</li>
+<li>Settings follow a strict precedence and must be valid JSON; invalid files are silently ignored in <code>-p</code> mode.</li>
+<li>Interactive sessions now default to auto mode; switch modes if you want to be asked.</li>
+<li>Report real bugs with <code>/feedback</code> or <code>/bug</code>, with version, steps, expected vs actual and clean logs.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q"><code>claude</code> won't start at all. Which tool can you still use?</p><div class="opts"><button><code>/doctor</code></button><button data-ok><code>claude doctor</code> from the shell</button><button><code>/status</code></button></div><p class="why" hidden>Slash commands need a running session; <code>claude doctor</code> runs from the shell without one.</p></div>
+<div class="qz"><p class="q">A problem disappears when you start with <code>--safe-mode</code>. What does that tell you?</p><div class="opts"><button>Claude Code is broken and needs reinstalling</button><button data-ok>A customisation (CLAUDE.md, skill, plugin, hook, MCP server…) is the likely cause</button><button>Your subscription expired</button></div><p class="why" hidden>Safe mode turns off customisations while keeping sign-in and model, so it isolates them.</p></div>
+<div class="qz"><p class="q">You have an active company subscription but get billing or "organization disabled" errors. First thing to check?</p><div class="opts"><button data-ok>Whether an old <code>ANTHROPIC_API_KEY</code> is set, using <code>/status</code></button><button>Your internet speed</button><button>The model you chose</button></div><p class="why" hidden>Environment-variable credentials take priority over the subscription login.</p></div>
+<div class="qz"><p class="q">Your new setting works interactively but not in a nightly <code>claude -p</code> script. A likely cause?</p><div class="opts"><button>Print mode doesn't support settings</button><button data-ok>The script uses a settings file with invalid JSON, which <code>-p</code> silently ignores</button><button>Settings only apply on weekdays</button></div><p class="why" hidden>Print mode skips the error dialog for settings that fail validation.</p></div>
+<div class="qz"><p class="q">Which command shows MCP-related debug output only?</p><div class="opts"><button><code>claude --debug mcp</code></button><button data-ok><code>claude --debug=mcp</code></button><button><code>/mcp --debug</code></button></div><p class="why" hidden>The category filter applies only in the <code>=</code> form.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Create a one-page "Claude Code first aid" sheet for your team: the five-step method, the ten problems your team is most likely to hit (from this chapter), and your company specifics (proxy settings, who to contact for access, approved MCP servers). Pin it in your team's wiki and ask two colleagues to use it the next time something goes wrong.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"When Claude Code misbehaves, troubleshoot like a tester. Check <code>/status</code> and <code>claude doctor</code>, then see if the problem goes away in <code>--safe-mode</code>. If it does, something you added is the cause. Most sign-in mysteries are an old API key in your environment. Most bad answers are a full context, so <code>/compact</code> or <code>/clear</code>. And if it's a real bug, report it with <code>/feedback</code> like a good bug report."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/troubleshooting" target="_blank" rel="noopener">Troubleshooting</a> and install troubleshooting pages.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/cli-reference" target="_blank" rel="noopener">CLI reference</a> (<code>--debug</code>, <code>--debug-file</code>, <code>--safe-mode</code>, <code>--bare</code>, <code>doctor</code>, <code>update</code>) and local <code>claude --help</code> output.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/commands" target="_blank" rel="noopener">Commands reference</a> (<code>/doctor</code>, <code>/debug</code>, <code>/status</code>, <code>/feedback</code>, <code>/bug</code>, <code>/usage</code>).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/authentication" target="_blank" rel="noopener">Authentication</a> (credential precedence) and <a href="https://code.claude.com/docs/en/settings" target="_blank" rel="noopener">Settings</a> (precedence, strict JSON).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/troubleshoot-install" target="_blank" rel="noopener">Install troubleshooting</a>, <a href="https://code.claude.com/docs/en/errors" target="_blank" rel="noopener">API errors</a> and <a href="https://code.claude.com/docs/en/env-vars" target="_blank" rel="noopener">Environment variables</a>.</li>
+</ol><p class="verified">Verified 9 November 2026 against Claude Code 2.1.319</p></div>

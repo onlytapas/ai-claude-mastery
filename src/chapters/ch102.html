@@ -1,0 +1,248 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>Three different ways AI can work with a browser, and when to use each</li>
+<li>How the Playwright MCP server "sees" a web page without screenshots</li>
+<li>How to install it in Claude Code and run your first exploratory test session</li>
+<li>The options that matter for testers: headless, browser choice, mobile, logged-in sessions, test IDs</li>
+<li>How to turn an exploratory session into a real Playwright test file and run it</li>
+<li>Playwright's own test agents (planner, generator, healer), CI considerations and safety</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 97 (what MCP is), Chapter 54 (first terminal commands) and Chapter 58 (Node.js and npm). You need Node.js 18 or newer (<code>node --version</code> shows yours) and Claude Code.</div>
+
+<div class="bigidea"><p><a class="gl" href="#g-playwright">Playwright</a> is a popular, free tool from Microsoft for automating web browsers, widely used for end-to-end testing. Microsoft also publishes a Playwright <a class="gl" href="#g-mcp">MCP</a> server that lets Claude drive a real browser itself: open pages, click, type, read what's on screen and check the console. Instead of looking at pictures of the page, it reads the page's structure, the same information screen readers use. For a tester, that means Claude can explore an application with you, report what it finds, and then write proper, repeatable Playwright tests from what it learned.</p></div>
+
+<h3 id="ch102-1"><span class="num">102.1</span>Three ways AI can work with a browser</h3>
+<p>People mix these up, so it's worth being precise.</p>
+<div class="tbl"><table>
+<tr><th>Approach</th><th>How it works</th><th>Strengths</th><th>Weaknesses</th></tr>
+<tr><td><b>Playwright MCP</b></td><td>Claude calls browser tools (navigate, click, type, snapshot) one step at a time, live</td><td>Great for exploring, reproducing bugs and checking a fix; adapts as it goes</td><td>Slow and uses many tokens; results vary run to run; not a regression suite</td></tr>
+<tr><td><b>Playwright tests</b></td><td>Claude (or you) writes test files in code; <code>npx playwright test</code> runs them</td><td>Fast, repeatable, cheap to run thousands of times, works in CI</td><td>Someone has to write and maintain them</td></tr>
+<tr><td><b>Computer use</b></td><td>The model looks at screenshots and moves a mouse and keyboard (Chapter 112)</td><td>Works with any app, including desktop software</td><td>Slowest; relies on reading pixels; more error-prone</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Playwright MCP is like a colleague exploring the app while describing what they see: brilliant for finding things out. Playwright tests are the written checklist that a machine runs every night, the same way every time. Good teams use the first to discover and the second to protect. The workflow in this chapter moves from one to the other.</p></div>
+
+<h3 id="ch102-2"><span class="num">102.2</span>How Playwright MCP "sees" a page</h3>
+<p>A web page has a hidden structure behind the visuals: headings, buttons, text boxes, links and checkboxes, each with a name. Browsers keep this as the <a class="gl" href="#g-accessibility-tree">accessibility tree</a> so screen readers can describe pages to blind users. Playwright MCP sends Claude a text <strong>snapshot</strong> of that tree. Each element gets a short reference (like <code>e8</code>) that Claude uses when it wants to click or type.</p>
+<div class="code"><span class="cap">A simplified idea of what a snapshot contains (TodoMVC page)</span><pre>- heading "todos"
+- textbox "What needs to be done?"      [ref=e8]
+- list:
+  - listitem:
+    - checkbox "Toggle Todo"             [ref=e15]
+    - text "Buy milk"
+- text "1 item left"
+- link "All"  - link "Active"  - link "Completed"</pre></div>
+<p>The real format has more detail, but the idea is the same: structured text, not pixels. This has real advantages:</p>
+<ul>
+<li><strong>No vision model needed.</strong> Any capable language model can read it.</li>
+<li><strong>Precise actions.</strong> "Click ref e15" is unambiguous; "click the small box on the left" isn't.</li>
+<li><strong>A built-in accessibility check.</strong> If a button has no accessible name, Claude literally can't tell what it is, and neither can a screen-reader user. That's a bug worth reporting (Chapter 123).</li>
+</ul>
+<p>Screenshots are still available when you want them (for example, to attach to a bug report or check layout), through a screenshot tool, and an optional "vision" mode exists for pages that need coordinate-based clicking.</p>
+
+<h3 id="ch102-3"><span class="num">102.3</span>Install it in Claude Code</h3>
+<p>The server runs on your own computer. Claude Code starts it with <code>npx</code>, which downloads and runs the latest published version of the package <code>@playwright/mcp</code>.</p>
+<div class="code"><span class="cap">Terminal</span><pre>claude mcp add playwright -- npx @playwright/mcp@latest</pre></div>
+<div class="tbl"><table>
+<tr><th>Part</th><th>Meaning</th></tr>
+<tr><td><code>claude mcp add playwright</code></td><td>Register a server nicknamed <code>playwright</code>. Permission rules will call its tools <code>mcp__playwright__…</code>.</td></tr>
+<tr><td><code>--</code></td><td>"Everything after this is the command that starts the server." Claude Code's own options go <em>before</em> it.</td></tr>
+<tr><td><code>npx @playwright/mcp@latest</code></td><td>Download (if needed) and run the newest Playwright MCP release. No <code>--transport</code> is needed: local servers use <code>stdio</code> by default, talking to Claude Code through text streams (Chapter 99).</td></tr>
+</table></div>
+<p>Playwright's own README shows the shorter <code>claude mcp add playwright npx @playwright/mcp@latest</code>. The version with <code>--</code> is the form Claude Code's documentation recommends, and it's the safer habit once you start adding options.</p>
+<p>Check it:</p>
+<div class="code"><span class="cap">Terminal</span><pre>claude mcp list</pre></div>
+<p>You should see <code>playwright</code> with a connected status. Inside a session, <code>/mcp</code> shows its tools. The first time it opens a browser, Playwright may need to download one; there's a tool for installing the browser if it's missing, and Claude will usually handle it.</p>
+<div class="box note"><span class="tag">Pinning a version</span><p><code>@latest</code> always fetches the newest release, which is convenient for learning. For a team setup, pin a specific version (<code>@playwright/mcp@</code> followed by the version number you've tested, which <code>npm view @playwright/mcp version</code> shows) so everyone gets the same behaviour and an update can't surprise you mid-sprint.</p></div>
+
+<h3 id="ch102-4"><span class="num">102.4</span>Your first exploratory session</h3>
+<p>Start <code>claude</code> and try:</p>
+<div class="code"><span class="cap">Prompt</span><pre>Use the Playwright browser to open https://demo.playwright.dev/todomvc.
+Describe what the page does and list the main controls you can see.</pre></div>
+<p>By default the browser opens <strong>headed</strong>, in a visible window, so you can watch Claude work. That's ideal while learning. Behind the scenes Claude calls tools like these:</p>
+<div class="tbl"><table>
+<tr><th>Tool</th><th>What it does</th></tr>
+<tr><td><code>browser_navigate</code></td><td>Go to a URL</td></tr>
+<tr><td><code>browser_snapshot</code></td><td>Read the page's accessibility snapshot</td></tr>
+<tr><td><code>browser_click</code>, <code>browser_type</code>, <code>browser_press_key</code></td><td>Interact with an element by its reference</td></tr>
+<tr><td><code>browser_fill_form</code>, <code>browser_select_option</code>, <code>browser_file_upload</code></td><td>Fill several fields, choose from dropdowns, upload files</td></tr>
+<tr><td><code>browser_wait_for</code></td><td>Wait for text to appear or disappear, or for a time</td></tr>
+<tr><td><code>browser_take_screenshot</code></td><td>Save an image of the page or an element</td></tr>
+<tr><td><code>browser_console_messages</code></td><td>Read JavaScript errors and warnings: gold for bug reports</td></tr>
+<tr><td><code>browser_network_requests</code></td><td>List the network calls the page made, such as failed API requests</td></tr>
+<tr><td><code>browser_tabs</code>, <code>browser_navigate_back</code>, <code>browser_close</code></td><td>Manage tabs, go back, close the browser</td></tr>
+<tr><td><code>browser_evaluate</code>, <code>browser_run_code_unsafe</code></td><td>Run JavaScript or Playwright code in the page: powerful, so keep these behind approval</td></tr>
+</table></div>
+<p>Extra groups (network mocking, cookies and storage, PDF, vision and others) are switched on with the <code>--caps</code> option.</p>
+<h4>Exploratory prompts that work well</h4>
+<div class="code"><span class="cap">Prompts</span><pre>Explore the to-do app like a curious first-time user. Try at least 10 different actions,
+including unusual ones (empty input, very long text, emoji, double-clicking).
+After each, note what happened. Then list anything that looks like a bug.
+
+Check the browser console after each action and tell me about any errors.
+
+Find every interactive control on this page that has no accessible name.</pre></div>
+
+<h3 id="ch102-5"><span class="num">102.5</span>Options that matter for testers</h3>
+<p>Options go after the package name, following the <code>--</code>. For example, to run headless in Firefox:</p>
+<div class="code"><span class="cap">Terminal</span><pre>claude mcp remove playwright
+claude mcp add playwright -- npx @playwright/mcp@latest --headless --browser firefox</pre></div>
+<div class="tbl"><table>
+<tr><th>Option</th><th>What it does</th><th>When a tester uses it</th></tr>
+<tr><td><code>--headless</code></td><td>Run without a visible window (headed is the default)</td><td>Background runs; servers with no screen</td></tr>
+<tr><td><code>--browser &lt;name&gt;</code></td><td><code>chrome</code>, <code>firefox</code>, <code>webkit</code> or <code>msedge</code></td><td>Cross-browser checks; WebKit is close to Safari</td></tr>
+<tr><td><code>--device "iPhone 15"</code> or <code>--mobile</code></td><td>Emulate a phone</td><td>Mobile layouts. Mobile pages are often lighter, which also saves tokens</td></tr>
+<tr><td><code>--viewport-size 1280x720</code></td><td>Set the window size</td><td>Responsive-design checks</td></tr>
+<tr><td><code>--isolated</code></td><td>Keep the browser profile in memory only; nothing persists</td><td>Clean sessions, like a new user every time</td></tr>
+<tr><td><code>--storage-state &lt;file&gt;</code></td><td>Start an isolated session with saved cookies and local storage</td><td>Start already logged in as a test user</td></tr>
+<tr><td><code>--test-id-attribute &lt;name&gt;</code></td><td>Which attribute counts as a test ID (default <code>data-testid</code>)</td><td>Match your team's convention, e.g. <code>data-qa</code></td></tr>
+<tr><td><code>--codegen &lt;lang&gt;</code></td><td>Language for the Playwright code shown alongside actions (default TypeScript)</td><td>Python or Java teams</td></tr>
+<tr><td><code>--secrets &lt;file&gt;</code></td><td>A dotenv file of secret values to hide from tool output</td><td>Stops test passwords showing up in what Claude reads (a convenience, not a security guarantee)</td></tr>
+<tr><td><code>--caps &lt;list&gt;</code></td><td>Enable extra tool groups such as <code>vision</code> or <code>pdf</code></td><td>Network mocking, storage, coordinate clicks</td></tr>
+<tr><td><code>--save-session</code></td><td>Save the session into the output directory</td><td>Keep a record of an exploratory session</td></tr>
+<tr><td><code>--config &lt;file&gt;</code></td><td>Read all settings from a JSON file</td><td>Team-wide, version-controlled setup</td></tr>
+</table></div>
+<p>A configuration file keeps long option lists tidy:</p>
+<div class="code"><span class="cap">playwright-mcp.json</span><pre>{
+  "browser": {
+    "browserName": "chromium",
+    "isolated": true,
+    "launchOptions": { "headless": true },
+    "contextOptions": { "viewport": { "width": 1280, "height": 720 } }
+  },
+  "testIdAttribute": "data-testid"
+}</pre></div>
+<div class="code"><span class="cap">Terminal</span><pre>claude mcp add playwright -- npx @playwright/mcp@latest --config playwright-mcp.json</pre></div>
+
+<h3 id="ch102-6"><span class="num">102.6</span>From exploration to a real test</h3>
+<p>Exploration finds things. Tests keep them fixed. Here is the hand-off.</p>
+<h4>1. Set up Playwright Test (once per project)</h4>
+<div class="code"><span class="cap">Terminal</span><pre>npm init playwright@latest</pre></div>
+<p>This asks a few questions (language, test folder, whether to add a GitHub Actions workflow, whether to install browsers) and creates <code>playwright.config.ts</code>, a <code>tests/</code> folder and an example test. Accept the defaults if unsure.</p>
+<h4>2. Ask Claude to write the test from what it just did</h4>
+<div class="code"><span class="cap">Prompt</span><pre>You just added three to-dos, completed one and checked the counter.
+Write that as a Playwright test in tests/todo-counter.spec.ts.
+Use role-based locators (getByRole, getByPlaceholder) and web-first assertions (await expect(...)).
+No fixed waits (no waitForTimeout). Then run it with npx playwright test.</pre></div>
+<p>You'll get something like this:</p>
+<div class="code"><span class="cap">tests/todo-counter.spec.ts</span><pre>import { test, expect } from '@playwright/test';
+
+test('counter shows items left after completing one', async ({ page }) => {
+  await page.goto('https://demo.playwright.dev/todomvc');
+  const input = page.getByPlaceholder('What needs to be done?');
+
+  for (const item of ['Buy milk', 'Write tests', 'Book dentist']) {
+    await input.fill(item);
+    await input.press('Enter');
+  }
+
+  await page.getByRole('listitem').filter({ hasText: 'Buy milk' })
+            .getByRole('checkbox', { name: 'Toggle Todo' }).check();
+
+  await expect(page.getByTestId('todo-count')).toHaveText('2 items left');
+});</pre></div>
+<div class="tbl"><table>
+<tr><th>Line</th><th>Plain English</th></tr>
+<tr><td><code>test('…', async ({ page }) =&gt; {</code></td><td>Define a test with a name; Playwright hands it a fresh browser page</td></tr>
+<tr><td><code>page.getByPlaceholder(…)</code></td><td>A <a class="gl" href="#g-locator">locator</a>: find the input by its placeholder text, as a user would</td></tr>
+<tr><td><code>.fill()</code>, <code>.press('Enter')</code></td><td>Type text, then press Enter</td></tr>
+<tr><td><code>.filter({ hasText })…check()</code></td><td>Find the list item containing "Buy milk" and tick its checkbox</td></tr>
+<tr><td><code>await expect(…).toHaveText(…)</code></td><td>A web-first assertion: Playwright keeps checking until it's true or times out, so no fixed sleeps are needed</td></tr>
+</table></div>
+<h4>3. Run it and read the result</h4>
+<div class="code"><span class="cap">Terminal</span><pre>npx playwright test tests/todo-counter.spec.ts</pre></div>
+<p>The output says how many tests ran, with how many workers (parallel browsers), and ends with a line such as <code>3 passed</code> (one per browser project in the default config). If something fails, Playwright prints the failing line and the difference between expected and actual. Open the visual report with:</p>
+<div class="code"><pre>npx playwright show-report</pre></div>
+<div class="box example"><span class="tag">Real-world tip: prove the test can fail</span><p>A test that always passes is worthless. Change the expected text to <code>'3 items left'</code> and run it again: it must fail. Then change it back. Make this a habit with every AI-written test (Chapter 121).</p></div>
+
+<h3 id="ch102-7"><span class="num">102.7</span>Logged-in sessions and test accounts</h3>
+<p>Most real applications need a login. There are three approaches:</p>
+<div class="tbl"><table>
+<tr><th>Approach</th><th>How</th><th>Watch out</th></tr>
+<tr><td>Persistent profile (default)</td><td>The MCP browser keeps its own profile per project, so a login you complete stays for the next session</td><td>Only one browser can use a profile at a time; run extra clients with <code>--isolated</code></td></tr>
+<tr><td>Isolated + storage state</td><td><code>--isolated --storage-state=auth.json</code> starts every session already signed in</td><td><code>auth.json</code> contains session cookies: keep it out of git</td></tr>
+<tr><td>Browser extension</td><td><code>--extension</code> connects to your own running Chrome or Edge, with its logins</td><td>Claude then acts with <em>your real</em> sessions; avoid this for production accounts</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Test accounts only</span><p>Use dedicated test accounts on test environments. Never let an AI-driven browser loose in production with a real customer or admin account. Keep passwords out of prompts: use a storage-state file, or the <code>--secrets</code> option so values are masked in what Claude reads.</p></div>
+
+<h3 id="ch102-8"><span class="num">102.8</span>Playwright's own test agents</h3>
+<p>Since version 1.56, Playwright itself ships three AI "test agents" that work with Claude Code and other tools. They're defined as instructions plus MCP tools, generated into your project:</p>
+<div class="code"><span class="cap">Terminal (in a Playwright project)</span><pre>npx playwright init-agents --loop=claude</pre></div>
+<div class="flow">
+<div><b>Planner</b>Explores the app and writes a Markdown test plan in <code>specs/</code></div>
+<div><b>Generator</b>Turns the plan into Playwright test files in <code>tests/</code>, checking locators live</div>
+<div class="hl"><b>Healer</b>Runs failing tests, inspects the page and patches locators, waits or data until they pass</div>
+</div>
+<p>The planner uses a <code>seed</code> test that sets up the environment (logins, fixtures) and copies its style. Regenerate the agent definitions whenever you update Playwright.</p>
+<div class="box warn"><span class="tag">A tester's caution about "healing"</span><p>Playwright documents that when the healer believes functionality is broken, it may mark the test as <em>skipped</em> rather than make it pass. Either way, a self-healing test can hide a real bug: a changed button label might be a deliberate redesign, or a regression. Review every healed change in a pull request, exactly as you would a colleague's.</p></div>
+
+<h3 id="ch102-9"><span class="num">102.9</span>In CI, and how much it costs</h3>
+<ul>
+<li><strong>Run tests in CI, not exploration.</strong> Your pipeline should run <code>npx playwright test</code>: fast, cheap and repeatable. Use MCP-driven sessions for investigation, triage and writing tests, not as the nightly regression suite.</li>
+<li><strong>Headless on servers.</strong> CI machines have no screen; use <code>--headless</code> if you do run the MCP server there. Microsoft publishes a Docker image (<code>mcr.microsoft.com/playwright/mcp</code>) that currently supports headless Chromium only.</li>
+<li><strong>Tokens add up.</strong> Every snapshot is text that fills Claude's <a class="gl" href="#g-context-window">context window</a>. Big pages mean big snapshots. Keep sessions focused on one flow, and start fresh between flows (Chapter 68).</li>
+<li><strong>Consider the Playwright CLI.</strong> Playwright's README notes that coding agents may get the same job done with fewer tokens through the Playwright CLI combined with skills, while MCP remains better for long exploratory sessions that need continuous browser state.</li>
+</ul>
+
+<h3 id="ch102-10"><span class="num">102.10</span>Safety</h3>
+<p>The Playwright MCP README is blunt: <strong>Playwright MCP is not a security boundary.</strong> Options like <code>--allowed-origins</code> help keep Claude on the right sites but don't stop a determined attack. So:</p>
+<ol>
+<li><strong>Be careful with untrusted websites.</strong> A page can contain hidden text written to manipulate an AI (prompt injection, Chapter 131). Point the browser at your own test environments.</li>
+<li><strong>Keep powerful tools behind approval.</strong> Allow the read-only tools you use constantly and make the code-running ones ask:
+<div class="code"><span class="cap">.claude/settings.json</span><pre>{
+  "permissions": {
+    "allow": ["mcp__playwright__browser_snapshot", "mcp__playwright__browser_navigate"],
+    "ask":   ["mcp__playwright__browser_evaluate", "mcp__playwright__browser_run_code_unsafe"]
+  }
+}</pre></div></li>
+<li><strong>Never use real customer data or production admin accounts.</strong></li>
+<li><strong>Pin versions</strong> for team use, and only install the official <code>@playwright/mcp</code> package. Look-alike package names are a known supply-chain trick (Chapter 105).</li>
+</ol>
+
+<div class="lab"><div class="lab-h"><b>Explore, then automate, the TodoMVC demo</b><span>60 min · Claude Code + Node.js</span></div><ol>
+<li>Make a practice folder and add the server: <code>mkdir pw-lab &amp;&amp; cd pw-lab</code>, then <code>claude mcp add playwright -- npx @playwright/mcp@latest</code>.<span class="expect">a confirmation that <code>playwright</code> was added.</span></li>
+<li>Run <code>claude mcp list</code>.<span class="expect"><code>playwright</code> shown as connected.</span></li>
+<li>Start <code>claude</code> and ask it to open <code>https://demo.playwright.dev/todomvc</code> and describe the page.<span class="expect">a browser window opens; Claude lists the input box, the to-do list and the filters.</span></li>
+<li>Ask Claude to add three to-dos, complete one and report the counter.<span class="expect">you watch it type; it reports "2 items left".</span></li>
+<li>Run the exploratory prompt from 95.4 (ten unusual actions).<span class="expect">a list of observations. Check at least two yourself in the window. Did it notice that empty input does nothing? How does it handle very long text?</span></li>
+<li>Ask it to check the console for errors and to list controls without accessible names.<span class="expect">a short report; possibly "no errors".</span></li>
+<li>In the terminal, run <code>npm init playwright@latest</code> (accept defaults).<span class="expect"><code>playwright.config.ts</code> and a <code>tests/</code> folder appear.</span></li>
+<li>Use the prompt in 95.6 to have Claude write and run <code>tests/todo-counter.spec.ts</code>.<span class="expect">a test file and a passing run.</span></li>
+<li>Change the expected count to 3 and run <code>npx playwright test</code> again.<span class="expect">a clear failure showing expected "3 items left" but received "2 items left". Change it back.</span></li>
+<li>Ask Claude to add two more tests: one for the "Active" filter and one for "Clear completed". Review the code before running.<span class="expect">three passing tests, each with web-first assertions and no fixed waits.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Playwright MCP replaces my test suite."</dt><dd>It's for exploring and writing tests. Repeatable regression testing should run as real Playwright tests.</dd>
+<dt>"Claude is looking at screenshots."</dt><dd>By default it reads the accessibility snapshot, structured text. Screenshots are an extra tool.</dd>
+<dt>"A test written by AI is correct if it passes."</dt><dd>It might assert the wrong thing, or nothing important. Read it, and prove it can fail.</dd>
+<dt>"Self-healing tests mean no more maintenance."</dt><dd>Healing changes tests. Every change needs review, because a "heal" can hide a real regression.</dd>
+<dt>"<code>--allowed-origins</code> makes it safe to browse anywhere."</dt><dd>It isn't a security boundary. Keep the browser on trusted test environments.</dd>
+</dl></div>
+
+<h3 id="ch102-r"><span class="num">102.11</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Playwright MCP lets Claude drive a real browser step by step; Playwright tests are the repeatable, cheap way to keep checks running; computer use is the slow, general fallback.</li>
+<li>It reads the page's accessibility tree as text snapshots with element references, not pixels.</li>
+<li>Install with <code>claude mcp add playwright -- npx @playwright/mcp@latest</code>; options such as <code>--headless</code>, <code>--browser</code>, <code>--isolated</code>, <code>--storage-state</code> and <code>--config</code> go after the package name.</li>
+<li>The core workflow: explore with MCP → have Claude write a Playwright test with role-based locators and web-first assertions → run <code>npx playwright test</code> → prove it can fail.</li>
+<li>Playwright's planner, generator and healer agents (<code>npx playwright init-agents --loop=claude</code>) automate plan → test → repair; review every healed change.</li>
+<li>It's not a security boundary: use test accounts on test environments, keep code-running tools behind approval, pin versions.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">How does the Playwright MCP server mainly show a page to Claude?</p><div class="opts"><button>As screenshots that Claude looks at</button><button data-ok>As a text snapshot of the accessibility tree, with references for each element</button><button>As the raw HTML source</button></div><p class="why" hidden>Structured snapshots make actions precise and work without a vision model.</p></div>
+<div class="qz"><p class="q">In <code>claude mcp add playwright -- npx @playwright/mcp@latest --headless</code>, what does <code>--</code> do?</p><div class="opts"><button>Comments out the rest of the line</button><button data-ok>Separates Claude Code's options from the command that starts the server</button><button>Makes the server remote</button></div><p class="why" hidden>Everything after <code>--</code>, including <code>--headless</code>, is passed to the server.</p></div>
+<div class="qz"><p class="q">What should your CI pipeline run every night?</p><div class="opts"><button>An exploratory Playwright MCP session</button><button data-ok>The Playwright test suite (npx playwright test)</button><button>Computer use</button></div><p class="why" hidden>Tests are fast, cheap and repeatable; MCP sessions are for discovery.</p></div>
+<div class="qz"><p class="q">The healer agent changes a locator so a failing test passes. What should you do?</p><div class="opts"><button>Accept it automatically</button><button data-ok>Review the change: the UI change might be a real regression</button><button>Delete the test</button></div><p class="why" hidden>Healing can hide bugs. Treat it like any code change.</p></div>
+<div class="qz"><p class="q">You need every MCP session to start logged in as a test user, with nothing left behind. Which options fit?</p><div class="opts"><button>--extension</button><button data-ok>--isolated with --storage-state</button><button>--headless only</button></div><p class="why" hidden>Isolated keeps nothing on disk; storage state loads the test user's cookies at the start.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick one real user journey in your team's test environment (for example: log in, search, add to basket). Run a 20-minute exploratory session with Playwright MCP and record every observation. Then have Claude write the journey as a Playwright test following your team's conventions, prove it can fail, and open a pull request. In the description, list what the exploration found that you hadn't thought to test.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Playwright MCP gives Claude a real browser. It reads the page's structure, the same information screen readers use, then clicks and types like a user. Use it to explore, reproduce bugs and check fixes. Then ask Claude to turn what it did into a proper Playwright test, run it with npx playwright test, and prove it can fail. Keep it on test environments with test accounts, because it isn't a security boundary."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Microsoft, <a href="https://github.com/microsoft/playwright-mcp" target="_blank" rel="noopener">Playwright MCP (official repository and README)</a>: accessibility snapshots, Claude Code install command, options, configuration file schema, user profiles and storage state, tools list, security note, Docker image.</li>
+<li>Playwright, <a href="https://playwright.dev/docs/test-agents" target="_blank" rel="noopener">Playwright Test Agents</a> (planner, generator, healer; <code>init-agents</code>).</li>
+<li>Playwright, <a href="https://playwright.dev/docs/intro" target="_blank" rel="noopener">Installation</a>, <a href="https://playwright.dev/docs/locators" target="_blank" rel="noopener">Locators</a>, <a href="https://playwright.dev/docs/test-assertions" target="_blank" rel="noopener">Assertions</a> and <a href="https://playwright.dev/docs/auth" target="_blank" rel="noopener">Authentication</a>.</li>
+<li>Microsoft, <a href="https://github.com/microsoft/playwright-cli" target="_blank" rel="noopener">Playwright CLI</a> (the CLI-plus-skills alternative for coding agents).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/mcp" target="_blank" rel="noopener">Claude Code: connect to tools via MCP</a> and <a href="https://code.claude.com/docs/en/permissions" target="_blank" rel="noopener">permissions</a>; Claude Code 2.1.319 <code>claude mcp add --help</code>.</li>
+<li>Model Context Protocol, <a href="https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices" target="_blank" rel="noopener">Security best practices</a>.</li>
+</ol><p class="verified">Verified 9 November 2026 against the Playwright MCP README, Playwright documentation and Claude Code 2.1.319.</p></div>

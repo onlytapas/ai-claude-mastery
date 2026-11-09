@@ -1,0 +1,233 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>Every keyboard shortcut in Claude Code's terminal interface, grouped by job</li>
+<li>The special input symbols: <code>/</code>, <code>@</code>, <code>!</code>, <code>:</code> and <code>?</code></li>
+<li>How to type multi-line prompts in any terminal</li>
+<li>Platform differences (macOS Option key, Windows, terminals) and how to change shortcuts</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch73">Chapter 73</a> explains the difference between shortcuts, symbols, slash commands and flags. This chapter is a reference: search it when you need it rather than reading it start to finish.</div>
+
+<div class="bigidea"><p>Claude Code is driven mostly by plain language, but a small set of keys makes you much faster and safer: <kbd>Esc</kbd> to stop, <kbd>Shift</kbd>+<kbd>Tab</kbd> to change permission mode, <kbd>Esc</kbd> <kbd>Esc</kbd> to rewind, <kbd>Ctrl</kbd>+<kbd>R</kbd> to find an old prompt, and <code>@</code> and <code>!</code> at the start of what you type. Learn those first; look up the rest here. Press <kbd>?</kbd> on an empty prompt at any time to see the list inside Claude Code itself.</p></div>
+
+<div class="box warn"><span class="tag">Version and platform</span><p>Everything here was checked against Claude Code 2.1.319 and Anthropic's interactive-mode and keybindings documentation on 9 November 2026. Shortcuts can differ by operating system, terminal app and version. On macOS, most <kbd>Alt</kbd> shortcuts need your terminal's "Option as Meta" setting turned on (73.9). Your installed version is the final authority: press <kbd>?</kbd>.</p></div>
+
+<h3 id="ch76-1"><span class="num">76.1</span>The ten to learn first</h3>
+<div class="tbl"><table>
+<tr><th>Press or type</th><th>What it does</th><th>Why it matters</th></tr>
+<tr><td><kbd>Esc</kbd></td><td>Stops Claude mid-turn; work so far is kept</td><td>Redirect early instead of waiting</td></tr>
+<tr><td><kbd>Esc</kbd> <kbd>Esc</kbd></td><td>Empty prompt: opens the rewind menu</td><td>Undo a wrong turn, including code changes</td></tr>
+<tr><td><kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Cycles permission modes</td><td>Switch to Plan before big changes</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd></td><td>Interrupts; press again on empty input to exit</td><td>The universal "stop"</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd></td><td>Searches earlier prompts</td><td>Reuse a good prompt</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>O</kbd></td><td>Opens the transcript viewer</td><td>See exactly what tools Claude ran</td></tr>
+<tr><td><code>\</code> then <kbd>Enter</kbd>, or <kbd>Ctrl</kbd>+<kbd>J</kbd></td><td>New line without sending</td><td>Multi-line prompts in any terminal</td></tr>
+<tr><td><code>@</code></td><td>Mention a file or folder (autocomplete)</td><td>Point Claude at the right file</td></tr>
+<tr><td><code>!</code> at start</td><td>Run a shell command yourself; Claude sees the output</td><td>Quick checks like <code>! git status</code></td></tr>
+<tr><td><kbd>?</kbd> on empty input</td><td>Shows the shortcut help panel</td><td>Your version's own list</td></tr>
+</table></div>
+
+<h3 id="ch76-2"><span class="num">76.2</span>Full shortcut reference</h3>
+<p>Type in the box to filter, for example "paste", "history", "model" or "Ctrl+X".</p>
+<input class="filter" id="kbFilter" type="search" placeholder="Filter shortcuts, e.g. paste, history, mode" aria-label="Filter keyboard shortcuts" data-filter="#kbTable" data-empty="#kbEmpty">
+<div class="tbl"><table id="kbTable">
+<tr><th>Keys</th><th>What it does</th><th>Notes</th></tr>
+<tr class="group"><td colspan="3"><b>Stopping, exiting and recovering</b></td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd></td><td>Interrupt, or clear input</td><td>With nothing running: first press clears the prompt, second press exits. Press <kbd>↑</kbd> to get a cleared draft back.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>D</kbd></td><td>Exit Claude Code</td><td>Press twice within 800 ms. With text in the prompt, it deletes the character after the cursor instead.</td></tr>
+<tr><td><kbd>Esc</kbd></td><td>Interrupt Claude, close a dialog, or decline a permission prompt</td><td>Claude keeps the work done so far. Queued messages are sent next.</td></tr>
+<tr><td><kbd>Esc</kbd> <kbd>Esc</kbd></td><td>Clear the draft, or rewind</td><td>With text: clears it (recall with <kbd>↑</kbd>). Empty prompt: opens the rewind menu to restore or summarise code and conversation.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Suspend Claude Code</td><td>macOS and Linux only. Type <code>fg</code> in the shell to come back.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>L</kbd></td><td>Redraw the screen</td><td>Fixes a garbled display. It does <strong>not</strong> clear the conversation; use <code>/clear</code> for that.</td></tr>
+<tr class="group"><td colspan="3"><b>Modes, model and thinking</b></td></tr>
+<tr><td><kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Cycle permission modes</td><td>Manual → Accept edits → Plan, then Bypass permissions (only if started with it) and Auto (when available). From Auto, the next press returns to Manual. On some Windows set-ups the key is <kbd>Alt</kbd>+<kbd>M</kbd>.</td></tr>
+<tr><td><kbd>Option</kbd>+<kbd>P</kbd> (Mac) / <kbd>Alt</kbd>+<kbd>P</kbd></td><td>Switch model</td><td>Keeps your half-typed prompt.</td></tr>
+<tr><td><kbd>Option</kbd>+<kbd>T</kbd> (Mac) / <kbd>Alt</kbd>+<kbd>T</kbd></td><td>Toggle extended thinking</td><td>No effect on Opus 5.5, Sonnet 5.5, Haiku 5.5 or Fable models, which always think.</td></tr>
+<tr><td><kbd>Option</kbd>+<kbd>O</kbd> (Mac) / <kbd>Alt</kbd>+<kbd>O</kbd></td><td>Toggle fast mode</td><td>Where fast mode is available.</td></tr>
+<tr class="group"><td colspan="3"><b>Seeing what's happening</b></td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>O</kbd></td><td>Toggle the transcript viewer</td><td>Shows each tool call in detail, with timestamps and the model used. Leave with <kbd>q</kbd>, <kbd>Esc</kbd> or <kbd>Ctrl</kbd>+<kbd>C</kbd>.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>T</kbd></td><td>Show or hide Claude's task checklist</td><td>The to-do list for the current job. For running background shells and subagents use <code>/tasks</code>.</td></tr>
+<tr class="group"><td colspan="3"><b>Background work and queued messages</b></td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>B</kbd></td><td>Send a running command or agent to the background</td><td>Long test runs keep going while you continue. tmux users press it twice.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>X</kbd> <kbd>Ctrl</kbd>+<kbd>K</kbd></td><td>Stop all background subagents</td><td>Press twice within 3 seconds to confirm.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>Enter</kbd> or <kbd>Ctrl</kbd>+<kbd>X</kbd> <kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Send queued messages now</td><td>Messages you type while Claude works are queued. <kbd>Ctrl</kbd>+<kbd>X</kbd> <kbd>Ctrl</kbd>+<kbd>S</kbd> works in every terminal.</td></tr>
+<tr><td><kbd>←</kbd> on an empty prompt</td><td>Open agent view</td><td>Background sessions (a research preview feature).</td></tr>
+<tr class="group"><td colspan="3"><b>History and drafts</b></td></tr>
+<tr><td><kbd>↑</kbd> / <kbd>↓</kbd> or <kbd>Ctrl</kbd>+<kbd>P</kbd> / <kbd>Ctrl</kbd>+<kbd>N</kbd></td><td>Move within a long prompt, then through history</td><td>History is kept per project folder and reaches earlier sessions.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd></td><td>Reverse search through earlier prompts</td><td>Press again for older matches; <kbd>Tab</kbd> or <kbd>Esc</kbd> accepts and lets you edit; <kbd>Enter</kbd> accepts and sends.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Stash or restore the prompt</td><td>Park a half-written prompt, ask something else, then press again on an empty prompt to bring it back.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>G</kbd> or <kbd>Ctrl</kbd>+<kbd>X</kbd> <kbd>Ctrl</kbd>+<kbd>E</kbd></td><td>Edit the prompt in your text editor</td><td>Handy for long, structured prompts.</td></tr>
+<tr class="group"><td colspan="3"><b>Input and pasting</b></td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>V</kbd> (<kbd>Cmd</kbd>+<kbd>V</kbd> in iTerm2, <kbd>Alt</kbd>+<kbd>V</kbd> on Windows/WSL)</td><td>Paste an image from the clipboard</td><td>Inserts an <code>[Image #1]</code> chip you can refer to, e.g. a bug screenshot.</td></tr>
+<tr><td><kbd>Tab</kbd></td><td>Accept an autocomplete suggestion; add a comment to a permission answer</td><td>On a permission prompt with Yes or No focused, opens a comment field.</td></tr>
+<tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>Switch tabs in dialogs</td><td>For example in permission dialogs and menus.</td></tr>
+<tr><td>Hold or tap <kbd>Space</kbd></td><td>Voice dictation</td><td>Only after turning it on with <code>/voice</code>; needs a Claude.ai account.</td></tr>
+<tr class="group"><td colspan="3"><b>Multi-line prompts</b></td></tr>
+<tr><td><code>\</code> then <kbd>Enter</kbd></td><td>New line</td><td>Works in all terminals.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>J</kbd></td><td>New line</td><td>Works in any terminal with no set-up.</td></tr>
+<tr><td><kbd>Shift</kbd>+<kbd>Enter</kbd></td><td>New line</td><td>Built in for iTerm2, WezTerm, Ghostty, Kitty, Warp, Apple Terminal and Windows Terminal. Elsewhere run <code>/terminal-setup</code>.</td></tr>
+<tr><td><kbd>Option</kbd>+<kbd>Enter</kbd></td><td>New line (macOS)</td><td>After enabling Option as Meta.</td></tr>
+<tr><td>Paste</td><td>Multi-line text</td><td>Paste code or logs directly.</td></tr>
+<tr class="group"><td colspan="3"><b>Editing the line you're typing</b></td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd> / <kbd>Ctrl</kbd>+<kbd>E</kbd></td><td>Start / end of line</td><td>In multi-line input, the current line.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>K</kbd></td><td>Delete to end of line</td><td>Deleted text can be pasted back with <kbd>Ctrl</kbd>+<kbd>Y</kbd>.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>U</kbd></td><td>Delete to start of line</td><td>On macOS, <kbd>Cmd</kbd>+<kbd>Backspace</kbd> often does the same.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>Delete back to the previous space</td><td>One press removes a whole path or <code>--flag=value</code>.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>Y</kbd>, then <kbd>Alt</kbd>+<kbd>Y</kbd></td><td>Paste deleted text; cycle older deletions</td><td><kbd>Alt</kbd>+<kbd>Y</kbd> needs Option as Meta on macOS.</td></tr>
+<tr><td><kbd>Alt</kbd>+<kbd>B</kbd> / <kbd>Alt</kbd>+<kbd>F</kbd></td><td>Word back / forward</td><td>Needs Option as Meta on macOS.</td></tr>
+<tr><td><kbd>Alt</kbd>+<kbd>D</kbd></td><td>Delete to end of word</td><td>Needs Option as Meta on macOS.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>_</kbd> or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>-</kbd></td><td>Undo the last input edit</td><td>Edits to your prompt only, not Claude's file changes (use rewind for those).</td></tr>
+</table></div>
+<p id="kbEmpty" hidden>No shortcut matches that filter. Try a shorter word, or press <kbd>?</kbd> inside Claude Code.</p>
+
+<h3 id="ch76-3"><span class="num">76.3</span>Input symbols</h3>
+<input class="filter" id="symFilter" type="search" placeholder="Filter symbols" aria-label="Filter input symbols" data-filter="#symTable" data-empty="#symEmpty">
+<div class="tbl"><table id="symTable">
+<tr><th>Symbol</th><th>Where you type it</th><th>What it does</th><th>Example</th></tr>
+<tr><td><code>/</code></td><td>At the start of a message</td><td>Runs a slash command or skill. After a space mid-prompt, it only offers completion; it doesn't run anything.</td><td><code>/compact keep the test failures</code></td></tr>
+<tr><td><code>@</code></td><td>Anywhere in a message</td><td>File or folder mention with autocomplete, so Claude reads it. MCP resources appear here too. With cross-session messaging, typing a letter after <code>@</code> also suggests your other live sessions.</td><td><code>Review @tests/checkout.spec.ts</code></td></tr>
+<tr><td><code>@server:…</code></td><td>Anywhere</td><td>Reference a resource offered by an MCP server.</td><td><code>@github:issue://123</code></td></tr>
+<tr><td><code>!</code></td><td>At the start</td><td>Shell mode: runs the command yourself, shows live output, adds it to the conversation, and Claude responds. Leave with <kbd>Esc</kbd>, <kbd>Backspace</kbd> or <kbd>Ctrl</kbd>+<kbd>U</kbd> on an empty prompt.</td><td><code>! npx playwright test login</code></td></tr>
+<tr><td><code>:</code></td><td>Anywhere</td><td>Emoji shortcode. Type <code>:name:</code> or two letters for suggestions.</td><td><code>:white_check_mark:</code></td></tr>
+<tr><td><code>?</code></td><td>On an empty prompt</td><td>Toggles the shortcut help panel. With text already typed, it's just a question mark.</td><td><code>?</code></td></tr>
+<tr><td><code>ultrathink</code></td><td>A word in your prompt</td><td>Asks for deeper reasoning on that turn. Other phrases like "think hard" are treated as ordinary text.</td><td><code>ultrathink: why is this test flaky?</code></td></tr>
+<tr><td><code>#</code></td><td>n/a</td><td><strong>Removed</strong> as a shortcut in version 2.0.70. Ask Claude to update CLAUDE.md, or use <code>/memory</code>.</td><td>n/a</td></tr>
+</table></div>
+<p id="symEmpty" hidden>No symbol matches that filter.</p>
+<details class="deep"><summary>Shell mode in detail</summary><div class="body">
+<ul>
+<li>Commands typed after <code>!</code> don't need Claude's permission check: you typed them, so you've already decided.</li>
+<li>If you've turned on sandboxing, commands you type in shell mode normally run <em>outside</em> the sandbox, because the sandbox applies to commands Claude runs.</li>
+<li>Long commands can be backgrounded with <kbd>Ctrl</kbd>+<kbd>B</kbd>.</li>
+<li>Press <kbd>Tab</kbd> to autocomplete from your earlier <code>!</code> commands in this project; type a path containing <code>/</code> to get file suggestions.</li>
+<li>Claude responds to the output automatically, which uses your allowance like a normal prompt. The <code>respondToBashCommands</code> setting set to <code>false</code> adds the output without a reply.</li>
+</ul>
+</div></details>
+
+<h3 id="ch76-4"><span class="num">76.4</span>Permission prompts</h3>
+<p>When Claude asks to run a command or edit a file, the dialog has its own keys:</p>
+<div class="tbl"><table>
+<tr><th>Keys</th><th>Effect</th></tr>
+<tr><td><kbd>Enter</kbd></td><td>Confirm the highlighted option</td></tr>
+<tr><td><kbd>Esc</kbd></td><td>Decline (the same as "No" without a comment)</td></tr>
+<tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Move between options</td></tr>
+<tr><td><kbd>Tab</kbd></td><td>With Yes or No focused, add a comment (for example "No, run only the login tests")</td></tr>
+<tr><td><kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>On a file permission prompt: close an open comment field; otherwise choose the option that allows the action for the rest of the session, when offered</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example: a QA habit</span><p>Claude proposes <code>npx playwright test</code> for the whole suite, but you only want the checkout tests. Instead of <kbd>Esc</kbd> and retyping, press <kbd>Tab</kbd> on "No" and write "only run tests/checkout". Claude gets the reason along with the refusal and adjusts.</p></div>
+
+<h3 id="ch76-5"><span class="num">76.5</span>Transcript viewer keys</h3>
+<p>Inside the transcript viewer (<kbd>Ctrl</kbd>+<kbd>O</kbd>):</p>
+<div class="tbl"><table>
+<tr><th>Key</th><th>Effect</th><th>Notes</th></tr>
+<tr><td><kbd>q</kbd>, <kbd>Esc</kbd>, <kbd>Ctrl</kbd>+<kbd>C</kbd></td><td>Leave the viewer</td><td></td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>E</kbd></td><td>Show all content</td><td>Classic display only</td></tr>
+<tr><td><kbd>?</kbd></td><td>Shortcut help</td><td>Fullscreen display only</td></tr>
+<tr><td><kbd>{</kbd> / <kbd>}</kbd></td><td>Jump to previous / next prompt you sent</td><td>Fullscreen display only</td></tr>
+<tr><td><kbd>[</kbd></td><td>Write the conversation to the terminal's scrollback so you can search it with your terminal's own tools</td><td>Fullscreen display only</td></tr>
+<tr><td><kbd>v</kbd></td><td>Open the conversation in your text editor</td><td>Fullscreen display only</td></tr>
+</table></div>
+
+<h3 id="ch76-6"><span class="num">76.6</span>Vim editor mode</h3>
+<p>If you like vim, turn on vim-style editing of the prompt with <code>/config</code> → <b>Editor mode</b>. (The old <code>/vim</code> command was removed in version 2.1.92.)</p>
+<div class="tbl"><table>
+<tr><th>Keys</th><th>Effect</th></tr>
+<tr><td><kbd>Esc</kbd> or <kbd>Ctrl</kbd>+<kbd>[</kbd></td><td>Go to NORMAL mode</td></tr>
+<tr><td><code>i</code> <code>I</code> <code>a</code> <code>A</code> <code>o</code> <code>O</code></td><td>Enter INSERT mode (before cursor, line start, after cursor, line end, new line below, above)</td></tr>
+<tr><td><code>v</code> / <code>V</code></td><td>Character / line visual selection</td></tr>
+<tr><td><code>h j k l</code>, <code>w e b</code>, <code>0 $ ^</code>, <code>gg G</code></td><td>Move by character, word, line edge, whole input</td></tr>
+<tr><td><code>f</code> <code>F</code> <code>t</code> <code>T</code> + character, <code>;</code> <code>,</code></td><td>Jump to a character on the line; repeat forward / backward</td></tr>
+<tr><td><code>x</code>, <code>dd</code>, <code>D</code>, <code>dw</code>, <code>cc</code>, <code>cw</code>, <code>yy</code>, <code>p</code>, <code>P</code>, <code>u</code>, <code>.</code></td><td>Delete, change, copy (yank), paste, undo, repeat</td></tr>
+<tr><td><code>iw</code> <code>aw</code> <code>i"</code> <code>i(</code> <code>i{</code> …</td><td>Text objects: inside/around a word, quotes or brackets</td></tr>
+<tr><td><code>/</code> in NORMAL mode</td><td>Reverse history search, like <kbd>Ctrl</kbd>+<kbd>R</kbd></td></tr>
+</table></div>
+
+<h3 id="ch76-7"><span class="num">76.7</span>Changing shortcuts</h3>
+<p>You can rebind keys. Run <code>/keybindings</code> to create or open <code>~/.claude/keybindings.json</code>. Changes apply straight away, without restarting.</p>
+<p>The file holds a list of <em>binding blocks</em>. Each block names a <strong>context</strong> (where the keys apply, such as <code>Chat</code> for the main input or <code>Global</code> for everywhere) and maps keys to <strong>actions</strong> written as <code>namespace:action</code>. Setting a key to <code>null</code> removes its binding.</p>
+<div class="code"><span class="cap">~/.claude/keybindings.json, the example from Anthropic's documentation</span><pre>{
+  "$schema": "https://www.schemastore.org/claude-code-keybindings.json",
+  "$docs": "https://code.claude.com/docs/en/keybindings",
+  "bindings": [
+    {
+      "context": "Chat",
+      "bindings": {
+        "ctrl+e": "chat:externalEditor",   <span class="c">// Ctrl+E opens your text editor</span>
+        "ctrl+s": null                     <span class="c">// Ctrl+S does nothing now</span>
+      }
+    }
+  ]
+}</pre></div>
+<p>The comments are explanations for this book; JSON files can't contain comments, so leave them out in the real file. One especially useful action is <code>command:&lt;name&gt;</code>, which runs a slash command. For example, <code>"meta+g": "command:compact"</code> in a <code>Chat</code> block makes <kbd>Meta</kbd>+<kbd>G</kbd> run <code>/compact</code>.</p>
+<div class="tbl"><table>
+<tr><th>A few action names</th><th>Default key</th></tr>
+<tr><td><code>app:interrupt</code></td><td><kbd>Ctrl</kbd>+<kbd>C</kbd></td></tr>
+<tr><td><code>app:toggleTranscript</code></td><td><kbd>Ctrl</kbd>+<kbd>O</kbd></td></tr>
+<tr><td><code>app:toggleTodos</code></td><td><kbd>Ctrl</kbd>+<kbd>T</kbd></td></tr>
+<tr><td><code>history:search</code></td><td><kbd>Ctrl</kbd>+<kbd>R</kbd></td></tr>
+<tr><td><code>chat:cycleMode</code></td><td><kbd>Shift</kbd>+<kbd>Tab</kbd></td></tr>
+<tr><td><code>chat:modelPicker</code></td><td><kbd>Meta</kbd>+<kbd>P</kbd></td></tr>
+<tr><td><code>chat:newline</code></td><td><kbd>Ctrl</kbd>+<kbd>J</kbd></td></tr>
+<tr><td><code>chat:stash</code></td><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td></tr>
+<tr><td><code>chat:imagePaste</code></td><td><kbd>Ctrl</kbd>+<kbd>V</kbd> (<kbd>Alt</kbd>+<kbd>V</kbd> on Windows/WSL)</td></tr>
+<tr><td><code>app:redraw</code></td><td>Not bound by default</td></tr>
+</table></div>
+<p>The full list of contexts and actions is on Anthropic's keybindings page; adding the <code>$schema</code> line gives you autocompletion in editors such as VS Code.</p>
+
+<h3 id="ch76-8"><span class="num">76.8</span>In VS Code and other surfaces</h3>
+<p>The VS Code extension, the desktop app and Claude Code on the web have their own interfaces, so not every terminal shortcut applies there. In the VS Code extension, <kbd>Option</kbd>+<kbd>K</kbd> (Mac) or <kbd>Alt</kbd>+<kbd>K</kbd> inserts an @-mention of the code you've selected, such as <code>@file.ts#5-10</code>. For the other surfaces, see <a href="#ch70">Chapter 70</a>.</p>
+
+<h3 id="ch76-9"><span class="num">76.9</span>Platform differences</h3>
+<div class="tbl"><table>
+<tr><th>Platform</th><th>What to know</th></tr>
+<tr><td>macOS</td><td><kbd>Alt</kbd> shortcuts (<kbd>Alt</kbd>+<kbd>B</kbd>, <kbd>F</kbd>, <kbd>D</kbd>, <kbd>Y</kbd>, <kbd>P</kbd>) need "Option as Meta" enabled in your terminal's settings. <kbd>Option</kbd>+<kbd>T</kbd> works without it. In iTerm2, <kbd>Cmd</kbd>+<kbd>V</kbd> also pastes images.</td></tr>
+<tr><td>Windows</td><td>Image paste is <kbd>Alt</kbd>+<kbd>V</kbd>. On older Node or Bun runtimes without VT input mode, mode cycling is <kbd>Alt</kbd>+<kbd>M</kbd> instead of <kbd>Shift</kbd>+<kbd>Tab</kbd>. <kbd>Ctrl</kbd>+<kbd>Z</kbd> suspend is Unix-only.</td></tr>
+<tr><td>WSL</td><td>Both <kbd>Ctrl</kbd>+<kbd>V</kbd> and <kbd>Alt</kbd>+<kbd>V</kbd> paste images; use <kbd>Alt</kbd>+<kbd>V</kbd> if your terminal grabs <kbd>Ctrl</kbd>+<kbd>V</kbd>.</td></tr>
+<tr><td>tmux</td><td>Press <kbd>Ctrl</kbd>+<kbd>B</kbd> twice to background a task (tmux uses it as its own prefix).</td></tr>
+<tr><td>Older terminals</td><td><kbd>Shift</kbd>+<kbd>Enter</kbd> may not work until you run <code>/terminal-setup</code>. <kbd>Ctrl</kbd>+<kbd>Enter</kbd> may arrive as plain <kbd>Enter</kbd>; use <kbd>Ctrl</kbd>+<kbd>X</kbd> <kbd>Ctrl</kbd>+<kbd>S</kbd>.</td></tr>
+</table></div>
+
+<div class="lab"><div class="lab-h"><b>Shortcut drill</b><span>20 min · any project folder</span></div><ol>
+<li>Start <code>claude</code> and press <kbd>?</kbd> on the empty prompt.<span class="expect">the shortcut help panel. Compare it with 73.2.</span></li>
+<li>Type a two-line prompt using <code>\</code> then <kbd>Enter</kbd> between the lines.<span class="expect">a new line appears without sending.</span></li>
+<li>Ask Claude to "explain every file in this folder", then press <kbd>Esc</kbd> after a few seconds.<span class="expect">Claude stops; what it had done stays on screen.</span></li>
+<li>Press <kbd>Ctrl</kbd>+<kbd>O</kbd>, look around, then press <kbd>q</kbd>.<span class="expect">a detailed view of tool calls, then back to normal.</span></li>
+<li>Type half a prompt, press <kbd>Ctrl</kbd>+<kbd>S</kbd>, type <code>/context</code>, then press <kbd>Ctrl</kbd>+<kbd>S</kbd> on the empty prompt.<span class="expect">your half-written prompt comes back.</span></li>
+<li>Press <kbd>Ctrl</kbd>+<kbd>R</kbd> and type a word from an earlier prompt.<span class="expect">the matching old prompt appears.</span></li>
+<li>Press <kbd>Esc</kbd> <kbd>Esc</kbd> on an empty prompt.<span class="expect">the rewind menu listing earlier points in the conversation. Press <kbd>Esc</kbd> to leave without changing anything.</span></li>
+<li>Run <code>/keybindings</code> and look at the file it opens.<span class="expect">your keybindings file (created if it didn't exist).</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"<kbd>Ctrl</kbd>+<kbd>L</kbd> clears the conversation."</dt><dd>It only redraws the screen. Use <code>/clear</code> to start fresh.</dd>
+<dt>"<kbd>Ctrl</kbd>+<kbd>_</kbd> undoes Claude's edit."</dt><dd>It undoes your typing in the input box. To undo Claude's changes, use rewind (<kbd>Esc</kbd> <kbd>Esc</kbd> or <code>/rewind</code>).</dd>
+<dt>"<kbd>Ctrl</kbd>+<kbd>T</kbd> shows background tasks."</dt><dd>It shows Claude's to-do checklist. Background shells and subagents are in <code>/tasks</code>.</dd>
+<dt>"<kbd>Alt</kbd> shortcuts are broken on my Mac."</dt><dd>Turn on "Option as Meta" in your terminal's settings.</dd>
+<dt>"Starting with <code>#</code> saves a memory."</dt><dd>Not any more; that was removed in version 2.0.70.</dd>
+</dl></div>
+
+<h3 id="ch76-r"><span class="num">76.10</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Learn ten first: <kbd>Esc</kbd>, <kbd>Esc</kbd> <kbd>Esc</kbd>, <kbd>Shift</kbd>+<kbd>Tab</kbd>, <kbd>Ctrl</kbd>+<kbd>C</kbd>, <kbd>Ctrl</kbd>+<kbd>R</kbd>, <kbd>Ctrl</kbd>+<kbd>O</kbd>, a newline key, <code>@</code>, <code>!</code> and <kbd>?</kbd>.</li>
+<li><code>\</code> + <kbd>Enter</kbd> and <kbd>Ctrl</kbd>+<kbd>J</kbd> give a new line in any terminal.</li>
+<li><kbd>Ctrl</kbd>+<kbd>L</kbd> redraws; <code>/clear</code> clears. Rewind undoes Claude's changes; <kbd>Ctrl</kbd>+<kbd>_</kbd> undoes your typing.</li>
+<li>Shortcuts can be changed in <code>~/.claude/keybindings.json</code> via <code>/keybindings</code>.</li>
+<li>Platform matters: Option as Meta on macOS, <kbd>Alt</kbd>+<kbd>V</kbd> on Windows, double <kbd>Ctrl</kbd>+<kbd>B</kbd> in tmux.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Your screen looks garbled. Which key fixes it without losing anything?</p><div class="opts"><button data-ok><kbd>Ctrl</kbd>+<kbd>L</kbd></button><button><code>/clear</code></button><button><kbd>Ctrl</kbd>+<kbd>D</kbd></button></div><p class="why" hidden><kbd>Ctrl</kbd>+<kbd>L</kbd> redraws and keeps everything. <code>/clear</code> starts a new conversation; <kbd>Ctrl</kbd>+<kbd>D</kbd> exits.</p></div>
+<div class="qz"><p class="q">Claude edited three files the wrong way. How do you undo the edits?</p><div class="opts"><button><kbd>Ctrl</kbd>+<kbd>_</kbd></button><button data-ok><kbd>Esc</kbd> <kbd>Esc</kbd> on an empty prompt (rewind)</button><button><kbd>Ctrl</kbd>+<kbd>Z</kbd></button></div><p class="why" hidden>Rewind restores code and conversation from an earlier point. <kbd>Ctrl</kbd>+<kbd>_</kbd> undoes only your typing; <kbd>Ctrl</kbd>+<kbd>Z</kbd> suspends the program.</p></div>
+<div class="qz"><p class="q">Which works for a new line in <em>every</em> terminal without set-up?</p><div class="opts"><button><kbd>Shift</kbd>+<kbd>Enter</kbd></button><button data-ok><kbd>Ctrl</kbd>+<kbd>J</kbd></button><button><kbd>Option</kbd>+<kbd>Enter</kbd></button></div><p class="why" hidden><kbd>Ctrl</kbd>+<kbd>J</kbd> (and <code>\</code> + <kbd>Enter</kbd>) work everywhere. The others depend on the terminal or settings.</p></div>
+<div class="qz"><p class="q">A long test run is blocking you. What sends it to the background?</p><div class="opts"><button data-ok><kbd>Ctrl</kbd>+<kbd>B</kbd></button><button><kbd>Ctrl</kbd>+<kbd>T</kbd></button><button><kbd>Esc</kbd></button></div><p class="why" hidden><kbd>Ctrl</kbd>+<kbd>B</kbd> backgrounds it. <kbd>Ctrl</kbd>+<kbd>T</kbd> shows the task checklist; <kbd>Esc</kbd> interrupts.</p></div>
+<div class="qz"><p class="q">Where do custom keyboard shortcuts live?</p><div class="opts"><button><code>.mcp.json</code></button><button data-ok><code>~/.claude/keybindings.json</code>, opened with <code>/keybindings</code></button><button><code>CLAUDE.md</code></button></div><p class="why" hidden>Changes there apply immediately, without a restart.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick three things you do often in Claude Code (for example compacting, opening the transcript, or switching to plan mode). Use <code>/keybindings</code> to give one of them a shortcut with a <code>command:&lt;name&gt;</code> action, test it, then write a five-line "my shortcuts" note for your team. Mention which terminal and operating system you tested on.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Esc stops Claude, Esc Esc rewinds, Shift+Tab changes permission mode, Ctrl+R finds an old prompt, Ctrl+O shows what Claude actually ran. For a new line use backslash-Enter or Ctrl+J. At the start of a message, slash runs a command and exclamation mark runs a shell command yourself; @ points Claude at a file. Press question mark on an empty prompt to see the full list."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/interactive-mode" target="_blank" rel="noopener">Claude Code: interactive mode</a> (shortcuts, multi-line input, quick commands, shell mode, history, transcript viewer, vim mode).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/keybindings" target="_blank" rel="noopener">Claude Code: customize keyboard shortcuts</a> (keybindings.json, contexts, actions).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/terminal-config" target="_blank" rel="noopener">Claude Code: terminal configuration</a> (Option as Meta, Shift+Enter).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/permission-modes" target="_blank" rel="noopener">Claude Code: permission modes</a> (Shift+Tab cycle).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/mcp" target="_blank" rel="noopener">Claude Code: MCP</a> (@ references to MCP resources).</li>
+<li>Claude Code changelog: versions 2.0.70 (<code>#</code> removed) and 2.1.92 (<code>/vim</code> removed).</li>
+</ol><p class="verified">Verified 9 November 2026 against Claude Code 2.1.319</p></div>

@@ -1,0 +1,228 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What model cards and system cards are, what they contain and where to find them</li>
+<li>What the most quoted benchmarks actually measure</li>
+<li>How to read a benchmark claim: the questions to ask about versions, settings, sample size and who ran it</li>
+<li>The common traps: cherry-picking, contamination, saturation, leaderboard gaming and "state of the art" marketing</li>
+<li>A red-flags checklist and a small script to tell a real gap from noise</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch31">Chapter 31</a> (model tiers and versions) and <a href="#ch32">Chapter 32</a> (open and closed models). Testers will find this chapter familiar: it applies ordinary test-report scepticism to AI claims. <a href="#ch125">Chapter 125</a> (evals) and <a href="#ch36">Chapter 36</a> (testing models yourself) build on it.</div>
+
+<div class="bigidea"><p>Every model launch comes with charts showing it beating its rivals. Those numbers are real measurements, but of a narrow thing, under chosen conditions, usually reported by the company selling the model. A model card or system card tells you what the model is for, how it was tested and what risks were found. A benchmark score tells you how it did on one fixed set of tasks. Reading them well means asking the questions a good tester asks of any test report: what exactly was tested, how, by whom, how many times, and does it resemble my use? The final answer always comes from testing on your own tasks.</p></div>
+
+<h3 id="ch33-1"><span class="num">33.1</span>Where claims about models come from</h3>
+<p>When a new model is released, information arrives from several places. They differ a lot in how much you should trust them.</p>
+<div class="tbl"><table>
+<tr><th>Source</th><th>Who writes it</th><th>Strength</th><th>Watch for</th></tr>
+<tr><td>Launch post or keynote</td><td>The vendor's marketing and research teams</td><td>First and most detailed numbers</td><td>Selected benchmarks, favourable settings, eye-catching charts</td></tr>
+<tr><td><a class="gl" href="#g-model-card">Model card</a></td><td>The model's makers</td><td>Intended use, limits, evaluation details in one place</td><td>Can be thin, especially for open-weight uploads</td></tr>
+<tr><td><a class="gl" href="#g-system-card">System card</a></td><td>The vendor's research and safety teams</td><td>Safety testing, red-teaming, deployment decisions, known risks</td><td>Long; still self-reported</td></tr>
+<tr><td>Public <a class="gl" href="#g-leaderboard">leaderboard</a></td><td>Benchmark maintainers or third parties</td><td>Same test for many models</td><td>Different settings per entry; gaming; staleness</td></tr>
+<tr><td>Independent evaluation or replication</td><td>Researchers, evaluation organisations, journalists</td><td>No sales interest in the result</td><td>May test an older version or a different setup</td></tr>
+<tr><td>Your own evals</td><td>You</td><td>Your tasks, your data, your definition of "good"</td><td>Small samples; needs care (<a href="#ch36">Chapter 36</a>)</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Buying a used car, you read the seller's advert, the manufacturer's spec sheet, an independent review and the MOT history, and then you take it for a test drive. The advert isn't lying, but it shows the car's best side. The test drive is the only one about <em>your</em> commute. Model launch posts are the advert; your own evals are the test drive.</p></div>
+
+<h3 id="ch33-2"><span class="num">33.2</span>Model cards and system cards</h3>
+<p>The idea of a <strong>model card</strong> comes from a 2019 paper by Margaret Mitchell and colleagues, "Model Cards for Model Reporting". They proposed a short, standard document shipped with every model, like a nutrition label. Their suggested sections are still the backbone of most model cards today:</p>
+<div class="tbl"><table>
+<tr><th>Section</th><th>What it tells you</th><th>Questions a tester asks</th></tr>
+<tr><td>Model details</td><td>Who built it, version, date, type, licence</td><td>Is this the exact version I'll use?</td></tr>
+<tr><td>Intended use</td><td>What it's for, and uses that are out of scope</td><td>Is my use case inside the intended scope?</td></tr>
+<tr><td>Factors</td><td>Groups, conditions or environments that affect performance</td><td>Were languages, accents, domains like mine considered?</td></tr>
+<tr><td>Metrics</td><td>How performance was measured and why</td><td>Does the metric match what "good" means for me?</td></tr>
+<tr><td>Evaluation data</td><td>Which datasets were used for testing</td><td>Do they look like my data?</td></tr>
+<tr><td>Training data</td><td>What it learned from (often only at a high level)</td><td>Could the test data have been in the training data?</td></tr>
+<tr><td>Quantitative analyses</td><td>Results, ideally broken down by factor</td><td>Are there weak spots hidden by the average?</td></tr>
+<tr><td>Ethical considerations</td><td>Risks, sensitive uses, mitigations</td><td>What could go wrong in my context?</td></tr>
+<tr><td>Caveats and recommendations</td><td>Known limits and advice</td><td>What does the maker themselves warn about?</td></tr>
+</table></div>
+<p>On Hugging Face, every model repository has a model card as its front page (the README you see when you open the model). Quality varies a great deal: some are thorough; some are a one-line description and a licence.</p>
+<p>A <strong>system card</strong> is the larger document that frontier labs such as Anthropic and OpenAI publish with major releases. "System" is a hint: it describes the model <em>as deployed</em>, including safeguards around it. A typical system card covers:</p>
+<ul>
+<li>capabilities and benchmark results, with the settings used;</li>
+<li>safety evaluations: harmful-request handling, over-refusal, bias, honesty and <a class="gl" href="#g-hallucination">hallucination</a> rates;</li>
+<li>dangerous-capability testing (for example cyber, biological and chemical risks) and red-teaming by internal and external testers;</li>
+<li>agentic safety: how the model behaves with tools, including <a class="gl" href="#g-prompt-injection">prompt injection</a> robustness;</li>
+<li>the deployment decision, such as which safety level applied. Anthropic's Transparency Hub, for example, states that Claude Opus 5 and Claude Fable 5.1 were deployed with ASL-3 protections under its Responsible Scaling Policy (<a href="#ch38">Chapter 38</a>).</li>
+</ul>
+<div class="box example"><span class="tag">Real-world example</span><p>A QA lead is asked whether a new model can review accessibility issues in screenshots. The launch post shows a high "vision" score. The system card, read more carefully, shows the vision benchmarks were about charts and documents, and lists small-text reading as a known limit. That's not a "no", but it changes the plan: run a 30-screenshot pilot on the team's own pages before trusting it (see <a href="#ch21">Chapter 21</a> on multimodal limits).</p></div>
+<div class="box note"><span class="tag">Read it in twenty minutes</span><p>System cards can run to well over a hundred pages. You don't need all of it. Read the summary, the section on your use (coding, agents, vision), the stated limitations, and any table where the new model is <em>worse</em> than the previous one. Those regressions are the most useful lines in the document.</p></div>
+
+<h3 id="ch33-3"><span class="num">33.3</span>What the famous benchmarks measure</h3>
+<p>A <a class="gl" href="#g-benchmark">benchmark</a> is a fixed set of tasks with a scoring method, used to compare models. Each one measures something specific. These are among the most cited in 2026:</p>
+<div class="tbl"><table>
+<tr><th>Benchmark</th><th>What it measures</th><th>Status note (2026)</th></tr>
+<tr><td>MMLU</td><td>Multiple-choice knowledge across 57 subjects</td><td>Largely saturated by frontier models; harder variants such as MMLU-Pro are used instead</td></tr>
+<tr><td>GPQA Diamond</td><td>Graduate-level science questions written by PhD experts, hard to answer by searching</td><td>Widely quoted hardest subset</td></tr>
+<tr><td>SWE-bench Verified</td><td>Fixing real GitHub issues in Python repositories so that tests pass; a human-checked 500-task subset</td><td>OpenAI stopped reporting it on 23 Feb 2026, citing contamination and flawed tasks, and recommends SWE-bench Pro</td></tr>
+<tr><td>Terminal-Bench</td><td>Agents completing real tasks in a command-line terminal</td><td>Newer versions cited in 2026 launches</td></tr>
+<tr><td>ARC-AGI-3</td><td>Solving novel, game-like interactive puzzles from a few examples</td><td>At launch (March 2026) humans solved 100% and the best AI about 0.37%</td></tr>
+<tr><td>Humanity's Last Exam</td><td>About 2,500 very hard expert-written questions across many fields</td><td>Built to sit at the edge of human knowledge</td></tr>
+<tr><td>Arena (formerly LMArena / Chatbot Arena)</td><td>People vote blind between two chatbot answers; votes become Elo-style rankings</td><td>Measures preference, not correctness</td></tr>
+</table></div>
+<p>Notice how different these are. A model can top a knowledge quiz and be mediocre at fixing code; it can win human preference votes by sounding confident and friendly while being less accurate. No single number captures "better".</p>
+<details class="deep"><summary>Benchmark scoring terms you'll meet</summary><div class="body">
+<ul>
+<li><strong>Accuracy / pass rate.</strong> The share of tasks answered correctly. The headline number on most charts.</li>
+<li><strong>pass@1 vs pass@k.</strong> pass@1 means the first attempt must be right. pass@k means the task counts as solved if any of <em>k</em> attempts is right. pass@10 is always at least as high as pass@1, so compare like with like.</li>
+<li><strong>Elo / Arena score.</strong> A rating from head-to-head votes, borrowed from chess. Differences of a few points between neighbours are often within the uncertainty.</li>
+<li><strong>Zero-shot vs few-shot.</strong> Whether examples were included in the prompt. Few-shot usually scores higher.</li>
+<li><strong>With or without tools.</strong> Scores on maths or knowledge tests can jump when the model may run code or search the web. Charts don't always make clear which was used.</li>
+<li><strong>Effort / thinking budget.</strong> Reasoning models score differently at different effort levels (<a href="#ch19">Chapter 19</a>). A launch chart may show maximum effort, while your app runs at the default.</li>
+</ul>
+</div></details>
+
+<h3 id="ch33-4"><span class="num">33.4</span>Reading a benchmark claim like a tester</h3>
+<p>Imagine a launch post says: "Model A scores 72.4% on CodeFix-500, beating Model B's 70.8%." Before you believe the ranking, ask six questions.</p>
+<div class="flow">
+<div><b>1. Which versions?</b>Exact model IDs and dates, for both models</div>
+<div><b>2. Which settings?</b>Effort, tools, prompts, attempts (pass@1 or pass@k), the scaffold or harness</div>
+<div><b>3. Who ran it?</b>The vendor, the benchmark authors or an independent group?</div>
+<div class="hl"><b>4. How many tasks?</b>Is the gap bigger than the noise?</div>
+<div><b>5. What was left out?</b>Benchmarks where it lost; regressions from the last version</div>
+<div><b>6. Like my work?</b>Language, domain, task length, tools</div>
+</div>
+<p>Question 4 is the one most often skipped. Scores measured on a few hundred tasks have a margin of error, just as an opinion poll does. Here is a small script that estimates it:</p>
+<div class="code"><span class="cap">bench.py</span><pre><span class="c"># bench.py - is a benchmark gap bigger than the noise?</span>
+<span class="c"># Uses a normal approximation for two independent pass rates. Rough, but honest.</span>
+import math
+
+def margin(p, n):
+    """95% margin of error for a pass rate p measured on n tasks."""
+    return 1.96 * math.sqrt(p * (1 - p) / n)
+
+def compare(name_a, score_a, name_b, score_b, n_tasks):
+    a, b = score_a / 100, score_b / 100
+    gap = a - b
+    se_gap = math.sqrt(a * (1 - a) / n_tasks + b * (1 - b) / n_tasks)
+    low, high = gap - 1.96 * se_gap, gap + 1.96 * se_gap
+    print(f"{name_a}: {score_a:.1f}% +/- {margin(a, n_tasks) * 100:.1f}")
+    print(f"{name_b}: {score_b:.1f}% +/- {margin(b, n_tasks) * 100:.1f}")
+    print(f"Gap: {gap * 100:+.1f} points, 95% range {low * 100:+.1f} to {high * 100:+.1f}")
+    if low &gt; 0 or high &lt; 0:
+        print("Verdict: the gap is larger than the noise for this many tasks.")
+    else:
+        print("Verdict: within the noise - the ranking could flip on a rerun.")
+    print()
+
+<span class="c"># Illustrative figures, not real results</span>
+compare("Model A", 72.4, "Model B", 70.8, n_tasks=500)
+compare("Model A", 72.4, "Model B", 62.0, n_tasks=500)
+compare("Model A", 90.0, "Model B", 80.0, n_tasks=40)</pre></div>
+<div class="code"><span class="cap">Expected output</span><pre>Model A: 72.4% +/- 3.9
+Model B: 70.8% +/- 4.0
+Gap: +1.6 points, 95% range -4.0 to +7.2
+Verdict: within the noise - the ranking could flip on a rerun.
+
+Model A: 72.4% +/- 3.9
+Model B: 62.0% +/- 4.3
+Gap: +10.4 points, 95% range +4.6 to +16.2
+Verdict: the gap is larger than the noise for this many tasks.
+
+Model A: 90.0% +/- 9.3
+Model B: 80.0% +/- 12.4
+Gap: +10.0 points, 95% range -5.5 to +25.5
+Verdict: within the noise - the ranking could flip on a rerun.</pre></div>
+<p>The third case matters for your own work: a ten-point gap on 40 test cases can easily be luck. Small internal evals need either more cases or repeated runs before you declare a winner.</p>
+<details class="deep"><summary>Why this script is deliberately rough</summary><div class="body">
+<p>The script treats the two scores as independent samples. When both models are run on the <em>same</em> tasks, a paired analysis (counting the tasks where only A succeeded versus only B) is tighter and more appropriate; McNemar's test is the classic method. Models are also <a class="gl" href="#g-non-deterministic">non-deterministic</a>, so each model's own score varies from run to run; repeating the whole run several times and reporting the spread is good practice. The rough version is still useful as a first sanity check: if even it says "within the noise", don't announce a winner.</p>
+</div></details>
+
+<h3 id="ch33-5"><span class="num">33.5</span>The common traps</h3>
+<h4><a class="gl" href="#g-cherry-picking">Cherry-picking</a></h4>
+<p>A vendor runs its model on twenty benchmarks and shows the eight where it wins. Nothing on the chart is false; the picture is still misleading. Look for what's missing: a benchmark rivals usually report, or last generation's chart that included a test now dropped.</p>
+<h4><a class="gl" href="#g-benchmark-contamination">Contamination</a></h4>
+<p>Models train on huge scrapes of the internet. If a benchmark's questions and answers are online, they may end up in training data, and the model can score well by remembering rather than solving. This is one reason OpenAI stopped reporting SWE-bench Verified in February 2026. Benchmarks built from new, private or regularly refreshed tasks resist contamination better.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>If last year's exam paper with answers has been circulating among students, high marks this year prove less. Some students learned the subject; some learned the answers. The examiner can't tell from the marks alone.</p></div>
+<h4><a class="gl" href="#g-benchmark-saturation">Saturation</a></h4>
+<p>When top models all score near the ceiling (as with MMLU), the benchmark stops separating them. A one-point gain at 92% is mostly noise and possibly memorisation. New, harder benchmarks keep appearing for this reason.</p>
+<h4>Teaching to the test</h4>
+<p>Once a benchmark becomes a target, effort goes into raising that number specifically. This is <a class="gl" href="#g-goodhart-s-law">Goodhart's law</a>: "when a measure becomes a target, it ceases to be a good measure". Testers know this from code-coverage targets that produce tests with no assertions.</p>
+<h4>Leaderboard gaming</h4>
+<p>Public leaderboards can be gamed too. A 2025 study of Chatbot Arena, "The Leaderboard Illusion" (Singh et al.), reported that some providers privately tested many variants and published only the best; the authors observed as many as 27 private Meta variants in the run-up to the Llama 4 release. These are the authors' findings; treat leaderboard positions as one signal, not a verdict.</p>
+<h4>"State of the art" marketing</h4>
+<p>"SOTA" (state of the art) just means "best reported score on this benchmark, under our conditions, at the time of writing". It may be best among open models only, best at one size, or best by 0.3 points. It also expires quickly.</p>
+<h4>Apples and oranges</h4>
+<p>Scores for different models are often gathered under different conditions: one at maximum effort with tools and a custom agent harness, another at default settings from its own launch post. Agentic coding scores in particular depend heavily on the harness (the code around the model that runs tools and retries). Only compare numbers from the same setup.</p>
+<h4>Chart tricks</h4>
+<p>A bar chart whose vertical axis starts at 60% makes a two-point gap look enormous. Always read the axis and the actual numbers.</p>
+
+<h3 id="ch33-6"><span class="num">33.6</span>A red-flags checklist</h3>
+<input class="filter" data-filter="#ch33flags" data-empty="#ch33flagsEmpty" type="search" placeholder="Filter red flags…" aria-label="Filter red flags">
+<div class="tbl"><table id="ch33flags">
+<tr><th>Red flag</th><th>Question to ask</th></tr>
+<tr class="group"><td colspan="2">What was tested</td></tr>
+<tr><td>Model versions not stated, or compared with a rival's older version</td><td>Which exact IDs and dates?</td></tr>
+<tr><td>Benchmark name without a version or subset</td><td>Which version, which subset, how many tasks?</td></tr>
+<tr><td>Benchmark known to be saturated or contaminated</td><td>Is there a newer, harder or private alternative?</td></tr>
+<tr class="group"><td colspan="2">How it was tested</td></tr>
+<tr><td>Settings missing (effort, tools, pass@k, prompts)</td><td>Were all models run the same way?</td></tr>
+<tr><td>Custom harness or "internal scaffold" for one model only</td><td>Would the default setup score the same?</td></tr>
+<tr><td>Single run, no error bars</td><td>How much does the score vary between runs?</td></tr>
+<tr class="group"><td colspan="2">How it is presented</td></tr>
+<tr><td>Only wins shown; familiar benchmarks missing</td><td>Where did it lose or regress?</td></tr>
+<tr><td>Truncated chart axis</td><td>What are the actual numbers?</td></tr>
+<tr><td>"SOTA" without qualification</td><td>Best among which models, at what date, by how much?</td></tr>
+<tr><td>Small gap declared a win</td><td>Is it bigger than the margin of error?</td></tr>
+<tr class="group"><td colspan="2">Relevance to you</td></tr>
+<tr><td>Benchmark unlike your tasks (language, domain, length)</td><td>What happens on twenty of my real cases?</td></tr>
+<tr><td>Only vendor-reported numbers</td><td>Has anyone independent reproduced them?</td></tr>
+</table></div>
+<p id="ch33flagsEmpty" hidden>No red flags match.</p>
+<div class="box opinion"><span class="tag">Opinion · common among evaluation practitioners</span><p>Many people who build AI evaluations argue that public benchmarks are best used to shortlist models, never to make the final choice. The final choice should come from a small, representative eval on your own tasks, scored the way your users would judge the output. This book takes the same view; <a href="#ch36">Chapter 36</a> shows how.</p></div>
+
+<h3 id="ch33-7"><span class="num">33.7</span>From reading claims to running your own</h3>
+<p>Benchmarks and cards narrow the field. Your own testing decides. A QA team is already well placed for this: you know how to write test cases, define expected results, and report pass rates with caveats.</p>
+<div class="flow">
+<div><b>Shortlist</b>Use cards, benchmarks and price to pick 2–3 candidates</div>
+<div><b>Sample</b>Collect 30–100 real tasks with agreed "good" answers</div>
+<div class="hl"><b>Run fairly</b>Same prompts, same settings, several runs each</div>
+<div><b>Score</b>Code checks, rubric, or <a class="gl" href="#g-llm-as-judge">LLM-as-judge</a> with spot checks</div>
+<div><b>Decide and record</b>Note versions, dates, scores, margins and cost</div>
+</div>
+
+<div class="lab"><div class="lab-h"><b>Audit a real launch claim</b><span>40 min · web browser + Python 3</span></div><ol>
+<li>Choose a recent model launch post from any vendor (for example, a post linked from the Claude models overview, or from OpenAI's or Google's model pages listed in Sources). Find its main benchmark chart or table.<span class="expect">a chart or table with at least three benchmarks and two or more competing models.</span></li>
+<li>Copy the red-flags checklist from 33.6 into a document. Go through it line by line for this one post, noting "OK", "red flag" or "can't tell" with a one-line reason.<span class="expect">most posts show several "can't tell" entries, typically settings, run counts and error bars. That is normal, and is itself a finding.</span></li>
+<li>Find the matching model card or system card (for Anthropic, start from the <a href="https://www.anthropic.com/transparency" target="_blank" rel="noopener">Transparency Hub</a>). Look for one result where the new model is <em>worse</em> than its predecessor, and one stated limitation.<span class="expect">at least one regression or limitation that wasn't in the launch post's headline.</span></li>
+<li>Save <code>bench.py</code> from 33.4 and run <code>python3 bench.py</code>. Then add a <code>compare(...)</code> line using two real scores from your chosen chart and the benchmark's task count (look it up; SWE-bench Verified, for instance, has 500 tasks).<span class="expect">the three illustrative results shown in 33.4, then a verdict for your real pair.</span></li>
+<li>Write a five-line summary for your team: what the claim says, what it doesn't show, whether the gap is beyond noise, and what you'd test yourself.<span class="expect">a short, balanced note you could post in a team channel.</span></li>
+</ol></div>
+<p><b>Troubleshooting.</b> Can't find a task count: check the benchmark's paper or website; if still unknown, write "can't tell" (that's a red flag). Chart shows ranges rather than single numbers: use the midpoint and note it. <code>python3</code> not found on Windows: use <code>py bench.py</code>. A launch post you open requires login: pick a different public one.</p>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"The model at the top of the leaderboard is the best model."</dt><dd>It's the best on that leaderboard's tasks under its conditions. For your task, a different model may win, and close ranks are often within the noise.</dd>
+<dt>"Vendor benchmark numbers are made up."</dt><dd>Usually they're real measurements. The issue is selection and settings, not fabrication. Read them carefully rather than dismissing them.</dd>
+<dt>"A high score means the model understands the subject."</dt><dd>It might, or the test might be contaminated or saturated. Check whether the benchmark resists memorisation.</dd>
+<dt>"Model cards are legal paperwork."</dt><dd>They are the maker's own statement of intended use, limits and test results: the best single place to find out what <em>not</em> to use the model for.</dd>
+<dt>"Our 20-case pilot proved Model A is better."</dt><dd>On 20 cases, even a large-looking gap can be luck. Use more cases, repeat runs and report the margin.</dd>
+</dl></div>
+
+<h3 id="ch33-r"><span class="num">33.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Claims come from launch posts, model cards, system cards, leaderboards, independent evaluations and your own tests; trust rises down that list.</li>
+<li>Model cards (Mitchell et al., 2019) set out intended use, factors, metrics, data, results and caveats; system cards add safety testing and deployment decisions.</li>
+<li>Each benchmark measures something narrow; preference votes are not correctness, and knowledge quizzes are not coding skill.</li>
+<li>Ask: which versions, which settings, who ran it, how many tasks, what's missing, and is it like my work?</li>
+<li>Watch for cherry-picking, contamination, saturation, Goodhart's law, leaderboard gaming, "SOTA" wording and truncated axes.</li>
+<li>Use public numbers to shortlist; decide with your own representative evals.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What is benchmark contamination?</p><div class="opts"><button>When a benchmark has too few questions</button><button data-ok>When benchmark questions or answers appeared in a model's training data, so it can score by remembering</button><button>When two models are tested with different prompts</button></div><p class="why" hidden>Contamination inflates scores without real skill. It's one reason OpenAI stopped reporting SWE-bench Verified in 2026.</p></div>
+<div class="qz"><p class="q">A launch chart shows Model A at 72.4% and Model B at 70.8% on a 500-task benchmark, single run. What's the best reading?</p><div class="opts"><button>Model A is clearly better</button><button data-ok>The gap is within the likely margin of error, so the ranking could flip on a rerun</button><button>Model B is better because it is cheaper</button></div><p class="why" hidden>With 500 tasks, each score carries roughly ±4 points of uncertainty; a 1.6-point gap isn't convincing on its own.</p></div>
+<div class="qz"><p class="q">Which document is most likely to describe a model's dangerous-capability testing and the safety level it was deployed under?</p><div class="opts"><button>The pricing page</button><button data-ok>The system card</button><button>A leaderboard entry</button></div><p class="why" hidden>System cards cover safety evaluations, red-teaming and deployment decisions, beyond the capability results in a model card.</p></div>
+<div class="qz"><p class="q">What does Arena (formerly LMArena) mainly measure?</p><div class="opts"><button>Correctness on expert exam questions</button><button>Ability to fix GitHub issues</button><button data-ok>Which answer people prefer in blind head-to-head votes</button></div><p class="why" hidden>Preference is useful but different from accuracy: a confident, well-formatted answer can win a vote while being wrong.</p></div>
+<div class="qz"><p class="q">How should a QA team use public benchmarks when choosing a model?</p><div class="opts"><button>Pick whichever model leads the most benchmarks</button><button data-ok>Use them to shortlist, then decide with a small eval on the team's own tasks</button><button>Ignore them completely</button></div><p class="why" hidden>Benchmarks narrow the field cheaply; only your own representative tasks tell you how a model performs on your work.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick two models your team might use. For each, find the model card or system card and complete a one-page "model fact sheet": exact version and date, intended uses and stated limits, three benchmark results relevant to your work (with settings and task counts), one regression or known weakness, and the source links. Then list five of your own real tasks you'd use to compare them, with what a "pass" looks like for each. Keep the fact sheets; you'll use them in <a href="#ch36">Chapter 36</a>.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Every AI launch comes with charts where the new model wins. The numbers are usually real, but chosen: the vendor picks the benchmarks, the settings and the comparison. So read them like a test report. Which exact versions? Same settings for everyone? How many test cases, and is the gap bigger than the noise? Could the questions have leaked into training data? What did they leave out? Model and system cards tell you intended use, limits and safety testing. Use all of that to shortlist, then test on our own work before deciding."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>M. Mitchell et al., "Model Cards for Model Reporting", FAT* 2019, <a href="https://arxiv.org/abs/1810.03993" target="_blank" rel="noopener">arXiv:1810.03993</a>.</li>
+<li>Hugging Face, <a href="https://huggingface.co/docs/hub/model-cards" target="_blank" rel="noopener">Model Cards documentation</a>.</li>
+<li>Anthropic, <a href="https://www.anthropic.com/transparency" target="_blank" rel="noopener">Transparency Hub</a> (system cards, ASL-3 deployment of Claude Opus 5 and Fable 5.1); <a href="https://www.anthropic.com/responsible-scaling-policy" target="_blank" rel="noopener">Responsible Scaling Policy</a>.</li>
+<li>D. Hendrycks et al., MMLU, <a href="https://arxiv.org/abs/2009.03300" target="_blank" rel="noopener">arXiv:2009.03300</a>; D. Rein et al., GPQA, <a href="https://arxiv.org/abs/2311.12022" target="_blank" rel="noopener">arXiv:2311.12022</a>; L. Phan et al., Humanity's Last Exam, <a href="https://arxiv.org/abs/2501.14249" target="_blank" rel="noopener">arXiv:2501.14249</a>.</li>
+<li>C. E. Jimenez et al., SWE-bench, <a href="https://arxiv.org/abs/2310.06770" target="_blank" rel="noopener">arXiv:2310.06770</a>; OpenAI, <a href="https://openai.com/index/why-we-no-longer-evaluate-swe-bench-verified/" target="_blank" rel="noopener">Why we no longer evaluate SWE-bench Verified</a> (Feb 2026).</li>
+<li>ARC Prize, <a href="https://arcprize.org/competitions/2026/arc-agi-3" target="_blank" rel="noopener">ARC-AGI-3 and ARC Prize 2026</a>; ARC-AGI-3 paper, <a href="https://arxiv.org/abs/2603.24621" target="_blank" rel="noopener">arXiv:2603.24621</a>.</li>
+<li>W.-L. Chiang et al., Chatbot Arena, <a href="https://arxiv.org/abs/2403.04132" target="_blank" rel="noopener">arXiv:2403.04132</a>; S. Singh et al., "The Leaderboard Illusion" (2025), <a href="https://arxiv.org/abs/2504.20879" target="_blank" rel="noopener">arXiv:2504.20879</a>.</li>
+<li>M. Chen et al., "Evaluating Large Language Models Trained on Code" (pass@k), <a href="https://arxiv.org/abs/2107.03374" target="_blank" rel="noopener">arXiv:2107.03374</a>.</li>
+</ol><p class="verified">Verified 9 November 2026 against the project's industry and Anthropic fact sheets and the papers listed. Benchmark status changes quickly; recheck before quoting.</p></div>

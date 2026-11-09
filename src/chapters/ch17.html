@@ -1,0 +1,296 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>The single training task behind every large language model: predict the next token</li>
+<li>How "wrongness" is measured (cross-entropy loss), with numbers you can check</li>
+<li>What goes into the training data, and how it is filtered</li>
+<li>Scale in three numbers: parameters, tokens and compute, including the "6 × N × D" rule of thumb</li>
+<li>What a model actually learns, roughly what it costs, and how sampling and temperature turn probabilities into text</li>
+<li>The difference between a base model and a chat model, and what a knowledge cutoff means for your work</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch16">Chapter 16</a> (the Transformer and next-token probabilities). Helpful: <a href="#ch12">Chapter 12</a> (loss and gradient descent) and <a href="#ch13">Chapter 13</a> (data).</div>
+
+<div class="bigidea"><p>Pre-training is the long, expensive first stage of building a language model. The model reads a vast amount of text and, at every position, tries to predict the next token. Each time it's wrong, its billions of weights are nudged slightly so it would do better next time. Repeated trillions of times, this one simple task forces the model to absorb grammar, facts, coding patterns and styles of reasoning. The result is a <em>base model</em>: brilliant at continuing text, but not yet a helpful assistant. That comes in post-training (<a href="#ch18">Chapter 18</a>).</p></div>
+
+<h3 id="ch17-1"><span class="num">17.1</span>One task: predict the next token</h3>
+<p>Every large language model you have used, Claude included, starts life the same way. Show it some text, hide what comes next, and ask it to guess. That's the whole pre-training task, called <a class="gl" href="#g-next-token-prediction">next-token prediction</a>.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Imagine learning a language only by reading millions of books with the next word always covered by your thumb. You guess, lift your thumb, see the real word, and adjust your instincts. At first your guesses are random. After a lifetime of this you'd know grammar, the plots of famous stories, how recipes are written and what usually happens in a bug report, without anyone ever teaching you a rule.</p></div>
+<p>The beauty of this task is that the text labels itself. No one has to annotate anything: the "right answer" is simply the next token in the document. Learning from labels that come from the data itself is called <strong>self-supervised learning</strong> (<a href="#ch10">Chapter 10</a>), and it is why models can learn from trillions of tokens rather than the thousands of examples a human team could label.</p>
+<p>One sentence gives many training examples at once. From "the login test failed on chrome" the model learns:</p>
+<div class="tbl"><table>
+<tr><th>The model sees</th><th>It must predict</th></tr>
+<tr><td>the</td><td>login</td></tr>
+<tr><td>the login</td><td>test</td></tr>
+<tr><td>the login test</td><td>failed</td></tr>
+<tr><td>the login test failed</td><td>on</td></tr>
+<tr><td>the login test failed on</td><td>chrome</td></tr>
+</table></div>
+<p>Thanks to the causal mask from <a href="#ch16">Chapter 16</a>, all five predictions are computed in a single pass: each position can only see the tokens before it, so none of them can cheat. A training document of 4,000 tokens gives about 4,000 predictions in one go.</p>
+
+<h3 id="ch17-2"><span class="num">17.2</span>Measuring wrongness: the loss</h3>
+<p>To improve, the model needs a number saying how wrong it was. The standard measure is <a class="gl" href="#g-cross-entropy-loss">cross-entropy loss</a>: look at the probability the model gave to the token that <em>actually</em> came next, and take minus its natural logarithm.</p>
+<div class="tbl"><table>
+<tr><th>Probability the model gave the real next token</th><th>Loss (−ln p)</th><th>In plain words</th></tr>
+<tr><td>0.99</td><td>0.01</td><td>Almost certain and right: tiny penalty</td></tr>
+<tr><td>0.60</td><td>0.51</td><td>Fairly confident and right: small penalty</td></tr>
+<tr><td>0.05</td><td>3.00</td><td>Thought it unlikely: big penalty</td></tr>
+<tr><td>0.000001</td><td>13.8</td><td>Ruled it out: huge penalty</td></tr>
+</table></div>
+<p>Training tries to make the <em>average</em> loss over all positions as low as possible. Notice the shape: being confidently wrong is punished far more than being unsure. So the model learns to spread probability sensibly when the future is genuinely uncertain ("the test… failed / passed / timed out") and to be sharp when it isn't ("the capital of France is…").</p>
+<details class="deep"><summary>Under the hood: perplexity</summary><div class="body">
+<p>Researchers often report <strong>perplexity</strong>, which is <i>e</i> raised to the average loss. A perplexity of 10 means the model is, on average, as uncertain as if it were choosing fairly between 10 tokens. Lower is better. Perplexity is only comparable between models that use the same tokenizer and the same test text, because different tokenizers cut text into different pieces (<a href="#ch14">Chapter 14</a>).</p>
+</div></details>
+
+<h3 id="ch17-3"><span class="num">17.3</span>One training step, repeated millions of times</h3>
+<p>Pre-training is gradient descent (<a href="#ch12">Chapter 12</a>) on a gigantic scale. Each step looks like this:</p>
+<div class="flow"><div><b>1 Batch</b>Take a batch of text sequences, often millions of tokens in total</div><div><b>2 Forward pass</b>Run them through the Transformer; get next-token probabilities at every position</div><div><b>3 Loss</b>Average −ln p of the real next tokens</div><div class="hl"><b>4 Backpropagation</b>Work out how each weight should move to lower the loss</div><div><b>5 Update</b>Nudge every weight a tiny amount; repeat</div></div>
+<p>A frontier model repeats this for weeks or months on thousands of chips working together. During the run, engineers watch the loss curve fall, save regular snapshots of the weights (checkpoints) in case hardware fails, and test the snapshots on held-out text and on <a class="gl" href="#g-benchmark">benchmarks</a> (<a href="#ch24">Chapter 24</a>). Usually the model sees each piece of data only about once, or a small number of times, which reduces pure memorisation.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>Think of it as the biggest regression run you can imagine. The "tests" are trillions of next-token predictions, the "pass rate" is the loss, and every failing test slightly rewrites the code (the weights). Like a long CI pipeline, the expensive part is running it, and a bad configuration discovered late wastes a lot of money, so teams run small trial versions first.</p></div>
+
+<h3 id="ch17-4"><span class="num">17.4</span>The data: what goes in</h3>
+<p>A model can only learn patterns that are in its data, so the training set (the <a class="gl" href="#g-dataset">dataset</a>) is one of the most closely guarded parts of any model. Labs rarely publish full details. The typical ingredients:</p>
+<div class="tbl"><table>
+<tr><th>Source</th><th>What it adds</th></tr>
+<tr><td>Public web pages (often from crawls such as the non-profit Common Crawl, or the lab's own crawler)</td><td>Breadth: everyday language, news, forums, how-to pages</td></tr>
+<tr><td>Code (for example public repositories)</td><td>Programming languages, and the habit of precise, step-by-step structure</td></tr>
+<tr><td>Books and long-form writing</td><td>Long, coherent text and narrative</td></tr>
+<tr><td>Scientific papers, reference works such as Wikipedia</td><td>Dense facts and technical reasoning</td></tr>
+<tr><td>Many languages</td><td>Multilingual ability</td></tr>
+<tr><td>Licensed and synthetic data</td><td>Specific domains; data generated by other models to fill gaps (<a class="gl" href="#g-synthetic-data">synthetic data</a>)</td></tr>
+</table></div>
+<p>Raw web text is mostly junk, so a large part of the work is cleaning: removing duplicates, spam, boilerplate and low-quality pages, filtering harmful content, trying to strip personal information, and respecting sites that opt out of crawling. The final proportions of each source, the <strong>data mixture</strong>, are a key design decision. One of the few published examples is GPT-3:</p>
+<div class="figure" role="img" aria-label="GPT-3 training mixture by weight: filtered Common Crawl 60%, WebText2 22%, Books1 8%, Books2 8%, Wikipedia 3%."><div class="bars"><div class="bt">GPT-3 training mixture (share of training examples drawn from each source)</div>
+<div class="bar-row"><span>Common Crawl (filtered)</span><span class="track"><span class="fill hl" style="width:60%">60%</span></span></div>
+<div class="bar-row"><span>WebText2</span><span class="track"><span class="fill" style="width:22%">22%</span></span></div>
+<div class="bar-row"><span>Books1</span><span class="track"><span class="fill" style="width:8%">8%</span></span></div>
+<div class="bar-row"><span>Books2</span><span class="track"><span class="fill" style="width:8%">8%</span></span></div>
+<div class="bar-row"><span>Wikipedia</span><span class="track"><span class="fill" style="width:3%">3%</span></span></div></div>
+<div class="cap">Source: Brown et al. (2020), Table 2.2. Smaller, higher-quality sources were sampled more often than their size alone would suggest.</div></div>
+<div class="box warn"><span class="tag">Contamination</span><p>If benchmark questions or your own test set leaked onto the web before the crawl, the model may have seen the answers. That inflates scores without improving skill. It is one reason to build private evaluations from your own data (<a href="#ch36">Chapter 36</a>, <a href="#ch125">Chapter 125</a>).</p></div>
+<div class="box opinion"><span class="tag">Opinion · public debate</span><p>Whether training on copyrighted or personal data without explicit permission is fair is contested by authors, artists, publishers, privacy advocates and AI companies, and is being tested in courts in several countries. <a href="#ch13">Chapter 13</a> covers the arguments on each side. Treat strong claims either way as positions, not settled law.</p></div>
+
+<h3 id="ch17-5"><span class="num">17.5</span>Scale: parameters, tokens and compute</h3>
+<p>Three numbers describe the size of a pre-training run:</p>
+<div class="cols2">
+<div><h4>Parameters (N)</h4><p>How many adjustable weights the model has: its capacity to store patterns. GPT-3 had 175 billion.</p></div>
+<div><h4>Training tokens (D)</h4><p>How much text it reads. GPT-3 read about 300 billion tokens.</p></div>
+</div>
+<p>The third is <a class="gl" href="#g-compute">compute</a>: the total arithmetic done, counted in <a class="gl" href="#g-flop">FLOPs</a> (floating-point operations, single multiplications or additions). A widely used rule of thumb for Transformers is:</p>
+<div class="code"><span class="cap">Training compute, rule of thumb</span><pre>compute ≈ 6 × N × D   <span class="c"># about 2 for the forward pass, 4 for the backward pass, per parameter per token</span>
+
+GPT-3: 6 × 175,000,000,000 × 300,000,000,000 ≈ 3.15 × 10<sup>23</sup> FLOPs</pre></div>
+<p>The GPT-3 paper reports 3.14 × 10<sup>23</sup>, so the rule works well. To picture it: a laptop doing a trillion operations a second would need around ten thousand years.</p>
+<h4>Scaling laws</h4>
+<p>In 2020, researchers at OpenAI (Kaplan et al.) showed that loss falls smoothly and predictably as you increase parameters, data and compute together, following simple curves called <a class="gl" href="#g-scaling-laws">scaling laws</a>. Labs use them to predict how a giant model will do from small trial runs. In 2022 DeepMind's "Chinchilla" paper (Hoffmann et al.) showed many models were too big for the data they were given: for a fixed compute budget, it's better to use roughly <strong>20 training tokens per parameter</strong>. Their 70-billion-parameter Chinchilla, trained on 1.4 trillion tokens, beat their own 280-billion-parameter Gopher.</p>
+<div class="figure" role="img" aria-label="Published training token counts: GPT-3 300 billion, Chinchilla 1.4 trillion, Llama 2 2 trillion, Llama 3 over 15 trillion."><div class="bars"><div class="bt">Training tokens, as published by each developer</div>
+<div class="bar-row"><span>GPT-3 (2020)</span><span class="track"><span class="fill" style="width:2%"></span></span></div>
+<div class="bar-row"><span>Chinchilla (2022)</span><span class="track"><span class="fill" style="width:9.3%">1.4T</span></span></div>
+<div class="bar-row"><span>Llama 2 (2023)</span><span class="track"><span class="fill" style="width:13.3%">2T</span></span></div>
+<div class="bar-row"><span>Llama 3 (2024)</span><span class="track"><span class="fill hl" style="width:100%">15T+</span></span></div></div>
+<div class="cap">GPT-3: 0.3T. Sources: Brown et al. 2020; Hoffmann et al. 2022; Touvron et al. 2023; Meta, April 2024. Anthropic does not publish these figures for Claude.</div></div>
+<p>The trend since then has been to train well <em>past</em> the Chinchilla ratio (Llama 3's 8-billion-parameter model read over 15 trillion tokens). The reason is practical: a smaller model trained longer costs more to train but less to run for millions of users, and running costs (<a href="#ch25">Chapter 25</a>) eventually dominate.</p>
+<details class="deep"><summary>Under the hood: why a smooth loss curve still surprises people</summary><div class="body">
+<p>Scaling laws predict the <em>average</em> loss well. They don't predict when a particular skill appears, such as multi-digit arithmetic or following a tricky instruction. Some skills seem to switch on suddenly as models grow, which led to talk of "emergent abilities" (Wei et al., 2022). Later work (Schaeffer et al., 2023) argued that some of that suddenness comes from how skills are scored: pass/fail metrics jump even when the underlying ability improves gradually. Both papers are worth reading as an example of how measurement choices shape conclusions, a lesson any tester will recognise.</p>
+</div></details>
+
+<h3 id="ch17-6"><span class="num">17.6</span>What the model learns</h3>
+<p>Nobody programs in grammar or geography. They appear because they reduce the loss. To predict text well across the whole internet, a model is pushed to pick up:</p>
+<div class="tbl"><table>
+<tr><th>What it learns</th><th>Because it helps predict…</th></tr>
+<tr><td>Spelling, grammar, style</td><td>Every sentence it reads</td></tr>
+<tr><td>Facts about the world</td><td>"The capital of Japan is …", "HTTP 404 means …"</td></tr>
+<tr><td>Code and formats (JSON, SQL, Gherkin)</td><td>The next line of a program or a feature file</td></tr>
+<tr><td>Patterns of reasoning</td><td>The next step of a worked solution or a proof</td></tr>
+<tr><td>Learning from examples in the prompt</td><td>Documents where a pattern repeats ("Input… Output… Input… Output…")</td></tr>
+</table></div>
+<p>The last row surprised researchers. GPT-3 showed that a large pre-trained model can do a new task just from a few examples in the prompt, without any change to its weights: "in-context learning". It is why few-shot prompting works (<a href="#ch44">Chapter 44</a>).</p>
+<div class="box warn"><span class="tag">It learns the bad too</span><p>The model also learns whatever is common in its data: stereotypes, popular misconceptions, outdated advice, insecure code patterns. Pre-training rewards <em>plausible</em> continuations, not <em>true</em> ones. That gap is the root of <a class="gl" href="#g-hallucination">hallucinations</a> (<a href="#ch22">Chapter 22</a>) and one big reason for post-training.</p></div>
+
+<h3 id="ch17-7"><span class="num">17.7</span>What it costs, roughly</h3>
+<p>Pre-training cost is mostly chips × time × electricity, plus the people and the failed experiments along the way. A worked estimate, with <strong>illustrative</strong> numbers:</p>
+<div class="code"><span class="cap">Back-of-envelope cost of a GPT-3-sized run (illustrative)</span><pre>compute needed            3.15 × 10^23 FLOPs
+useful speed per chip     3 × 10^14 FLOPs per second   <span class="c"># illustrative modern accelerator</span>
+chip-seconds              3.15e23 / 3e14 ≈ 1.05 × 10^9 seconds
+chip-hours                ≈ 290,000
+at $2 per chip-hour       ≈ $580,000                     <span class="c"># illustrative price</span></pre></div>
+<p>That is for a 2020-sized model on today's hardware. Frontier runs in 2026 use vastly more compute, and companies rarely publish what they spend. Independent estimates for the largest runs reach hundreds of millions of US dollars, but treat any specific figure as an estimate, not data. The point to remember: pre-training is so expensive that it happens rarely, and everything after it (post-training, prompting, tools) is comparatively cheap.</p>
+
+<h3 id="ch17-8"><span class="num">17.8</span>From probabilities to text: sampling and temperature</h3>
+<p>Training produces a model that outputs probabilities. Using it to write text (inference) requires choosing a token at each step. This choice is called <strong>decoding</strong>, and there are several strategies:</p>
+<div class="tbl"><table>
+<tr><th>Strategy</th><th>How it chooses</th><th>Effect</th></tr>
+<tr><td><a class="gl" href="#g-greedy-decoding">Greedy decoding</a></td><td>Always the single most likely token</td><td>Predictable, but tends to get repetitive and dull in long text</td></tr>
+<tr><td>Sampling</td><td>Draw at random, weighted by the probabilities</td><td>Varied and natural; two runs can differ</td></tr>
+<tr><td><a class="gl" href="#g-temperature">Temperature</a></td><td>Divide the logits by T before softmax</td><td>T below 1 sharpens towards the top choice; above 1 flattens towards randomness</td></tr>
+<tr><td>Top-k</td><td>Sample only from the k most likely tokens</td><td>Cuts off the long tail of odd choices</td></tr>
+<tr><td><a class="gl" href="#g-top-p-sampling">Top-p (nucleus)</a></td><td>Sample from the smallest set of tokens whose probabilities add up to p</td><td>Like top-k, but the cut-off adapts to how confident the model is</td></tr>
+</table></div>
+<p>Using the same illustrative logits as Chapter 16 ("The login test …"):</p>
+<div class="tbl"><table>
+<tr><th>Next token</th><th>T = 0.5</th><th>T = 1.0</th><th>T = 1.5</th></tr>
+<tr><td>failed</td><td><b>76.9%</b></td><td>50.8%</td><td>39.7%</td></tr>
+<tr><td>passed</td><td>15.5%</td><td>22.8%</td><td>23.3%</td></tr>
+<tr><td>timed</td><td>4.7%</td><td>12.5%</td><td>15.6%</td></tr>
+<tr><td>is</td><td>1.7%</td><td>7.6%</td><td>11.2%</td></tr>
+<tr><td>was</td><td>1.2%</td><td>6.2%</td><td>9.8%</td></tr>
+<tr><td>banana</td><td>0.0%</td><td>0.0%</td><td>0.4%</td></tr>
+</table></div>
+<div class="box note"><span class="tag">What changed in Claude's API</span><p>Many tutorials tell you to set <code>temperature</code>, <code>top_p</code> or <code>top_k</code>. Anthropic's API version <code>2026-10-21</code> <strong>removed</strong> all three: sending them now returns a 400 error (<a href="#ch86">Chapter 86</a>). You steer Claude's output with instructions, examples and structured outputs instead. Other providers' APIs may still offer these settings; check their current documentation.</p></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A QA team generating test data from the same prompt every night sees slightly different wording each run. That's sampling at work, not a bug in their pipeline. If they need stable outputs to compare, they should check structure and meaning (schema checks, rubric grading) rather than exact strings, and run each eval more than once (<a href="#ch125">Chapter 125</a>).</p></div>
+
+<h3 id="ch17-9"><span class="num">17.9</span>Base models and chat models</h3>
+<p>The output of pre-training is a <a class="gl" href="#g-base-model">base model</a>. It continues text. It doesn't follow instructions in the way you expect, because on the internet an instruction is often followed by more instructions, not by an answer.</p>
+<div class="cols2">
+<div><h4>Base model</h4><p>Prompt: "Write three test cases for the password reset page."</p><p>Plausible continuation: "Write three test cases for the login page. Write three test cases for the signup page. …", as if continuing a list of homework exercises.</p></div>
+<div><h4>Chat (post-trained) model</h4><p>Same prompt. Answer: three numbered test cases with steps and expected results, in a helpful tone, perhaps asking whether you want negative cases too.</p></div>
+</div>
+<p>The knowledge in both is largely the same; post-training changes the <em>behaviour</em>: following instructions, taking turns in a conversation, refusing harmful requests, admitting uncertainty. Some open-weight families publish both versions (for example Meta's Llama "base" and "instruct" models). Anthropic offers Claude to the public only as post-trained models. <a href="#ch18">Chapter 18</a> explains how the transformation is done.</p>
+
+<h3 id="ch17-10"><span class="num">17.10</span>The knowledge cutoff</h3>
+<p>Pre-training data is collected up to some date. After that, the model has seen nothing. That date is its <a class="gl" href="#g-knowledge-cutoff">knowledge cutoff</a>. Anthropic lists two dates per model: a <strong>training data cutoff</strong> (how recent the data goes) and a <strong>reliable knowledge cutoff</strong> (up to when its knowledge is most complete and reliable; the last months before a cutoff are thinly covered, because the web hasn't finished writing about them yet).</p>
+<div class="tbl"><table>
+<tr><th>Current Claude models</th><th>Reliable knowledge cutoff</th><th>Training data cutoff</th></tr>
+<tr><td>Fable 5.1, Opus 5.5, Sonnet 5.5, Haiku 5.5</td><td>June 2026</td><td>June 2026</td></tr>
+</table></div>
+<p>What this means for QA work:</p>
+<ul>
+<li>A library version, API change or CVE released after the cutoff is unknown to the model unless you provide it: paste the changelog, or use a tool such as web search or documentation via <a href="#ch97">MCP</a>.</li>
+<li>Near the cutoff, knowledge is patchy. Ask the model to state its uncertainty, and verify version-specific claims.</li>
+<li>The model doesn't know today's date unless the app tells it. Claude Code puts the current date into its context, and chat apps generally do the same; a raw API call only knows the date if you include it.</li>
+</ul>
+
+<div class="lab"><div class="lab-h"><b>Pre-train a (very) tiny language model</b><span>30 min · Python 3 on your computer</span></div><ol>
+<li>Save this as <code>tiny_lm.py</code>. It is a "bigram" model: it only looks at the previous token, and "training" is just counting. Real models learn far richer patterns with a Transformer, but the objective, the loss and the sampling are the same ideas.
+<div class="code"><span class="cap">tiny_lm.py</span><pre><span class="c"># tiny_lm.py - a toy "pre-trained" language model: count, measure loss, generate</span>
+import math
+import random
+from collections import Counter, defaultdict
+
+corpus = """
+the login test failed on chrome .
+the login test passed on firefox .
+the checkout test failed on safari .
+the checkout test timed out on chrome .
+the search test passed on chrome .
+the login page failed to load .
+the checkout page timed out .
+""".split()
+
+<span class="c"># 1. "Pre-training": count which token follows which (a bigram model)</span>
+follows = defaultdict(Counter)
+for prev, nxt in zip(corpus, corpus[1:]):
+    follows[prev][nxt] += 1
+
+def probs(prev):
+    counts = follows[prev]
+    total = sum(counts.values())
+    return {tok: c / total for tok, c in counts.items()}
+
+print("After 'test' the model predicts:")
+for tok, p in sorted(probs("test").items(), key=lambda x: -x[1]):
+    print(f"  {tok:8} {p:.2f}")
+
+<span class="c"># 2. Cross-entropy loss: how surprised is the model by real text?</span>
+def loss(text):
+    toks = text.split()
+    losses = [-math.log(probs(a).get(b, 1e-6)) for a, b in zip(toks, toks[1:])]
+    return sum(losses) / len(losses)
+
+print()
+print(f"loss on 'the login test failed on chrome .'  = {loss('the login test failed on chrome .'):.2f}")
+print(f"loss on 'the chrome test login on failed .'  = {loss('the chrome test login on failed .'):.2f}")
+
+<span class="c"># 3. Temperature reshapes the probabilities before a token is drawn</span>
+def with_temperature(prev, temperature):
+    p = probs(prev)
+    w = {t: math.exp(math.log(q) / temperature) for t, q in p.items()}
+    total = sum(w.values())
+    return {t: v / total for t, v in w.items()}
+
+print()
+print("After 'on', at different temperatures:")
+for t in (0.2, 1.0, 3.0):
+    shown = ", ".join(f"{tok} {q:.2f}" for tok, q in with_temperature("on", t).items())
+    print(f"  T={t}: {shown}")
+
+<span class="c"># 4. Generate whole sentences by sampling one token at a time</span>
+def generate(temperature, seed):
+    rng = random.Random(seed)
+    out = ["the"]
+    while out[-1] != "." and len(out) &lt; 12:
+        p = with_temperature(out[-1], temperature)
+        out.append(rng.choices(list(p), weights=list(p.values()))[0])
+    return " ".join(out)
+
+print()
+for t in (0.2, 3.0):
+    print(f"Sentences at temperature {t}:")
+    for seed in (1, 2, 3, 4):
+        print("  ", generate(t, seed))</pre></div></li>
+<li>Run <code>python3 tiny_lm.py</code>.<span class="expect">output like this (tested on Python 3.11; the sampled sentences may differ on other versions, the numbers will not):</span>
+<div class="code"><span class="cap">Output</span><pre>After 'test' the model predicts:
+  failed   0.40
+  passed   0.40
+  timed    0.20
+
+loss on 'the login test failed on chrome .'  = 0.51
+loss on 'the chrome test login on failed .'  = 13.82
+
+After 'on', at different temperatures:
+  T=0.2: chrome 0.99, firefox 0.00, safari 0.00
+  T=1.0: chrome 0.60, firefox 0.20, safari 0.20
+  T=3.0: chrome 0.42, firefox 0.29, safari 0.29
+
+Sentences at temperature 0.2:
+   the login test passed on chrome .
+   the checkout test failed on chrome .
+   the login test failed on chrome .
+   the login test failed on chrome .
+Sentences at temperature 3.0:
+   the login page timed out on firefox .
+   the search test failed on safari .
+   the login test passed on firefox .
+   the login test passed on chrome .</pre></div></li>
+<li>Read the loss lines.<span class="expect">a natural sentence scores a low loss (0.51); the scrambled one scores 13.82, because the model has never seen pairs like "the chrome". This is exactly the signal pre-training minimises.</span></li>
+<li>Read the temperature lines. At T=0.2 every sentence ends "on chrome", the most common choice. At T=3.0 Firefox and Safari appear more often.<span class="expect">low temperature = repetitive and safe; high = varied. Note that "failed" and "passed" still alternate at T=0.2: after "test" they are tied at 0.40, so even a cold model has no favourite.</span></li>
+<li><b>Add data.</b> Append two lines to the corpus, for example <code>the login test failed on edge .</code> and <code>the payment test failed on chrome .</code>, then run again.<span class="expect">"edge" now appears in the "on" probabilities and "payment" can appear in samples. The model knows only what was in its data: a tiny knowledge cutoff.</span></li>
+<li>Ask Claude: "Here is a bigram language model [paste the code]. List three things a Transformer-based model does that this cannot, with an example from bug reports."<span class="expect">points such as long-range context (attention), generalising to unseen word pairs (embeddings), and learning from trillions of tokens.</span></li>
+</ol>
+<p><b>Troubleshooting.</b> <code>ZeroDivisionError</code>: you asked for predictions after a token that is never followed by anything in the corpus (try a word from the middle of a sentence). A sentence of 12 tokens with no full stop: the loop hit its length limit, which is fine. On Windows use <code>py tiny_lm.py</code>.</p>
+</div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"The model stores the internet and looks things up."</dt><dd>It stores patterns in its weights, compressed far below the size of its training data. It can reproduce some text it saw many times, but it doesn't keep a searchable copy.</dd>
+<dt>"The model learns from my chats as I use it."</dt><dd>Using a model doesn't change its weights. Whether your conversations are used to train <em>future</em> models depends on the provider's terms and your settings (<a href="#ch41">Chapter 41</a>).</dd>
+<dt>"Lower temperature means more accurate."</dt><dd>It means more predictable. A confident wrong answer stays wrong at any temperature.</dd>
+<dt>"Bigger is always better."</dt><dd>For a fixed budget, more data for a smaller model can beat a bigger model (Chinchilla). And bigger models cost more to run.</dd>
+</dl></div>
+
+<h3 id="ch17-r"><span class="num">17.11</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Pre-training = predict the next token across trillions of tokens; the text labels itself (self-supervised).</li>
+<li>Cross-entropy loss (−ln p of the real next token) punishes confident mistakes hardest.</li>
+<li>Data is mixed from web, code, books, papers and more, then heavily filtered; mixtures are rarely published.</li>
+<li>Scale = parameters (N), tokens (D) and compute (≈ 6ND FLOPs); scaling laws make results predictable; Chinchilla suggested about 20 tokens per parameter.</li>
+<li>Decoding turns probabilities into text: greedy, sampling, temperature, top-k, top-p. Anthropic's API no longer accepts temperature, top_p or top_k (version 2026-10-21).</li>
+<li>A base model continues text; post-training makes it an assistant. Current Claude models have a reliable knowledge cutoff of June 2026.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Why is pre-training called self-supervised?</p><div class="opts"><button>Because the model checks its own answers for safety</button><button data-ok>Because the correct answer (the next token) comes from the text itself, so no human labels are needed</button><button>Because no computer supervises the training run</button></div><p class="why" hidden>Every position in a document provides its own label: the token that actually came next.</p></div>
+<div class="qz"><p class="q">The model gave the real next token a probability of 0.05. What is the cross-entropy loss for that position?</p><div class="opts"><button>0.05</button><button>0.95</button><button data-ok>About 3.0</button></div><p class="why" hidden>Loss = −ln(0.05) ≈ 3.0. A probability of 0.6 would give about 0.51.</p></div>
+<div class="qz"><p class="q">Using compute ≈ 6 × N × D, roughly how many FLOPs does a 10-billion-parameter model trained on 200 billion tokens need?</p><div class="opts"><button>1.2 × 10<sup>20</sup></button><button data-ok>1.2 × 10<sup>22</sup></button><button>1.2 × 10<sup>24</sup></button></div><p class="why" hidden>6 × 10<sup>10</sup> × 2 × 10<sup>11</sup> = 12 × 10<sup>21</sup> = 1.2 × 10<sup>22</sup>.</p></div>
+<div class="qz"><p class="q">What does raising the temperature above 1 do?</p><div class="opts"><button>Makes the model more accurate</button><button data-ok>Flattens the probabilities so less likely tokens are chosen more often</button><button>Lets the model use more of its context window</button></div><p class="why" hidden>Dividing the logits by a larger T shrinks the gaps between them before softmax.</p></div>
+<div class="qz"><p class="q">Your team asks Claude about a framework release from last month (November 2026). What is the most likely problem?</p><div class="opts"><button>Claude will refuse to talk about frameworks</button><button>Claude knows it, because models update daily</button><button data-ok>It's after the June 2026 knowledge cutoff, so you need to supply the release notes or use a search tool</button></div><p class="why" hidden>Weights don't update as the world changes. Give the model the facts it can't have seen.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick a library your test suite depends on (for example Playwright or your API client). Find its latest release notes and its release date. Ask Claude what changed in that release <em>without</em> giving it the notes, then again <em>with</em> the notes pasted in. Record the differences, any invented features, and whether Claude flagged uncertainty. Write a three-line team guideline on handling questions about versions newer than the knowledge cutoff.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Pre-training is where a language model learns almost everything it knows. It reads trillions of tokens of text and keeps guessing the next one. Each wrong guess nudges its weights. To guess well across the whole internet it has to pick up grammar, facts, code and reasoning patterns, but also the internet's mistakes. It's hugely expensive, so it happens rarely, and the knowledge stops at a cutoff date. The result can continue any text, but it isn't a helpful assistant until post-training. When it writes, it picks each next token from a set of probabilities, which is why answers vary a little each run."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>T. Brown et al., <a href="https://arxiv.org/abs/2005.14165" target="_blank" rel="noopener">"Language Models are Few-Shot Learners"</a> (GPT-3), 2020: parameters, 300B tokens, compute, data mixture (Table 2.2), in-context learning.</li>
+<li>J. Kaplan et al., <a href="https://arxiv.org/abs/2001.08361" target="_blank" rel="noopener">"Scaling Laws for Neural Language Models"</a>, 2020.</li>
+<li>J. Hoffmann et al., <a href="https://arxiv.org/abs/2203.15556" target="_blank" rel="noopener">"Training Compute-Optimal Large Language Models"</a> (Chinchilla), 2022.</li>
+<li>H. Touvron et al., <a href="https://arxiv.org/abs/2307.09288" target="_blank" rel="noopener">"Llama 2"</a>, 2023; Meta, <a href="https://ai.meta.com/blog/meta-llama-3/" target="_blank" rel="noopener">"Introducing Meta Llama 3"</a>, April 2024.</li>
+<li>A. Holtzman et al., <a href="https://arxiv.org/abs/1904.09751" target="_blank" rel="noopener">"The Curious Case of Neural Text Degeneration"</a> (top-p sampling), 2019.</li>
+<li>J. Wei et al., <a href="https://arxiv.org/abs/2206.07682" target="_blank" rel="noopener">"Emergent Abilities of Large Language Models"</a>, 2022; R. Schaeffer et al., <a href="https://arxiv.org/abs/2304.15004" target="_blank" rel="noopener">"Are Emergent Abilities of Large Language Models a Mirage?"</a>, 2023.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/models/overview" target="_blank" rel="noopener">Models overview</a> (knowledge cutoffs) and <a href="https://platform.claude.com/docs/en/api/versioning" target="_blank" rel="noopener">API versions</a> (removal of temperature, top_p and top_k in 2026-10-21).</li>
+<li><a href="https://commoncrawl.org/" target="_blank" rel="noopener">Common Crawl</a>: the open web-crawl archive used in many training sets.</li>
+</ol><p class="verified">Verified 9 November 2026 against Anthropic's models overview and API versioning pages (via the project research file); other content is established research · Last reviewed 9 November 2026</p></div>

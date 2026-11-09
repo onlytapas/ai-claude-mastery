@@ -1,0 +1,142 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How language models grew from research curiosities into products used by hundreds of millions of people</li>
+<li>What "scaling" means and why it surprised even the researchers</li>
+<li>Why ChatGPT took off in 2022 when similar models already existed</li>
+<li>The arrival of Claude, Gemini, open-weight models, reasoning models and agents</li>
+<li>Where things stand in late 2026</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 6 (the Transformer and GPT).</div>
+
+<div class="bigidea"><p>From 2018, researchers found that making Transformer models bigger, and training them on more text, kept making them better, often in surprising ways. In late 2022 OpenAI put a model that had been trained to follow instructions into a simple chat window, called it ChatGPT, and the world noticed. A race followed: Claude, Gemini, open models anyone could download, models that "think" before answering, and by 2025, agents that do multi-step work on their own. This chapter tells that story year by year.</p></div>
+
+<h3 id="ch7-1"><span class="num">7.1</span>Bigger turns out to be better (2018–2020)</h3>
+<p>After GPT-1 in 2018 (Chapter 6), OpenAI trained much larger versions:</p>
+<div class="tbl"><table>
+<tr><th>Model</th><th>Year</th><th>Size (parameters)</th><th>Why it mattered</th></tr>
+<tr><td>GPT-1</td><td>2018</td><td>About 117 million</td><td>Showed pre-training then fine-tuning works for language tasks</td></tr>
+<tr><td>GPT-2</td><td>2019</td><td>Up to 1.5 billion</td><td>Wrote convincing paragraphs. OpenAI released it in stages, citing misuse concerns: an early public debate about AI risk</td></tr>
+<tr><td>GPT-3</td><td>2020</td><td>175 billion</td><td>Could do new tasks from just a few examples in the prompt, without retraining ("few-shot learning")</td></tr>
+</table></div>
+<p>A <a class="gl" href="#g-parameter">parameter</a> is one of the adjustable numbers inside a model (Chapter 11). GPT-3 had about a thousand times more than GPT-1.</p>
+<div class="box note"><span class="tag">Scaling laws (2020)</span><p>In January 2020 OpenAI researchers led by Jared Kaplan published "Scaling Laws for Neural Language Models". They found that a model's error fell smoothly and predictably as you increased three things: the model's size, the amount of training data and the computing power used. In plain words: <strong>you could forecast how much better a model would get if you spent more</strong>. That turned AI progress into an engineering and investment question, and set off the race to build ever larger models. (Kaplan later co-founded Anthropic.)</p></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Imagine discovering that every time you double the size of a library and the time a student spends reading in it, their exam score improves by a predictable amount. Suddenly building bigger libraries looks like a sure bet. That's what scaling laws did for AI investment.</p></div>
+<p>Larger models also showed abilities that smaller ones lacked, such as basic arithmetic, translating between language pairs they'd rarely seen, or writing simple code. Researchers called these <strong>emergent abilities</strong>, though how sudden they really are is still debated.</p>
+
+<h3 id="ch7-2"><span class="num">7.2</span>From predicting text to following instructions (2021–2022)</h3>
+<p>A model trained only to predict the next word isn't a helpful assistant. Ask it "How do I bake bread?" and it might continue with "How do I bake cake? How do I bake biscuits?", because lists of questions are common online. It needs a second stage of training to behave like an assistant.</p>
+<p>In 2022 OpenAI published <strong>InstructGPT</strong>, which used <a class="gl" href="#g-rlhf">reinforcement learning from human feedback</a> (RLHF). People wrote example answers and ranked the model's answers from best to worst, and the model was trained towards the preferred kind. The result: a much smaller model that people preferred over the giant GPT-3, because it actually did what was asked. Chapter 18 explains how this works.</p>
+<p>Meanwhile, generative AI broke out beyond text:</p>
+<ol class="timeline">
+<li><span class="yr">2021</span><span class="ev"><b>DALL·E</b> (OpenAI) generates images from text descriptions. <b>GitHub Copilot</b> preview suggests code inside programmers' editors, powered by OpenAI's Codex model.</span></li>
+<li><span class="yr">2022</span><span class="ev"><b>DALL·E 2</b>, <b>Midjourney</b> and <b>Stable Diffusion</b> make high-quality image generation widely available; Stable Diffusion's weights are released publicly.</span></li>
+</ol>
+
+<h3 id="ch7-3"><span class="num">7.3</span>November 2022: ChatGPT</h3>
+<p>On 30 November 2022 OpenAI released ChatGPT as a free "research preview". The underlying model wasn't dramatically new. It was an instruction-tuned GPT-3.5 model. What changed was the packaging:</p>
+<ul>
+<li><strong>A chat window anyone could use</strong>, with no technical setup or API key.</li>
+<li><strong>Conversation</strong>: it remembered what you said earlier in the chat, so you could refine requests.</li>
+<li><strong>Free</strong>, at least to start.</li>
+<li><strong>Trained to be helpful</strong> through RLHF, so it followed instructions instead of rambling.</li>
+</ul>
+<p>It spread faster than almost any consumer product before it. One widely reported analyst estimate put it at around 100 million monthly users within about two months. For many people, this was their first experience of AI that felt like talking to something.</p>
+<div class="box example"><span class="tag">Real-world lesson</span><p>ChatGPT's success is a lesson in product design, not just science. Similar models existed, but they were hidden behind developer tools. Making a capable model easy, conversational and safe enough for the public is what changed the world. That's why this book spends as much time on how to <em>use</em> AI products as on how they work.</p></div>
+
+<h3 id="ch7-4"><span class="num">7.4</span>2023: the race begins</h3>
+<ol class="timeline">
+<li><span class="yr">Jan–Feb</span><span class="ev"><b>Microsoft</b> announces a major further investment in OpenAI and launches an AI chat feature in its Bing search engine.</span></li>
+<li><span class="yr">Feb</span><span class="ev"><b>Meta releases LLaMA</b> to researchers. Its weights soon spread widely, kick-starting the open-weight model movement (Chapter 32).</span></li>
+<li class="key"><span class="yr">14 Mar</span><span class="ev"><b>Claude</b> is released by Anthropic, alongside a faster, cheaper Claude Instant. The same day, OpenAI releases <b>GPT-4</b>, which can also read images.</span></li>
+<li><span class="yr">Mar</span><span class="ev"><b>Google Bard</b>, Google's chatbot, opens to the public.</span></li>
+<li class="key"><span class="yr">11 Jul</span><span class="ev"><b>Claude 2</b> launches with a public chat app at claude.ai and a 100,000-token context window: enough to read a whole book at once.</span></li>
+<li><span class="yr">Jul</span><span class="ev"><b>Llama 2</b> (Meta) is released with weights available for commercial use.</span></li>
+<li><span class="yr">Nov</span><span class="ev"><b>Claude 2.1</b> doubles the context window to 200,000 tokens.</span></li>
+<li><span class="yr">Dec</span><span class="ev"><b>Gemini</b>, Google DeepMind's new model family, is announced. Bard is later renamed Gemini.</span></li>
+</ol>
+<p>Governments started paying close attention: the UK hosted an international AI Safety Summit at Bletchley Park in November 2023, and the European Union agreed its AI Act, which became law in 2024 (Chapter 132).</p>
+
+<h3 id="ch7-5"><span class="num">7.5</span>2024: families, images and reasoning</h3>
+<ol class="timeline">
+<li class="key"><span class="yr">Mar</span><span class="ev"><b>Claude 3 family</b>: Haiku, Sonnet and Opus. Three sizes for different needs, a pattern most companies now follow (Chapter 31).</span></li>
+<li><span class="yr">May</span><span class="ev"><b>GPT-4o</b> (OpenAI) handles text, images and audio in real time.</span></li>
+<li class="key"><span class="yr">Jun</span><span class="ev"><b>Claude 3.5 Sonnet</b> and <b>Artifacts</b>: Claude can build documents and small apps in a panel beside the chat.</span></li>
+<li class="key"><span class="yr">Sep</span><span class="ev"><b>OpenAI o1</b>: the first widely released "reasoning model", trained to think step by step before answering (Chapter 19).</span></li>
+<li><span class="yr">22 Oct</span><span class="ev"><b>Computer use</b> (beta): Claude can operate a computer by looking at screenshots and moving the mouse.</span></li>
+<li class="key"><span class="yr">Nov</span><span class="ev"><b>Model Context Protocol (MCP)</b>: Anthropic releases an open standard for connecting AI to tools and data. Other major AI companies later adopt it.</span></li>
+</ol>
+
+<h3 id="ch7-6"><span class="num">7.6</span>2025: reasoning goes open, and agents arrive</h3>
+<ol class="timeline">
+<li class="key"><span class="yr">Jan</span><span class="ev"><b>DeepSeek-R1</b>, from a Chinese lab, matches leading reasoning models on many tests and is released with open weights. Its reportedly low training cost briefly shook technology stock markets.</span></li>
+<li class="key"><span class="yr">24 Feb</span><span class="ev"><b>Claude 3.7 Sonnet</b>, described by Anthropic as the first "hybrid reasoning" model (it can answer quickly or think at length), and <b>Claude Code</b> as a research preview: an agent that works in your terminal.</span></li>
+<li class="key"><span class="yr">22 May</span><span class="ev"><b>Claude 4</b> (Opus 4 and Sonnet 4). <b>Claude Code becomes generally available.</b></span></li>
+<li><span class="yr">Aug</span><span class="ev"><b>GPT-5</b> (OpenAI). <b>Claude Opus 4.1</b> (5 Aug).</span></li>
+<li><span class="yr">Sep–Nov</span><span class="ev"><b>Claude Sonnet 4.5</b> (29 Sep), <b>Haiku 4.5</b> (15 Oct) and <b>Opus 4.5</b> (24 Nov); <b>Gemini 3</b> (18 Nov). Coding agents from every major lab compete on real software tasks.</span></li>
+</ol>
+<p>2025 is often described as the year of agents. Instead of answering one question, AI systems started working through tasks of many steps: reading code, running tests, fixing failures and reporting back. That's the shift from "era 2: create" to "era 3: act".</p>
+
+<h3 id="ch7-7"><span class="num">7.7</span>2026 so far <span class="vchip">Verified 9 Nov 2026</span></h3>
+<ol class="timeline">
+<li><span class="yr">Feb</span><span class="ev"><b>Claude Opus 4.6</b> and <b>Sonnet 4.6</b>.</span></li>
+<li><span class="yr">Apr</span><span class="ev"><b>Project Glasswing</b>: Anthropic gives an unreleased model, <b>Claude Mythos Preview</b>, to selected organisations for cybersecurity defence (7 Apr). <b>Meta</b> launches its Muse family, moving away from open Llama releases (8 Apr). <b>GPT-5.5</b> (OpenAI).</span></li>
+<li class="key"><span class="yr">9 Jun</span><span class="ev"><b>Claude Fable 5</b>, a new top tier above Opus that Anthropic described as "a Mythos-class model that we've made safe for general use".</span></li>
+<li><span class="yr">Jun–Jul</span><span class="ev"><b>Claude Sonnet 5</b> (30 Jun) and <b>Opus 5</b> (24 Jul).</span></li>
+<li class="key"><span class="yr">Sep</span><span class="ev"><b>Claude Fable 5.1</b> (1 Sep). OpenAI's <b>GPT-6 Astra</b> (3 Sep). <b>Claude Opus 5.5</b> (22 Sep) and <b>Sonnet 5.5</b> (28 Sep). Google's <b>Gemini 4 Argon</b> (announced 30 Sep).</span></li>
+<li><span class="yr">Oct</span><span class="ev"><b>Claude Haiku 5.5</b> (7 Oct). Mistral releases open weights for <b>Mistral Large 4</b>.</span></li>
+</ol>
+<p>The industry also reorganised: SpaceX acquired xAI and the AI code editor Cursor, NVIDIA agreed to buy Hugging Face, and Microsoft and OpenAI rewrote their partnership. Part III covers the companies in detail.</p>
+<div class="box warn"><span class="tag">This section ages fast</span><p>Model names and release dates in 7.7 were checked against official sources on 9 November 2026. New models appear every few weeks. For the current Claude lineup, check Anthropic's models overview; Chapter 40 explains how to read it.</p></div>
+
+<h3 id="ch7-8"><span class="num">7.8</span>The five big trends</h3>
+<div class="tbl"><table>
+<tr><th>Trend</th><th>What changed</th><th>Covered in</th></tr>
+<tr><td>Scale</td><td>Bigger models, more data, much more compute</td><td>Chapters 17, 25, 138</td></tr>
+<tr><td>Assistant training</td><td>RLHF and Constitutional AI turned text predictors into helpful assistants</td><td>Chapter 18</td></tr>
+<tr><td>Reasoning</td><td>Models that think step by step before answering</td><td>Chapter 19</td></tr>
+<tr><td>Multimodality</td><td>Text, images, audio and video in one model</td><td>Chapter 21</td></tr>
+<tr><td>Agents</td><td>Models that use tools and finish multi-step tasks</td><td>Part XIII</td></tr>
+</table></div>
+<p>A sixth thread runs alongside: <strong>open versus closed</strong>. Some companies publish their model weights for anyone to run (DeepSeek, Mistral, Qwen); others keep them private and offer access through apps and APIs (Anthropic, OpenAI, Google). Chapter 32 explains the trade-offs.</p>
+
+<div class="lab"><div class="lab-h"><b>Interview the timeline</b><span>30 min · claude.ai</span></div><ol>
+<li>Ask Claude: "Why did ChatGPT become popular so quickly when GPT-3 had existed for two years?"<span class="expect">points about the chat interface, instruction tuning (RLHF), free access and conversation.</span></li>
+<li>Ask: "What's the difference between Claude Instant (2023) and Claude Haiku today, in purpose?"<span class="expect">both are the fast, low-cost option in their lineup.</span></li>
+<li>Ask Claude for "the five most important AI releases of the last 12 months", then compare its answer with section 7.7.<span class="expect">overlap with 7.7, possibly with gaps or mistakes about very recent months. Check against the dates in this book; recent events are where models make the most errors.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"ChatGPT was the first large language model."</dt><dd>GPT-3, BERT and others came before. ChatGPT was the first that became a mass-market product.</dd>
+<dt>"Bigger is always better."</dt><dd>Scaling helps, but smaller, well-trained models often beat older, bigger ones, and speed and cost matter for real work (Chapter 31).</dd>
+<dt>"Claude is built on ChatGPT."</dt><dd>No. Claude is Anthropic's own family of models. Both use the Transformer design and similar training ideas, but they're separate systems from separate companies.</dd>
+<dt>"The newest model is always the best for my task."</dt><dd>The right model depends on the task, speed and budget. Chapter 35 walks through real choices.</dd>
+</dl></div>
+
+<h3 id="ch7-r"><span class="num">7.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>GPT-2 and GPT-3 showed that larger models trained on more text keep improving; scaling laws (2020) made the gains predictable.</li>
+<li>Instruction tuning with RLHF (InstructGPT, 2022) turned text predictors into helpful assistants.</li>
+<li>ChatGPT (30 Nov 2022) succeeded through easy, conversational, free packaging of an instruction-tuned model.</li>
+<li>2023 brought Claude, GPT-4, Bard/Gemini and open-weight Llama; 2024 brought model families, Artifacts, reasoning models, computer use and MCP.</li>
+<li>2025 was the year of reasoning going open (DeepSeek-R1) and of agents, including Claude Code.</li>
+<li>In 2026 Anthropic added a top tier, Fable; the current lineup (verified Nov 2026) is Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 5.5.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What did "scaling laws" show?</p><div class="opts"><button>Models eventually stop improving</button><button data-ok>Model quality improves predictably with more parameters, data and compute</button><button>Smaller models are always better</button></div><p class="why" hidden>That predictability drove huge investment in larger models.</p></div>
+<div class="qz"><p class="q">Why did InstructGPT matter?</p><div class="opts"><button>It was the largest model ever</button><button data-ok>Training with human feedback made a model follow instructions helpfully</button><button>It could generate images</button></div><p class="why" hidden>People preferred it over the much larger GPT-3.</p></div>
+<div class="qz"><p class="q">When did Claude Code first appear, and when did it become generally available?</p><div class="opts"><button>2023 and 2024</button><button data-ok>February 2025 (research preview) and May 2025 (generally available)</button><button>2026 and 2027</button></div><p class="why" hidden>It launched with Claude 3.7 Sonnet and became generally available with Claude 4.</p></div>
+<div class="qz"><p class="q">What is Claude Fable?</p><div class="opts"><button>A new name for Claude Haiku</button><button data-ok>A top tier above Opus, introduced in June 2026</button><button>A storytelling app</button></div><p class="why" hidden>Anthropic described Fable 5 as a Mythos-class model made safe for general use.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Make a one-page "AI since 2018" timeline for your team, using only facts from this chapter and official sources. Add one row at the bottom called "Last checked" with today's date. Ask a colleague to spot-check three dates against official pages; agree on any corrections.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"After 2018, bigger Transformer models trained on more text kept getting better, predictably. Training with human feedback made them helpful. ChatGPT packaged that in a free chat window in November 2022, and everything exploded. Claude, Gemini and open models followed in 2023. 2024 brought reasoning models and MCP; 2025 brought agents like Claude Code. Today Claude comes in four tiers: Fable, Opus, Sonnet and Haiku."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>A. Radford et al., "Language Models are Unsupervised Multitask Learners" (GPT-2), OpenAI (2019); T. Brown et al., "Language Models are Few-Shot Learners" (GPT-3), arXiv:2005.14165 (2020).</li>
+<li>J. Kaplan et al., "Scaling Laws for Neural Language Models", arXiv:2001.08361 (2020).</li>
+<li>L. Ouyang et al., "Training Language Models to Follow Instructions with Human Feedback" (InstructGPT), arXiv:2203.02155 (2022).</li>
+<li>OpenAI, "Introducing ChatGPT" (30 Nov 2022) and "GPT-4" (14 Mar 2023).</li>
+<li>Anthropic announcements: <a href="https://www.anthropic.com/news/introducing-claude" target="_blank" rel="noopener">Introducing Claude</a> (14 Mar 2023), <a href="https://www.anthropic.com/news/claude-2" target="_blank" rel="noopener">Claude 2</a>, <a href="https://www.anthropic.com/news/claude-3-family" target="_blank" rel="noopener">Claude 3 family</a>, <a href="https://www.anthropic.com/news/3-5-models-and-computer-use" target="_blank" rel="noopener">computer use</a>, <a href="https://www.anthropic.com/news/claude-3-7-sonnet" target="_blank" rel="noopener">Claude 3.7 Sonnet and Claude Code</a>, <a href="https://www.anthropic.com/news/claude-4" target="_blank" rel="noopener">Claude 4</a>, <a href="https://www.anthropic.com/news/claude-fable-5-mythos-5" target="_blank" rel="noopener">Claude Fable 5 and Mythos 5</a>.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/models/overview" target="_blank" rel="noopener">Models overview</a> and model pages for release dates of the 4.5 generation onward.</li>
+<li>DeepSeek-AI, "DeepSeek-R1", arXiv:2501.12948 (2025).</li>
+<li>Google, <a href="https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-4-argon/" target="_blank" rel="noopener">Gemini 4 Argon announcement</a>; OpenAI, <a href="https://openai.com/index/gpt-6-astra/" target="_blank" rel="noopener">GPT-6 Astra</a>; Meta, <a href="https://about.fb.com/news/2026/04/introducing-muse-spark-meta-superintelligence-labs/" target="_blank" rel="noopener">Muse Spark</a>.</li>
+</ol><p class="verified">Sections 7.1–7.6: established history. Section 7.7: verified 9 November 2026 against official sources.</p></div>

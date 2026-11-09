@@ -1,0 +1,169 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How to start Claude Code in the right folder, and what the workspace trust prompt means</li>
+<li>How to read the screen: the prompt box, the mode indicator, permission prompts, diffs and the task list</li>
+<li>The three input symbols (<code>@</code>, <code>!</code>, <code>/</code>) and the handful of keys that matter most</li>
+<li>How to answer a permission prompt sensibly, every time</li>
+<li>How to end a session and pick it up again later</li>
+<li>A complete, guided 45-minute first session in a safe practice project</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Claude Code installed and signed in (Chapter 64). Basic terminal skills help: changing folders and running a command (Chapters 53–54). If you've never used Git, skim Chapter 61 first.</div>
+
+<div class="bigidea"><p>Claude Code is easy to start and easy to misuse. The good habits are simple: start it inside the project you want it to work on, slow it down while you're learning so you see every action, read each permission prompt like a test step, and stop it the moment it heads the wrong way. This chapter walks you through a full first session in a throwaway practice project, so you can make mistakes where they don't matter.</p></div>
+
+<h3 id="ch65-1"><span class="num">65.1</span>Start in the right folder</h3>
+<p>Claude Code works on whatever folder you start it in. That folder becomes its <strong>working directory</strong>: it can read files there (and in sub-folders) freely, and it asks before touching anything outside it. So the first rule is simple: <em>open your terminal, go to the project, then start Claude.</em></p>
+<div class="code"><span class="cap">Terminal</span><pre>cd ~/projects/shop-app      <span class="c"># go to the project folder first</span>
+claude                      <span class="c"># then start Claude Code</span></pre></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Starting Claude Code is like letting a contractor into one room of your house. You open the door of the room you want worked on. If you start it in your home folder, you've effectively opened every room at once, which is rarely what you want.</p></div>
+<h4>The workspace trust prompt</h4>
+<p>The first time you start Claude Code in a folder, it asks whether you trust that folder. This matters because a project can contain its own Claude Code settings, hooks and MCP servers (Chapters 78, 82 and 83), and those can run commands. Only say yes for projects you know: your team's repositories, or folders you created yourself. For a repository you've just downloaded from a stranger, read its <code>.claude/</code> folder and <code>.mcp.json</code> first.</p>
+<div class="box note"><span class="tag">Good to know</span><p>If you start Claude Code directly in your home folder, the trust answer is kept only for that session and the prompt comes back every time. Anthropic's documentation recommends starting from a project folder instead, where trust is remembered per folder. Non-interactive runs (<code>claude -p</code>, Chapter 75) skip the trust prompt entirely, so only use them in folders you trust.</p></div>
+
+<h3 id="ch65-2"><span class="num">65.2</span>Reading the screen</h3>
+<p>Claude Code runs inside your terminal, so its "screen" is text. Exact layout and wording change between versions, but the parts are always the same:</p>
+<div class="tbl"><table>
+<tr><th>Part</th><th>What it shows</th><th>What to do with it</th></tr>
+<tr><td><b>Prompt box</b></td><td>Where you type, at the bottom</td><td>Type requests in plain English. Press Enter to send.</td></tr>
+<tr><td><b>Mode indicator</b></td><td>The current <a class="gl" href="#g-permission-mode">permission mode</a>, for example <code>⏵⏵ auto mode on</code> or <code>⏸ manual mode on</code></td><td>Check it before asking for anything that changes files. <kbd>Shift</kbd>+<kbd>Tab</kbd> changes it.</td></tr>
+<tr><td><b>Claude's messages</b></td><td>Explanations, plans and answers</td><td>Read them. They tell you what Claude believes, which is what you need to check.</td></tr>
+<tr><td><b>Tool activity</b></td><td>Lines showing what Claude is doing: reading a file, running a command, searching</td><td>A running commentary of its actions. <kbd>Ctrl</kbd>+<kbd>O</kbd> opens the detailed transcript.</td></tr>
+<tr><td><b>Permission prompts</b></td><td>A box asking "Do you want to proceed?" before a risky action</td><td>Read the command or file name. Then choose (62.5).</td></tr>
+<tr><td><b>Diffs</b></td><td>File changes, with removed lines and added lines marked</td><td>Review them the way you'd review a pull request.</td></tr>
+<tr><td><b>Task list</b></td><td>A checklist Claude keeps for multi-step work</td><td><kbd>Ctrl</kbd>+<kbd>T</kbd> shows or hides it. Useful to see what's left.</td></tr>
+</table></div>
+<p>Press <kbd>?</kbd> on an empty prompt to see the shortcut help panel at any time.</p>
+
+<h3 id="ch65-3"><span class="num">65.3</span>Choose a learning-friendly mode</h3>
+<p>Since version 2.1.283, a new interactive session normally starts in <strong>Auto</strong> mode. In Auto mode, a background safety checker (a classifier) reviews Claude's actions and blocks risky ones, so you get very few prompts. That's convenient for experienced users, but while you're learning you <em>want</em> to see each action.</p>
+<p>So for your first sessions, press <kbd>Shift</kbd>+<kbd>Tab</kbd> once. From Auto, the first press goes to <strong>Manual</strong>, and the indicator shows <code>⏸ manual mode on</code>. In Manual mode, Claude can read files without asking, but asks before editing files or running commands. You'll see exactly what it wants to do, and you'll learn far faster.</p>
+<div class="tbl"><table>
+<tr><th>Mode (as shown)</th><th>Asks you before…</th><th>Use it when</th></tr>
+<tr><td>Manual</td><td>File edits and shell commands</td><td>Learning; sensitive work</td></tr>
+<tr><td>Accept edits</td><td>Most shell commands (edits and simple file commands like <code>mkdir</code> run freely)</td><td>You trust the direction and will review the diff</td></tr>
+<tr><td>Plan</td><td>It doesn't edit at all until you approve a plan</td><td>Before any bigger change</td></tr>
+<tr><td>Auto</td><td>Rarely; a classifier checks actions instead</td><td>Routine work once you're confident</td></tr>
+</table></div>
+<p>Chapter 67 covers all six modes, including two you'll rarely use in a normal session.</p>
+
+<h3 id="ch65-4"><span class="num">65.4</span>The three input symbols and the keys that matter</h3>
+<p>Most of the time you just type. Three symbols at the start of what you type change what happens:</p>
+<div class="tbl"><table>
+<tr><th>Type</th><th>What happens</th><th>Example</th></tr>
+<tr><td><code>@</code></td><td>Mention a file or folder. Autocomplete helps you pick it, and Claude reads it.</td><td><code>Explain @tests/login.spec.ts</code></td></tr>
+<tr><td><code>!</code> at the start</td><td>Shell mode: runs the command yourself, adds its output to the conversation, and Claude responds to it.</td><td><code>! npm test</code></td></tr>
+<tr><td><code>/</code> at the start</td><td>Runs a command or skill, such as <code>/help</code> or <code>/clear</code>.</td><td><code>/context</code></td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Changed in newer versions</span><p>Older tutorials say that starting a message with <code>#</code> saves a memory. That shortcut was removed in version 2.0.70. To save something permanently, ask Claude to add it to your CLAUDE.md, or use <code>/memory</code> (Chapter 77).</p></div>
+<h4>The keys worth learning on day one</h4>
+<div class="tbl"><table>
+<tr><th>Key</th><th>What it does</th></tr>
+<tr><td><kbd>Esc</kbd></td><td>Stops Claude mid-task. Work so far is kept; give it a new direction. Also declines a permission prompt.</td></tr>
+<tr><td><kbd>Esc</kbd> <kbd>Esc</kbd></td><td>On an empty prompt: opens the <strong>rewind</strong> menu to go back to an earlier point (Chapter 67). With text typed: clears your draft.</td></tr>
+<tr><td><kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Cycles permission modes.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd></td><td>Interrupts a running operation. With nothing running, the first press clears your input and a second press exits.</td></tr>
+<tr><td><kbd>↑</kbd></td><td>Brings back earlier prompts (history is kept per project).</td></tr>
+<tr><td><kbd>\</kbd> then <kbd>Enter</kbd></td><td>Starts a new line without sending. Works in every terminal.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>V</kbd></td><td>Pastes an image (such as a bug screenshot) from the clipboard.</td></tr>
+</table></div>
+<p>You can also type while Claude is working. Your message is queued and Claude reads it at the next safe point, so you can correct course without stopping it.</p>
+<p>The full list of shortcuts is in Chapter 76.</p>
+
+<h3 id="ch65-5"><span class="num">65.5</span>Answering permission prompts</h3>
+<p>When Claude wants to do something that needs approval, it shows a box with a title (for example "Bash command"), a short description, the exact command or file, and "Do you want to proceed?". The options look like this:</p>
+<div class="tbl"><table>
+<tr><th>Option</th><th>Effect</th></tr>
+<tr><td><b>Yes</b></td><td>Allow this one action.</td></tr>
+<tr><td><b>Yes, and don't ask again for …</b></td><td>Allow it and remember. For a shell command, the rule is saved to <code>.claude/settings.local.json</code> in that repository and applies in future sessions there. For file edits, it lasts until the session ends.</td></tr>
+<tr><td><b>Yes, and switch to auto mode</b></td><td>Approve and change mode (not shown on every prompt).</td></tr>
+<tr><td><b>No</b></td><td>Refuse. Press <kbd>Tab</kbd> to add a note telling Claude what to do instead.</td></tr>
+</table></div>
+<p>A good habit is to read every prompt like a test step, using three questions:</p>
+<ol>
+<li><strong>What exactly will run?</strong> Read the whole command. If you don't understand it, choose No and ask "What does that command do?"</li>
+<li><strong>What can it change?</strong> Reading is harmless. Deleting (<code>rm</code>), pushing (<code>git push</code>), installing, or calling external services deserve a second look.</li>
+<li><strong>Do I want this every time?</strong> Only choose "don't ask again" for safe, repeatable commands like <code>npm test</code> or <code>git status</code>.</li>
+</ol>
+<div class="box example"><span class="tag">Real-world example</span><p>Claude asks to run <code>rm -rf node_modules &amp;&amp; npm install</code>. That deletes a folder of downloaded packages and downloads them again. It's usually harmless and a common fix, but it takes time and needs the internet. A sensible answer is "Yes" once, not "don't ask again", because you don't want unattended deletes.</p></div>
+
+<h3 id="ch65-6"><span class="num">65.6</span>Ending and coming back</h3>
+<div class="tbl"><table>
+<tr><th>To…</th><th>Do this</th></tr>
+<tr><td>Leave Claude Code</td><td>Type <code>/exit</code>, or press <kbd>Ctrl</kbd>+<kbd>D</kbd> twice</td></tr>
+<tr><td>Continue the most recent conversation in this folder</td><td><code>claude -c</code> (same as <code>claude --continue</code>)</td></tr>
+<tr><td>Pick an older conversation from a list</td><td><code>claude -r</code> (same as <code>claude --resume</code>), or <code>/resume</code> inside a session</td></tr>
+<tr><td>Give a session a memorable name</td><td><code>/rename checkout-tests</code>, or start with <code>claude -n checkout-tests</code></td></tr>
+<tr><td>Start a fresh conversation without leaving</td><td><code>/clear</code></td></tr>
+</table></div>
+<p>Conversations are saved on your computer (under <code>~/.claude/projects/</code>, kept for 30 days by default), which is how resuming works. A new session always starts with an empty conversation: Claude doesn't remember yesterday's chat unless you resume it or the information is in CLAUDE.md or auto memory (Chapter 77).</p>
+
+<h3 id="ch65-7"><span class="num">65.7</span>How to ask well in Claude Code</h3>
+<p>Prompting in Claude Code is the same skill as in the chat app (Chapter 44), with three additions:</p>
+<ul>
+<li><strong>Delegate, don't dictate.</strong> Describe the goal and the context ("The discount is wrong for orders over 100; the code is in src/pricing"). You don't need to list which files to open; Claude finds them.</li>
+<li><strong>Give it a way to check itself.</strong> "Make the tests in test/discount.test.js pass" beats "fix the discount", because success is measurable.</li>
+<li><strong>Say what's out of bounds.</strong> "Only change the test files" or "Don't install new packages."</li>
+</ul>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Brief Claude Code as you'd brief a capable new colleague on their first day: explain the goal and the rules of the house, then let them get on with it, and check their work before it ships.</p></div>
+
+<details class="deep"><summary>What happens when you press Enter</summary><div class="body">
+<p>Your message goes, together with instructions, your CLAUDE.md files and the conversation so far, to a Claude model running on Anthropic's servers. The model replies either with text or with a request to use a tool (read a file, run a command). Claude Code runs that tool on your computer, after checking permissions, and sends the result back. This repeats until the task is done. Chapter 66 follows one task through this loop in detail.</p>
+</div></details>
+
+<h3 id="ch65-8"><span class="num">65.8</span>A guided first session (45 minutes)</h3>
+<p>This session uses a tiny practice project you create yourself, so nothing important is at risk. You need Node.js (Chapter 58); the project uses Node's built-in test runner, so there's nothing to install.</p>
+
+<div class="lab"><div class="lab-h"><b>Your first Claude Code session</b><span>45 min · terminal</span></div><ol>
+<li>Create an empty practice folder and start Claude in it:
+<div class="code"><pre>mkdir ~/claude-practice
+cd ~/claude-practice
+git init
+claude</pre></div>
+<span class="expect">a workspace trust question for the new folder (answer yes; you just created it), then the prompt box.</span></li>
+<li>Press <kbd>Shift</kbd>+<kbd>Tab</kbd> until the indicator says <code>⏸ manual mode on</code>.<span class="expect">the mode indicator changes. From Auto, one press is usually enough.</span></li>
+<li>Ask: <em>"Create a tiny Node.js project: src/discount.js with a function applyDiscount(price, percent), and test/discount.test.js using Node's built-in test runner (node --test). Include tests for 0%, 50%, 100% and a negative percent. Don't install any packages."</em><span class="expect">a short plan, then permission prompts to create each file, each showing the file contents. Approve them with "Yes".</span></li>
+<li>Run the tests yourself with shell mode: <code>! node --test</code><span class="expect">the test results printed in the conversation, and Claude commenting on them. If any test fails, that's fine: you'll fix it next.</span></li>
+<li>Ask: <em>"What does applyDiscount do with a negative percent? Is that sensible for a shop?"</em><span class="expect">an explanation, probably pointing out that a negative discount would raise the price. This is Claude helping you think like a tester.</span></li>
+<li>Ask: <em>"Make applyDiscount throw an error for percents below 0 or above 100, update the tests, and run them."</em><span class="expect">a diff for each file (removed and added lines), then a prompt to run <code>node --test</code>. Read each diff before approving.</span></li>
+<li>Halfway through, press <kbd>Esc</kbd> once, then type <em>"Actually, use a RangeError with a clear message."</em><span class="expect">Claude stops, then continues with your correction.</span></li>
+<li>Mention a file: <em>"Explain @test/discount.test.js line by line for a beginner."</em><span class="expect">a plain explanation of each test.</span></li>
+<li>Ask: <em>"Commit these changes with a clear message."</em><span class="expect">a prompt to run <code>git add</code> and <code>git commit</code>. Read the message before approving.</span></li>
+<li>Press <kbd>Esc</kbd> <kbd>Esc</kbd> on an empty prompt, look at the rewind menu, then choose "Never mind".<span class="expect">a list of earlier points in the conversation you could go back to.</span></li>
+<li>Type <code>/exit</code>. Then run <code>claude -c</code>.<span class="expect">the same conversation back, ready to continue.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"I'll start Claude Code from my home folder so it can see everything."</dt><dd>That gives it access to far more than it needs, and the trust prompt reappears every time. Start in the project folder.</dd>
+<dt>"Auto mode means it never makes mistakes."</dt><dd>Auto mode reduces prompts; it doesn't check whether the code is right. You still review diffs and test results.</dd>
+<dt>"Pressing Esc throws away all the work."</dt><dd>Esc stops the current step and keeps what's been done. Rewind (Esc Esc) is how you go back.</dd>
+<dt>"Typing # saves a note to memory."</dt><dd>Not any more: that shortcut was removed. Ask Claude to update CLAUDE.md, or use <code>/memory</code>.</dd>
+<dt>"Claude will remember this tomorrow."</dt><dd>Only if you resume the conversation, or the information is in CLAUDE.md or auto memory.</dd>
+</dl></div>
+
+<h3 id="ch65-r"><span class="num">65.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Always <code>cd</code> into the project first; only trust folders you know.</li>
+<li>Learn in Manual mode (<kbd>Shift</kbd>+<kbd>Tab</kbd> from Auto) so you see every edit and command.</li>
+<li><code>@</code> mentions a file, <code>!</code> runs a shell command, <code>/</code> runs a command or skill. The old <code>#</code> memory shortcut is gone.</li>
+<li><kbd>Esc</kbd> stops, <kbd>Esc</kbd> <kbd>Esc</kbd> rewinds, <kbd>Ctrl</kbd>+<kbd>C</kbd> interrupts or exits.</li>
+<li>Read each permission prompt like a test step; choose "don't ask again" only for safe, repeatable commands.</li>
+<li><code>/exit</code> to leave; <code>claude -c</code> to continue; <code>claude -r</code> to pick an older conversation.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">You want Claude Code to work on your test repository. What should you do first?</p><div class="opts"><button>Start <code>claude</code> in your home folder</button><button data-ok><code>cd</code> into the test repository, then start <code>claude</code></button><button>Open the repository in a browser</button></div><p class="why" hidden>The folder you start in becomes Claude's working directory.</p></div>
+<div class="qz"><p class="q">A new session shows <code>⏵⏵ auto mode on</code>. You're learning and want to approve each edit and command. What do you do?</p><div class="opts"><button data-ok>Press Shift+Tab to switch to Manual mode</button><button>Type #manual</button><button>Restart the computer</button></div><p class="why" hidden>From Auto, the first Shift+Tab press goes to Manual (shown as "⏸ manual mode on").</p></div>
+<div class="qz"><p class="q">What does typing <code>! npm test</code> do?</p><div class="opts"><button>Asks Claude to explain npm</button><button data-ok>Runs npm test directly and adds the output to the conversation</button><button>Deletes the test folder</button></div><p class="why" hidden>The <code>!</code> prefix is shell mode.</p></div>
+<div class="qz"><p class="q">Claude is halfway through a change you realise is wrong. Best move?</p><div class="opts"><button data-ok>Press Esc and give a new direction</button><button>Close the terminal window</button><button>Wait until it finishes, then delete the files</button></div><p class="why" hidden>Esc stops it and keeps the work so far; you can redirect immediately.</p></div>
+<div class="qz"><p class="q">Which command picks up yesterday's conversation from a list?</p><div class="opts"><button><code>claude -c</code></button><button data-ok><code>claude -r</code></button><button><code>claude -p</code></button></div><p class="why" hidden><code>-r</code> (resume) opens the picker. <code>-c</code> continues only the most recent conversation; <code>-p</code> runs one non-interactive request.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Repeat the guided session on a real but low-risk repository from your team, such as a test-automation repo, in Manual mode. Ask Claude to explain the project's structure and how to run its tests, then run them with <code>!</code>. Write down every permission prompt you saw and whether you'd approve it permanently. Share the list with a colleague and agree on which commands are safe to allow for the team (you'll turn that list into rules in Chapter 78).</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Go into the project folder, then type claude. Trust only folders you know. While learning, press Shift+Tab to Manual so it asks before every edit and command. @ points at a file, ! runs a command, / runs a Claude command. Esc stops it, Esc Esc rewinds. Read every permission prompt like a test step. /exit to leave, claude -c to come back."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/quickstart" target="_blank" rel="noopener">Claude Code quickstart</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/interactive-mode" target="_blank" rel="noopener">Interactive mode</a>: keyboard shortcuts, input prefixes, queued messages.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/permission-modes" target="_blank" rel="noopener">Permission modes</a> and <a href="https://code.claude.com/docs/en/permissions" target="_blank" rel="noopener">Permissions</a>: modes, the permission prompt and saved rules.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/security" target="_blank" rel="noopener">Security</a>: workspace trust.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/sessions" target="_blank" rel="noopener">Manage sessions</a> and <a href="https://code.claude.com/docs/en/checkpointing" target="_blank" rel="noopener">Checkpointing</a>.</li>
+<li>Claude Code changelog (v2.0.70 removal of the <code>#</code> shortcut; v2.1.283 auto as the starting mode), as summarised in this book's research notes.</li>
+</ol><p class="verified">Verified 9 November 2026 against Claude Code 2.1.319</p></div>

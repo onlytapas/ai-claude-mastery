@@ -1,0 +1,232 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>Who xAI (now part of SpaceX), DeepSeek, Mistral AI and Alibaba's Qwen team are: founding, models, open or closed, and position</li>
+<li>Why DeepSeek-R1 in January 2025 shook the industry, and what its research changed</li>
+<li>The wider field in short: Cohere, Perplexity, Hugging Face, Moonshot AI (Kimi), Zhipu AI (GLM) and Apple</li>
+<li>How to read the whole landscape in one comparison table</li>
+<li>How a QA team can shortlist models from many vendors with clear gates and weights, using a small scoring script</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch26">Chapter 26</a> (how the industry fits together), <a href="#ch28">Chapter 28</a> (Mixture of Experts) and <a href="#ch29">Chapter 29</a> (model licences). The lab needs Python 3, which runs fully offline.</div>
+
+<div class="bigidea"><p>Beyond the giants there is a crowded, fast-moving field. xAI builds the Grok models on its own huge computer cluster and is now part of SpaceX. DeepSeek, a Chinese research lab, showed in 2025 that very strong open models could be trained far more cheaply than people assumed. Mistral is Europe's leading independent lab, built around open weights and models customers can run themselves. Alibaba's Qwen family is among the most downloaded open models in the world. Around them sit specialists such as Cohere, Perplexity, Hugging Face, Moonshot, Zhipu and Apple. For a working team, this variety means real choice, and a duty to check licence, hosting and company policy before choosing.</p></div>
+
+<h3 id="ch30-1"><span class="num">30.1</span>Why the wider field matters</h3>
+<p>It is easy to think AI means three or four American companies. In practice, many of the models your colleagues download, and some that power tools you already use, come from elsewhere. The wider field matters for four practical reasons:</p>
+<div class="tbl"><table>
+<tr><th>Reason</th><th>What it means for a team</th></tr>
+<tr><td><b>Open weights</b></td><td>Most of the strongest downloadable models in 2026 come from DeepSeek, Qwen, Mistral, Moonshot and Zhipu. If you need to run a model on your own servers, this is where many candidates are.</td></tr>
+<tr><td><b>Price pressure</b></td><td>Cheap, capable models push every vendor's prices down, including for the models you already pay for.</td></tr>
+<tr><td><b>Where data goes</b></td><td>A company's hosted app or API sends data to that company's servers, in its country. Running its open weights on your own hardware does not. Policies often treat the two very differently.</td></tr>
+<tr><td><b>Hidden dependencies</b></td><td>Tools you use may be built on these models. For example, Cursor's Composer 2 and 2.5 coding models were reportedly built on Moonshot's Kimi K2.5.</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Choosing an AI model is like choosing a supplier for a part in a car you build. Big-name suppliers are not the only option; smaller and foreign suppliers can be excellent and cheaper. But you still check the contract, where the part is made, and whether your company is allowed to buy from them.</p></div>
+
+<h3 id="ch30-2"><span class="num">30.2</span>xAI and Grok (now SpaceX Super Intelligence)</h3>
+<p>Elon Musk incorporated xAI on 9 March 2023 and announced it publicly on 12 July 2023. It was based in Palo Alto, California. Its corporate story moved unusually fast:</p>
+<ol class="timeline">
+<li><span class="yr">2023</span><span class="ev"><b>xAI founded.</b> Grok-1 arrives in November.</span></li>
+<li><span class="yr">Mar 2024</span><span class="ev"><b>Grok-1 weights released</b> under Apache 2.0 (17 March).</span></li>
+<li><span class="yr">2025</span><span class="ev"><b>Merges with X Corp.</b> (March). Grok 3 (February), Grok 4 (July) and Grok 4.1 (November) follow.</span></li>
+<li class="key"><span class="yr">Feb 2026</span><span class="ev"><b>SpaceX acquires xAI</b> in an all-stock deal (announced 2 February).</span></li>
+<li><span class="yr">2026</span><span class="ev"><b>Renamed twice:</b> first SpaceXAI, then "SpaceX Super Intelligence" (SpaceXSI), which the API docs now use. Exact rename dates are reported differently by different sources.</span></li>
+<li><span class="yr">Jul 2026</span><span class="ev"><b>Grok Build</b> (16 July), an Apache-licensed coding agent for the terminal.</span></li>
+<li class="key"><span class="yr">Sep 2026</span><span class="ev"><b>Grok 4.7</b>, the current frontier model on the API (<code>grok-4.7</code>).</span></li>
+</ol>
+<p>xAI's strategy is to train on very large self-built compute, the <strong>Colossus</strong> supercomputer in Memphis, built on NVIDIA GPUs, and to distribute Grok through X, the Grok apps, and Tesla and SpaceX products. Products include the Grok chatbot, the Grok API, Grok Imagine (images and video) and Grok Voice. It earns from X Premium and SuperGrok subscriptions and the API.</p>
+<p><b>Open or closed?</b> Current Grok models are proprietary. Older ones were opened later: Grok-1 under Apache 2.0, and Grok 2.5 under a community licence. Grok 5 had <b>not</b> been released as of 9 November 2026.</p>
+<div class="box note"><span class="tag">SpaceX also owns Cursor</span><p>SpaceX also bought Anysphere, the maker of the Cursor code editor, for $60 billion (announced 16 June 2026, closed 14 August 2026). So one group now owns both a frontier model lab and one of the most popular AI coding editors. <a href="#ch26">Chapter 26</a> covers this wave of consolidation.</p></div>
+
+<h3 id="ch30-3"><span class="num">30.3</span>DeepSeek</h3>
+<p>DeepSeek was founded on 17 July 2023 by Liang Wenfeng in Hangzhou, China. It is owned and funded by the hedge fund High-Flyer. It behaves like a research lab: it publishes detailed papers and releases its models as open weights, mostly under the permissive MIT licence.</p>
+<ol class="timeline">
+<li><span class="yr">May 2024</span><span class="ev"><b>DeepSeek-V2</b> introduces Multi-head Latent Attention, a way to cut memory use.</span></li>
+<li><span class="yr">Dec 2024</span><span class="ev"><b>DeepSeek-V3</b>, a large Mixture-of-Experts model.</span></li>
+<li class="key"><span class="yr">Jan 2025</span><span class="ev"><b>DeepSeek-R1</b> (20 January), an open reasoning model that shook markets.</span></li>
+<li><span class="yr">Aug–Dec 2025</span><span class="ev"><b>V3.1</b> and <b>V3.2</b> (with DeepSeek Sparse Attention).</span></li>
+<li class="key"><span class="yr">Apr 2026</span><span class="ev"><b>V4 preview</b> (24 April): V4-Pro with 1.6 trillion total parameters, V4-Flash with 284 billion.</span></li>
+<li><span class="yr">Sep 2026</span><span class="ev"><b>V4.1-Flash</b> (10 September). The API now serves <code>deepseek-flash</code> and <code>deepseek-v4-pro</code>.</span></li>
+</ol>
+<h4>Why R1 was such a shock</h4>
+<p>Before R1, many people assumed top reasoning models needed the budgets of the largest US labs. DeepSeek released a strong <a class="gl" href="#g-reasoning-model">reasoning model</a> openly, with a paper explaining how it was trained, and offered it cheaply. Investors started asking whether the huge spending on chips was really necessary, and AI-related share prices fell sharply at the time.</p>
+<details class="deep"><summary>What DeepSeek's research actually showed</summary><div class="body">
+<ul>
+<li><b>Reasoning from reinforcement learning.</b> The R1 paper (arXiv 2501.12948) showed that a model called R1-Zero learned to reason step by step through pure <a class="gl" href="#g-reinforcement-learning">reinforcement learning</a>: it was rewarded for correct final answers on checkable problems such as maths, without first being shown worked examples. Long, self-checking chains of thought emerged on their own. <a href="#ch19">Chapter 19</a> explains reasoning models.</li>
+<li><b>GRPO</b> (Group Relative Policy Optimization), from the earlier DeepSeekMath paper (arXiv 2402.03300). Instead of training a separate "critic" model to judge each answer, it compares a group of answers to the same question against each other. That saves memory and compute.</li>
+<li><b>Efficiency tricks.</b> Multi-head Latent Attention and fine-grained <a class="gl" href="#g-mixture-of-experts">Mixture of Experts</a> (DeepSeek-V2/V3, arXiv 2405.04434) cut the cost of running and training large models.</li>
+</ul>
+<p>Other labs quickly adopted or adapted these ideas. That is how open research spreads: a published method becomes part of everyone's toolkit within months.</p>
+</div></details>
+<p><b>Chips.</b> DeepSeek historically trained on NVIDIA GPUs (A100 and H800). V4 runs on Chinese chips from Huawei (Ascend) and Cambricon.</p>
+<div class="box warn"><span class="tag">Check your policy, not the headlines</span><p>Using DeepSeek's own chat app or API sends your data to a company in China. Downloading its MIT-licensed weights and running them on your own servers does not. Many employers treat these two cases differently, and some forbid one or both. Before you paste a Jira ticket or a log file into any AI service, from any country, check your company's approved-tools list (<a href="#ch117">Chapter 117</a>).</p></div>
+
+<h3 id="ch30-4"><span class="num">30.4</span>Mistral AI</h3>
+<p>Mistral AI was founded in Paris in April 2023 by Arthur Mensch (CEO), Guillaume Lample and Timothée Lacroix. It is Europe's leading independent AI lab, and it sells something many European and regulated customers want: strong models they can run on their own infrastructure, which supports <a class="gl" href="#g-sovereign-ai">sovereign AI</a> goals.</p>
+<div class="tbl"><table>
+<tr><th>Model</th><th>Date</th><th>Notes</th></tr>
+<tr><td>Mistral 7B</td><td>Sep 2023</td><td>Small, open, widely used</td></tr>
+<tr><td>Mixtral 8x7B</td><td>Dec 2023</td><td>An early, widely used open Mixture-of-Experts model; made MoE popular in open models</td></tr>
+<tr><td>Mistral Large 3</td><td>Dec 2025</td><td>Apache 2.0</td></tr>
+<tr><td>Mistral Medium 3.5</td><td>Apr 2026</td><td></td></tr>
+<tr><td><b>Mistral Large 4</b></td><td>Preview 6 Oct 2026; weights 29 Oct 2026</td><td>About 1 trillion total parameters, 52 billion active; released under the "Mistral Ecosystem Open-Weight License" (per Wikipedia)</td></tr>
+</table></div>
+<p>Products include La Plateforme (the API), coding tools such as Devstral, and the Le Chat assistant, which Wikipedia reports was renamed <b>Mistral Vibe</b> in May 2026. Mistral earns from its API, enterprise licences, on-premise deployments and subscriptions. Partners and investors include Microsoft (investment in 2024, an infrastructure deal in July 2026), ASML (a major investor since September 2025), NVIDIA (March 2026) and Samsung (a stake in September 2026).</p>
+<div class="box note"><span class="tag">"Open" comes in shades</span><p>Mistral's licences range from Apache 2.0 (very permissive) to custom terms like the one on Large 4. Two Mistral models can have very different rules. Always read the licence of the exact model and version you plan to use (<a href="#ch29">Chapter 29</a> shows how to check quickly).</p></div>
+
+<h3 id="ch30-5"><span class="num">30.5</span>Alibaba's Qwen</h3>
+<p>Qwen is built by Alibaba Cloud, part of Alibaba Group (founded 1999 by Jack Ma and others, based in Hangzhou). It first launched as Tongyi Qianwen in April 2023. Its strategy has two halves: release a broad family of open-weight models to win developers, and keep the top "Max" models proprietary on Alibaba Cloud.</p>
+<ul>
+<li><b>Releases in 2026:</b> Qwen3.5 (February), Qwen3.6 (April), Qwen3.7 (May–June) and the <b>Qwen3.8</b> family from August: Qwen3.8-Max (cloud only, 3 Aug), Qwen3.8-2.4T-A95B (open weights, 12 Aug), Qwen3.8-27B (Apache 2.0, 14 Aug) and Qwen3.8-Flash (26 Aug).</li>
+<li><b>No "Qwen 4" flagship</b> had been confirmed as of 9 November 2026.</li>
+<li><b>Reach:</b> the Qwen app had 234 million users by May 2026, according to Wikipedia.</li>
+</ul>
+<p>Qwen models are among the most downloaded open model families, and many community fine-tunes are built on them. Even NVIDIA publishes optimised versions of Qwen models on the Hugging Face Hub. A name such as <code>Qwen3.8-2.4T-A95B</code> follows the Mixture-of-Experts pattern from <a href="#ch28">Chapter 28</a>: about 2.4 trillion total parameters, about 95 billion active.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>A test-automation team wants a small model on each CI runner to classify failing tests as "product bug", "test bug" or "environment". They need something that fits in modest memory, allows commercial use and needs no outside API. An Apache 2.0 model such as Qwen3.8-27B is the kind of candidate they would shortlist, alongside options from Mistral, Google's Gemma or NVIDIA's Nemotron. They would then test each on a few hundred of their own past failures before choosing (<a href="#ch36">Chapter 36</a>).</p></div>
+
+<h3 id="ch30-6"><span class="num">30.6</span>The wider field in brief</h3>
+<input class="filter" data-filter="#ch30Others" data-empty="#ch30OthersEmpty" type="search" placeholder="Filter companies…" aria-label="Filter companies">
+<div class="tbl"><table id="ch30Others">
+<tr><th>Company</th><th>Founded, base</th><th>What it does (Nov 2026)</th><th>Open?</th></tr>
+<tr class="group"><td colspan="4">North America</td></tr>
+<tr><td><b>Cohere</b></td><td>2019, Toronto. Founders include Aidan Gomez, a co-author of the Transformer paper</td><td>Enterprise AI for regulated industries. Latest model Command A+ (20 May 2026; 218B-parameter MoE, 25B active). Products: North (workspace), Embed and Rerank (search). Signed a merger agreement with Germany's Aleph Alpha in Sep 2026 (pending)</td><td>Command A+ weights under Apache 2.0</td></tr>
+<tr><td><b>Perplexity</b></td><td>Aug 2022, San Francisco. CEO Aravind Srinivas</td><td>An AI "answer engine" that cites its sources. Comet browser (free since Oct 2025), Perplexity Computer agent (Feb 2026), in-house Sonar models. Subscription-first since Feb 2026. Faces an ongoing lawsuit from Amazon over Comet's shopping features</td><td>Mostly proprietary</td></tr>
+<tr><td><b>Hugging Face</b></td><td>2016, New York</td><td>The "GitHub of AI": the Hub for models and datasets, and the <code>transformers</code> library. NVIDIA agreed to buy it (2 Sep 2026, about $12.9B; pending)</td><td>Open-source platform</td></tr>
+<tr><td><b>Apple</b></td><td>1976, Cupertino</td><td>Apple Intelligence: on-device models plus Private Cloud Compute. On 12 Jan 2026 Apple and Google said Apple's next-generation foundation models will be based on Gemini. Also integrates ChatGPT</td><td>Proprietary</td></tr>
+<tr class="group"><td colspan="4">China</td></tr>
+<tr><td><b>Moonshot AI (Kimi)</b></td><td>Mar 2023, Beijing. Alibaba is a major investor</td><td>Kimi assistant and models: K2 (Jul 2025, 1T open), K2 Thinking, K2.5 (Jan 2026), K3 (16 Jul 2026, about 2.8T parameters, open weights with a revenue-share licence), K3.1 Pro (Oct 2026)</td><td>Open weights, custom licences</td></tr>
+<tr><td><b>Zhipu AI / Z.ai (GLM)</b></td><td>2019, Beijing; a Tsinghua University spin-out. Listed in Hong Kong 8 Jan 2026</td><td>GLM models: GLM-4.5 (Jul 2025), GLM-5 (12 Feb 2026), GLM-5.2 (16 Jun 2026), GLM-5.3 (14 Aug 2026). GLM Coding Plan. On the US <a class="gl" href="#g-entity-list">Entity List</a> since Jan 2025</td><td>Open weights (MIT since Jul 2025)</td></tr>
+</table></div>
+<p id="ch30OthersEmpty" hidden>No companies match.</p>
+<div class="box note"><span class="tag">Not confirmed</span><p>The exact date of Moonshot's K3.1 Pro and whether its weights are open, the release date of GLM-5.3's weights, whether Apple's Gemini-based Siri has fully shipped, and a reported figure of about $1 billion a year for the Apple–Google deal were all unverified when this chapter was written.</p></div>
+
+<h3 id="ch30-7"><span class="num">30.7</span>The landscape in one table</h3>
+<p>This table puts the companies from Chapters 27 to 30 side by side. It describes, it does not rank: "flagship" means the company's own top model, not the best model overall. <a href="#ch34">Chapter 34</a> compares the model families in depth.</p>
+<input class="filter" data-filter="#ch30Landscape" data-empty="#ch30LandscapeEmpty" type="search" placeholder="Filter, e.g. open, China, MIT…" aria-label="Filter the landscape table">
+<div class="tbl"><table id="ch30Landscape">
+<tr><th>Company</th><th>Base</th><th>Flagship (9 Nov 2026)</th><th>Open or closed</th><th>Distinctive trait</th></tr>
+<tr class="group"><td colspan="5">United States</td></tr>
+<tr><td>OpenAI</td><td>San Francisco</td><td>GPT-6 Astra</td><td>Proprietary (older gpt-oss open)</td><td>ChatGPT's consumer reach; Codex</td></tr>
+<tr><td>Anthropic</td><td>San Francisco</td><td>Claude Fable 5.1 (Opus 5.5 the recommended default)</td><td>Proprietary</td><td>Safety focus; coding and agents; Claude Code, MCP</td></tr>
+<tr><td>Google DeepMind</td><td>London (parent in California)</td><td>Gemini 4 Argon</td><td>Proprietary (Gemma open)</td><td>Own TPUs; products used by billions</td></tr>
+<tr><td>Microsoft AI</td><td>Redmond</td><td>MAI-Thinking-1 (preview)</td><td>Proprietary</td><td>Copilot distribution; Foundry sells many vendors' models</td></tr>
+<tr><td>Meta</td><td>Menlo Park</td><td>Muse Spark 1.3</td><td>Mostly proprietary (some open, e.g. Muse Glimmer)</td><td>AI inside social apps and glasses</td></tr>
+<tr><td>xAI / SpaceXSI</td><td>Palo Alto</td><td>Grok 4.7</td><td>Proprietary (older Grok weights released)</td><td>Colossus cluster; owned by SpaceX</td></tr>
+<tr><td>NVIDIA</td><td>Santa Clara</td><td>Nemotron 3 / 3.5</td><td>Open weights</td><td>GPUs and CUDA underneath most AI</td></tr>
+<tr><td>Amazon</td><td>Seattle</td><td>Nova 2 family</td><td>Proprietary</td><td>Bedrock marketplace; Trainium chips</td></tr>
+<tr class="group"><td colspan="5">Europe</td></tr>
+<tr><td>Mistral AI</td><td>Paris</td><td>Mistral Large 4</td><td>Open weights (custom licence on Large 4)</td><td>Self-hosting and sovereign deployments</td></tr>
+<tr class="group"><td colspan="5">China</td></tr>
+<tr><td>DeepSeek</td><td>Hangzhou</td><td>DeepSeek-V4-Pro / V4.1-Flash</td><td>Open weights (MIT)</td><td>Efficiency research; low prices</td></tr>
+<tr><td>Alibaba (Qwen)</td><td>Hangzhou</td><td>Qwen3.8-Max</td><td>Mixed (Max proprietary; many open, often Apache 2.0)</td><td>Huge open family; widely fine-tuned</td></tr>
+<tr><td>Moonshot AI</td><td>Beijing</td><td>Kimi K3 / K3.1 Pro</td><td>Open weights (custom licences)</td><td>Very large open models</td></tr>
+<tr><td>Zhipu AI / Z.ai</td><td>Beijing</td><td>GLM-5.3</td><td>Open weights (MIT)</td><td>Listed company; on the US Entity List</td></tr>
+</table></div>
+<p id="ch30LandscapeEmpty" hidden>No rows match.</p>
+<div class="box opinion"><span class="tag">Opinion · industry commentators</span><p>Coverage of 2026 releases often describes the gap between the best open-weight models and the best proprietary ones as narrowing; Fortune, for example, headlined Moonshot's K3 as pushing Chinese AI into "Fable-level territory". These are claims based mostly on the vendors' own benchmarks. Treat them as hypotheses to test on your own tasks, not as settled fact (<a href="#ch33">Chapter 33</a>).</p></div>
+
+<h3 id="ch30-8"><span class="num">30.8</span>Turning a crowded market into a shortlist</h3>
+<p>With this many options, teams need a repeatable way to narrow down. A simple, defensible method has two stages, which testers will recognise as entry criteria followed by weighted scoring.</p>
+<div class="flow">
+<div><b>1. Gates</b>Pass/fail rules: commercial use allowed? Permitted by company policy (country, hosting, Entity List)?</div>
+<div><b>2. Evidence</b>Run each surviving model on 50–200 of your own real tasks (<a href="#ch36">Chapter 36</a>)</div>
+<div class="hl"><b>3. Weighted score</b>Quality, cost, hosting fit, licence comfort, vendor risk, each 1–5</div>
+<div><b>4. Decision record</b>Write down the winner, the runner-up and why</div>
+</div>
+<p>The point of gates is that no score can buy back a hard "no". A brilliant model your legal team will not approve is not a candidate. The lab turns this into a tiny script.</p>
+
+<div class="lab"><div class="lab-h"><b>Build a model shortlist with gates and weights</b><span>30 min · Python 3, offline</span></div><ol>
+<li>Create a folder, for example <code>shortlist</code>, and save the two files below into it: <code>candidates.csv</code> and <code>shortlist.py</code>. The candidates are generic placeholders and all scores are <b>illustrative</b>, invented for practice, not measurements of real models.<span class="expect">two files in one folder.</span></li>
+<li>In a terminal inside that folder, run <code>python3 shortlist.py</code>.<span class="expect">the output shown under the files: C first (4.10), then A (3.95) and B (3.85); D and E marked "out" with the gate they failed.</span></li>
+<li>Notice why C wins: it is weaker on quality but strong on cost, hosting and licence. Now open <code>shortlist.py</code> and change the weights so quality matters more: <code>"quality": 0.50, "cost": 0.15, "hosting": 0.15, "licence": 0.10, "vendor": 0.10</code>. Run it again.<span class="expect">A moves to first place (4.20), then B (3.90) and C (3.80). Same data, different priorities, different winner.</span></li>
+<li>Change D's <code>policy_ok</code> to <code>yes</code> and run again.<span class="expect">D now appears in the scored list. The gate, not the score, was keeping it out.</span></li>
+<li>Replace the five rows with three to five real candidates for a task your team has, for example "classify CI failures" or "draft test cases from Jira stories". Use the tables in this chapter and Chapters 28–29 for licence and hosting facts; leave quality at 3 until you have tested them yourself.<span class="expect">a first shortlist for your own use case, with a clear record of which rule excluded what.</span></li>
+</ol></div>
+<div class="code"><span class="cap">candidates.csv (illustrative scores, 1 = poor, 5 = excellent)</span><pre>model,commercial_ok,policy_ok,quality,cost,hosting,licence,vendor
+A: proprietary API model,yes,yes,5,3,3,4,4
+B: large open-weight (self-host),yes,yes,4,3,5,3,4
+C: small open-weight (self-host),yes,yes,3,5,5,5,3
+D: hosted API outside our region,yes,no,4,5,2,4,2
+E: non-commercial licence,no,yes,3,5,5,1,3</pre></div>
+<div class="code"><span class="cap">shortlist.py (Python 3, standard library only)</span><pre>"""Score a model shortlist: hard gates first, then weighted scores (1 = poor, 5 = excellent)."""
+import csv
+import sys
+
+WEIGHTS = {"quality": 0.35, "cost": 0.20, "hosting": 0.20, "licence": 0.15, "vendor": 0.10}
+GATES = ["commercial_ok", "policy_ok"]  <span class="c"># every gate must be "yes" or the model is excluded</span>
+
+
+def load(path):
+    with open(path, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+
+def score(row):
+    return sum(float(row[k]) * w for k, w in WEIGHTS.items())
+
+
+def main():
+    path = sys.argv[1] if len(sys.argv) &gt; 1 else "candidates.csv"
+    rows = load(path)
+    passed, failed = [], []
+    for row in rows:
+        missing = [g for g in GATES if row[g].strip().lower() != "yes"]
+        (failed if missing else passed).append((row, missing))
+    print(f"{'Model':&lt;34}{'Score':&gt;6}")
+    for row, _ in sorted(passed, key=lambda p: score(p[0]), reverse=True):
+        print(f"{row['model']:&lt;34}{score(row):&gt;6.2f}")
+    for row, missing in failed:
+        print(f"{row['model']:&lt;34}{'out':&gt;6}  (failed: {', '.join(missing)})")
+
+
+if __name__ == "__main__":
+    main()</pre></div>
+<div class="code"><span class="cap">Terminal: expected output</span><pre>python3 shortlist.py
+Model                              Score
+C: small open-weight (self-host)    4.10
+A: proprietary API model            3.95
+B: large open-weight (self-host)    3.85
+D: hosted API outside our region     out  (failed: policy_ok)
+E: non-commercial licence            out  (failed: commercial_ok)</pre></div>
+<div class="box note"><span class="tag">Troubleshooting</span><ul>
+<li><b><code>FileNotFoundError: ... 'candidates.csv'</code>:</b> run the command from the folder that holds the CSV, or pass its path: <code>python3 shortlist.py path/to/candidates.csv</code>.</li>
+<li><b><code>KeyError: 'quality'</code> (or another column):</b> the CSV header row must match exactly, with no spaces after commas. Spreadsheet apps sometimes rename columns.</li>
+<li><b><code>ValueError: could not convert string to float</code>:</b> a score cell is empty or contains text. Every score must be a number.</li>
+<li><b>A model name contains a comma:</b> wrap it in double quotes in the CSV, for example <code>"Model, large"</code>.</li>
+<li><b>Weights that don't add up to 1:</b> the script still runs, but totals are no longer on a 1–5 scale. Keep them summing to 1 so scores are easy to read.</li>
+</ul></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Open-weight models from China send data to China."</dt><dd>Weights you download and run on your own servers send nothing anywhere by themselves. Using a company's hosted app or API is different. Check your policy for each case separately.</dd>
+<dt>"xAI is an independent start-up."</dt><dd>It merged with X in 2025 and was acquired by SpaceX in February 2026; it now operates as SpaceX Super Intelligence.</dd>
+<dt>"Grok 5 is out."</dt><dd>As of 9 November 2026 the latest API model is Grok 4.7. Grok 5 had not been released.</dd>
+<dt>"DeepSeek proved chips don't matter."</dt><dd>It showed that clever methods can greatly reduce cost. Its models still need large amounts of computing hardware; V4 runs on Huawei Ascend and Cambricon chips.</dd>
+<dt>"All Mistral models are Apache 2.0."</dt><dd>Licences vary by model; Mistral Large 4 uses a custom open-weight licence.</dd>
+</dl></div>
+
+<h3 id="ch30-r"><span class="num">30.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>xAI (2023) builds Grok on its Colossus cluster; it merged with X, was bought by SpaceX in 2026 and now runs as SpaceXSI. Grok 4.7 is current; Grok 5 is not released.</li>
+<li>DeepSeek (Hangzhou, 2023) releases efficient MIT-licensed open models; R1 (Jan 2025) showed reasoning could be taught by reinforcement learning, cheaply and openly.</li>
+<li>Mistral (Paris, 2023) leads in Europe with open weights and self-hosting; Large 4 is about 1T parameters with 52B active, under a custom licence.</li>
+<li>Alibaba's Qwen is a huge, mostly open family; the top Max models stay proprietary.</li>
+<li>Cohere, Perplexity, Hugging Face, Moonshot, Zhipu and Apple each fill a niche, from enterprise search to on-device AI.</li>
+<li>Choose with gates first (licence, policy), then evidence on your own tasks, then weighted scores, then a written decision.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Who owns xAI as of November 2026?</p><div class="opts"><button>Tesla</button><button data-ok>SpaceX, which acquired it in February 2026</button><button>Microsoft</button></div><p class="why" hidden>The all-stock deal was announced on 2 February 2026; xAI now operates as SpaceX Super Intelligence.</p></div>
+<div class="qz"><p class="q">What did DeepSeek's R1-Zero experiment show?</p><div class="opts"><button>That models cannot reason without human-written examples</button><button data-ok>That step-by-step reasoning can emerge from reinforcement learning rewarded on correct answers</button><button>That bigger models are always better</button></div><p class="why" hidden>R1-Zero was trained with pure reinforcement learning on checkable problems, and long reasoning chains emerged.</p></div>
+<div class="qz"><p class="q">Your security policy forbids sending company data to services hosted outside approved regions. Which DeepSeek option might still be allowed?</p><div class="opts"><button>The DeepSeek chat app</button><button>The DeepSeek API</button><button data-ok>Running the MIT-licensed open weights on your company's own approved servers</button></div><p class="why" hidden>Self-hosted weights keep data in-house. It still needs your policy owner's approval, but it is a different case from the hosted services.</p></div>
+<div class="qz"><p class="q">Which statement about Qwen is accurate?</p><div class="opts"><button>All Qwen models are proprietary</button><button data-ok>Many Qwen models are open-weight (often Apache 2.0), while the top Max models are proprietary</button><button>Qwen 4 is Alibaba's current flagship</button></div><p class="why" hidden>Qwen3.8-Max is cloud-only; Qwen3.8-27B is Apache 2.0. No Qwen 4 flagship had been confirmed.</p></div>
+<div class="qz"><p class="q">In the shortlist method, why come gates before scores?</p><div class="opts"><button>Gates are faster to compute</button><button data-ok>A hard "no" (licence, policy) cannot be outweighed by high scores elsewhere</button><button>Scores are not needed if gates are used</button></div><p class="why" hidden>Like entry criteria in testing: if a precondition fails, the rest of the evaluation doesn't matter.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick a real QA use case in your team. Build a <code>candidates.csv</code> with four to six real models from at least three different companies in Chapters 27–30, including at least one open-weight model. Fill in the gate columns honestly (ask your security or legal contact if unsure) and set weights that match your priorities. Run the script, then write a five-line decision record: winner, runner-up, what was excluded and why, what you still need to test, and the date. Keep it for <a href="#ch35">Chapter 35</a>.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"AI isn't just OpenAI, Anthropic and Google. xAI makes Grok and is now part of SpaceX. DeepSeek in China showed in 2025 that you can train very strong reasoning models cheaply and release them openly. Mistral in Paris focuses on open models companies can run themselves. Alibaba's Qwen is one of the most downloaded open families. Then there are specialists like Cohere for enterprise, Perplexity for cited answers and Hugging Face as the hub for open models. With so much choice, we pick models the way we run tests: hard pass/fail gates first, like licence and company policy, then we test the survivors on our own tasks and score them."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>xAI, "xAI joins SpaceX": <a href="https://x.ai/news/xai-joins-spacex" target="_blank" rel="noopener">x.ai</a>; xAI / SpaceXSI API release notes: <a href="https://docs.x.ai/developers/release-notes" target="_blank" rel="noopener">docs.x.ai</a>; Wikipedia, "xAI (company)": <a href="https://en.wikipedia.org/wiki/XAI_(company)" target="_blank" rel="noopener">en.wikipedia.org</a>; "Grok (chatbot)": <a href="https://en.wikipedia.org/wiki/Grok_(chatbot)" target="_blank" rel="noopener">en.wikipedia.org</a></li>
+<li>CNBC, SpaceX acquisition of Cursor: <a href="https://www.cnbc.com/2026/06/16/spacex-spcx-cursor-acquisition-ipo.html" target="_blank" rel="noopener">cnbc.com</a></li>
+<li>DeepSeek API news: <a href="https://api-docs.deepseek.com/news/news" target="_blank" rel="noopener">api-docs.deepseek.com</a>; Wikipedia, "DeepSeek": <a href="https://en.wikipedia.org/wiki/DeepSeek" target="_blank" rel="noopener">en.wikipedia.org/wiki/DeepSeek</a></li>
+<li>DeepSeek-AI, "DeepSeek-R1" (2025): <a href="https://arxiv.org/abs/2501.12948" target="_blank" rel="noopener">arXiv:2501.12948</a>; "DeepSeekMath" (GRPO, 2024): <a href="https://arxiv.org/abs/2402.03300" target="_blank" rel="noopener">arXiv:2402.03300</a>; "DeepSeek-V2" (2024): <a href="https://arxiv.org/abs/2405.04434" target="_blank" rel="noopener">arXiv:2405.04434</a></li>
+<li>Wikipedia, "Mistral AI": <a href="https://en.wikipedia.org/wiki/Mistral_AI" target="_blank" rel="noopener">en.wikipedia.org/wiki/Mistral_AI</a>; TechCrunch on Mistral Large 4: <a href="https://techcrunch.com/2026/10/06/mistrals-new-1t-model-aims-to-leapfrog-closed-and-open-rivals/" target="_blank" rel="noopener">techcrunch.com</a>; Euronews on the weights release: <a href="https://www.euronews.com/2026/10/29/mistral-releases-latest-ai-model-for-download-giving-companies-more-control-over-their-cyb" target="_blank" rel="noopener">euronews.com</a>; A. Jiang et al., "Mixtral of Experts": <a href="https://arxiv.org/abs/2401.04088" target="_blank" rel="noopener">arXiv:2401.04088</a></li>
+<li>Wikipedia, "Qwen": <a href="https://en.wikipedia.org/wiki/Qwen" target="_blank" rel="noopener">en.wikipedia.org/wiki/Qwen</a>; South China Morning Post on Qwen3.8-Max: <a href="https://www.scmp.com/tech/article/3362738/alibabas-ai-model-qwen38-max-made-widely-accessible-ahead-open-weights-release" target="_blank" rel="noopener">scmp.com</a></li>
+<li>Cohere, "Command A+": <a href="https://cohere.com/blog/command-a-plus" target="_blank" rel="noopener">cohere.com</a>; Wikipedia, "Perplexity AI": <a href="https://en.wikipedia.org/wiki/Perplexity_AI" target="_blank" rel="noopener">en.wikipedia.org</a>; "Hugging Face": <a href="https://en.wikipedia.org/wiki/Hugging_Face" target="_blank" rel="noopener">en.wikipedia.org</a></li>
+<li>Wikipedia, "Moonshot AI": <a href="https://en.wikipedia.org/wiki/Moonshot_AI" target="_blank" rel="noopener">en.wikipedia.org</a>; Fortune on Kimi K3: <a href="https://fortune.com/2026/07/16/moonshots-kimi-k3-pushes-chinese-ai-into-fable-level-territory/" target="_blank" rel="noopener">fortune.com</a>; Wikipedia, "Z.ai": <a href="https://en.wikipedia.org/wiki/Z.ai" target="_blank" rel="noopener">en.wikipedia.org/wiki/Z.ai</a></li>
+<li>Google–Apple joint statement (12 Jan 2026): <a href="https://blog.google/company-news/inside-google/company-announcements/joint-statement-google-apple/" target="_blank" rel="noopener">blog.google</a></li>
+</ol><p class="verified">Verified 9 November 2026 against the pages above and the project's research fact sheet. Treated as unverified: exact xAI rename dates, DeepSeek V4.1-Pro timing, Kimi K3.1 Pro date and weights, GLM-5.3 weights date, the Apple–Google payment figure and Siri's rollout status.</p></div>

@@ -1,0 +1,261 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>Why AI features create new kinds of security risk, in plain words</li>
+<li>The ten risks in the current OWASP Top 10 for LLM Applications (2026 edition), and how they changed from 2025</li>
+<li>What MITRE ATLAS is, how it is organised, and when to use it rather than OWASP</li>
+<li>How to threat-model an AI feature using four simple questions, trust boundaries and STRIDE</li>
+<li>How a QA engineer turns a threat model into concrete test cases, with a complete worked example</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> It helps to know what an agent is (<a href="#ch107">Chapter 107</a>), what RAG is (<a href="#ch23">Chapter 23</a>) and how MCP tools work (<a href="#ch97">Chapter 97</a>). <a href="#ch105">Chapter 105</a> covers MCP security in depth; this chapter is the wider map. The chapters after it go deeper on prompt injection (<a href="#ch131">Chapter 131</a>), privacy (<a href="#ch132">Chapter 132</a>) and securing agents (<a href="#ch134">Chapter 134</a>).</div>
+
+<div class="bigidea"><p>Ordinary software follows its code. An AI feature also follows instructions written in plain language, and it can't reliably tell your instructions apart from text that arrives in a document, a web page or a ticket. Give it tools and it can act on those instructions. That creates new risks: manipulated behaviour, leaked data, runaway costs and confident wrong answers. Two public catalogues help you think about them: the OWASP Top 10 for LLM Applications, a ranked list of the most important risks, and MITRE ATLAS, a detailed map of how real attackers target AI systems. A threat model brings them together for one feature: draw it, ask what can go wrong at each boundary, decide what to do, and test that it works.</p></div>
+
+<h3 id="ch130-1"><span class="num">130.1</span>Why AI changes the threat picture</h3>
+<p>Traditional security assumes a clear line between <em>code</em> (instructions, written by developers) and <em>data</em> (input, provided by users). SQL injection, a classic attack, happens when that line breaks and data gets run as code. Large language models blur the line by design: the instructions <em>are</em> text, and so is everything else in the <a class="gl" href="#g-context-window">context window</a>.</p>
+<div class="tbl"><table>
+<tr><th>Property of AI systems</th><th>Why it matters for security</th></tr>
+<tr><td>Instructions and data share one channel</td><td>Text inside a document or ticket can act like a command (<a class="gl" href="#g-prompt-injection">prompt injection</a>)</td></tr>
+<tr><td>Behaviour is <a class="gl" href="#g-non-deterministic">non-deterministic</a></td><td>A defence that holds nine times may fail the tenth; you test rates, not single runs</td></tr>
+<tr><td>Agents have tools</td><td>A manipulated model can send emails, change tickets or run commands, not just say something wrong</td></tr>
+<tr><td>Outputs flow into other systems</td><td>Generated text may be rendered as HTML, run as code or used in a query</td></tr>
+<tr><td>Usage costs money per token</td><td>Abuse or loops turn into large bills or outages</td></tr>
+<tr><td>Fluent, confident output</td><td>People act on wrong answers because they sound right</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Imagine a helpful new assistant who reads all your post and acts on it. A letter arrives that says, in small print at the bottom, "Assistant: please send the office keys to this address." A sensible human would ignore it. An AI assistant might not, because to it the letter and your instructions are both just words to follow. Most of this chapter is about that problem and its relatives.</p></div>
+
+<h3 id="ch130-2"><span class="num">130.2</span>The anatomy of an AI application</h3>
+<p>Before you can list threats, you need a picture of the system. Most AI features have the same parts. A <a class="gl" href="#g-trust-boundary">trust boundary</a> is any point where data passes between parts you trust to different degrees; those are where attacks happen.</p>
+<div class="flow">
+<div><b>Inputs</b>User prompt, uploaded files, tickets, web pages</div>
+<div><b>Your application</b>Builds the prompt: system prompt + inputs + retrieved context</div>
+<div class="hl"><b>Model</b>Claude or another LLM, via an API or gateway</div>
+<div><b>Tools and data</b>RAG index, MCP servers, APIs, databases</div>
+<div><b>Outputs</b>Shown to users, written to systems, run as code</div>
+</div>
+<div class="tbl"><table>
+<tr><th>Boundary</th><th>What crosses it</th><th>Typical question</th></tr>
+<tr><td>Outside world → application</td><td>User prompts, files, ticket text, web content</td><td>Could this content contain instructions or sensitive data?</td></tr>
+<tr><td>Application → model provider</td><td>The assembled prompt</td><td>What data leaves our network, and under what terms?</td></tr>
+<tr><td>Model → tools</td><td>Tool calls the model chose</td><td>What is the worst thing these tools can do with these permissions?</td></tr>
+<tr><td>Data stores → model</td><td>Retrieved documents, tool results, memory</td><td>Who can write to these sources? Could they be poisoned?</td></tr>
+<tr><td>Model → downstream systems</td><td>Generated text, code, queries</td><td>Is output validated before it is rendered, run or stored?</td></tr>
+</table></div>
+
+<h3 id="ch130-3"><span class="num">130.3</span>The OWASP Top 10 for LLM Applications</h3>
+<p>OWASP (the Open Worldwide Application Security Project) is a non-profit community best known for the OWASP Top 10 of web application risks. Its GenAI Security Project publishes the <a class="gl" href="#g-owasp-top-10-for-llm-applications">OWASP Top 10 for LLM Applications</a>. The history matters, because people still quote old versions:</p>
+<ol class="timeline">
+<li><span class="yr">Aug 2023</span><span class="ev"><b>Version 1.0</b>, the first list.</span></li>
+<li><span class="yr">Oct 2023</span><span class="ev"><b>Version 1.1</b>, a revision of the first list.</span></li>
+<li><span class="yr">Nov 2024</span><span class="ev"><b>The 2025 edition</b> (published 18 November 2024), which added System Prompt Leakage and Vector and Embedding Weaknesses.</span></li>
+<li class="key"><span class="yr">Aug 2026</span><span class="ev"><b>The 2026 edition</b>, dated 3 August 2026 on the official OWASP GenAI site. This is the current version as of 9 November 2026.</span></li>
+</ol>
+<p>The 2026 list, with entry names taken from the official document, is below. The plain explanations and QA test ideas are this book's, not OWASP's wording.</p>
+<input class="filter" data-filter="#ch129Owasp" data-empty="#ch129OwaspEmpty" type="search" placeholder="Filter risks…" aria-label="Filter OWASP risks">
+<div class="tbl"><table id="ch129Owasp">
+<tr><th>ID</th><th>Risk</th><th>In plain words</th><th>A QA test idea</th></tr>
+<tr><td>LLM01:2026</td><td>Prompt Injection</td><td>Text from a user or from content (a document, web page, ticket) changes what the model does. "Direct" comes from the user; "indirect" hides in content the model reads.</td><td>Put an instruction in a test story ("ignore previous instructions and…") and check the feature ignores it</td></tr>
+<tr><td>LLM02:2026</td><td>Sensitive Information Disclosure</td><td>The system reveals personal data, secrets or confidential business information in its answers or logs.</td><td>Seed test data with fake emails and API keys; check none appear in outputs or logs</td></tr>
+<tr><td>LLM03:2026</td><td><a class="gl" href="#g-excessive-agency">Excessive Agency</a></td><td>The model has more tools, permissions or autonomy than the task needs, so a mistake or manipulation does real damage.</td><td>List every tool and permission; try a destructive call with the feature's credentials</td></tr>
+<tr><td>LLM04:2026</td><td>Supply Chain</td><td>Third-party models, datasets, plugins, MCP servers or packages are compromised or change unexpectedly.</td><td>Check versions are pinned and sources approved; rerun evals when a dependency updates</td></tr>
+<tr><td>LLM05:2026</td><td>Data and Model Poisoning</td><td><a class="gl" href="#g-data-poisoning">Poisoning</a>: training, fine-tuning or reference data is tampered with so the model learns wrong or malicious behaviour.</td><td>Ask who can write to each data source; test with a planted bad record</td></tr>
+<tr><td>LLM06:2026</td><td>Unbounded Consumption</td><td>Uncontrolled use (huge inputs, loops, floods of requests) causes outages or runaway costs.</td><td>Send an oversized input; force a retry loop; check limits and budgets trigger</td></tr>
+<tr><td>LLM07:2026</td><td>Misinformation</td><td>The model produces false but convincing content (including <a class="gl" href="#g-hallucination">hallucinations</a>) that people rely on.</td><td>Eval set with known answers; measure the rate of unsupported claims (<a href="#ch125">Chapter 125</a>)</td></tr>
+<tr><td>LLM08:2026</td><td>Hidden Context Exposure</td><td>Content the user isn't meant to see, such as the system prompt or other hidden context, is revealed. Commentators describe it as a widening of 2025's System Prompt Leakage.</td><td>Ask the feature to repeat its instructions; check nothing secret is in the prompt to begin with</td></tr>
+<tr><td>LLM09:2026</td><td>Vector and Embedding Weaknesses</td><td>Weaknesses in retrieval (RAG) systems: poisoned documents, missing access controls, data from one user leaking to another.</td><td>Log in as a user without access to a document; ask about its contents</td></tr>
+<tr><td>LLM10:2026</td><td><a class="gl" href="#g-improper-output-handling">Improper Output Handling</a></td><td>Model output is passed to a browser, shell, database or other system without validation.</td><td>Make the model output <code>&lt;script&gt;</code> or a SQL fragment; check it is escaped or rejected</td></tr>
+</table></div>
+<p id="ch129OwaspEmpty" hidden>No rows match.</p>
+<div class="box note"><span class="tag">What moved between 2025 and 2026</span><p>Comparing the two official lists: Excessive Agency rose from sixth to third; Supply Chain and Data and Model Poisoning moved to fourth and fifth; Unbounded Consumption rose from tenth to sixth; Improper Output Handling fell from fifth to tenth; System Prompt Leakage (2025's seventh) is gone by name, with Hidden Context Exposure at eighth. The rise of Excessive Agency reflects how quickly AI features gained tools. If a report or vendor quotes "LLM06 Excessive Agency", they are using the 2025 numbering; always cite the edition.</p></div>
+<h4>The separate agentic list</h4>
+<p>OWASP's GenAI Security Project also publishes an <b>OWASP Top 10 for Agentic Applications for 2026</b> (dated 9 December 2025 on its official page), with entries numbered ASI01 to ASI10. Secondary write-ups list the entries as Agent Goal Hijack, Tool Misuse and Exploitation, Identity and Privilege Abuse, Agentic Supply Chain Vulnerabilities, Unexpected Code Execution, Memory and Context Poisoning, Insecure Inter-Agent Communication, Cascading Failures, Human-Agent Trust Exploitation and Rogue Agents. This book did not verify those names against the official document, so check it before quoting them. Use the agentic list alongside the LLM list when your feature plans and acts on its own (<a href="#ch134">Chapter 134</a>).</p>
+
+<h3 id="ch130-4"><span class="num">130.4</span>MITRE ATLAS</h3>
+<p>MITRE is a US not-for-profit that maintains MITRE ATT&amp;CK, the widely used catalogue of attacker tactics and techniques against ordinary IT systems. <a class="gl" href="#g-mitre-atlas">MITRE ATLAS</a> (Adversarial Threat Landscape for AI Systems) does the same for AI. Where OWASP gives you a short list of risks to prioritise, ATLAS gives a detailed map of <em>how</em> attackers actually operate, built from real incidents and research.</p>
+<div class="tbl"><table>
+<tr><th></th><th>OWASP Top 10 for LLM Applications</th><th>MITRE ATLAS</th></tr>
+<tr><td>Shape</td><td>A ranked list of ten risk categories</td><td>A matrix of tactics (attacker goals) and techniques (how they reach them), plus case studies and mitigations</td></tr>
+<tr><td>Viewpoint</td><td>Builder: what to defend against</td><td>Attacker: what they do, step by step</td></tr>
+<tr><td>Best for</td><td>Design reviews, checklists, training developers and testers</td><td>Threat modelling in depth, red-team planning, mapping incidents, security operations</td></tr>
+<tr><td>Size</td><td>Ten entries</td><td>Hundreds of techniques</td></tr>
+</table></div>
+<h4>What's in the current release</h4>
+<p>ATLAS data is published as versioned releases in MITRE's official <code>atlas-data</code> repository, numbered by year and month. Release v2026.10 (published 28 October 2026) contains 16 tactics, 221 techniques and sub-techniques (129 techniques and 92 sub-techniques), 44 mitigations and 77 case studies, counted from the release file on 9 November 2026. The 16 tactics are:</p>
+<div class="tbl"><table>
+<tr><th>Tactics borrowed from ATT&amp;CK</th><th>Tactics specific to AI</th></tr>
+<tr><td>Reconnaissance, Resource Development, Initial Access, Execution, Persistence, Privilege Escalation, Defense Evasion, Credential Access, Discovery, Lateral Movement, Collection, Command and Control, Exfiltration, Impact</td><td>AI Model Access (AML.TA0000): gaining some level of access to a model<br>AI Attack Adaptation (AML.TA0001)</td></tr>
+</table></div>
+<p>A few techniques that matter to most teams using LLMs (IDs from release v2026.10):</p>
+<div class="tbl"><table>
+<tr><th>ATLAS ID</th><th>Technique</th><th>Closest OWASP 2026 entry</th></tr>
+<tr><td>AML.T0051</td><td>LLM Prompt Injection (sub-techniques: Direct, Indirect, Triggered)</td><td>LLM01</td></tr>
+<tr><td>AML.T0054</td><td>LLM Jailbreak</td><td>LLM01</td></tr>
+<tr><td>AML.T0053</td><td>AI Agent Tool Invocation</td><td>LLM03</td></tr>
+<tr><td>AML.T0086</td><td>Exfiltration via AI Agent Tool Invocation</td><td>LLM02, LLM03</td></tr>
+<tr><td>AML.T0070</td><td>RAG Poisoning</td><td>LLM09, LLM05</td></tr>
+<tr><td>AML.T0080</td><td>AI Agent Context Poisoning (sub-technique: Memory)</td><td>LLM05</td></tr>
+<tr><td>AML.T0020</td><td>Training Data Poisoning</td><td>LLM05</td></tr>
+<tr><td>AML.T0010</td><td>Supply Chain Compromise</td><td>LLM04</td></tr>
+<tr><td>AML.T0069.002</td><td>Discover LLM System Information: System Prompt</td><td>LLM08</td></tr>
+<tr><td>AML.T0034</td><td>Cost Harvesting</td><td>LLM06</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example: an ATLAS case study close to QA work</span><p>ATLAS case study AML.CS0067, "Claude Code GitHub Action Secret Exposure", records that Microsoft security researchers showed prompt injection in GitHub content such as issue bodies, pull request descriptions and comments could make Anthropic's Claude Code GitHub Action reveal a CI secret. According to the case study, the issue was disclosed to Anthropic on 29 April 2026 and mitigated in Claude Code 2.1.128 on 5 May 2026. The lesson for any team running AI in CI: text written by outsiders (an issue, a PR comment) is untrusted input, and the job's secrets are within reach of whatever the agent can read.</p></div>
+<details class="deep"><summary>Under the hood: how to read an ATLAS technique page</summary><div class="body">
+<p>Each technique has an ID (<code>AML.T</code> plus a number, with sub-techniques after a dot), a description, the tactics it serves, mitigations (<code>AML.M</code> IDs) and the case studies (<code>AML.CS</code> IDs) where it was seen. Case studies are written as sequences of steps, each tagged with a technique, so they read like an attack storyboard. A practical way to use ATLAS in a threat model: for each trust boundary in your diagram, look up the tactics that apply (for example Initial Access at the input boundary, Exfiltration at the tool boundary), skim their techniques for ones that fit your design, and record the IDs in your threat register. That gives security colleagues a shared vocabulary and lets you check later whether new techniques affect you. The data is also available as files (YAML, with STIX and Navigator layers generated from them), which is useful if you want to build tooling.</p>
+</div></details>
+
+<h3 id="ch130-5"><span class="num">130.5</span>Threat modelling for AI features</h3>
+<p>A <a class="gl" href="#g-threat-model">threat model</a> is a structured look at a system to find what could go wrong before attackers or accidents find it. The most widely used framing is Adam Shostack's four questions, also adopted by the Threat Modeling Manifesto:</p>
+<div class="flow">
+<div><b>1. What are we working on?</b>Draw the system: parts, data flows, trust boundaries</div>
+<div class="hl"><b>2. What can go wrong?</b>Walk each boundary with STRIDE, OWASP and ATLAS</div>
+<div><b>3. What are we going to do about it?</b>Mitigate, accept, transfer or avoid each threat</div>
+<div><b>4. Did we do a good job?</b>Test the mitigations; review after changes</div>
+</div>
+<p><a class="gl" href="#g-stride">STRIDE</a>, a mnemonic from Microsoft, is a quick way to answer question 2. It still works for AI features, with new examples:</p>
+<div class="tbl"><table>
+<tr><th>STRIDE</th><th>Classic meaning</th><th>AI example</th></tr>
+<tr><td><b>S</b>poofing</td><td>Pretending to be someone else</td><td>Injected text claims to be from the admin; an agent uses a human's credentials</td></tr>
+<tr><td><b>T</b>ampering</td><td>Changing data or code</td><td>Poisoning a RAG document; editing an agent's memory</td></tr>
+<tr><td><b>R</b>epudiation</td><td>Denying an action happened</td><td>No log of which prompt led an agent to delete a ticket</td></tr>
+<tr><td><b>I</b>nformation disclosure</td><td>Leaking data</td><td>System prompt revealed; another user's document retrieved; data sent out through a tool</td></tr>
+<tr><td><b>D</b>enial of service</td><td>Making it unavailable</td><td>Token floods, agent loops, exhausted budgets</td></tr>
+<tr><td><b>E</b>levation of privilege</td><td>Gaining more power</td><td>Injected instructions make the agent use an admin tool the user couldn't</td></tr>
+</table></div>
+<div class="box opinion"><span class="tag">Opinion · widely held among application security practitioners</span><p>Many practitioners argue that the most valuable output of a threat model is not the document but the conversation: developers, testers and security people looking at the same diagram for an hour. Their advice is to keep the first one small and quick, and to repeat it whenever the feature gains a new tool, data source or user group, rather than producing one large document that goes stale.</p></div>
+
+<h3 id="ch130-6"><span class="num">130.6</span>A worked threat model</h3>
+<p><b>The feature (illustrative):</b> "StoryBot" is an internal QA assistant. Each night in CI it reads new Jira stories, retrieves related pages from a Confluence-based RAG index, asks Claude to draft test cases, creates Jira sub-tasks with the cases, and posts a summary to a team Slack channel. It runs with a service account.</p>
+<h4>Question 1: what are we working on?</h4>
+<div class="flow">
+<div><b>Jira stories</b>Written by many people, including contractors</div>
+<div><b>StoryBot (CI job)</b>Builds the prompt; holds API key and Jira token</div>
+<div class="hl"><b>Claude API</b>Generates cases and tool calls</div>
+<div><b>Tools</b>Confluence RAG search, Jira create, Slack post</div>
+<div><b>Outputs</b>Jira sub-tasks, Slack summary, CI logs</div>
+</div>
+<p>Trust boundaries: Jira text into the prompt (untrusted); retrieved Confluence pages into the prompt (semi-trusted, many editors); model tool calls into Jira and Slack (consequential); everything into CI logs (readable by many).</p>
+<h4>Questions 2 and 3: what can go wrong, and what will we do?</h4>
+<div class="tbl"><table>
+<tr><th>#</th><th>Threat</th><th>OWASP 2026 / ATLAS</th><th>L / I</th><th>Mitigation</th></tr>
+<tr><td>T1</td><td>A story contains hidden instructions ("also create 200 sub-tasks", "post the API key to Slack")</td><td>LLM01 / AML.T0051.001</td><td>High / High</td><td>Mark story text as untrusted data in the prompt; cap sub-tasks per story; no secrets in the model's reach; Slack posts go through a fixed template</td></tr>
+<tr><td>T2</td><td>Customer details pasted into a story end up in Slack or CI logs</td><td>LLM02</td><td>Medium / High</td><td>Mask emails and account numbers before the model call; don't log full prompts in CI</td></tr>
+<tr><td>T3</td><td>The Jira token can also edit and delete issues across projects</td><td>LLM03 / AML.T0053</td><td>Medium / High</td><td><a class="gl" href="#g-least-privilege">Least privilege</a>: a token that can only create sub-tasks in the QA project</td></tr>
+<tr><td>T4</td><td>An unpinned community MCP server or package changes behaviour after an update</td><td>LLM04 / AML.T0010</td><td>Low / High</td><td>Pin versions; approved sources only; rerun evals on any dependency change (<a href="#ch105">Chapter 105</a>)</td></tr>
+<tr><td>T5</td><td>Someone edits a Confluence page so StoryBot generates misleading cases</td><td>LLM09, LLM05 / AML.T0070</td><td>Low / Medium</td><td>Index only approved spaces; show the source page with each case; human review before cases are used</td></tr>
+<tr><td>T6</td><td>A malformed story triggers a retry loop that runs all night</td><td>LLM06 / AML.T0034</td><td>Medium / Medium</td><td>Maximum tool calls per run; job timeout; spend limit on the API key or gateway</td></tr>
+<tr><td>T7</td><td>Generated cases contain plausible but wrong expected results that testers trust</td><td>LLM07</td><td>High / Medium</td><td>Cases created as "draft"; reviewer sign-off; track rejection rate as an eval</td></tr>
+<tr><td>T8</td><td>The system prompt contains an internal URL and token and can be extracted</td><td>LLM08 / AML.T0069.002</td><td>Medium / Medium</td><td>Nothing secret in prompts; treat the system prompt as public</td></tr>
+<tr><td>T9</td><td>Generated text with HTML or Jira markup breaks or spoofs content in Jira or Slack</td><td>LLM10</td><td>Medium / Low</td><td>Escape output; post as plain text; validate against a schema (<a class="gl" href="#g-structured-output">structured output</a>)</td></tr>
+<tr><td>T10</td><td>No record links a created sub-task to the run and prompt that produced it</td><td>STRIDE: Repudiation</td><td>Medium / Medium</td><td>Label sub-tasks with the run ID; keep a run log without sensitive content</td></tr>
+</table></div>
+<p class="verified">L / I = likelihood and impact, judged by the team (illustrative). Mapping to OWASP and ATLAS is this book's.</p>
+<h4>Question 4: did we do a good job?</h4>
+<p>This is where QA owns the work. Each mitigation becomes a test, and because the model is non-deterministic, the injection tests run many times and report a rate.</p>
+<div class="tbl"><table>
+<tr><th>Threat</th><th>Test</th><th>Pass condition</th></tr>
+<tr><td>T1</td><td>20 test stories with hidden instructions (polite, disguised, in comments, in other languages)</td><td>0 unexpected tool calls across 10 runs each; sub-task cap never exceeded</td></tr>
+<tr><td>T2</td><td>Stories seeded with fake emails such as <code>test.user@example.com</code></td><td>No unmasked email in Jira, Slack or CI logs</td></tr>
+<tr><td>T3</td><td>Use StoryBot's token to call the delete-issue API directly</td><td>Request refused (permission error)</td></tr>
+<tr><td>T6</td><td>A story designed to cause repeated tool failures</td><td>Run stops at the tool-call limit; alert raised</td></tr>
+<tr><td>T9</td><td>Force output containing <code>&lt;script&gt;alert(1)&lt;/script&gt;</code></td><td>Appears as literal text, never executed or rendered</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Test safely and with permission</span><p>Security tests belong in test environments, with test data, and with the agreement of whoever owns the system. Never try injection or exfiltration techniques against systems or AI products you aren't authorised to test. <a href="#ch131">Chapter 131</a> gives safe exercises for prompt injection.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Lab: threat-model an AI feature and check your coverage</b><span>40 min · claude.ai or Claude Code, and Python 3</span></div>
+<p>You will build a small threat register for an AI feature, then use a script to check which OWASP 2026 risks you haven't considered and which threats lack a mitigation or test.</p><ol>
+<li>Choose a feature: one your team runs or plans, or use StoryBot from section 129.6. Write three sentences: what it reads, what it can do, and who uses it.<span class="expect">A short description naming its inputs, tools and users.</span></li>
+<li>Ask Claude: <code>Here is an AI feature: [your three sentences]. List its components, data flows and trust boundaries as a numbered list. Mark each input as trusted, semi-trusted or untrusted, and explain why.</code><span class="expect">Five to eight components and three to six boundaries. Correct anything it has wrong about your system; you know it better.</span></li>
+<li>Make a folder <code>threat-lab</code>. Create <code>threats.csv</code> with this starting register (it deliberately has gaps):
+<div class="code"><span class="cap">threats.csv</span><pre>id,threat,owasp,likelihood,impact,mitigation,test
+T1,Instructions hidden in a Jira story make the bot create junk tickets,LLM01,High,Medium,Ticket creation needs human approval,Story with hidden instruction; expect no ticket without approval
+T2,Bot copies customer emails from a story into Slack,LLM02,Medium,High,Mask emails before the model call,Story containing an email; expect it masked in all outputs
+T3,Service account can delete tickets as well as create them,LLM03,Medium,High,Token scoped to create sub-tasks only,Call delete with the bot token; expect 403
+T4,Unpinned third-party MCP server changes behaviour,LLM04,Low,High,,
+T5,Looping agent burns the monthly budget overnight,LLM06,Medium,Medium,Gateway budget and max 20 tool calls per run,Force a retry loop; expect stop at 20 calls</pre></div><span class="expect">A CSV with a header and five threats. Use semicolons, not commas, inside text fields.</span></li>
+<li>Create <code>threat_coverage.py</code>:
+<div class="code"><span class="cap">threat_coverage.py</span><pre>"""Check a threat register against the OWASP Top 10 for LLM Applications 2026."""
+import csv
+import sys
+
+OWASP_2026 = {
+    "LLM01": "Prompt Injection",
+    "LLM02": "Sensitive Information Disclosure",
+    "LLM03": "Excessive Agency",
+    "LLM04": "Supply Chain",
+    "LLM05": "Data and Model Poisoning",
+    "LLM06": "Unbounded Consumption",
+    "LLM07": "Misinformation",
+    "LLM08": "Hidden Context Exposure",
+    "LLM09": "Vector and Embedding Weaknesses",
+    "LLM10": "Improper Output Handling",
+}
+
+path = sys.argv[1] if len(sys.argv) &gt; 1 else "threats.csv"
+with open(path, newline="", encoding="utf-8") as f:
+    rows = list(csv.DictReader(f))
+
+covered = {}
+problems = []
+for r in rows:
+    code = r["owasp"].strip().upper()
+    if code not in OWASP_2026:
+        problems.append(f"{r['id']}: unknown OWASP code '{r['owasp']}'")
+        continue
+    covered.setdefault(code, []).append(r["id"])
+    if not r["mitigation"].strip():
+        problems.append(f"{r['id']}: no mitigation")
+    if not r["test"].strip():
+        problems.append(f"{r['id']}: no test")
+
+print(f"Threats in register: {len(rows)}")
+for code, name in OWASP_2026.items():
+    ids = ", ".join(covered.get(code, [])) or "NOT CONSIDERED"
+    print(f"  {code} {name:&lt;34} {ids}")
+print("Problems:" if problems else "Problems: none")
+for p in problems:
+    print("  " + p)</pre></div><span class="expect">A Python file using only the standard library.</span></li>
+<li>Run <code>cd threat-lab</code> then <code>python3 threat_coverage.py</code>.<span class="expect"><code>Threats in register: 5</code>; LLM01 to LLM04 and LLM06 show T1 to T5; LLM05, LLM07, LLM08, LLM09 and LLM10 show <code>NOT CONSIDERED</code>; under <code>Problems:</code>, <code>T4: no mitigation</code> and <code>T4: no test</code>.</span></li>
+<li>Fill the gaps. Ask Claude: <code>For this feature, suggest one realistic threat for each of these OWASP 2026 risks: Data and Model Poisoning, Misinformation, Hidden Context Exposure, Vector and Embedding Weaknesses, Improper Output Handling. For each, give a mitigation and a test with a clear pass condition. Output CSV rows matching this header: id,threat,owasp,likelihood,impact,mitigation,test. No commas inside fields.</code> Review each row, keep the realistic ones, and add a mitigation and test for T4.<span class="expect">Five or more new rows. You will probably reject or rewrite at least one that doesn't fit your system.</span></li>
+<li>Run the script again.<span class="expect">Every OWASP entry shows at least one threat ID, or you have written down why it doesn't apply, and <code>Problems: none</code>.</span></li>
+<li>For your three highest-risk threats, look up the closest ATLAS technique on atlas.mitre.org and note its ID in the threat text.<span class="expect">IDs such as AML.T0051 for prompt injection, ready to share with your security team.</span></li>
+</ol>
+<p><b>Troubleshooting:</b> <code>KeyError: 'owasp'</code> means the header row is missing or misspelled; copy it again. A threat marked <code>unknown OWASP code</code> has a typo such as <code>LLM1</code> instead of <code>LLM01</code>. If columns look shifted, a field contains a comma; replace it with a semicolon or wrap the field in double quotes. If <code>python3</code> isn't found, see <a href="#ch58">Chapter 58</a>. <b>No Python?</b> Put the register in a spreadsheet and use a pivot table on the <code>owasp</code> column; filter for blank mitigation and test cells.</p>
+</div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"A good system prompt stops prompt injection."</dt><dd>It helps, but no prompt reliably separates instructions from data. Limit what the model can do (permissions, approvals, output validation) so a successful injection does little harm.</dd>
+<dt>"The OWASP list is the same every year."</dt><dd>The 2026 edition reordered most entries and renamed one. Always state the edition, for example LLM03:2026.</dd>
+<dt>"ATLAS and OWASP compete; pick one."</dt><dd>They complement each other. OWASP helps prioritise and design; ATLAS describes attacker behaviour in detail and records real cases.</dd>
+<dt>"If the injection test passed once, we're safe."</dt><dd>Model behaviour varies. Run security tests many times and track the failure rate, and rerun them when the model, prompt or tools change.</dd>
+<dt>"Threat modelling is the security team's job."</dt><dd>Testers are ideally placed to answer question 4, "did we do a good job?", by turning each mitigation into a repeatable test.</dd>
+</dl></div>
+
+<h3 id="ch130-r"><span class="num">130.7</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>AI features mix instructions and data in one channel, behave non-deterministically, act through tools and feed outputs into other systems. That creates new risks.</li>
+<li>Draw the system and mark trust boundaries: inputs, the model provider, tools, data stores and downstream systems.</li>
+<li>The current OWASP Top 10 for LLM Applications is the 2026 edition (dated 3 August 2026): Prompt Injection, Sensitive Information Disclosure, Excessive Agency, Supply Chain, Data and Model Poisoning, Unbounded Consumption, Misinformation, Hidden Context Exposure, Vector and Embedding Weaknesses, Improper Output Handling.</li>
+<li>OWASP also publishes a separate Top 10 for Agentic Applications for agents that plan and act.</li>
+<li>MITRE ATLAS maps attacker tactics, techniques, mitigations and real case studies for AI systems; release v2026.10 has 16 tactics and 77 case studies.</li>
+<li>Threat modelling asks four questions; STRIDE, OWASP and ATLAS help answer "what can go wrong?"; QA answers "did we do a good job?" with repeatable tests.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Why is prompt injection hard to prevent completely?</p><div class="opts"><button>Because models are slow</button><button data-ok>Because instructions and data arrive as the same kind of text, and the model can't reliably tell them apart</button><button>Because attackers need the model's weights</button></div><p class="why" hidden>That's why defences focus on limiting what a manipulated model can do, not only on the prompt.</p></div>
+<div class="qz"><p class="q">In the OWASP Top 10 for LLM Applications 2026, what is LLM03?</p><div class="opts"><button>Supply Chain</button><button data-ok>Excessive Agency</button><button>Improper Output Handling</button></div><p class="why" hidden>Excessive Agency rose from sixth in 2025 to third in 2026, reflecting how many AI features now have tools.</p></div>
+<div class="qz"><p class="q">What is the main difference between OWASP's list and MITRE ATLAS?</p><div class="opts"><button>OWASP is for AI and ATLAS is for web apps</button><button data-ok>OWASP is a short ranked list of risks; ATLAS is a detailed map of attacker tactics, techniques and real case studies</button><button>ATLAS replaced OWASP in 2026</button></div><p class="why" hidden>They complement each other: one for prioritising and design, one for detailed attacker behaviour.</p></div>
+<div class="qz"><p class="q">An AI feature's output is inserted into a web page without escaping. Which risk is this?</p><div class="opts"><button>Misinformation</button><button>Unbounded Consumption</button><button data-ok>Improper Output Handling</button></div><p class="why" hidden>Output passed to a browser, shell or database without validation is LLM10:2026.</p></div>
+<div class="qz"><p class="q">StoryBot's Jira token can delete issues, but the bot only needs to create sub-tasks. What is the best mitigation?</p><div class="opts"><button>Tell the model in the system prompt never to delete issues</button><button data-ok>Replace the token with one that can only create sub-tasks in the QA project</button><button>Run the bot less often</button></div><p class="why" hidden>Least privilege removes the capability, so even a manipulated model can't use it. Prompt instructions alone can be overridden.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Run a one-hour threat-modelling session for a real AI feature your team uses or is building (an AI test generator, a support chatbot, an agent in CI). Invite a developer and, if possible, someone from security. Produce: a one-page diagram with trust boundaries; a threat register of at least eight threats mapped to OWASP 2026 entries and, for the top three, ATLAS technique IDs; a mitigation and a test with a pass condition for each; and a list of tests to automate first. Run <code>threat_coverage.py</code> on the register and include its output. Agree when you will repeat the session (for example, whenever a tool or data source is added).</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"AI features follow instructions written in plain text, and they can't reliably tell our instructions from text hidden in a ticket or a web page. Give them tools and that text can make them act. OWASP's Top 10 for LLM Applications, now the 2026 edition, is the checklist of the main risks: prompt injection first, then data leaks, too much power for the agent, and so on. MITRE ATLAS is the detailed map of how real attackers do it. To use them, draw the feature, mark where untrusted text comes in and where the AI can act, ask what could go wrong at each point, limit what the AI can do, and then test every mitigation many times, because the model doesn't behave the same way every run."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>OWASP GenAI Security Project, <a href="https://genai.owasp.org/resource/owasp-genai-llm-top-10-2026/" target="_blank" rel="noopener">OWASP GenAI LLM Top 10 2026</a> (dated 3 August 2026; entry names taken from the official document's contents).</li>
+<li>OWASP GenAI Security Project, <a href="https://genai.owasp.org/llm-top-10/" target="_blank" rel="noopener">LLM Top 10</a> pages and <a href="https://genai.owasp.org/resource/owasp-top-10-for-llm-applications-2025/" target="_blank" rel="noopener">Top 10 for LLM Applications 2025</a> (previous edition, used for the comparison).</li>
+<li>OWASP GenAI Security Project, <a href="https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/" target="_blank" rel="noopener">OWASP Top 10 for Agentic Applications for 2026</a> (dated 9 December 2025; entry names not verified against the official document).</li>
+<li>MITRE, <a href="https://atlas.mitre.org/" target="_blank" rel="noopener">MITRE ATLAS</a> and the official data repository <a href="https://github.com/mitre-atlas/atlas-data" target="_blank" rel="noopener">mitre-atlas/atlas-data</a> (release v2026.10, 28 October 2026: tactic list, technique IDs, counts and case study AML.CS0067).</li>
+<li>MITRE, <a href="https://attack.mitre.org/" target="_blank" rel="noopener">MITRE ATT&amp;CK</a> (the model ATLAS is based on).</li>
+<li>Threat Modeling Manifesto, <a href="https://www.threatmodelingmanifesto.org/" target="_blank" rel="noopener">threatmodelingmanifesto.org</a> (the four questions); A. Shostack, <i>Threat Modeling: Designing for Security</i> (Wiley, 2014).</li>
+<li>Microsoft, <a href="https://learn.microsoft.com/en-us/azure/security/develop/threat-modeling-tool-threats" target="_blank" rel="noopener">Microsoft Threat Modeling Tool: threats (STRIDE)</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/security" target="_blank" rel="noopener">Claude Code security</a> (prompt-injection protections and guidance for agents).</li>
+</ol><p class="verified">Verified 9 November 2026 against the official OWASP GenAI 2026 document and resource pages and the MITRE ATLAS v2026.10 release data. The agentic Top 10 entry names come from secondary sources and are marked as such.</p></div>

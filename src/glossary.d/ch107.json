@@ -1,0 +1,86 @@
+{
+ "Agentic workflow": {
+  "d": "A system where a language model and tools are joined together along steps that a programmer fixed in advance in code. Contrast with an agent, where the model decides the steps itself.",
+  "see": "ch107"
+ },
+ "Autonomy level": {
+  "d": "How much an AI system may do on its own before a person checks it, from only suggesting, through acting with approval, to acting freely within limits.",
+  "see": "ch107"
+ },
+ "Agent-computer interface": {
+  "d": "The tools, tool descriptions, parameters and results an agent works through. Anthropic's term (ACI) for the agent's equivalent of a user interface; designing it well matters as much as the prompt.",
+  "see": "ch107"
+ },
+ "ReAct": {
+  "d": "Reason + Act: a 2022 research pattern in which a language model alternates between thinking about what to do and taking an action (such as a search), then reads the result before thinking again. The basis of most agent loops.",
+  "see": "ch107"
+ },
+ "Compounding error": {
+  "d": "When small mistakes in early steps of a multi-step process feed into later steps and grow, so a long chain of steps fails far more often than any single step.",
+  "see": "ch107"
+ },
+ "Prompt routing": {
+  "d": "A workflow pattern where a first step classifies an input and sends it to the prompt, model or handler best suited to that kind of input.",
+  "see": "ch108"
+ },
+ "Parallelisation": {
+  "d": "A workflow pattern that runs several model calls at the same time: either different parts of a task (sectioning) or the same task several times to compare answers (voting).",
+  "see": "ch108"
+ },
+ "Orchestrator-workers": {
+  "d": "A pattern where one model call (the orchestrator) breaks a task into subtasks it decides at run time, hands them to worker calls, and combines the results.",
+  "see": "ch108"
+ },
+ "Evaluator-optimiser": {
+  "d": "A pattern where one step produces an answer and another judges it against clear criteria and gives feedback, in a loop, until it passes or a round limit is reached.",
+  "see": "ch108"
+ },
+ "Plan-and-execute": {
+  "d": "An agent pattern that first writes a full plan as a list of steps, then carries the steps out one by one, re-planning only when something goes wrong.",
+  "see": "ch108"
+ },
+ "Reflection": {
+  "d": "In agents: having the model critique its own output or failed attempt and write down lessons, then try again using that critique.",
+  "see": "ch108"
+ },
+ "Idempotency": {
+  "d": "The property that doing an action twice has the same effect as doing it once. Essential for anything an agent may retry, such as writing a file or creating a ticket.",
+  "see": "ch109"
+ },
+ "Idempotency key": {
+  "d": "A unique value attached to an action so the system can recognise a repeat of the same action and skip it instead of doing it twice.",
+  "see": "ch109"
+ },
+ "Approval gate": {
+  "d": "A point in an automated process where it must stop and get a person's explicit yes before a consequential action, such as sending, deleting, paying or publishing.",
+  "see": "ch109"
+ },
+ "Human-in-the-loop": {
+  "d": "A design where a person reviews or approves some of an AI system's decisions or actions before they take effect.",
+  "see": "ch109"
+ },
+ "Observability": {
+  "d": "How well you can tell what a running system is doing, and why, from what it records: logs, metrics and traces.",
+  "see": "ch109"
+ },
+ "Trace": {
+  "d": "A record of everything that happened during one run or request, step by step and in order, so it can be replayed and debugged later.",
+  "see": "ch109"
+ },
+ "Span": {
+  "d": "One timed step inside a trace, such as a single model call or tool call, with its start time, duration and details.",
+  "see": "ch109"
+ },
+ "Fake model": {
+  "d": "A stand-in for a real AI model in tests: code that returns scripted replies in the same format, so the rest of the system can be tested quickly, cheaply and repeatably without an API key.",
+  "see": "ch109"
+ },
+ "Atomic write": {
+  "d": "Writing a file so it is either fully replaced or not changed at all, usually by writing a temporary file and then renaming it, so a crash never leaves a half-written file.",
+  "see": "ch109"
+ },
+ "Durable execution": {
+  "d": "Running a long process so that its progress is saved as it goes and it can resume from the last saved point after a crash, instead of starting again.",
+  "see": "ch109"
+ }
+}

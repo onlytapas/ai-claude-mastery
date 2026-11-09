@@ -1,0 +1,299 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What a subagent is, and why handing work to one keeps your main conversation clean</li>
+<li>The built-in subagents Claude Code already uses (Explore, Plan, general-purpose and others)</li>
+<li>Where subagent files live, which one wins when names clash, and how the file format works</li>
+<li>Every frontmatter field, with the ones that matter most: tools, model, permissions, skills and memory</li>
+<li>How to call a subagent (automatically, by name, by @-mention, or for a whole session) and when not to</li>
+<li>How to build two QA subagents, a test reviewer and a log analyst, and what changed with <code>/agents</code></li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch66">Chapter 66</a> (the life of a task), <a href="#ch68">Chapter 68</a> (context, models and effort), <a href="#ch78">Chapter 78</a> (settings and permissions) and ideally <a href="#ch80">Chapter 80</a> (skills). You need Claude Code installed and a practice folder you can safely change.</div>
+
+<div class="bigidea"><p>A <a class="gl" href="#g-subagent">subagent</a> is a helper that Claude hands a self-contained job to. It works in its own fresh <a class="gl" href="#g-context-window">context window</a>, with its own instructions, its own tool list and, if you like, a cheaper or stronger model. When it finishes, only its summary comes back to your conversation, not the hundreds of lines it read along the way. You define your own subagents as small Markdown files in <code>.claude/agents/</code>, and Claude decides when to use them from a one-line description. Used well, subagents keep long sessions focused, enforce "read-only" roles, and let you reuse a good reviewer across every project.</p></div>
+
+<h3 id="ch81-1"><span class="num">81.1</span>What a subagent is</h3>
+<p>Every Claude Code session has one main conversation. Everything Claude reads, every command it runs and every result it sees lands in that conversation's context window. That's fine for a quick change. It becomes a problem when a side task produces a flood of material you'll never look at again: a 4,000-line CI log, the output of a full test run, a search through fifty files.</p>
+<p>A subagent solves this by doing the noisy part somewhere else. Claude writes a short task message (the "delegation prompt"), a subagent picks it up in a brand-new context window, works through it with its own tools, and returns one summary. Your main conversation receives the summary and nothing else.</p>
+<div class="flow">
+<div><b>You ask</b>"Why did last night's regression run fail?"</div>
+<div><b>Claude delegates</b>Writes a task message for the log-analyst subagent</div>
+<div class="hl"><b>Subagent works</b>Reads the 4,000-line log in its own context window</div>
+<div><b>Summary returns</b>"3 failures, all timeouts on the payments API after 02:10"</div>
+<div><b>You continue</b>Your main context holds the summary, not the log</div>
+</div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A test lead asks a colleague: "Go through last night's run and tell me what broke." The colleague spends an hour in the logs and comes back with three bullet points. The lead never has to read the logs, and their head stays clear for the release meeting. A subagent is that colleague. The written brief you give them matters, because they weren't in the meeting and know only what you tell them.</p></div>
+<p>Each subagent has its own <a class="gl" href="#g-system-prompt">system prompt</a> (the standing instructions that shape how a model behaves), its own tool access and its own permissions. The official documentation lists five benefits: keeping exploration out of your main context, enforcing constraints by limiting tools, reusing a configuration across projects, specialising behaviour with a focused prompt, and controlling cost by sending suitable tasks to a faster, cheaper model such as Haiku.</p>
+<div class="box note"><span class="tag">Subagents use your plan too</span><p>A subagent sends its own requests to the model, and those count towards the same usage limits as your main conversation. Delegating saves <em>context</em>, not necessarily <em>tokens</em>. Five subagents running in parallel can use more of your allowance than doing the work yourself.</p></div>
+
+<h3 id="ch81-2"><span class="num">81.2</span>The built-in subagents</h3>
+<p>You've probably already used subagents without noticing. Claude Code ships several and delegates to them on its own.</p>
+<div class="tbl"><table>
+<tr><th>Name</th><th>What it's for</th><th>Tools</th><th>Model</th></tr>
+<tr><td><b>Explore</b></td><td>Fast searching and reading of a codebase. Claude asks for a thoroughness level: quick, medium or very thorough</td><td>Read-only; Write and Edit denied</td><td>The main conversation's model (with some exceptions when that model is Fable)</td></tr>
+<tr><td><b>Plan</b></td><td>Research during plan mode, so exploration stays out of the read-only main conversation</td><td>Read-only; Write and Edit denied</td><td>Inherits from the main conversation</td></tr>
+<tr><td><b>general-purpose</b></td><td>Multi-step tasks that need both exploring and changing things</td><td>Every tool available to subagents</td><td>The main conversation's model unless <code>CLAUDE_CODE_SUBAGENT_MODEL</code> is set</td></tr>
+<tr><td><b>claude</b></td><td>A catch-all when nothing more specific fits; also the default agent for background sessions</td><td>Every tool available to subagents</td><td>None of its own</td></tr>
+<tr><td><b>statusline-setup</b></td><td>Used when you run <code>/statusline</code></td><td>Chosen by Claude Code</td><td>Sonnet</td></tr>
+<tr><td><b>claude-code-guide</b></td><td>Answers questions about Claude Code itself</td><td>Chosen by Claude Code</td><td>Haiku</td></tr>
+</table></div>
+<p>Explore and Plan deliberately start <em>without</em> your <a class="gl" href="#g-claude-md">CLAUDE.md</a> files and the git status snapshot, to keep research fast and cheap. Other built-in and custom subagents load both. You can switch built-ins off:</p>
+<div class="code"><span class="cap">.claude/settings.json: stop Claude using Explore</span><pre>{
+  "permissions": {
+    "deny": ["Agent(Explore)"]
+  }
+}</pre></div>
+<p>Denying the <code>Agent</code> tool itself stops all delegation. The environment variable <code>CLAUDE_CODE_DISABLE_EXPLORE_PLAN_AGENTS=1</code> removes only Explore and Plan (v2.1.198 or later).</p>
+<details class="deep"><summary>Why the tool is called "Agent" (and sometimes "Task")</summary><div class="body"><p>Claude starts a subagent by calling a tool. In version 2.1.63 that tool was renamed from <code>Task</code> to <code>Agent</code>. Old <code>Task(...)</code> references in settings and agent files still work as aliases, so you may meet both spellings in older team repositories. Permission rules, hook matchers and tool lists should use <code>Agent</code> for anything new.</p></div></details>
+
+<h3 id="ch81-3"><span class="num">81.3</span>Where subagent files live</h3>
+<p>A custom subagent is a Markdown file. Where you put it decides who gets it. When two subagents share a name, the higher-priority location wins.</p>
+<div class="tbl"><table>
+<tr><th>Priority</th><th>Location</th><th>Who gets it</th><th>Typical use</th></tr>
+<tr><td>1 (highest)</td><td><code>.claude/agents/</code> inside the managed settings directory</td><td>Everyone the organisation deploys it to</td><td>Company-mandated reviewers</td></tr>
+<tr><td>2</td><td><code>--agents '&lt;json&gt;'</code> on the command line</td><td>That one session</td><td>Quick experiments, CI scripts</td></tr>
+<tr><td>3</td><td><code>.claude/agents/</code> in the project</td><td>Everyone who clones the repo (commit it)</td><td>A team's QA reviewer for this codebase</td></tr>
+<tr><td>4</td><td><code>~/.claude/agents/</code></td><td>You, in every project</td><td>Your personal helpers</td></tr>
+<tr><td>5 (lowest)</td><td>A plugin's <code>agents/</code> folder</td><td>Wherever the plugin is enabled</td><td>Shared kits (<a href="#ch84">Chapter 84</a>)</td></tr>
+</table></div>
+<ul>
+<li><strong>Subfolders are fine.</strong> Both agent folders are scanned recursively, so <code>.claude/agents/review/</code> works. The folder doesn't change the subagent's identity: only the <code>name</code> field does.</li>
+<li><strong>Nested projects.</strong> Claude Code walks up from your working directory to the repository root and reads every <code>.claude/agents/</code> it finds; the one closest to you wins a name clash.</li>
+<li><strong>Hot reload.</strong> Edits to existing files are picked up within a few seconds. Restart only when you created the <em>first</em> agent in a brand-new <code>agents</code> folder, because a running session doesn't watch folders that didn't exist at start-up.</li>
+<li><strong>Plugin subagents</strong> are named with the plugin as a prefix, such as <code>my-plugin:reviewer</code>.</li>
+</ul>
+<p>For a one-off session, you can define subagents inline as JSON. Each key is a name; <code>prompt</code> plays the role of the Markdown body:</p>
+<div class="code"><span class="cap">Terminal (from the official docs)</span><pre>claude --agents '{"code-reviewer": {"description": "Expert code reviewer.", "prompt": "You are a senior code reviewer.", "tools": ["Read", "Grep", "Glob", "Bash"], "model": "sonnet"}}'</pre></div>
+<p>With <code>-p</code> (non-interactive mode), <code>--agents</code> also accepts the path to a JSON file holding the same object (v2.1.281 or later).</p>
+
+<h3 id="ch81-4"><span class="num">81.4</span>The file format</h3>
+<p>A subagent file has two parts. At the top, between two <code>---</code> lines, is <a class="gl" href="#g-frontmatter">frontmatter</a>: settings written in YAML, a simple "key: value" format. Below it is plain Markdown, which becomes the subagent's system prompt.</p>
+<div class="code"><span class="cap">.claude/agents/code-reviewer.md (the documented example)</span><pre>---
+name: code-reviewer
+description: Reviews code for quality and best practices
+tools: Read, Glob, Grep
+model: sonnet
+---
+
+You are a code reviewer. When invoked, analyze the code and provide
+specific, actionable feedback on quality, security, and best practices.</pre></div>
+<p>Only <code>name</code> and <code>description</code> are required. The subagent receives this body plus basic environment details such as the working directory. It does <em>not</em> receive Claude Code's own long system prompt, so write the body as a complete brief.</p>
+<input class="filter" data-filter="#ch81-fields" data-empty="#ch81-fields-empty" type="search" placeholder="Filter frontmatter fields…" aria-label="Filter frontmatter fields">
+<div class="tbl"><table id="ch81-fields">
+<tr><th>Field</th><th>What it does</th><th>Example</th></tr>
+<tr class="group"><td colspan="3">Identity</td></tr>
+<tr><td><code>name</code> (required)</td><td>Unique identifier, up to 256 characters. Can't contain <code>:</code> or start with <code>-</code>. The file name doesn't have to match</td><td><code>qa-reviewer</code></td></tr>
+<tr><td><code>description</code> (required)</td><td>When Claude should delegate. This is what Claude reads to decide</td><td><code>Reviews test code… Use proactively after tests change.</code></td></tr>
+<tr><td><code>color</code></td><td>Display colour in the task list: red, blue, green, yellow, purple, orange, pink or cyan</td><td><code>green</code></td></tr>
+<tr class="group"><td colspan="3">Capabilities</td></tr>
+<tr><td><code>tools</code></td><td>Allowlist of tools, comma-separated or a YAML list. Omit to inherit every tool available to subagents</td><td><code>Read, Grep, Glob</code></td></tr>
+<tr><td><code>disallowedTools</code></td><td>Denylist, removed from the inherited or listed tools</td><td><code>Write, Edit</code></td></tr>
+<tr><td><code>mcpServers</code></td><td>MCP servers for this subagent: names of configured servers or inline definitions</td><td><code>- playwright</code></td></tr>
+<tr><td><code>skills</code></td><td>Skills whose full content is preloaded at start-up</td><td><code>- bug-report-format</code></td></tr>
+<tr><td><code>permissionMode</code></td><td><code>default</code>, <code>acceptEdits</code>, <code>auto</code>, <code>dontAsk</code>, <code>bypassPermissions</code>, <code>plan</code> (or <code>manual</code> for default). The main session's mode often overrides it (see 81.5)</td><td><code>plan</code></td></tr>
+<tr><td><code>hooks</code></td><td>Hooks that run only while this subagent is active (<a href="#ch82">Chapter 82</a>)</td><td>see 82.9</td></tr>
+<tr class="group"><td colspan="3">Model and limits</td></tr>
+<tr><td><code>model</code></td><td><code>sonnet</code>, <code>opus</code>, <code>haiku</code>, <code>fable</code>, a full model ID, or <code>inherit</code></td><td><code>haiku</code></td></tr>
+<tr><td><code>effort</code></td><td><code>low</code>, <code>medium</code>, <code>high</code>, <code>xhigh</code> or <code>max</code>, depending on the model</td><td><code>low</code></td></tr>
+<tr><td><code>maxTurns</code></td><td>Maximum agentic turns before it stops and returns partial output</td><td><code>20</code></td></tr>
+<tr><td><code>autoCompactWindow</code></td><td>A lower auto-compact window for this subagent, 100000 to 1000000 tokens (v2.1.296+)</td><td><code>200000</code></td></tr>
+<tr class="group"><td colspan="3">Context and running</td></tr>
+<tr><td><code>memory</code></td><td>A persistent memory folder: <code>user</code>, <code>project</code> or <code>local</code></td><td><code>project</code></td></tr>
+<tr><td><code>omitClaudeMd</code></td><td><code>true</code> starts it without your user, project and local CLAUDE.md files (v2.1.271+)</td><td><code>true</code></td></tr>
+<tr><td><code>background</code></td><td><code>true</code> keeps it in the background even when Claude asks to wait</td><td><code>true</code></td></tr>
+<tr><td><code>isolation</code></td><td><code>worktree</code> runs it in a temporary <a class="gl" href="#g-git-worktree">git worktree</a>, removed if it made no changes</td><td><code>worktree</code></td></tr>
+<tr><td><code>initialPrompt</code></td><td>First user turn, auto-submitted when the agent runs as the whole session (<code>--agent</code>)</td><td><code>Review today's changes</code></td></tr>
+<tr><td><code>experimental</code></td><td>A map of experimental options; currently <code>cacheTtl</code> (<code>5m</code> or <code>1h</code>)</td><td><code>cacheTtl: 1h</code></td></tr>
+</table></div>
+<p id="ch81-fields-empty" hidden>No fields match.</p>
+<div class="box warn"><span class="tag">Silent failures</span><p>Field names are camelCase and must match exactly: <code>disallowedTools</code>, not <code>disallowed-tools</code> (that hyphenated style belongs to skills). Claude Code <strong>ignores unknown fields without an error</strong>. It also silently skips a file with no <code>name</code>, a <code>name</code> but no <code>description</code>, a <code>---</code> that isn't on the first line, or YAML that doesn't parse. Run <code>claude plugin validate .claude/agents</code> to catch parse errors before a session (v2.1.233+), and <code>claude --debug</code> to see why a file was skipped.</p></div>
+<div class="box note"><span class="tag">Plugin subagents are restricted</span><p>For security, subagents that come from a plugin ignore <code>hooks</code>, <code>mcpServers</code> and <code>permissionMode</code>. If you need those, copy the file into <code>.claude/agents/</code> or <code>~/.claude/agents/</code>.</p></div>
+
+<h3 id="ch81-5"><span class="num">81.5</span>Tools and permissions</h3>
+<p>Limiting tools is the most useful thing a subagent definition does. A reviewer that can't edit files can't "helpfully" rewrite the code it was asked to review.</p>
+<div class="cols2">
+<div><h4>Allowlist with <code>tools</code></h4><p>Only these tools, nothing else. No MCP tools unless you list them.</p>
+<div class="code"><pre>tools: Read, Grep, Glob, Bash</pre></div></div>
+<div><h4>Denylist with <code>disallowedTools</code></h4><p>Everything the subagent would inherit, minus these.</p>
+<div class="code"><pre>disallowedTools: Write, Edit</pre></div></div>
+</div>
+<ul>
+<li>If both are set, <code>disallowedTools</code> is applied first; a tool in both is removed.</li>
+<li><strong>MCP servers:</strong> <code>tools: mcp__github__*</code> grants every tool from the <code>github</code> server; <code>disallowedTools: mcp__github</code> withholds them; <code>disallowedTools: mcp__*</code> withholds every MCP tool.</li>
+<li><strong>A trap:</strong> <code>disallowedTools: Bash(git push *)</code> removes the <em>whole</em> Bash tool, not just pushes. To keep Bash but block pushes, put <code>Bash(git push *)</code> in <code>permissions.deny</code> in settings, which applies to the main conversation and every subagent.</li>
+<li><strong>Background subagents get fewer tools.</strong> Subagents Claude starts from the main conversation run in the background by default, and a background subagent keeps only a fixed set of built-in tools (Read, Grep, Glob, Bash, Edit, Write, WebFetch, WebSearch and some others) plus every MCP tool. Interactive tools such as <code>AskUserQuestion</code> are never available to subagents.</li>
+<li><strong>Nesting.</strong> A subagent can start its own subagents, up to three layers below the main conversation by default (<code>CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH</code> changes this; <code>1</code> turns nesting off). Leave <code>Agent</code> out of a reviewer's <code>tools</code> list to keep it from delegating.</li>
+</ul>
+<p><strong>Permission mode.</strong> If you don't set <code>permissionMode</code>, the subagent inherits the main conversation's mode. Even if you do, the main session often wins: when the main conversation is in <code>bypassPermissions</code>, <code>acceptEdits</code> or <code>auto</code>, the subagent runs in that mode; in <code>plan</code> mode it stays in plan mode. Your value applies only when the main session is in <code>default</code> or <code>dontAsk</code>. Background subagents send their permission prompts to your main session, naming the subagent that's asking.</p>
+
+<h3 id="ch81-6"><span class="num">81.6</span>Choosing a model</h3>
+<p>The <code>model</code> field lets you match the model to the job. A log summariser rarely needs your most capable model; a security reviewer might.</p>
+<div class="flow">
+<div class="hl"><b>1. Per call</b>A <code>model</code> Claude passes when it starts the subagent (an alias only)</div>
+<div><b>2. Frontmatter</b>The file's <code>model</code> field; <code>inherit</code> means "same as main"</div>
+<div><b>3. Environment</b><code>CLAUDE_CODE_SUBAGENT_MODEL</code>, if set</div>
+<div><b>4. Fallback</b>The main conversation's model</div>
+</div>
+<p>That order applies from v2.1.251; before that, the environment variable came first. To force one model onto <em>every</em> subagent, set both <code>CLAUDE_CODE_SUBAGENT_MODEL</code> and <code>CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1</code> (v2.1.257+). Run <code>/tasks</code> while a subagent is working to see which model and effort level it's actually on. Your organisation's <code>availableModels</code> allowlist still applies; a blocked choice is swapped for an allowed one with a warning.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>A QA team runs its <code>log-analyst</code> on <code>haiku</code> with <code>effort: low</code> because it only reads and summarises, and its <code>qa-reviewer</code> on <code>sonnet</code> because judging whether an assertion is meaningful needs more reasoning. The main session stays on whatever model each person prefers.</p></div>
+
+<h3 id="ch81-7"><span class="num">81.7</span>Calling a subagent</h3>
+<p>There are four ways, from gentlest to strongest:</p>
+<div class="tbl"><table>
+<tr><th>How</th><th>What you do</th><th>What's guaranteed</th></tr>
+<tr><td><b>Automatic</b></td><td>Nothing. Claude matches your request against each subagent's <code>description</code>. Phrases such as "use proactively" in the description encourage it</td><td>Nothing; Claude decides</td></tr>
+<tr><td><b>By name</b></td><td>"Use the qa-reviewer subagent to check tests/checkout/"</td><td>Claude usually delegates</td></tr>
+<tr><td><b>@-mention</b></td><td>Type <code>@</code> and pick it, e.g. <code>@"qa-reviewer (agent)" check the new tests</code>, or type <code>@agent-qa-reviewer</code></td><td>That subagent runs for this task</td></tr>
+<tr><td><b>Whole session</b></td><td><code>claude --agent qa-reviewer</code>, or <code>"agent": "qa-reviewer"</code> in settings</td><td>The main thread itself takes on its prompt, tools and model</td></tr>
+</table></div>
+<p>With an @-mention, your full message still goes to Claude, which writes the subagent's task prompt. The mention controls <em>which</em> subagent runs, not the exact words it receives. With <code>--agent</code>, the subagent's prompt replaces Claude Code's default system prompt entirely, much as <code>--system-prompt</code> does, and the name shows as <code>@qa-reviewer</code> in the start-up header.</p>
+<h4>Foreground, background and forks</h4>
+<p>A <strong>foreground</strong> subagent blocks the conversation until it's done. A <strong>background</strong> subagent runs while you keep working, and its result arrives later as a notification. With nothing configured, subagents that Claude starts from the main conversation run in the background.</p>
+<p>A <a class="gl" href="#g-forked-subagent">fork</a> is a special subagent that inherits the <em>whole</em> conversation so far instead of starting fresh, so you don't have to re-explain anything. Its own tool calls still stay out of your context. Start one yourself with <code>/subtask</code>:</p>
+<div class="code"><span class="cap">In a Claude Code session</span><pre>/subtask draft negative test cases for the coupon rules we just discussed</pre></div>
+<p>"Fork mode", on by default from v2.1.302, lets Claude start forks on its own; while it's on, Claude can't wait for a subagent in an interactive session. To let Claude wait for results, set <code>CLAUDE_CODE_FORK_SUBAGENT</code> to <code>0</code> in the <code>env</code> block of your settings and restart. To stop forks only, add <code>"Agent(fork)"</code> to <code>permissions.deny</code>.</p>
+
+<h3 id="ch81-8"><span class="num">81.8</span>What a subagent sees (and doesn't)</h3>
+<p>This is where most disappointing subagents go wrong. A non-fork subagent starts with:</p>
+<ul>
+<li>its own system prompt (your Markdown body) plus environment details;</li>
+<li>the task message Claude writes when it delegates;</li>
+<li>your CLAUDE.md files at every level (except Explore, Plan and subagents with <code>omitClaudeMd</code>);</li>
+<li>a git status snapshot (except Explore and Plan);</li>
+<li>the full text of any skills listed in its <code>skills</code> field.</li>
+</ul>
+<p>It does <strong>not</strong> see your conversation history, the files Claude has already read, the skills you've already invoked, your <a class="gl" href="#g-output-style">output style</a> or your auto memory. If something in the chat matters, it must be in the delegation prompt, so ask Claude to include it: "Delegate to the qa-reviewer and tell it we use <code>data-qa</code> attributes, not <code>data-testid</code>."</p>
+<h4>Persistent memory</h4>
+<p>The <code>memory</code> field gives a subagent its own notes folder that survives between sessions. The subagent's prompt then includes the first 200 lines or 25KB of that folder's <code>MEMORY.md</code>, and Read, Write and Edit are enabled so it can maintain its notes.</p>
+<div class="tbl"><table>
+<tr><th>Scope</th><th>Folder</th><th>When</th></tr>
+<tr><td><code>user</code></td><td><code>~/.claude/agent-memory/&lt;agent-name&gt;/</code></td><td>Learnings useful in all projects</td></tr>
+<tr><td><code>project</code></td><td><code>.claude/agent-memory/&lt;agent-name&gt;/</code></td><td>Project knowledge the team can share through git (the recommended default)</td></tr>
+<tr><td><code>local</code></td><td><code>.claude/agent-memory-local/&lt;agent-name&gt;/</code></td><td>Project knowledge that stays off git</td></tr>
+</table></div>
+<p>Subagent memory is part of auto memory: turn auto memory off (<a href="#ch77">Chapter 77</a>) and the field has no effect.</p>
+
+<h3 id="ch81-9"><span class="num">81.9</span>When to delegate, and when not to</h3>
+<div class="tbl"><table>
+<tr><th>Use the main conversation when…</th><th>Use a subagent when…</th><th>Use a skill instead when…</th></tr>
+<tr><td>You'll go back and forth refining the work</td><td>The task produces lots of output you won't need again</td><td>You want a reusable procedure that runs in your main conversation</td></tr>
+<tr><td>Planning, coding and testing share a lot of context</td><td>You want to enforce a tool restriction, such as read-only</td><td>The instructions matter more than the isolation</td></tr>
+<tr><td>It's a quick, targeted change, or speed matters (a fresh subagent has to gather context first)</td><td>The work is self-contained and can be summarised</td><td>You want it on demand as <code>/name</code> (<a href="#ch80">Chapter 80</a>)</td></tr>
+</table></div>
+<p>Three patterns from the documentation are worth knowing by name: <strong>isolate high-volume work</strong> ("use a subagent to run the suite and report only the failures"), <strong>parallel research</strong> (several subagents each investigate an independent area), and <strong>chaining</strong> (reviewer finds issues, then a second subagent fixes them). For a quick question about something already in the conversation, <code>/btw</code> is lighter than any subagent.</p>
+<div class="box opinion"><span class="tag">Opinion · this textbook's authors</span><p>Start with zero custom subagents. Add one only when you notice the same pattern twice: a side task flooding your context, or a role that should never have write access. Teams that create ten subagents on day one tend to end up with overlapping descriptions, and Claude then picks the wrong one. Anthropic's own guidance points the same way: keep descriptions short, because every custom subagent's description sits in context in every session.</p></div>
+
+<h3 id="ch81-10"><span class="num">81.10</span>The <code>/agents</code> change</h3>
+<p>Older tutorials, videos and blog posts show <code>/agents</code> opening an interactive wizard with tabs for creating and editing subagents. That's out of date. On Claude Code v2.1.197 and earlier, <code>/agents</code> opened that interface. In current versions it only prints a reminder: ask Claude to create or manage subagents, or edit <code>.claude/agents/</code> and <code>~/.claude/agents/</code> directly.</p>
+<div class="box warn"><span class="tag">Don't confuse these three</span><p><code>/agents</code> (in a session) is the reminder described above. <code>claude agents</code> (in your shell) opens <strong>agent view</strong>, which monitors and dispatches background <em>sessions</em> (<a href="#ch69">Chapter 69</a>), not subagents. <code>/list-agents</code> lists subagents, teammates and sessions Claude can message, and appears only when cross-session messaging is on. To see subagents running right now, use <code>/tasks</code>.</p></div>
+<p>The easiest way to create a subagent today is to ask for one, then read what Claude wrote:</p>
+<div class="code"><span class="cap">Prompt</span><pre>Create a project subagent in .claude/agents/ called qa-reviewer that reviews
+automated tests for weak assertions, fixed waits and missing negative cases.
+Make it read-only and have it use Sonnet.</pre></div>
+
+<h3 id="ch81-11"><span class="num">81.11</span>Two QA subagents, built properly</h3>
+<h4>1. The test reviewer</h4>
+<p>Read-only by design, so it can only report. The body is a complete brief, because the subagent won't see your conversation.</p>
+<div class="code"><span class="cap">.claude/agents/qa-reviewer.md</span><pre>---
+name: qa-reviewer
+description: Reviews automated test code (Playwright, pytest, API tests) for weak assertions, fixed waits, flaky patterns and missing negative cases. Use proactively after tests are written or changed.
+tools: Read, Grep, Glob
+model: sonnet
+color: green
+---
+
+You are a senior QA engineer reviewing automated tests. You never edit files.
+
+For each test file you are given (or every changed test file if none is named):
+1. Check that each test asserts something meaningful about behaviour,
+   not just that a page loaded or a call returned.
+2. Flag fixed waits (waitForTimeout, time.sleep) and suggest a web-first
+   assertion or explicit wait instead.
+3. Flag brittle locators (CSS chains, nth-child, auto-generated ids).
+4. List missing cases: invalid input, empty states, boundaries, permissions.
+5. Note any test that could pass even if the feature were broken.
+
+Reply with a table: file, line, problem, why it matters, suggested fix.
+End with the three most important changes. If everything looks fine, say so
+plainly rather than inventing problems.</pre></div>
+<h4>2. The log analyst</h4>
+<p>Its job is to read huge files so your main conversation doesn't. It runs on a cheaper model at low effort and can't change anything.</p>
+<div class="code"><span class="cap">.claude/agents/log-analyst.md</span><pre>---
+name: log-analyst
+description: Reads CI, test-runner and application logs and returns a short failure summary. Use when the user asks why a run failed or shares a log file.
+tools: Read, Grep, Glob
+model: haiku
+effort: low
+color: cyan
+---
+
+You analyse log files for a QA team. Never paste large chunks of the log back.
+
+1. Find every failure, error and exception. Use Grep before reading whole files.
+2. Group failures that share a root cause (same error text, same endpoint,
+   same time window).
+3. For each group give: count, first occurrence (timestamp and line number),
+   one representative error line, and your best guess at the cause, labelled
+   as a guess.
+4. Separate test-code problems (bad locator, wrong data) from product
+   problems (5xx responses, crashes) and environment problems (timeouts,
+   DNS, out of memory).
+
+Finish with a one-line verdict: product bug, test bug, environment, or unclear.</pre></div>
+<div class="box example"><span class="tag">Real-world example: using them together</span><p>"Use the log-analyst on <code>artifacts/nightly.log</code>, then have the qa-reviewer look at whichever test files the failures point to." Claude chains the two: the analyst's summary tells it which files matter, and the reviewer reads only those. Your main conversation ends up with two short reports instead of a log and a dozen test files.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Build and use two QA subagents</b><span>35 min · Claude Code, any practice folder</span></div><ol>
+<li>Make a practice folder with a test file and a log: <code>mkdir -p sub-lab/.claude/agents sub-lab/tests sub-lab/logs &amp;&amp; cd sub-lab &amp;&amp; git init</code>.<span class="expect">an empty git repository with three folders.</span></li>
+<li>Create <code>tests/test_login.py</code> containing:<div class="code"><pre>import time
+
+def test_login_page_loads():
+    time.sleep(5)
+    assert True
+
+def test_login_with_valid_user():
+    response = {"status": 200, "body": {"token": "abc"}}
+    assert response["status"] == 200</pre></div><span class="expect">a deliberately weak test file: a fixed wait, an assertion that can't fail, and no negative cases.</span></li>
+<li>Create <code>logs/nightly.log</code> with a few lines such as <code>02:10:04 ERROR POST /api/payments 504 Gateway Timeout</code> repeated three times, one <code>02:15:30 ERROR AssertionError: expected "Paid" but got "Pending"</code>, and some <code>INFO</code> lines in between.<span class="expect">a small log with two kinds of failure (illustrative content).</span></li>
+<li>Save the two files from 81.11 as <code>.claude/agents/qa-reviewer.md</code> and <code>.claude/agents/log-analyst.md</code>, then run <code>claude plugin validate .claude/agents</code>.<span class="expect"><code>Validating components in: …/.claude/agents</code> followed by <code>✔ Validation passed</code>.</span></li>
+<li>Break one on purpose: change a <code>description:</code> line to start with an unclosed quote (<code>description: "Reads CI</code>) and validate again. Then fix it.<span class="expect"><code>✘ Found 1 error</code> naming <code>YAML frontmatter failed to parse</code> and warning that the agent won't load at all, then <code>✘ Validation failed</code>. After fixing, it passes again.</span></li>
+<li>Start <code>claude</code> in the folder. Type <code>@</code> and look for your agents in the list.<span class="expect"><code>qa-reviewer</code> and <code>log-analyst</code> appear as agents. (If not, restart: the <code>agents</code> folder was new.)</span></li>
+<li>Run <code>@"qa-reviewer (agent)" review tests/test_login.py</code>.<span class="expect">a tool-call row such as <code>qa-reviewer(…)</code>, then a table flagging <code>time.sleep(5)</code>, <code>assert True</code> and missing invalid-password cases. No files are changed.</span></li>
+<li>While a subagent runs, type <code>/tasks</code>.<span class="expect">a row for the subagent showing the model it runs on.</span></li>
+<li>Ask: "Why did last night's run fail? The log is logs/nightly.log." without naming any subagent.<span class="expect">Claude delegates to <code>log-analyst</code> on its own (the description matched) and returns a grouped summary: three 504s on <code>/api/payments</code> and one assertion failure, with a verdict.</span></li>
+<li>Test the read-only promise: "Ask the qa-reviewer to fix the tests itself."<span class="expect">the reviewer reports it can't edit (it has no Edit or Write tool); Claude may offer to make the fixes in the main conversation instead.</span></li>
+</ol></div>
+<p><b>Troubleshooting.</b> Agent missing from the @ list: restart the session if <code>.claude/agents/</code> didn't exist when it started, then check the file starts with <code>---</code> on line 1 and has both <code>name</code> and <code>description</code>. A field seems ignored: check the camelCase spelling and search the <code>claude --debug</code> log for <code>does not recognize or apply</code>. "Agent would be spawned with zero tools": every entry in <code>tools</code> is misspelled or unavailable. Claude never delegates automatically: make the description say <em>when</em> to use it, in the words people actually type.</p>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"The subagent knows what we've been discussing."</dt><dd>A normal subagent starts fresh and sees only its own prompt, CLAUDE.md and Claude's delegation message. Only a fork inherits the conversation.</dd>
+<dt>"Subagents save money."</dt><dd>They save main-conversation context. They spend their own tokens, which count towards the same limits. A cheaper model can lower cost; parallel subagents can raise it.</dd>
+<dt>"<code>/agents</code> is where I manage subagents."</dt><dd>Not any more. It prints a reminder; edit the files or ask Claude. <code>claude agents</code> is something else entirely (background sessions).</dd>
+<dt>"<code>disallowedTools: Bash(rm *)</code> blocks only rm."</dt><dd>A specifier there removes the whole Bash tool. Use a deny rule in settings for command-level blocking.</dd>
+<dt>"If I misspell a field, Claude Code will tell me."</dt><dd>Unknown fields are ignored silently. Validate files and check the debug log.</dd>
+</dl></div>
+
+<h3 id="ch81-r"><span class="num">81.12</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>A subagent does a self-contained job in its own context window and returns only a summary, keeping your main conversation focused.</li>
+<li>Built-ins include Explore and Plan (read-only, no CLAUDE.md) and general-purpose; disable any with <code>Agent(name)</code> in <code>permissions.deny</code>.</li>
+<li>Custom subagents are Markdown files with YAML frontmatter in <code>.claude/agents/</code> (team) or <code>~/.claude/agents/</code> (personal); only <code>name</code> and <code>description</code> are required, and the body is the system prompt.</li>
+<li><code>tools</code> and <code>disallowedTools</code> restrict capability; <code>model</code> and <code>effort</code> match cost to the job; <code>memory</code> gives persistent notes.</li>
+<li>Claude delegates from the description; an @-mention guarantees a specific subagent; <code>--agent</code> runs the whole session as one.</li>
+<li><code>/agents</code> no longer opens an editor (since after v2.1.197): ask Claude or edit the files, and validate them with <code>claude plugin validate .claude/agents</code>.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What comes back to your main conversation when a normal subagent finishes?</p><div class="opts"><button>Everything it read and ran, so you can check its work</button><button data-ok>Its final summary</button><button>Nothing; you must open its transcript</button></div><p class="why" hidden>The point of a subagent is that the noisy work stays in its own context window and only the result returns.</p></div>
+<div class="qz"><p class="q">Which two frontmatter fields are required in a subagent file?</p><div class="opts"><button>name and tools</button><button>description and model</button><button data-ok>name and description</button></div><p class="why" hidden>Everything else is optional. A file without a description is skipped with only a debug-log message.</p></div>
+<div class="qz"><p class="q">You want a reviewer subagent that can read files and run Bash but never edit. Which is simplest?</p><div class="opts"><button data-ok>tools: Read, Grep, Glob, Bash</button><button>disallowedTools: Bash(git *)</button><button>permissionMode: bypassPermissions</button></div><p class="why" hidden>An allowlist gives exactly those tools and nothing else, so Edit and Write are unavailable.</p></div>
+<div class="qz"><p class="q">A colleague says "type /agents to open the subagent editor". On Claude Code 2.1.319, what happens?</p><div class="opts"><button>The interactive editor opens with Running and Library tabs</button><button data-ok>It prints a reminder to ask Claude or edit the agents folders directly</button><button>It lists background sessions in agent view</button></div><p class="why" hidden>The interactive interface existed only up to v2.1.197. Agent view is <code>claude agents</code> in the shell.</p></div>
+<div class="qz"><p class="q">Your log-analyst gives poor answers because it doesn't know which test environment failed, which you mentioned earlier in the chat. Why?</p><div class="opts"><button>Subagents can't read files</button><button>Haiku can't read logs</button><button data-ok>A non-fork subagent doesn't see the conversation history, only the task message Claude writes</button></div><p class="why" hidden>Ask Claude to include the detail in the delegation, put it in the subagent's body, or use a fork, which inherits the conversation.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick one recurring, noisy task in your team's work: reading CI logs, scanning a test report, or checking a pull request's tests. Write a project subagent for it with a precise description, the smallest tool list that works, and a model chosen on purpose. Validate it with <code>claude plugin validate .claude/agents</code>, use it on three real cases, and note each time whether Claude delegated automatically. Revise the description until it does. Commit it with a short note in your team's CLAUDE.md saying it exists and when to use it.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"A subagent is a helper Claude hands a job to. It works in its own separate memory, with its own instructions and tools, and only its summary comes back, so a 4,000-line log never clutters our main session. You create one as a small Markdown file in .claude/agents: a name, a description of when to use it, which tools it may use and which model. Make reviewers read-only, put cheap jobs on Haiku, and remember it doesn't see our chat, so the brief has to be complete. And /agents no longer opens an editor: just ask Claude to write the file."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/sub-agents" target="_blank" rel="noopener">Create custom subagents</a>: built-in subagents, scopes and priority, frontmatter reference, tools, models, permission modes, skills, memory, invocation, forks, context, example subagents.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/commands" target="_blank" rel="noopener">Commands reference</a>: current behaviour of <code>/agents</code>, <code>/tasks</code>, <code>/subtask</code>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/features-overview" target="_blank" rel="noopener">Extend Claude Code</a>: skills versus subagents.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/permissions" target="_blank" rel="noopener">Permissions</a>: <code>Agent(name)</code> rules.</li>
+<li>Claude Code 2.1.319 local help: <code>claude --help</code> (<code>--agent</code>, <code>--agents</code>) and <code>claude plugin validate --help</code>; validation output checked on a scratch agents folder.</li>
+</ol><p class="verified">Verified 9 November 2026 against the Claude Code documentation and Claude Code 2.1.319.</p></div>

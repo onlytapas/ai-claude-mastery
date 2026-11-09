@@ -1,0 +1,185 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>The five kinds of "command" you meet with Claude Code, and how to tell them apart at a glance</li>
+<li>Where you type each one, and when it takes effect</li>
+<li>Where Claude's own shell commands, bundled skills and plugin commands fit in</li>
+<li>The most common mix-ups, such as typing <code>/model</code> into a normal terminal, and how to avoid them</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch52">Chapter 52</a> (terminals and shells) and <a href="#ch65">Chapter 65</a> (your first session) help. If you've opened Claude Code at least once, you can follow this chapter.</div>
+
+<div class="bigidea"><p>People say "run the command" about five quite different things: a <strong>slash command</strong> typed inside Claude Code, a <strong>terminal command</strong> typed into your normal shell, a <strong>flag</strong> added to the <code>claude</code> command when you start it, a <strong>keyboard shortcut</strong> pressed while Claude Code is open, and a <strong>special symbol</strong> such as <code>@</code> or <code>!</code> at the start of what you type. Each lives in a different place and works at a different time. Once you can tell them apart, most "it didn't work" moments disappear.</p></div>
+
+<h3 id="ch73-1"><span class="num">73.1</span>Two places you can be typing</h3>
+<p>Everything in this chapter depends on one question: <em>where is your cursor right now?</em> There are only two places.</p>
+<div class="cols2">
+<div><h4>Your normal terminal (the shell)</h4><p>The prompt usually ends in <code>$</code> or <code>%</code>, for example <code>alex@mac ~/shop-app %</code>. Anything you type here is run by your computer's <a class="gl" href="#g-terminal">terminal</a> shell (bash or zsh). This is where you <em>start</em> Claude Code.</p></div>
+<div><h4>Inside a Claude Code session</h4><p>After you run <code>claude</code>, the screen changes. You see Claude Code's input box with a <code>&gt;</code> prompt and a status line underneath. Anything you type here goes to Claude Code, not to the shell.</p></div>
+</div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a building and a meeting room inside it. In the corridor (the shell) you can walk to any room and tell the receptionist which room to open and how to set it up (<code>claude --model opus</code>). Once you're inside the meeting room (the Claude Code session), you talk to the person in the room, and the room has its own buttons and its own way of doing things (<code>/model</code>, <kbd>Shift</kbd>+<kbd>Tab</kbd>). Shouting room-instructions in the corridor, or corridor-instructions in the room, gets you nowhere.</p></div>
+
+<h3 id="ch73-2"><span class="num">73.2</span>The five kinds at a glance</h3>
+<div class="tbl"><table>
+<tr><th>Kind</th><th>Looks like</th><th>Where you type it</th><th>When it takes effect</th><th>Example</th></tr>
+<tr><td><b>1. Slash command</b></td><td>Starts with <code>/</code></td><td>Inside a Claude Code session, at the start of a message</td><td>Immediately, or after Claude's current turn if Claude is busy</td><td><code>/model</code>, <code>/clear</code>, <code>/compact</code></td></tr>
+<tr><td><b>2. Terminal command</b></td><td>Starts with a program name, often <code>claude</code></td><td>In your normal shell, before or instead of a session</td><td>When you press Enter; it runs and finishes</td><td><code>claude --version</code>, <code>claude mcp list</code>, <code>git status</code></td></tr>
+<tr><td><b>3. CLI flag (option)</b></td><td>Starts with <code>-</code> or <code>--</code>, attached to <code>claude</code></td><td>In your normal shell, on the same line as <code>claude</code></td><td>Once, when that session or command starts</td><td><code>claude --model opus</code>, <code>claude -c</code></td></tr>
+<tr><td><b>4. Keyboard shortcut</b></td><td>Keys pressed together</td><td>While a Claude Code session is open (nothing is typed)</td><td>Instantly</td><td><kbd>Shift</kbd>+<kbd>Tab</kbd>, <kbd>Esc</kbd>, <kbd>Ctrl</kbd>+<kbd>R</kbd></td></tr>
+<tr><td><b>5. Input symbol</b></td><td>A single character at a special position</td><td>In the Claude Code input box</td><td>Changes what the rest of your message means</td><td><code>@src/login.ts</code>, <code>! npm test</code></td></tr>
+</table></div>
+<p>There's also a sixth thing people call a "command", and it isn't typed by you at all: the <strong>shell commands Claude runs for you</strong> through its Bash tool (70.8). Keep it separate in your head, because it's the one that asks for permission.</p>
+
+<h3 id="ch73-3"><span class="num">73.3</span>Kind 1: slash commands</h3>
+<p>A slash command is an instruction to <em>Claude Code itself</em>, typed inside a session. It controls the session rather than asking Claude a question: switch model, clear the conversation, check usage, start a review.</p>
+<div class="code"><span class="cap">Inside a Claude Code session</span><pre>&gt; /model                 <span class="c"># opens the model picker</span>
+&gt; /compact keep the test failures   <span class="c"># text after the name becomes its argument</span>
+&gt; /context               <span class="c"># shows what is filling the context window</span></pre></div>
+<p>Rules worth knowing, from Anthropic's command documentation:</p>
+<ul>
+<li><strong>Only at the start.</strong> A slash command is recognised only at the start of a message. <code>please /clear</code> is just text.</li>
+<li><strong>Arguments come after the name.</strong> Anything after <code>/compact</code> is passed to it.</li>
+<li><strong>Busy Claude means a queue.</strong> If you send a command while Claude is working, it waits until the turn ends. A few, such as <code>/status</code> and <code>/usage</code>, run immediately.</li>
+<li><strong>Not everyone sees the same list.</strong> Your platform, plan and installed extras change what appears when you type <code>/</code>.</li>
+</ul>
+<h4>Three kinds of slash command</h4>
+<div class="tbl"><table>
+<tr><th>Kind</th><th>What it is</th><th>Examples</th></tr>
+<tr><td>Built-in command</td><td>Behaviour coded into Claude Code</td><td><code>/clear</code>, <code>/model</code>, <code>/context</code>, <code>/mcp</code></td></tr>
+<tr><td>Bundled skill</td><td>Detailed instructions shipped with Claude Code; Claude then does the work with its normal tools</td><td><code>/code-review</code> (alias <code>/review</code>), <code>/simplify</code>, <code>/doctor</code>, <code>/update-config</code></td></tr>
+<tr><td>Your own or a plugin's</td><td><a class="gl" href="#g-skill">Skills</a> you or your team wrote, or that came with a <a class="gl" href="#g-plugin">plugin</a>; prompts exposed by an MCP server can appear here too</td><td><code>/bug-report</code> (from <a href="#ch80">Chapter 80</a>)</td></tr>
+</table></div>
+<p>You type all three the same way. The difference matters when something behaves unexpectedly: a skill is guided by instructions, so its results can vary a little each time, while a built-in command always does the same thing. The full list is in <a href="#ch74">Chapter 74</a>.</p>
+
+<h3 id="ch73-4"><span class="num">73.4</span>Kind 2: terminal commands</h3>
+<p>A terminal command is a program you run from your normal shell. Many have nothing to do with Claude (<code>git status</code>, <code>npm test</code>). The <code>claude</code> program also has its own <strong>subcommands</strong>, which do a job and then return you to the shell without opening a session:</p>
+<div class="code"><span class="cap">In your normal terminal</span><pre>claude --version        <span class="c"># prints the installed version, e.g. 2.1.319 (Claude Code)</span>
+claude doctor           <span class="c"># health check of your installation</span>
+claude mcp list         <span class="c"># lists configured MCP servers</span>
+claude auth status      <span class="c"># shows whether you're signed in</span>
+claude update           <span class="c"># checks for and installs updates</span></pre></div>
+<p>Notice the pattern: <code>claude</code> + a word (<code>mcp</code>, <code>auth</code>, <code>doctor</code>). That word is a subcommand. Some subcommands have their own subcommands: <code>claude mcp add</code>, <code>claude mcp list</code>. The full list is in <a href="#ch75">Chapter 75</a>.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>A teammate says "Claude can't see Jira". The quickest check is a terminal command, before even opening a session: <code>claude mcp list</code> shows whether the Jira server is configured and whether it's connected. Inside a session, the equivalent is the slash command <code>/mcp</code>. Same information, two different places.</p></div>
+
+<h3 id="ch73-5"><span class="num">73.5</span>Kind 3: CLI flags</h3>
+<p>A flag (also called an option) changes <em>how</em> the <code>claude</code> command runs. Flags start with one dash and a letter (<code>-c</code>) or two dashes and a word (<code>--continue</code>). Many have both forms, which mean the same thing.</p>
+<div class="code"><span class="cap">In your normal terminal</span><pre>claude --model opus                 <span class="c"># start a session on the Opus model</span>
+claude -c                           <span class="c"># continue the most recent conversation in this folder</span>
+claude --permission-mode plan       <span class="c"># start in plan mode</span>
+claude -p "summarise README.md"     <span class="c"># print mode: answer once and exit</span></pre></div>
+<p>Flags take effect <strong>once, when the session starts</strong>. To change the model halfway through a session you don't restart with a flag; you use the slash command <code>/model</code>. Some settings exist in both forms for exactly this reason:</p>
+<div class="tbl"><table>
+<tr><th>You want to…</th><th>Before starting (flag)</th><th>During the session (slash command or shortcut)</th></tr>
+<tr><td>Choose the model</td><td><code>claude --model sonnet</code></td><td><code>/model</code></td></tr>
+<tr><td>Set effort</td><td><code>claude --effort high</code></td><td><code>/effort</code></td></tr>
+<tr><td>Start in plan mode</td><td><code>claude --permission-mode plan</code></td><td><code>/plan</code> or <kbd>Shift</kbd>+<kbd>Tab</kbd></td></tr>
+<tr><td>Pick up an old conversation</td><td><code>claude -r</code> or <code>claude -c</code></td><td><code>/resume</code></td></tr>
+<tr><td>Allow another folder</td><td><code>claude --add-dir ../api-tests</code></td><td><code>/add-dir</code></td></tr>
+</table></div>
+<details class="deep"><summary>Reading a command line like a sentence</summary><div class="body">
+<p>Take <code>claude mcp add --transport http jira https://example.com/mcp</code>. Read it left to right:</p>
+<ol>
+<li><code>claude</code>: the program.</li>
+<li><code>mcp add</code>: the subcommand ("add an MCP server").</li>
+<li><code>--transport http</code>: a flag with a value ("use HTTP").</li>
+<li><code>jira</code>: the first argument (the name you're giving the server).</li>
+<li><code>https://example.com/mcp</code>: the second argument (where it lives).</li>
+</ol>
+<p>Flags usually come after the subcommand and before or between arguments. Words in <code>&lt;angle brackets&gt;</code> in documentation are required; words in <code>[square brackets]</code> are optional. <code>claude --help</code> and <code>claude mcp add --help</code> show the exact pattern for your version.</p>
+</div></details>
+
+<h3 id="ch73-6"><span class="num">73.6</span>Kind 4: keyboard shortcuts</h3>
+<p>Shortcuts are keys you press while a session is open. You don't type them as text and you don't press Enter. They act instantly.</p>
+<div class="tbl"><table>
+<tr><th>Press</th><th>What happens</th></tr>
+<tr><td><kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Cycles permission modes (Manual, Accept edits, Plan, and Auto when available)</td></tr>
+<tr><td><kbd>Esc</kbd></td><td>Stops Claude mid-turn, keeping the work done so far</td></tr>
+<tr><td><kbd>Esc</kbd> <kbd>Esc</kbd></td><td>On an empty prompt, opens the rewind menu; with text, clears the draft</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd></td><td>Interrupts; with nothing running, first clears input, a second press exits</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd></td><td>Searches your earlier prompts</td></tr>
+<tr><td><kbd>?</kbd> on an empty prompt</td><td>Shows the shortcut help panel</td></tr>
+</table></div>
+<p>The complete list, including multi-line input, history, background tasks and custom key bindings, is in <a href="#ch76">Chapter 76</a>.</p>
+
+<h3 id="ch73-7"><span class="num">73.7</span>Kind 5: input symbols</h3>
+<p>Some characters have a special meaning when you type them in the Claude Code input box. They change what the rest of your message means.</p>
+<div class="tbl"><table>
+<tr><th>Symbol</th><th>Where</th><th>Meaning</th><th>Example</th></tr>
+<tr><td><code>/</code></td><td>Start of the message</td><td>Run a slash command or skill</td><td><code>/clear</code></td></tr>
+<tr><td><code>@</code></td><td>Anywhere</td><td>Mention a file or folder so Claude reads it (with autocomplete); MCP resources appear here too</td><td><code>Review @tests/login.spec.ts</code></td></tr>
+<tr><td><code>!</code></td><td>Start of the message</td><td>Shell mode: run that command yourself, straight away; the output joins the conversation and Claude responds to it</td><td><code>! npm test</code></td></tr>
+<tr><td><code>?</code></td><td>Empty prompt</td><td>Toggle the shortcut help panel</td><td><code>?</code></td></tr>
+<tr><td><code>#</code></td><td>n/a</td><td><strong>No longer special.</strong> It used to save a memory; it was removed in version 2.0.70. Ask Claude to update CLAUDE.md, or use <code>/memory</code>.</td><td>n/a</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>In an email, "@Priya" tags a person and "Re:" marks a reply. The symbol at the front changes what the message does. Claude Code's <code>/</code>, <code>@</code> and <code>!</code> work the same way.</p></div>
+
+<h3 id="ch73-8"><span class="num">73.8</span>The sixth kind: commands Claude runs for you</h3>
+<p>When you ask "run the login tests and tell me what failed", Claude decides to run a shell command such as <code>npx playwright test login</code>. It uses its Bash tool to do that on your computer. You don't type the command; Claude proposes it, and depending on your <a href="#ch67">permission mode</a>, you may be asked to approve it.</p>
+<div class="flow">
+<div><b>You ask</b>"Run the login tests"</div>
+<div><b>Claude proposes</b><code>npx playwright test login</code></div>
+<div class="hl"><b>Permission check</b>Allowed, asked, or denied by your mode and rules</div>
+<div><b>It runs</b>On your machine, in the project folder</div>
+<div><b>Result</b>Output goes back to Claude</div>
+</div>
+<div class="cols2">
+<div><h4><code>! npm test</code> (you)</h4><p>You typed it, so you've decided. It runs straight away. Claude sees the output and responds.</p></div>
+<div><h4>"Run the tests" (Claude)</h4><p>Claude chooses the exact command. You see it before it runs (unless your mode or rules auto-approve it). Read it the way you'd read a test step.</p></div>
+</div>
+
+<h3 id="ch73-9"><span class="num">73.9</span>A decision guide</h3>
+<div class="tbl"><table>
+<tr><th>Situation</th><th>Use</th></tr>
+<tr><td>I'm in my normal terminal and want to start Claude with a particular model</td><td>Flag: <code>claude --model opus</code></td></tr>
+<tr><td>I'm already in a session and want a different model</td><td>Slash command: <code>/model</code> (or <kbd>Option</kbd>/<kbd>Alt</kbd>+<kbd>P</kbd>)</td></tr>
+<tr><td>I want to check my setup without opening a session</td><td>Terminal command: <code>claude doctor</code>, <code>claude mcp list</code></td></tr>
+<tr><td>Claude is heading the wrong way</td><td>Shortcut: <kbd>Esc</kbd></td></tr>
+<tr><td>I want Claude to look at a specific file</td><td>Symbol: <code>@path/to/file</code></td></tr>
+<tr><td>I want to run a quick command myself and let Claude see the result</td><td>Symbol: <code>! command</code></td></tr>
+<tr><td>I want Claude to figure out and run the right commands</td><td>Just ask in plain words; approve what it proposes</td></tr>
+</table></div>
+
+<div class="lab"><div class="lab-h"><b>One of each</b><span>20 min · any project folder</span></div><ol>
+<li><strong>Terminal command.</strong> In your normal terminal, run <code>claude --version</code>.<span class="expect">a version number such as <code>2.1.319 (Claude Code)</code>, then your shell prompt again. No session opened.</span></li>
+<li><strong>Flag.</strong> Run <code>claude --permission-mode plan</code>.<span class="expect">a session opens, and the status line shows plan mode is on.</span></li>
+<li><strong>Keyboard shortcut.</strong> Press <kbd>Shift</kbd>+<kbd>Tab</kbd> a few times.<span class="expect">the mode in the status line changes each time.</span></li>
+<li><strong>Slash command.</strong> Type <code>/context</code> and press Enter.<span class="expect">a breakdown of what's using the context window.</span></li>
+<li><strong>Input symbol <code>@</code>.</strong> Type <code>Summarise @</code> and pick any file from the list.<span class="expect">autocomplete suggests files; Claude summarises the one you chose.</span></li>
+<li><strong>Input symbol <code>!</code>.</strong> Type <code>! git status</code>.<span class="expect">the command runs immediately and Claude comments on the output.</span></li>
+<li><strong>Claude's own command.</strong> Ask "list the files in this folder, largest first".<span class="expect">Claude proposes a shell command; depending on your mode, you may be asked to approve it.</span></li>
+<li>Type <code>/exit</code>, then in your normal terminal type <code>/model</code>.<span class="expect">an error such as "no such file or directory": the shell doesn't know slash commands.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>Typing <code>/model</code> in the normal terminal</dt><dd>The shell thinks <code>/model</code> is a file path. Slash commands only work inside a session.</dd>
+<dt>Typing <code>claude --model opus</code> inside a session</dt><dd>Inside a session that's just a message to Claude. Use <code>/model</code> there.</dd>
+<dt>Putting flags after the prompt text</dt><dd>Write <code>claude --model opus "explain this repo"</code>, not <code>claude "explain this repo --model opus"</code>. Inside quotes, <code>--model</code> is just part of the text.</dd>
+<dt>Starting a message with <code>#</code> to save a memory</dt><dd>That shortcut was removed. Ask Claude to add the rule to CLAUDE.md, or run <code>/memory</code>.</dd>
+<dt>Thinking <code>!</code> and "ask Claude to run it" are the same</dt><dd><code>!</code> runs exactly what you typed, immediately. Asking Claude lets it choose the command, which you then review.</dd>
+<dt>Expecting every slash command from a colleague's screen</dt><dd>Lists differ by version, plan, platform and installed skills and plugins. Type <code>/</code> to see yours.</dd>
+</dl></div>
+
+<h3 id="ch73-r"><span class="num">73.10</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>First ask where your cursor is: the normal shell, or inside a Claude Code session.</li>
+<li>Slash commands (<code>/model</code>) work inside a session; terminal commands (<code>claude mcp list</code>) and flags (<code>--model</code>) work in the shell.</li>
+<li>Flags take effect once at start-up; slash commands and shortcuts change things mid-session.</li>
+<li>Keyboard shortcuts act instantly; input symbols (<code>/</code>, <code>@</code>, <code>!</code>) change what your message means. <code>#</code> is no longer special.</li>
+<li>Commands Claude runs through its Bash tool are proposed by Claude and checked by your permission mode.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">You're in your normal terminal and want to start Claude Code on the Opus model. What do you type?</p><div class="opts"><button>/model opus</button><button data-ok>claude --model opus</button><button>! claude opus</button></div><p class="why" hidden>In the shell you add a flag to the <code>claude</code> command. <code>/model</code> only works inside a session.</p></div>
+<div class="qz"><p class="q">Halfway through a session you want to switch to a faster model. What's the right tool?</p><div class="opts"><button data-ok>The slash command <code>/model</code></button><button>Exit and restart with <code>--model</code></button><button>Type <code>--model haiku</code> as a message</button></div><p class="why" hidden>Slash commands change the running session. Flags only apply at start-up.</p></div>
+<div class="qz"><p class="q">What does typing <code>! npm test</code> in the Claude Code input box do?</p><div class="opts"><button>Asks Claude to decide how to test</button><button data-ok>Runs <code>npm test</code> straight away and shares the output with Claude</button><button>Saves "npm test" to memory</button></div><p class="why" hidden><code>!</code> at the start is shell mode: you run the command; Claude sees and responds to the output.</p></div>
+<div class="qz"><p class="q">Which of these is a terminal command rather than a slash command?</p><div class="opts"><button>/mcp</button><button data-ok>claude mcp list</button><button>/context</button></div><p class="why" hidden><code>claude mcp list</code> runs in your shell without opening a session.</p></div>
+<div class="qz"><p class="q">A colleague starts a message with <code>#</code> to save a rule to memory, but nothing is saved. Why?</p><div class="opts"><button>They need admin rights</button><button data-ok>The <code>#</code> shortcut was removed; ask Claude to edit CLAUDE.md or use <code>/memory</code></button><button><code>#</code> only works in plan mode</button></div><p class="why" hidden>It was removed in version 2.0.70.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Make a one-page "Which command where?" card for your team, with five columns (slash command, terminal command, flag, shortcut, symbol) and three examples from your own daily work in each. Add a row for "things Claude runs for you" with one command you'd always want to approve by hand. Test every example on your machine before you share it.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"There are two places you type: your normal terminal and inside Claude Code. In the terminal you run commands like <code>claude mcp list</code> and add flags like <code>--model</code> when starting. Inside Claude Code you use slash commands like <code>/model</code>, shortcuts like Shift+Tab, and symbols: <code>@</code> to point at a file and <code>!</code> to run a command yourself. Anything Claude runs on its own goes through a permission check."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/commands" target="_blank" rel="noopener">Claude Code: commands</a> (slash command rules and the built-in / bundled skill split).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/cli-reference" target="_blank" rel="noopener">Claude Code: CLI reference</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/interactive-mode" target="_blank" rel="noopener">Claude Code: interactive mode</a> (shortcuts and input prefixes).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/permission-modes" target="_blank" rel="noopener">Claude Code: permission modes</a>.</li>
+<li>Claude Code changelog, version 2.0.70 (removal of the <code>#</code> memory shortcut).</li>
+<li>Local <code>claude --help</code> output, Claude Code 2.1.319.</li>
+</ol><p class="verified">Verified 9 November 2026 against Claude Code 2.1.319</p></div>

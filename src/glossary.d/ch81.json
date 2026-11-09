@@ -1,0 +1,26 @@
+{
+ "Forked subagent": {
+  "d": "In Claude Code, a subagent that inherits the whole conversation so far instead of starting fresh, so it needs no re-explaining. Only its final result comes back. Start one with /subtask.",
+  "see": "ch81"
+ },
+ "Hook event": {
+  "d": "A named moment in a Claude Code session at which hooks can run, such as PreToolUse (before a tool runs), PostToolUse (after it succeeds) or SessionStart.",
+  "see": "ch82"
+ },
+ "Hook matcher": {
+  "d": "The filter on a Claude Code hook that decides which occurrences of an event trigger it, for example \"Edit|Write\" to run only when Claude edits or writes a file.",
+  "see": "ch82"
+ },
+ "Plugin manifest": {
+  "d": "The file .claude-plugin/plugin.json that gives a Claude Code plugin its name (the only required field), and optionally a version, description, author and other details.",
+  "see": "ch84"
+ },
+ "Output style": {
+  "d": "In Claude Code, a set of instructions that changes Claude's role, tone and response format for a whole session, such as the built-in Concise or Explanatory styles, or a custom Markdown file.",
+  "see": "ch84"
+ },
+ "Status line": {
+  "d": "A customisable line under the Claude Code prompt, produced by a script that reads session details (model, folder, context used) as JSON and prints one line of text.",
+  "see": "ch84"
+ }
+}

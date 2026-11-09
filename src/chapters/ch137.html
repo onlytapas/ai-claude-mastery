@@ -1,0 +1,292 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>Why you might run a language model on your own computer, and when you shouldn't</li>
+<li>What you actually download: weights, the GGUF file format and the "engine" that runs it</li>
+<li>Quantisation in plain words, and how to read names like <code>Q4_K_M</code></li>
+<li>How much memory and what kind of hardware you need, and how to check what's being used</li>
+<li>How to install and use Ollama and llama.cpp, from the command line and from code</li>
+<li>The real privacy benefits of local models, and the gaps people overlook</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch32">Chapter 32</a> (open-weight versus proprietary, including the memory rule of thumb), <a href="#ch25">Chapter 25</a> (why memory bandwidth matters), <a href="#ch54">Chapter 54</a> (first terminal commands) and <a href="#ch60">Chapter 60</a> (Python for HTTP and JSON). For the lab you need a computer with at least 8 GB of memory and about 3 GB of free disk space.</div>
+
+<div class="bigidea"><p>An <a class="gl" href="#g-open-weight-model">open-weight model</a> is a file of numbers you can download and run yourself. Two free tools make that easy: <a class="gl" href="#g-ollama">Ollama</a>, which feels like an app store plus a local server, and <a class="gl" href="#g-llama-cpp">llama.cpp</a>, the lower-level engine for people who want control. Because a full model is too big for most laptops, people run <a class="gl" href="#g-quantisation">quantised</a> versions that store each number with fewer bits. The result is an AI that works offline and keeps your prompts on your machine, but which is smaller, slower and less capable than a frontier model such as Claude.</p></div>
+
+<h3 id="ch137-1"><span class="num">137.1</span>Why run a model yourself?</h3>
+<p>Most of this book uses Claude through the app, Claude Code or the API. The model runs in a data centre and you send it your text. Running a model locally flips that: the model runs on your laptop or a server you control, and your text never leaves it.</p>
+<div class="tbl"><table>
+<tr><th>Reason</th><th>What it means in practice</th><th>QA example</th></tr>
+<tr><td>Privacy</td><td>Prompts and answers stay on your machine</td><td>Summarising production logs that contain customer data your policy forbids sending out</td></tr>
+<tr><td>Offline use</td><td>No internet needed once the model is downloaded</td><td>Working on a train, or in a secure lab with no outbound network</td></tr>
+<tr><td>Predictable cost</td><td>No per-token bill; you pay for hardware and electricity</td><td>Running thousands of cheap classification calls in a nightly CI job</td></tr>
+<tr><td>Version control</td><td>The exact same weights forever; no surprise retirements</td><td>A regression suite for an AI feature that must not change behaviour between releases</td></tr>
+<tr><td>Learning</td><td>You can see memory use, speed and settings directly</td><td>Understanding why your vendor's prices and latency look the way they do</td></tr>
+</table></div>
+<p>And the honest limits:</p>
+<ul>
+<li><strong>Capability.</strong> A model that fits on a laptop is much smaller than a frontier model. It will make more mistakes on hard reasoning, long documents and multi-step agent work.</li>
+<li><strong>Speed.</strong> Your laptop has a tiny fraction of a data centre's memory bandwidth (<a href="#ch25">Chapter 25</a>), so answers stream more slowly, especially for bigger models.</li>
+<li><strong>Your job now.</strong> Updates, safety filters, security and support become your responsibility.</li>
+</ul>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Using Claude through the API is like eating at a top restaurant: excellent food, but you go to them and they see your order. Running a local model is cooking at home: nobody sees what you eat and it's cheap per meal, but your kitchen is smaller than theirs, and some dishes are simply out of reach.</p></div>
+
+<h3 id="ch137-2"><span class="num">137.2</span>What you actually download</h3>
+<p>Three pieces work together whenever you run a model locally:</p>
+<div class="flow">
+<div><b>Weights</b>The model itself: billions of numbers, published by a lab such as Alibaba (Qwen) or Google (Gemma), often on Hugging Face</div>
+<div class="hl"><b>A packaged file</b>The weights converted and usually quantised into a single file, typically <a class="gl" href="#g-gguf">GGUF</a></div>
+<div><b>An engine</b>Software that loads the file, uses your CPU or GPU, and turns your prompt into tokens and back (llama.cpp, Ollama)</div>
+<div><b>An interface</b>A chat in the terminal, a local web page, or an HTTP API that your scripts call</div>
+</div>
+<p><strong>GGUF</strong> is the file format used by llama.cpp. One <code>.gguf</code> file holds the weights plus the information needed to run them: the <a class="gl" href="#g-tokenizer">tokenizer</a>, the model's shape, and the chat template that formats conversations the way the model was trained to expect. That's why you can download a single file and run it. On Hugging Face, repositories whose names end in <code>-GGUF</code> usually contain several versions of the same model at different quantisation levels.</p>
+<p>Ollama hides most of this. You ask for a model by name, such as <code>qwen3.5:0.8b</code>, and it downloads the right file and runs it. llama.cpp exposes more: you can choose the exact file and quantisation, and tune how it uses your hardware.</p>
+<div class="box note"><span class="tag">Model name versus model tag</span><p>In Ollama, the part after the colon is a <strong>tag</strong>: <code>qwen3.5</code> is the family, <code>qwen3.5:0.8b</code> is the 0.8-billion-parameter version. Leaving the tag off gives you the family's <code>latest</code> tag, which may be much bigger than you expected. Always check the size on the model's library page before you pull.</p></div>
+
+<h3 id="ch137-3"><span class="num">137.3</span>Quantisation, in plain words</h3>
+<p><a href="#ch32">Chapter 32</a> introduced the idea: a model's numbers are normally stored with 16 bits each, and quantisation stores them with fewer bits, such as 8 or 4. The file shrinks by two or four times, needs less memory, and runs faster because there's less to move from memory to the processor. The price is a small loss of precision, which may or may not show up in answers.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Imagine recording temperatures. Writing "21.3847 °C" is precise. Writing "21 °C" is close enough for almost every purpose and takes half the ink. Writing "about 20" is cheaper still, but now you'd struggle to notice a fever. Quantisation chooses how many digits to keep for billions of numbers at once.</p></div>
+<p>llama.cpp's README lists support for 1.5-bit, 2-bit, 3-bit, 4-bit, 5-bit, 6-bit and 8-bit integer quantisation. In GGUF files, the level appears in the file name:</p>
+<div class="tbl"><table>
+<tr><th>Name pattern</th><th>Roughly</th><th>When people pick it</th></tr>
+<tr><td><code>F16</code> / <code>BF16</code></td><td>16 bits per weight, no quantisation</td><td>Reference quality; needs the most memory</td></tr>
+<tr><td><code>Q8_0</code></td><td>About 8 bits per weight</td><td>Near-original quality when you have the memory</td></tr>
+<tr><td><code>Q5_K_M</code>, <code>Q6_K</code></td><td>About 5–6 bits</td><td>A cautious middle ground</td></tr>
+<tr><td><code>Q4_K_M</code></td><td>About 4–5 bits</td><td>The common default; llama.cpp picks it when you don't specify one</td></tr>
+<tr><td><code>Q3_K</code>, <code>Q2_K</code> and below</td><td>3 bits or fewer</td><td>Squeezing a big model onto small hardware; quality loss becomes noticeable</td></tr>
+</table></div>
+<details class="deep"><summary>Under the hood: how 4 bits can stand in for 16</summary><div class="body">
+<p>A 4-bit number can only take 16 different values. On its own that would be hopeless for weights that range over many sizes. The trick is <strong>block quantisation</strong>: the weights are split into small blocks (dozens of numbers), and each block gets its own scale factor stored at higher precision. Within a block, each weight is stored as one of 16 steps between that block's minimum and maximum. Because neighbouring weights tend to have similar sizes, the error per block stays small.</p>
+<p>The "K" families in GGUF names use blocks within larger super-blocks, so even the scale factors are stored compactly, and the "S / M / L" suffix (small, medium, large) says how many of the more sensitive tensors are kept at a higher bit width. That's why a <code>Q4_K_M</code> file is a little larger than a pure 4-bit calculation predicts: some parts are deliberately kept more precise.</p>
+<p>Quantisation for running models on your laptop is mostly about the weights. Data-centre serving also quantises activations and the <a class="gl" href="#g-kv-cache">KV cache</a>; <a href="#ch139">Chapter 139</a> covers that.</p>
+</div></details>
+<div class="box warn"><span class="tag">Quality loss is task-specific</span><p>"4-bit is nearly as good" is an average across benchmarks. Your task may be the exception: exact numbers, code, rare languages and long instructions often suffer first. If a local model will do real work, test the quantisation you'll actually use on your own examples (<a href="#ch36">Chapter 36</a>).</p></div>
+
+<h3 id="ch137-4"><span class="num">137.4</span>Hardware: memory is everything</h3>
+<p>To run a model, its weights must fit in memory, plus room for the conversation (the KV cache) and the engine itself. Where that memory lives decides the speed:</p>
+<div class="cols2">
+<div><h4>GPU memory (VRAM)</h4><p>An NVIDIA or AMD graphics card has its own fast memory. If the whole model fits there, answers are quick. If not, the engine splits the model between GPU and main memory, and speed drops sharply.</p></div>
+<div><h4>Apple Silicon (unified memory)</h4><p>Macs with M-series chips share one pool of memory between CPU and GPU, so a 32 GB Mac can give most of that to a model. llama.cpp's README calls Apple silicon "a first-class citizen", using Apple's Metal framework.</p></div>
+</div>
+<p>A plain CPU with ordinary memory also works, just more slowly. Small models (around 1–4 billion parameters) are usable on CPU-only laptops; larger ones become painfully slow.</p>
+<div class="tbl"><table>
+<tr><th>Memory available to the model</th><th>What is realistic (4-bit, rule of thumb)</th></tr>
+<tr><td>8 GB</td><td>Models up to roughly 4 billion parameters, short conversations</td></tr>
+<tr><td>16 GB</td><td>Models around 7–9 billion parameters comfortably</td></tr>
+<tr><td>24–32 GB</td><td>Models in the 20–30 billion range, such as the 27B and 31B tags below</td></tr>
+<tr><td>64 GB and up</td><td>Larger mixture-of-experts models; very large ones still need data-centre hardware</td></tr>
+</table></div>
+<p>This table is a rule of thumb derived from the "about half a gigabyte per billion parameters at 4 bits" rule in <a href="#ch32">Chapter 32</a>, with headroom for the system and context. It is not a vendor specification. The download sizes on Ollama's library pages are the most reliable guide to the weights; add a few gigabytes for everything else.</p>
+<details class="deep"><summary>Under the hood: why the context costs memory too</summary><div class="body">
+<p>Every token in the conversation leaves behind attention "keys" and "values" for every layer of the model, stored in the KV cache (<a href="#ch25">Chapter 25</a>). A model that advertises a 256K-token context could need many gigabytes for the cache alone at full length. That's why local tools start with a much smaller context by default and let you raise it: in Ollama with the <code>num_ctx</code> parameter or the <code>OLLAMA_CONTEXT_LENGTH</code> environment variable; in llama.cpp with <code>-c</code>. Ollama's FAQ gives the current default. Raising it uses more memory, and if the total no longer fits on the GPU, part of the model moves to the CPU and slows down.</p>
+</div></details>
+<p>To see what's happening, Ollama's <code>ollama ps</code> command shows a <strong>PROCESSOR</strong> column. According to Ollama's FAQ, "100% GPU" means the model sits entirely on the GPU, "100% CPU" means it's in main memory, and a split such as "48%/52% CPU/GPU" means it's shared, which is usually the cause of disappointing speed.</p>
+
+<h3 id="ch137-5"><span class="num">137.5</span>Choosing an open-weight model</h3>
+<p>New open-weight models appear every few weeks, so treat any list as a snapshot. Here are the families named in this chapter's scope, with facts checked on 9 November 2026. Company background is in <a href="#ch28">Chapter 28</a> and <a href="#ch30">Chapter 30</a>.</p>
+<div class="tbl"><table>
+<tr><th>Family</th><th>From</th><th>Local-friendly options (examples)</th><th>Notes</th></tr>
+<tr><td>Qwen</td><td>Alibaba</td><td>Ollama's <code>qwen3.5</code> family has tags from <code>0.8b</code> (about 1.2 GB download) through <code>2b</code>, <code>4b</code>, <code>9b</code>, <code>27b</code> and larger</td><td>Many open releases; Qwen3.8-27B (Aug 2026) is Apache 2.0. The top "Max" models are cloud-only</td></tr>
+<tr><td>Gemma</td><td>Google DeepMind</td><td>Ollama's <code>gemma4</code> family: <code>e2b</code>, <code>e4b</code>, <code>12b</code>, <code>26b</code> (a mixture-of-experts model with about 3.8B active parameters) and <code>31b</code>; text and image input</td><td>Google's open family alongside its proprietary Gemini models</td></tr>
+<tr><td>Mistral</td><td>Mistral AI</td><td>Older small models such as Mistral 7B suit laptops</td><td>Mistral Large 4 (weights Oct 2026) is about 1 trillion parameters: data-centre hardware only</td></tr>
+<tr><td>DeepSeek</td><td>DeepSeek</td><td>Smaller distilled variants appear from time to time; check the library</td><td>Main models (V4 family) are MIT-licensed but far too large for a laptop</td></tr>
+</table></div>
+<p>A sensible way to choose:</p>
+<ol>
+<li><strong>Start from your memory budget.</strong> Pick the largest size that fits comfortably, not the largest that barely loads.</li>
+<li><strong>Read the licence</strong> before any work use (<a href="#ch32">Chapter 32</a>). "Open weights" does not always mean "free for any commercial purpose".</li>
+<li><strong>Test two or three candidates</strong> on 10–20 of your own real examples, not on a leaderboard.</li>
+<li><strong>Check the tag</strong>. Tags ending in <code>-cloud</code> (for example <code>gemma4:cloud</code>) run on Ollama's servers, not your machine. More on that in 136.9.</li>
+</ol>
+
+<h3 id="ch137-6"><span class="num">137.6</span>Ollama: the easy route</h3>
+<p>Ollama is a free tool that downloads models, runs them, and offers a local HTTP API on your computer. Install it from <a href="https://ollama.com/download" target="_blank" rel="noopener">ollama.com/download</a>, or with the commands from its README:</p>
+<div class="code"><span class="cap">Terminal · install</span><pre>curl -fsSL https://ollama.com/install.sh | sh     <span class="c"># macOS or Linux</span>
+irm https://ollama.com/install.ps1 | iex          <span class="c"># Windows PowerShell</span></pre></div>
+<p>On macOS and Windows you can also download a normal installer (a <code>.dmg</code> or <code>.exe</code>) from the same page. As always with "pipe this script into your shell" commands, only run them from the official site.</p>
+<h4>The commands you'll use</h4>
+<div class="tbl"><table>
+<tr><th>Command</th><th>What it does</th></tr>
+<tr><td><code>ollama run qwen3.5:0.8b</code></td><td>Download the model if needed, then start an interactive chat. Add a quoted prompt at the end for a one-off answer</td></tr>
+<tr><td><code>ollama pull qwen3.5:0.8b</code></td><td>Download a model without starting a chat</td></tr>
+<tr><td><code>ollama ls</code></td><td>List models on your computer, with sizes</td></tr>
+<tr><td><code>ollama ps</code></td><td>List models currently loaded in memory, and whether they're on GPU or CPU</td></tr>
+<tr><td><code>ollama stop qwen3.5:0.8b</code></td><td>Unload a running model and free its memory</td></tr>
+<tr><td><code>ollama rm qwen3.5:0.8b</code></td><td>Delete a downloaded model from disk</td></tr>
+<tr><td><code>ollama create name -f Modelfile</code></td><td>Build your own variant with a fixed system prompt and settings</td></tr>
+<tr><td><code>ollama serve</code></td><td>Start the background server manually (the desktop app normally does this for you)</td></tr>
+<tr><td><code>ollama launch claude</code></td><td>Set up and start a supported external tool, here Claude Code, to use Ollama models</td></tr>
+</table></div>
+<p>In an interactive chat, type <code>/bye</code> to leave. You can also pipe a file in, which is handy for logs or bug reports:</p>
+<div class="code"><span class="cap">Terminal</span><pre>ollama run qwen3.5:0.8b "Summarise this bug report in one sentence:" &lt; bug-1234.txt</pre></div>
+<p>Downloaded models live in <code>~/.ollama/models</code> on macOS, <code>/usr/share/ollama/.ollama/models</code> on Linux and <code>C:\Users\%username%\.ollama\models</code> on Windows (the <code>OLLAMA_MODELS</code> variable moves them). Models stay loaded for five minutes after use by default, then unload to free memory.</p>
+<h4>The local API</h4>
+<p>While Ollama is running, it listens on <code>http://localhost:11434</code>. Ollama's FAQ states that it binds to 127.0.0.1 by default, meaning only programs on your own computer can reach it. Any language that can send HTTP can use it:</p>
+<div class="code"><span class="cap">Terminal · native chat API</span><pre>curl http://localhost:11434/api/chat -d '{
+  "model": "qwen3.5:0.8b",
+  "messages": [{"role": "user", "content": "Give one boundary-value test for an age field that accepts 18-65."}],
+  "stream": false
+}'</pre></div>
+<p>The reply is JSON. The answer is in <code>message.content</code>, and it also reports <code>eval_count</code> (tokens generated) and <code>eval_duration</code> (in nanoseconds), so you can calculate the speed yourself. Ollama also offers two compatibility layers, so existing code can switch to a local model by changing a base URL:</p>
+<div class="tbl"><table>
+<tr><th>Style</th><th>Endpoint</th><th>Use it with</th></tr>
+<tr><td>Native</td><td><code>/api/chat</code>, <code>/api/generate</code></td><td>Ollama's own Python (<code>pip install ollama</code>) and JavaScript libraries, or raw HTTP</td></tr>
+<tr><td>OpenAI-compatible</td><td><code>/v1/chat/completions</code> and others under <code>/v1/</code></td><td>Code written for the OpenAI SDK; the API key is required by the SDK but ignored locally</td></tr>
+<tr><td>Anthropic-compatible</td><td><code>/v1/messages</code></td><td>Code written for the Anthropic Messages API, and Claude Code (see 136.8)</td></tr>
+</table></div>
+<p>The compatibility layers cover the basics (messages, streaming, system prompts, tool calling), not everything. Ollama's Anthropic compatibility page lists, for example, no prompt caching, no Batches API and no citations.</p>
+<h4>A Modelfile: your own preset</h4>
+<p>A <a class="gl" href="#g-modelfile">Modelfile</a> is a small text file that builds a named variant of a model with a fixed system prompt and settings, much like a <code>Dockerfile</code> builds an image.</p>
+<div class="code"><span class="cap">Modelfile</span><pre>FROM qwen3.5:0.8b
+PARAMETER temperature 0
+PARAMETER num_ctx 8192
+SYSTEM You are a QA assistant. Turn rough notes into bug reports with: Title, Steps to reproduce, Expected, Actual, Severity. Never invent steps that are not in the notes.</pre></div>
+<div class="code"><span class="cap">Terminal</span><pre>ollama create bugwriter -f Modelfile
+ollama run bugwriter "login page: typed wrong password 5 times, no lockout, can keep trying"</pre></div>
+
+<h3 id="ch137-7"><span class="num">137.7</span>llama.cpp: the engine room</h3>
+<p>llama.cpp is an open-source (MIT-licensed) engine written in C and C++ with no heavy dependencies. Its stated goal is to run models "with minimal setup and state-of-the-art performance on a wide range of hardware". It supports Apple's Metal, NVIDIA's CUDA, AMD through HIP, Vulkan and many other back-ends, and it can split a model between CPU and GPU when it doesn't fit in graphics memory. Choose it when you want to pick exact files, squeeze the most out of your hardware, or embed a model server in your own tooling.</p>
+<div class="code"><span class="cap">Terminal · install (pick one)</span><pre>curl -LsSf https://llama.app/install.sh | sh     <span class="c"># macOS or Linux, from the README</span>
+irm https://llama.app/install.ps1 | iex          <span class="c"># Windows PowerShell</span>
+brew install llama.cpp                           <span class="c"># Homebrew (macOS or Linux)</span>
+winget install llama.cpp                         <span class="c"># Windows Package Manager</span></pre></div>
+<p>Prebuilt downloads are also on the project's GitHub releases page. The README's quick start then uses a single <code>llama</code> command with sub-commands:</p>
+<div class="code"><span class="cap">Terminal</span><pre>llama cli -hf ggml-org/Qwen3.5-0.8B-GGUF      <span class="c"># download from Hugging Face and chat in the terminal</span>
+llama serve -hf ggml-org/Qwen3.5-0.8B-GGUF    <span class="c"># start an OpenAI-compatible server with a web UI</span></pre></div>
+<p>You'll also see the separate programs <code>llama-cli</code> and <code>llama-server</code> in older guides and in the project's own tool documentation. They are still shipped (Homebrew's package lists <code>llama</code>, <code>llama-cli</code> and <code>llama-server</code> among its binaries), so either style works with a current install.</p>
+<div class="tbl"><table>
+<tr><th>Option</th><th>Meaning</th></tr>
+<tr><td><code>-hf user/repo[:quant]</code></td><td>Download a GGUF from Hugging Face. The optional quant picks the file, for example <code>:Q8_0</code>; the default is <code>Q4_K_M</code></td></tr>
+<tr><td><code>-m path/to/model.gguf</code></td><td>Use a GGUF file you already have</td></tr>
+<tr><td><code>-c N</code></td><td>Context size in tokens; 0 means "use the model's own setting"</td></tr>
+<tr><td><code>-ngl N</code></td><td>How many layers to put in GPU memory: a number, <code>auto</code> (default) or <code>all</code></td></tr>
+<tr><td><code>--port N</code></td><td>For the server: which port to listen on</td></tr>
+</table></div>
+<p>The server's documentation says it listens on <code>127.0.0.1:9931</code> by default (some examples, including the project's own Docker ones, set port 8080 explicitly; check the address your terminal prints). It offers OpenAI-style endpoints such as <code>/v1/chat/completions</code>, an Anthropic-style <code>/v1/messages</code>, a <code>/health</code> check, and a built-in chat page you can open in your browser at the same address.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>A test-automation team keeps a <code>llama-server</code> running on a spare workstation with a mid-sized model. Their nightly job sends each failed test's error message and last 50 log lines to <code>/v1/chat/completions</code> and asks for a one-line suspected cause. Because the logs contain customer email addresses, a local model is the only option their security team approved. Engineers treat the output as a hint for triage, never as the verdict.</p></div>
+
+<h3 id="ch137-8"><span class="num">137.8</span>Connecting your tools to a local model</h3>
+<p>Because both tools speak the common API styles, most software that talks to a cloud model can be pointed at a local one. Ollama's documentation shows two ways to use it with Claude Code: the <code>ollama launch claude</code> command, or setting the environment variables yourself:</p>
+<div class="code"><span class="cap">Terminal · from Ollama's Anthropic-compatibility docs</span><pre>export ANTHROPIC_AUTH_TOKEN=ollama     <span class="c"># required but ignored by the local server</span>
+export ANTHROPIC_BASE_URL=http://localhost:11434</pre></div>
+<div class="box warn"><span class="tag">Expect a big drop in agent quality</span><p>Claude Code is designed around Claude models. A small local model behind it will follow multi-step instructions far less reliably, may call tools wrongly, and can make destructive mistakes look confident. Use this only for experiments in a throwaway folder, keep permission prompts on (<a href="#ch67">Chapter 67</a>), and don't judge Claude Code by what a 1-billion-parameter model does with it. Unset the variables afterwards so your normal sessions go back to Claude.</p></div>
+<p>For your own scripts, the simplest path is plain HTTP to the native API, which the lab below uses. It needs nothing beyond Python's standard library.</p>
+
+<h3 id="ch137-9"><span class="num">137.9</span>Privacy: real benefits and overlooked gaps</h3>
+<p>Ollama's FAQ states: "We don't see your prompts or data when you run locally." llama.cpp is code you run yourself with no service behind it. That is a real, strong benefit. But "local" only protects you if everything around the model is local too.</p>
+<div class="tbl"><table>
+<tr><th>Gap</th><th>What can go wrong</th><th>What to do</th></tr>
+<tr><td>Cloud models in a local tool</td><td>Ollama also offers cloud-hosted models (tags such as <code>gemma4:cloud</code>). Those prompts go to Ollama's servers</td><td>For sensitive work, use only tags you have downloaded; check with <code>ollama ls</code></td></tr>
+<tr><td>Opening the server to the network</td><td>Changing <code>OLLAMA_HOST</code> or llama.cpp's <code>--host</code> to <code>0.0.0.0</code> lets anyone on the network use it. The local Ollama server does not check API keys</td><td>Keep the default 127.0.0.1, or put proper authentication in front</td></tr>
+<tr><td>The front-end app</td><td>A third-party chat UI or IDE plug-in may log, sync or send telemetry</td><td>Check every tool in the chain, not just the model runner</td></tr>
+<tr><td>Where outputs go</td><td>Answers pasted into Jira, Slack or a cloud document leave your machine anyway</td><td>Apply the same data rules to outputs as to inputs</td></tr>
+<tr><td>Untrusted model files</td><td>A model from an unknown uploader may be altered, mislabelled or behave badly</td><td>Prefer official or well-known publishers; keep tools updated</td></tr>
+<tr><td>Local disk</td><td>Conversation history and logs sit on your laptop</td><td>Follow your device encryption and retention rules</td></tr>
+</table></div>
+<div class="box opinion"><span class="tag">Opinion · many security teams</span><p>A common position in company security policies is that a local model is acceptable for sensitive data only on a managed, encrypted device, with models from an approved list and the server bound to localhost. Check what your own organisation says before relying on "it's local" as your justification.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Run a private bug-triage model</b><span>45 min · your computer · about 1.5 GB download</span></div><ol>
+<li>Install Ollama for your system (136.6), then open a new terminal and run <code>ollama --version</code>.<span class="expect">A version number. If you see "command not found", close and reopen the terminal, or start the Ollama desktop app once.</span></li>
+<li>Run <code>ollama run qwen3.5:0.8b "In one sentence, what is regression testing?"</code><span class="expect">A download progress bar the first time (about 1.2 GB), then a one-sentence answer. Later runs start in seconds.</span></li>
+<li>While it is still loaded, run <code>ollama ps</code>.<span class="expect">A row for <code>qwen3.5:0.8b</code> with its size and a PROCESSOR value such as "100% GPU" on most Macs, or "100% CPU" on a laptop without a supported GPU.</span></li>
+<li>Save the script below as <code>local_triage.py</code> and run <code>python3 local_triage.py</code>.<span class="expect">Three lines, each with a severity, a speed in tokens per second and the start of the bug text, followed by a one-line reason. The exact wording and speed will differ from the sample.</span></li>
+<li>Check the classifications. The data-exposure bug should be "critical"; the typo "trivial" or "minor".<span class="expect">A small model may get one wrong. That is the point: write down which, because it's your first evidence about this model's fitness for triage.</span></li>
+<li>Privacy test: turn off Wi-Fi (or unplug the network) and run the script again.<span class="expect">It still works, proving the model runs entirely on your machine.</span></li>
+<li>Optional: build the <code>bugwriter</code> preset from the Modelfile in 136.6 and try it on your own rough notes.<span class="expect">A structured bug report. Check whether it invented any steps.</span></li>
+<li>Clean up if you need the space: <code>ollama rm qwen3.5:0.8b</code>.<span class="expect">The model no longer appears in <code>ollama ls</code>, and its disk space is freed.</span></li>
+</ol></div>
+<div class="code"><span class="cap">local_triage.py</span><pre><span class="c"># local_triage.py - ask a local Ollama model to triage bug reports. Standard library only.</span>
+import json
+import os
+import urllib.request
+
+HOST = os.environ.get("OLLAMA_HOST_URL", "http://localhost:11434")
+MODEL = os.environ.get("OLLAMA_MODEL", "qwen3.5:0.8b")
+
+BUGS = [
+    "Checkout button does nothing on Safari 18 when the basket has 3+ items.",
+    "Typo on the About page: 'Teh team'.",
+    "Users can see other customers' order history by changing the ID in the URL.",
+]
+
+SCHEMA = {  <span class="c"># structured output: the reply must match this JSON shape</span>
+    "type": "object",
+    "properties": {
+        "severity": {"type": "string", "enum": ["critical", "major", "minor", "trivial"]},
+        "reason": {"type": "string"},
+    },
+    "required": ["severity", "reason"],
+}
+
+def ask(text):
+    body = {
+        "model": MODEL,
+        "stream": False,
+        "format": SCHEMA,
+        "options": {"temperature": 0},
+        "messages": [
+            {"role": "system", "content": "You are a QA lead. Classify the bug's severity. Reply in JSON."},
+            {"role": "user", "content": text},
+        ],
+    }
+    req = urllib.request.Request(
+        HOST + "/api/chat",
+        data=json.dumps(body).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(req, timeout=300) as resp:
+        return json.load(resp)
+
+for bug in BUGS:
+    r = ask(bug)
+    verdict = json.loads(r["message"]["content"])
+    tok_per_s = r["eval_count"] / (r["eval_duration"] / 1e9)  <span class="c"># durations are nanoseconds</span>
+    print(f"{verdict['severity']:&lt;9} {tok_per_s:6.1f} tok/s  {bug[:48]}")
+    print(f"          reason: {verdict['reason']}")</pre></div>
+<div class="code"><span class="cap">Sample output (yours will differ; speeds are illustrative)</span><pre>major       41.2 tok/s  Checkout button does nothing on Safari 18 when t
+          reason: Blocks purchase for a subset of users on one browser.
+trivial     44.8 tok/s  Typo on the About page: 'Teh team'.
+          reason: Cosmetic text error with no functional impact.
+critical    43.5 tok/s  Users can see other customers' order history by
+          reason: Exposes personal data to unauthorised users.</pre></div>
+<div class="box note"><span class="tag">Troubleshooting</span><ul>
+<li><b><code>Connection refused</code></b>: Ollama isn't running. Start the desktop app or run <code>ollama serve</code> in another terminal.</li>
+<li><b><code>HTTP Error 404</code></b>: the model isn't downloaded or the name is misspelt. Run <code>ollama ls</code>, then <code>ollama pull qwen3.5:0.8b</code>.</li>
+<li><b><code>JSONDecodeError</code></b>: the model returned something that isn't JSON. Re-run; if it persists, try a larger tag such as <code>qwen3.5:4b</code> with <code>OLLAMA_MODEL=qwen3.5:4b python3 local_triage.py</code>.</li>
+<li><b>Very slow</b>: <code>ollama ps</code> probably shows CPU. Close other apps, use a smaller model, or accept the speed for batch jobs.</li>
+<li><b>The reply contains reasoning text before the JSON</b>: some models "think" first. Ollama's chat API accepts <code>"think": false</code> in the request body for models that support switching it off.</li>
+</ul></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"A local model is the same as Claude, just free."</dt><dd>Models small enough for a laptop are far less capable than frontier models. They are useful for narrow, well-tested tasks, not as drop-in replacements.</dd>
+<dt>"If it runs in Ollama, nothing leaves my computer."</dt><dd>Only for models you've downloaded and run locally. Cloud tags, network-exposed servers and third-party front-ends can all send data elsewhere.</dd>
+<dt>"4-bit quantisation ruins a model."</dt><dd>For most tasks the loss is small, which is why 4-bit is the common default. But measure it on your task; some tasks are more sensitive.</dd>
+<dt>"Bigger is always better locally."</dt><dd>A model that only fits by spilling onto the CPU can be so slow that a smaller model on the GPU serves you better.</dd>
+<dt>"Open weights means I can use it however I like."</dt><dd>Each model has a licence. Read it before commercial use.</dd>
+</dl></div>
+
+<h3 id="ch137-r"><span class="num">137.10</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Running locally gives privacy, offline use, fixed versions and no per-token bill, at the cost of capability, speed and maintenance.</li>
+<li>You need weights (usually a quantised GGUF file), an engine to run them, and an interface such as a chat, web page or API.</li>
+<li>Quantisation stores weights with fewer bits; <code>Q4_K_M</code> is a common default, and quality loss depends on the task.</li>
+<li>Memory decides what you can run: model size, plus context, plus overhead. <code>ollama ps</code> shows whether you're on GPU or CPU.</li>
+<li>Ollama is the easy route (<code>run</code>, <code>pull</code>, <code>ls</code>, <code>ps</code>, a local API on port 11434 with OpenAI- and Anthropic-compatible endpoints); llama.cpp gives finer control.</li>
+<li>"Local" is only private if cloud tags, network exposure, front-ends and outputs are all handled too.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What does a GGUF file contain?</p><div class="opts"><button>Only the model's licence and description</button><button data-ok>The weights plus what's needed to run them, such as the tokenizer and chat template</button><button>A Python program that trains the model</button></div><p class="why" hidden>That's why llama.cpp can run a model from a single downloaded file.</p></div>
+<div class="qz"><p class="q">Your 16 GB laptop runs a model at "48%/52% CPU/GPU" in <code>ollama ps</code> and it's very slow. What is the most likely fix?</p><div class="opts"><button>Raise the context length</button><button>Switch to a cloud tag</button><button data-ok>Use a smaller model or a lower quantisation so it fits entirely on the GPU</button></div><p class="why" hidden>A split between CPU and GPU usually means the model doesn't fit in fast memory. Raising the context would make it worse, and a cloud tag gives up the privacy benefit.</p></div>
+<div class="qz"><p class="q">Which of these sends your prompts off your computer?</p><div class="opts"><button>Running a downloaded <code>qwen3.5:0.8b</code> with the network unplugged</button><button data-ok>Running an Ollama tag ending in <code>cloud</code></button><button>Calling <code>http://localhost:11434/api/chat</code> from a script for a downloaded model</button></div><p class="why" hidden>Cloud tags are processed on Ollama's servers. The other two stay on your machine.</p></div>
+<div class="qz"><p class="q">What does the <code>-hf ggml-org/Qwen3.5-0.8B-GGUF</code> option do in llama.cpp?</p><div class="opts"><button>Converts the model to half precision</button><button data-ok>Downloads a GGUF model from that Hugging Face repository, using the Q4_K_M file unless you name another</button><button>Hides the model from other users</button></div><p class="why" hidden>You can add a quantisation after a colon, for example <code>:Q8_0</code>.</p></div>
+<div class="qz"><p class="q">Why should you test a quantised model on your own examples?</p><div class="opts"><button>Because quantised models can't be benchmarked</button><button data-ok>Because quality loss varies by task, and averages can hide a weakness that matters to you</button><button>Because Ollama requires it before first use</button></div><p class="why" hidden>Exact numbers, code and long instructions often degrade before general chat does.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick a real, non-sensitive task from your work (for example, classifying 20 old bug reports by severity, or summarising 10 test-run logs). Run it through two local models of different sizes (for example <code>qwen3.5:0.8b</code> and <code>qwen3.5:4b</code>) and through Claude. Record accuracy against your own judgement, speed, and memory use from <code>ollama ps</code>. Write a half-page recommendation: is a local model good enough for this task, and under what data rules would you use it?</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Open-weight models are files you can download and run on your own machine. Ollama makes it nearly one command: <code>ollama run</code> and a model name. To fit on a laptop, models are quantised, meaning each number is stored with fewer bits, so a 9-billion-parameter model fits in a few gigabytes. Memory decides what you can run. The big win is privacy: prompts stay on your computer, as long as you don't use cloud models or open the server to the network. The big cost is capability: these models are much weaker than Claude, so use them for narrow tasks you've tested."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Ollama, <a href="https://github.com/ollama/ollama" target="_blank" rel="noopener">README on GitHub</a> (installation, quickstart, API example).</li>
+<li>Ollama documentation: <a href="https://docs.ollama.com/cli" target="_blank" rel="noopener">CLI reference</a>, <a href="https://docs.ollama.com/faq" target="_blank" rel="noopener">FAQ</a> (bind address, model storage, privacy, GPU use), <a href="https://docs.ollama.com/modelfile" target="_blank" rel="noopener">Modelfile reference</a>, <a href="https://docs.ollama.com/api/chat" target="_blank" rel="noopener">Chat API</a>.</li>
+<li>Ollama documentation: <a href="https://docs.ollama.com/api/openai-compatibility" target="_blank" rel="noopener">OpenAI compatibility</a> and <a href="https://docs.ollama.com/api/anthropic-compatibility" target="_blank" rel="noopener">Anthropic compatibility</a>.</li>
+<li>Ollama library pages: <a href="https://ollama.com/library/qwen3.5" target="_blank" rel="noopener">qwen3.5</a> and <a href="https://ollama.com/library/gemma4" target="_blank" rel="noopener">gemma4</a> (tags and download sizes).</li>
+<li>ggml-org, <a href="https://github.com/ggml-org/llama.cpp" target="_blank" rel="noopener">llama.cpp README</a>, <a href="https://github.com/ggml-org/llama.cpp/blob/master/docs/install.md" target="_blank" rel="noopener">install guide</a>, <a href="https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md" target="_blank" rel="noopener">server documentation</a> and <a href="https://github.com/ggml-org/llama.cpp/blob/master/tools/cli/README.md" target="_blank" rel="noopener">CLI options</a>.</li>
+<li>Homebrew, <a href="https://formulae.brew.sh/formula/llama.cpp" target="_blank" rel="noopener">llama.cpp formula</a> (installed binaries).</li>
+<li>Model and company facts: this book's <code>research/ai-industry-facts.md</code> (Qwen, Mistral, DeepSeek, Gemma), verified 9 November 2026.</li>
+</ol>
+<p class="verified">Verified 9 November 2026 against the Ollama and llama.cpp documentation and repositories listed above. Commands, tags and defaults change often; check the official pages before relying on them.</p></div>

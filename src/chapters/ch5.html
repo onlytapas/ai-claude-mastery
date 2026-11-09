@@ -1,0 +1,120 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How AI shifted from writing rules to learning from data</li>
+<li>What backpropagation made possible, in plain terms</li>
+<li>Why ImageNet and AlexNet in 2012 were a turning point</li>
+<li>What "deep" in deep learning means</li>
+<li>The landmark achievements from 1997 to 2020 and the people behind them</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapters 2–4. Chapter 2's "three ingredients" idea is used throughout.</div>
+
+<div class="bigidea"><p>Instead of telling computers the rules, researchers started showing them examples and letting them work out the rules themselves. That is <a class="gl" href="#g-machine-learning">machine learning</a>. For years it worked best with simple methods, because neural networks with many layers were hard to train and computers were slow. Around 2012 three things came together: a big labelled image collection (ImageNet), fast graphics chips (GPUs) and better training techniques. Neural networks suddenly beat everything else. That moment started the <a class="gl" href="#g-deep-learning">deep learning</a> era that leads directly to Claude.</p></div>
+
+<h3 id="ch5-1"><span class="num">5.1</span>From rules to examples</h3>
+<div class="cols2">
+<div><h4>Traditional programming</h4><p>Rules + data → answers. A person writes "IF the email contains 'winner' AND a link THEN spam."</p></div>
+<div><h4>Machine learning</h4><p>Data + answers → rules. Show the computer 100,000 emails already marked spam or not, and it works out which patterns predict spam.</p></div>
+</div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Nobody teaches a child the rules for recognising a dog. There's no checklist of ear shapes and tail lengths. Instead the child sees many dogs, hears "dog" each time, and learns to recognise new ones, even breeds they've never seen. Machine learning works the same way: examples first, patterns learned.</p></div>
+<div class="box example"><span class="tag">Real-world example: spam filters</span><p>In 2002 the programmer Paul Graham published "A Plan for Spam", describing a filter that learned word probabilities from your own spam and genuine mail. It worked far better than hand-written rules and adapted as spammers changed tactics. Learned spam filters soon became standard, and they're still how your email is filtered today, now with much more advanced models.</p></div>
+
+<h3 id="ch5-2"><span class="num">5.2</span>Backpropagation: how deep networks learn (1986)</h3>
+<p>Chapter 4 ended with a problem: networks with several layers could solve harder problems, but nobody had a practical way to train them. In 1986 David Rumelhart, Geoffrey Hinton and Ronald Williams published a paper in <i>Nature</i> that popularised <a class="gl" href="#g-backpropagation">backpropagation</a> (the core idea had appeared earlier, including in Paul Werbos's work in 1974).</p>
+<p>In plain words, backpropagation answers this question: <em>the network got the answer wrong; which of its millions of internal settings should change, and by how much?</em> It works backwards from the error, layer by layer, sharing out the "blame" so every connection can be adjusted a little. Repeat over many examples and the network gradually improves.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A restaurant serves a dish that a customer says is too salty. The head chef traces back: was it the sauce, the stock or the seasoning at the end? Each cook adjusts slightly in proportion to how much they contributed. After many dishes and much feedback, the kitchen gets it right without anyone writing a rule for "the right amount of salt". That tracing-back of blame is backpropagation. Chapter 12 explains it properly.</p></div>
+<p>With backpropagation, multi-layer networks could learn. In 1989 Yann LeCun and colleagues at Bell Labs used it to train a network that read handwritten digits; versions of it were later used to read the numbers on bank cheques. But in the 1990s and 2000s neural networks still struggled on harder problems, and other methods often worked better.</p>
+
+<h3 id="ch5-3"><span class="num">5.3</span>The statistical years (1990s–2000s)</h3>
+<p>During this period, machine learning became a mainstream engineering tool, mostly using methods simpler than deep neural networks: decision trees, "support vector machines" and statistical models. They powered search engines, recommendations, credit scoring and fraud detection. Several famous moments came from this era:</p>
+<ol class="timeline">
+<li><span class="yr">1997</span><span class="ev"><b>Deep Blue beats Garry Kasparov.</b> IBM's chess computer defeated the world champion in a six-game match. It won mainly through enormous search speed and expert-tuned evaluation, not learning, which is why some said it "wasn't really AI" (the AI effect, Chapter 1).</span></li>
+<li><span class="yr">1997</span><span class="ev"><b>LSTM</b>, by Sepp Hochreiter and Jürgen Schmidhuber: a kind of network that can remember information across long sequences. It later powered speech recognition and translation (Chapter 6).</span></li>
+<li><span class="yr">2006–09</span><span class="ev"><b>The Netflix Prize</b> offered US$1 million to anyone who could improve its film recommendations by 10%. The winning team combined many learning models, showing how valuable learned predictions had become.</span></li>
+<li><span class="yr">2011</span><span class="ev"><b>IBM Watson wins <i>Jeopardy!</i></b> on US television against two champions, combining search, language processing and statistics.</span></li>
+</ol>
+
+<h3 id="ch5-4"><span class="num">5.4</span>ImageNet: data at scale (2009)</h3>
+<p>The Stanford professor Fei-Fei Li believed AI was limited less by clever algorithms than by a lack of data. Her team built <strong>ImageNet</strong>: millions of photos, each labelled by people (often through Amazon's Mechanical Turk crowdsourcing service) with what it showed, across thousands of categories. It was presented in 2009.</p>
+<p>From 2010 an annual competition used a subset of ImageNet: 1.2 million training images in 1,000 categories, from "tabby cat" to "container ship". Teams' programs had to name what was in new photos. The main score was the "top-5 error": how often the right answer wasn't among the program's five best guesses.</p>
+
+<h3 id="ch5-5"><span class="num">5.5</span>2012: the AlexNet moment</h3>
+<p>In 2012 a team from the University of Toronto entered a deep neural network called <strong>AlexNet</strong>. It was named after Alex Krizhevsky, who built it with Ilya Sutskever and their supervisor Geoffrey Hinton. It achieved a top-5 error of about 15.3%. The next best entry, using traditional methods, scored about 26.2%. In a field where teams fought over fractions of a percent, it was a landslide.</p>
+<div class="figure" role="img" aria-label="Bar chart comparing ImageNet 2012 top-5 error: AlexNet about 15.3 percent versus runner-up about 26.2 percent">
+<div class="bars">
+<div class="bt">ImageNet 2012 · top-5 error (lower is better)</div>
+<div class="bar-row"><span>AlexNet</span><span class="track"><span class="fill hl" style="width:58.4%">15.3%</span></span></div>
+<div class="bar-row"><span>Runner-up</span><span class="track"><span class="fill" style="width:100%">26.2%</span></span></div>
+</div>
+<div class="cap">Bar lengths are to scale (15.3 is 58% of 26.2). Source: Krizhevsky, Sutskever and Hinton (2012) and the ILSVRC 2012 results.</div></div>
+<p>Why did it work now, when neural networks had disappointed for decades? All three ingredients from Chapter 2 arrived together:</p>
+<div class="flow">
+<div><b>Data</b>1.2 million labelled images from ImageNet</div>
+<div><b>Compute</b>Trained on two NVIDIA gaming graphics cards (GTX 580s)</div>
+<div><b>Methods</b>A deeper network plus training tricks, such as "dropout" to stop it memorising</div>
+<div class="hl"><b>Result</b>A huge leap in accuracy, and every major lab switched to deep learning</div>
+</div>
+<p>Within a few years, deep learning had taken over image recognition, speech recognition and machine translation. Tech companies hired the researchers, often by buying their start-ups: Google acquired Hinton's small company in 2013 and the London lab DeepMind in 2014.</p>
+
+<h3 id="ch5-6"><span class="num">5.6</span>What makes learning "deep"?</h3>
+<p>"Deep" just means <strong>many <a class="gl" href="#g-layer">layers</a></strong>. Each layer transforms the information a little and passes it on. In image networks, researchers found that early layers learn to detect simple things like edges and colours; middle layers combine them into textures and shapes; later layers recognise whole objects like eyes, wheels or faces.</p>
+<div class="flow">
+<div><b>Pixels</b>The raw image: millions of coloured dots</div>
+<div><b>Early layers</b>Edges, lines, colour patches</div>
+<div><b>Middle layers</b>Textures, corners, simple shapes</div>
+<div><b>Later layers</b>Parts: eyes, ears, wheels</div>
+<div class="hl"><b>Output</b>"Golden retriever (91%)"</div>
+</div>
+<p>Nobody programs these features. The network discovers them during training because they help it get the answers right. Language models (Part II) work similarly with text: early layers handle word fragments, later layers handle meaning and context.</p>
+
+<h3 id="ch5-7"><span class="num">5.7</span>The landmark years (2014–2020)</h3>
+<ol class="timeline">
+<li><span class="yr">2014</span><span class="ev"><b>GANs</b> (generative adversarial networks), by Ian Goodfellow and colleagues: two networks compete, one generating images and one spotting fakes. An early form of generative AI.</span></li>
+<li><span class="yr">2015</span><span class="ev"><b>ResNet</b>, from Microsoft Research, trains networks over 100 layers deep and beats the human-level benchmark often quoted for ImageNet.</span></li>
+<li class="key"><span class="yr">2016</span><span class="ev"><b>AlphaGo beats Lee Sedol</b> 4–1 at Go. DeepMind combined deep learning with <a class="gl" href="#g-reinforcement-learning">reinforcement learning</a> and search. Go has far more possible positions than chess and had been expected to resist computers for another decade.</span></li>
+<li class="key"><span class="yr">2017</span><span class="ev"><b>The Transformer</b> is introduced by Google researchers, transforming language AI (Chapter 6).</span></li>
+<li><span class="yr">2018</span><span class="ev"><b>Turing Award</b> (often called computing's Nobel Prize) to Yoshua Bengio, Geoffrey Hinton and Yann LeCun for deep learning.</span></li>
+<li><span class="yr">2020</span><span class="ev"><b>AlphaFold 2</b> (DeepMind) predicts protein shapes with accuracy close to laboratory methods, solving a 50-year-old biology problem.</span></li>
+</ol>
+<div class="box note"><span class="tag">Recognition</span><p>In 2024, the Nobel Prize in Physics went to John Hopfield and Geoffrey Hinton for foundational work on neural networks, and half of the Nobel Prize in Chemistry went to Demis Hassabis and John Jumper of Google DeepMind for AlphaFold (shared with David Baker for protein design).</p></div>
+
+<div class="lab"><div class="lab-h"><b>Feel the difference between rules and learning</b><span>25 min · claude.ai</span></div><ol>
+<li>Ask Claude: "Write rules a computer could follow to tell a photo of a cat from a photo of a dog."<span class="expect">rules about ears, snouts and size, plus admissions of many exceptions.</span></li>
+<li>Ask: "Give five real photos those rules would get wrong."<span class="expect">examples like small dogs, cats with unusual ears, puppies, odd angles. Rules are brittle.</span></li>
+<li>Ask: "Explain in simple terms how a deep learning model learns to tell cats from dogs instead."<span class="expect">an explanation built on many labelled examples, layers learning features, and adjusting weights after mistakes.</span></li>
+<li>Upload a photo of something near you and ask Claude what it is and how confident it is.<span class="expect">a description. Ask how it would get it wrong; it should mention unusual angles, lighting or objects it rarely saw.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Deep learning means the AI thinks deeply."</dt><dd>"Deep" refers only to the number of layers in the network.</dd>
+<dt>"Deep Blue used deep learning."</dt><dd>No. It relied mainly on fast search and hand-tuned evaluation. The names are a coincidence.</dd>
+<dt>"Machine learning removes humans from the process."</dt><dd>People choose the data, label it, design the model, decide what counts as success, and check the results. Bad data gives bad models (Chapter 13).</dd>
+<dt>"AlexNet was a brand-new idea."</dt><dd>Its design built on LeCun's networks from 1989. What changed was scale: more data, GPUs and training tricks.</dd>
+</dl></div>
+
+<h3 id="ch5-r"><span class="num">5.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Machine learning flips programming around: give data and answers, get the rules.</li>
+<li>Backpropagation (popularised 1986) made it practical to train multi-layer networks.</li>
+<li>Through the 1990s and 2000s, simpler learning methods ran search, recommendations and spam filters.</li>
+<li>ImageNet (2009) provided the data; GPUs provided the compute; AlexNet (2012) proved deep learning by winning by a landslide.</li>
+<li>"Deep" means many layers, each learning more complex features automatically.</li>
+<li>AlphaGo (2016), the Transformer (2017) and AlphaFold (2020) showed deep learning's reach; its pioneers won the 2018 Turing Award and 2024 Nobel Prizes.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">In machine learning, what does the computer receive and what does it produce?</p><div class="opts"><button>Rules and data in, answers out</button><button data-ok>Data and answers in, rules (patterns) out</button><button>Answers in, data out</button></div><p class="why" hidden>It learns the patterns from labelled examples.</p></div>
+<div class="qz"><p class="q">What did backpropagation make possible?</p><div class="opts"><button>Faster internet</button><button data-ok>Training neural networks with several layers</button><button>Storing more data</button></div><p class="why" hidden>It works out how much each connection contributed to an error so it can be adjusted.</p></div>
+<div class="qz"><p class="q">Why did AlexNet succeed in 2012 when neural networks had disappointed before?</p><div class="opts"><button>It used a completely new type of computer</button><button data-ok>Large labelled data (ImageNet), GPUs and better training techniques arrived together</button><button>It was programmed with expert rules</button></div><p class="why" hidden>All three ingredients (data, compute, methods) came together.</p></div>
+<div class="qz"><p class="q">What does "deep" mean in deep learning?</p><div class="opts"><button>The model understands deeply</button><button data-ok>The network has many layers</button><button>It uses a lot of memory</button></div><p class="why" hidden>Each extra layer can build more complex features from simpler ones.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick a task at your work that follows rules today, such as triaging tickets, classifying test failures or routing requests. Write half a page: what would the "examples and answers" be if you used machine learning instead? Where would the data come from, who would label it, and how would you check it was working?</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Machine learning means showing a computer examples instead of writing rules. Backpropagation let multi-layer networks learn, but they only took off in 2012, when ImageNet's data, GPU power and better methods came together in AlexNet. 'Deep' just means many layers, each learning more complex patterns. That's the foundation Claude is built on."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>D. E. Rumelhart, G. E. Hinton and R. J. Williams, "Learning Representations by Back-propagating Errors", <i>Nature</i> 323 (1986).</li>
+<li>Y. LeCun et al., "Backpropagation Applied to Handwritten Zip Code Recognition", <i>Neural Computation</i> (1989).</li>
+<li>S. Hochreiter and J. Schmidhuber, "Long Short-Term Memory", <i>Neural Computation</i> (1997).</li>
+<li>J. Deng, W. Dong, R. Socher, L.-J. Li, K. Li and L. Fei-Fei, "ImageNet: A Large-Scale Hierarchical Image Database", CVPR (2009).</li>
+<li>A. Krizhevsky, I. Sutskever and G. E. Hinton, "ImageNet Classification with Deep Convolutional Neural Networks", NeurIPS (2012).</li>
+<li>D. Silver et al., "Mastering the Game of Go with Deep Neural Networks and Tree Search", <i>Nature</i> (2016).</li>
+<li>ACM, 2018 A.M. Turing Award announcement; NobelPrize.org, 2024 Physics and Chemistry prizes.</li>
+</ol><p class="verified">Content type: established history · Last reviewed 9 November 2026</p></div>

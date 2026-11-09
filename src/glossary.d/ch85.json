@@ -1,0 +1,46 @@
+{
+ "HTTP": {
+  "d": "Hypertext Transfer Protocol: the set of rules programs use to send requests and responses over the web. HTTPS is the encrypted version.",
+  "see": "ch85"
+ },
+ "JSON": {
+  "d": "JavaScript Object Notation: a plain-text format for structured data using objects { }, lists [ ], text in double quotes, numbers, true/false and null. Most APIs send and receive JSON.",
+  "see": "ch85"
+ },
+ "Endpoint": {
+  "d": "A specific address an API offers, written as a method plus a path, such as POST /v1/messages.",
+  "see": "ch85"
+ },
+ "Header": {
+  "d": "A short Name: value line sent with an HTTP request or response that describes it, such as Content-Type or Authorization.",
+  "see": "ch85"
+ },
+ "Status code": {
+  "d": "The three-digit number at the start of an HTTP response saying how the request went: 2xx success, 4xx a problem with the request, 5xx a problem on the server.",
+  "see": "ch85"
+ },
+ "Rate limit": {
+  "d": "A cap on how much you can use an API in a period of time. Going over it returns 429 Too Many Requests.",
+  "see": "ch85"
+ },
+ "Webhook": {
+  "d": "A request a service sends to a URL you provide when an event happens, so you don't have to keep asking whether something changed.",
+  "see": "ch85"
+ },
+ "curl": {
+  "d": "A command-line program for sending HTTP requests. Most API documentation shows its examples as curl commands.",
+  "see": "ch85"
+ },
+ "REST": {
+  "d": "A common style of web API that uses URLs for things (resources) and HTTP methods (GET, POST, PUT, PATCH, DELETE) for actions on them.",
+  "see": "ch85"
+ },
+ "API key": {
+  "d": "A long secret string that identifies a program to an API. Anyone holding it can act as you, so it must be kept like a password.",
+  "see": "ch86"
+ },
+ "SDK": {
+  "d": "Software development kit: a ready-made library that makes calling an API easier, handling headers, retries and errors for you. Anthropic publishes SDKs for Python, TypeScript and other languages.",
+  "see": "ch86"
+ }
+}

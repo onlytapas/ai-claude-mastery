@@ -1,0 +1,248 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How Google DeepMind came to be, from a London start-up to the heart of Google's AI work</li>
+<li>Google's research gifts to the whole industry: AlphaGo, AlphaFold, the Transformer, BERT and Mixture of Experts</li>
+<li>The Gemini family up to Gemini 4 Argon, the open Gemma family, and Google's coding tools (Antigravity, Jules, and the end of Gemini CLI for individuals)</li>
+<li>Microsoft's three-way strategy: Copilot everywhere, its own MAI models, and a model marketplace in Azure / Microsoft Foundry that also sells Claude</li>
+<li>How the Microsoft–OpenAI relationship worked, and how it was rewritten in 2025 and 2026</li>
+<li>What all this means for a QA team that lives inside Google Workspace or Microsoft 365</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch26">Chapter 26</a> (how the AI industry fits together) and <a href="#ch27">Chapter 27</a> (OpenAI). It helps to remember the Transformer from <a href="#ch6">Chapter 6</a>. No software is needed except for the optional script in the lab (Python 3).</div>
+
+<div class="bigidea"><p>Google and Microsoft are the two oldest giants in this story, and they play the AI game differently. Google builds almost the whole stack itself: its own chips (TPUs), its own research lab (Google DeepMind), its own models (Gemini and the open Gemma) and the products billions of people already use. Microsoft is mainly a distributor and platform: it puts "Copilot" into Windows, Office and GitHub, and it sells many companies' models through its cloud, using OpenAI's models, its own MAI models and third-party models, including Claude. Both companies matter to you even if you never choose them, because your company probably already runs on one of them.</p></div>
+
+<h3 id="ch28-1"><span class="num">28.1</span>Two giants, two strategies</h3>
+<p>In <a href="#ch26">Chapter 26</a> you met the AI "stack": chips, then cloud, then model labs, then platforms, then applications. Most companies sit in one or two layers. Google and Microsoft sit in almost all of them, but they lean on different layers.</p>
+<div class="tbl"><table>
+<tr><th>Layer</th><th>Google</th><th>Microsoft</th></tr>
+<tr><td>Chips</td><td>Designs its own <a class="gl" href="#g-tpu">TPUs</a> (Tensor Processing Units) and also uses NVIDIA GPUs</td><td>Mostly NVIDIA <a class="gl" href="#g-gpu">GPUs</a> in Azure data centres, plus an in-house accelerator called Maia (2026 status not verified for this book)</td></tr>
+<tr><td>Cloud</td><td>Google Cloud (Vertex AI, which Google now calls Agent Platform)</td><td>Azure, with Microsoft Foundry as its AI model catalogue</td></tr>
+<tr><td>Model lab</td><td>Google DeepMind</td><td>Microsoft AI (the "MAI" models), plus a large stake in OpenAI</td></tr>
+<tr><td>Main models</td><td>Gemini (proprietary), Gemma (open weights)</td><td>OpenAI's GPT models, its own MAI models, and third-party models such as Claude</td></tr>
+<tr><td>Products</td><td>Search, Android, Gemini app, Workspace (Gmail, Docs), NotebookLM</td><td>Windows, Microsoft 365 Copilot, GitHub Copilot, Teams</td></tr>
+<tr><td>Main way it earns from AI</td><td>Ads, subscriptions (Google AI Pro / Ultra), Workspace, cloud and API usage</td><td>Per-seat Copilot subscriptions, Azure usage, GitHub Copilot subscriptions</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Google is like a restaurant that grows its own vegetables, builds its own ovens, writes its own recipes and runs its own dining room. Microsoft is more like a huge food hall: it cooks some dishes itself, but its real strength is that everyone already walks through its doors, and it rents counters to other cooks, including some of its rivals.</p></div>
+<p>The rest of this chapter takes each company in turn, then looks at how they meet in your day-to-day work.</p>
+
+<h3 id="ch28-2"><span class="num">28.2</span>DeepMind: from London start-up to Google DeepMind</h3>
+<p>DeepMind was founded in London on 15 November 2010 by three people: Demis Hassabis, Shane Legg and Mustafa Suleyman. Its stated aim was ambitious from day one: to understand intelligence and build general-purpose learning systems. Google bought it in January 2014. In April 2023 Google merged DeepMind with its other big research group, Google Brain, to form <strong>Google DeepMind</strong>, still based in London and led by Hassabis.</p>
+<div class="person"><span class="ini">DH</span><b>Demis Hassabis</b><span>Co-founder and leader of DeepMind; shared the 2024 Nobel Prize in Chemistry for AlphaFold.</span></div>
+<div class="person"><span class="ini">MS</span><b>Mustafa Suleyman</b><span>DeepMind co-founder who now leads Microsoft AI. One person links the two halves of this chapter.</span></div>
+<ol class="timeline">
+<li><span class="yr">2010</span><span class="ev"><b>DeepMind founded</b> in London by Hassabis, Legg and Suleyman.</span></li>
+<li><span class="yr">2014</span><span class="ev"><b>Google acquires DeepMind</b> (January).</span></li>
+<li class="key"><span class="yr">2016</span><span class="ev"><b>AlphaGo beats Lee Sedol 4–1</b> at the board game Go (March), a milestone many experts had expected to be a decade away.</span></li>
+<li class="key"><span class="yr">2017</span><span class="ev"><b>"Attention Is All You Need"</b>: Google researchers publish the <a class="gl" href="#g-transformer">Transformer</a>. The same year, Google Brain publishes early sparse <a class="gl" href="#g-mixture-of-experts">Mixture-of-Experts</a> work.</span></li>
+<li><span class="yr">2018</span><span class="ev"><b>BERT</b> from Google shows how pre-trained Transformers can understand text (<a href="#ch6">Chapter 6</a>).</span></li>
+<li><span class="yr">2023</span><span class="ev"><b>Google DeepMind formed</b> (April) by merging DeepMind and Google Brain.</span></li>
+<li><span class="yr">2024</span><span class="ev"><b>First Gemma</b> open-weight models (21 February). <b>Nobel Prize in Chemistry</b> shared by Hassabis and John Jumper for AlphaFold.</span></li>
+<li class="key"><span class="yr">2026</span><span class="ev"><b>Gemini 4 Argon</b> announced (30 September), generally available in the Gemini API on 13 October.</span></li>
+</ol>
+
+<h3 id="ch28-3"><span class="num">28.3</span>Research the whole industry runs on</h3>
+<p>Google's biggest contribution to AI may be ideas it gave away. Much of what powers Claude, GPT and every other modern chatbot was first published by Google researchers.</p>
+<div class="tbl"><table>
+<tr><th>Work</th><th>Year</th><th>What it showed, in plain words</th><th>Why it matters to you</th></tr>
+<tr><td><b>AlphaGo</b></td><td>2016</td><td>A system combining neural networks and <a class="gl" href="#g-reinforcement-learning">reinforcement learning</a> could beat a world champion at Go</td><td>Made "learning by trial and reward" famous; reinforcement learning is now part of how chat models are trained (<a href="#ch18">Chapter 18</a>)</td></tr>
+<tr><td><b>Transformer</b></td><td>2017</td><td>Attention alone, with every word looking at every other word, beats older designs and trains fast on parallel chips</td><td>The architecture inside Claude, Gemini, GPT and almost every large language model</td></tr>
+<tr><td><b>Sparse Mixture of Experts</b></td><td>2017</td><td>A huge model can switch on only a small part of itself for each word</td><td>Many 2026 models (DeepSeek, Mistral Large 4, Microsoft's MAI-Thinking-1) use this to be big but affordable</td></tr>
+<tr><td><b>BERT</b></td><td>2018</td><td>A Transformer pre-trained by filling in hidden words understands text well</td><td>Improved Google Search; the ancestor of many search and classification models</td></tr>
+<tr><td><b>AlphaFold</b></td><td>2020s</td><td>AI can predict the 3D shape of proteins from their building blocks</td><td>The clearest example of "AI for science"; it won a Nobel Prize in 2024</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Publishing the Transformer was a bit like a carmaker publishing the design of a new engine. Rivals, including OpenAI, built on it. Google gained reputation and talent, and the whole field moved faster, but it also handed competitors a head start.</p></div>
+<details class="deep"><summary>How a Mixture of Experts works, without maths</summary><div class="body">
+<p>A normal ("dense") model uses all of its <a class="gl" href="#g-parameter">parameters</a> for every token it reads or writes. A Mixture-of-Experts (MoE) model splits parts of the network into many smaller sub-networks called <em>experts</em>. A small "router" looks at each token and sends it to only a few experts. The rest stay idle for that token.</p>
+<p>That is why you see two numbers in model announcements. Microsoft describes MAI-Thinking-1 as about 1 trillion <em>total</em> parameters but only about 35 billion <em>active</em> per token. The total size gives the model lots of knowledge capacity. The active size decides how much computing each token costs. You still need enough memory to hold all the experts, so MoE models are cheap to run per token but not small to host.</p>
+<p>The idea is older than 2017, but the 2017 Google Brain paper by Shazeer and colleagues (arXiv 1701.06538) showed how to make it work at very large scale.</p>
+</div></details>
+
+<h3 id="ch28-4"><span class="num">28.4</span>Gemini, Gemma and Google's AI products</h3>
+<p><strong>Gemini</strong> is the name of both Google's main <a class="gl" href="#g-frontier-model">frontier model</a> family and its chat app. The models are proprietary: you use them through Google's apps, the Gemini API (via Google AI Studio) or Google Cloud, and you cannot download them.</p>
+<div class="tbl"><table>
+<tr><th>Model (as of 9 Nov 2026)</th><th>What it is</th><th>Key date</th></tr>
+<tr><td><b>Gemini 4 Argon</b></td><td>Google's frontier model. Access first went to cyber defenders, then to everyone in the API and to Google AI Pro and Ultra subscribers in the Gemini app</td><td>Announced 30 Sep 2026; generally available in the API 13 Oct 2026</td></tr>
+<tr><td><b>Gemini 3.8 Flash</b></td><td>A fast, cheaper model for high-volume work</td><td>Generally available Sep 2026</td></tr>
+<tr><td><b>Gemini Omni 1.2 Flash</b></td><td>A fast model in the "Omni" line</td><td>Generally available 5 Nov 2026</td></tr>
+<tr><td>Gemini 3 / 3.1 Pro</td><td>The previous generation</td><td>Gemini 3: 18 Nov 2025; 3.1 Pro preview: 19 Feb 2026</td></tr>
+</table></div>
+<p>Google listed Gemini 4 Argon at an introductory price of $2 per million input <a class="gl" href="#g-token">tokens</a> and $10 per million output tokens, rising later to $4 and $20. Prices change often; always check the official pricing page before you budget.</p>
+<p><strong>Gemma</strong> is Google's <a class="gl" href="#g-open-weight-model">open-weight</a> family. The first Gemma models appeared on 21 February 2024. You can download Gemma and run it on your own machine or servers. The lab at the end of this chapter shows you which Gemma versions are most downloaded today, straight from the source.</p>
+<h4>Where Gemini turns up</h4>
+<ul>
+<li><b>For everyone:</b> the Gemini app, AI Mode in Google Search, Gemini inside Gmail, Docs and Sheets (Workspace), and NotebookLM for working with your own documents.</li>
+<li><b>For creators:</b> Veo (video), Imagen and Nano Banana (images) and Lyria (music).</li>
+<li><b>For developers:</b> the Gemini API and Google AI Studio, and Vertex AI on Google Cloud.</li>
+<li><b>Inside other companies' products:</b> on 12 January 2026 Google and Apple announced that Apple's next-generation Apple Foundation Models will be based on Gemini models and Google's cloud technology.</li>
+</ul>
+<div class="box note"><span class="tag">Google also sells Claude</span><p>Google Cloud hosts Anthropic's models too. In Google Cloud the Claude IDs look like <code>claude-opus-5-5</code>. Anthropic also signed a deal in October 2025 to use up to one million Google TPUs. So Google is at the same time a competitor to Anthropic (Gemini against Claude), a supplier (chips and cloud) and a reseller. This "frenemy" pattern is normal in this industry.</p></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A test team at a company that runs on Google Workspace wants AI help writing test plans. They have three realistic routes: Gemini built into Docs (already paid for in some Workspace plans), the Gemini app, or Claude used through claude.ai or through their company's Google Cloud account. The choice is usually decided less by "which model is smartest" and more by what the company already has approved, where the data goes, and what it costs. <a href="#ch35">Chapter 35</a> walks through decisions like this.</p></div>
+
+<h3 id="ch28-5"><span class="num">28.5</span>Google's coding tools: Antigravity, Jules and the end of Gemini CLI for individuals</h3>
+<p>Google competes directly with Claude Code in AI coding. Its line-up changed a lot in 2025–2026, which is a good lesson in how quickly tools in this field appear and disappear.</p>
+<div class="tbl"><table>
+<tr><th>Tool</th><th>What it is</th><th>Status (9 Nov 2026)</th></tr>
+<tr><td><b>Gemini CLI</b></td><td>An open-source agent in the terminal, launched June 2025. Reads instructions from a <code>GEMINI.md</code> file</td><td>Retired for free and individual users on 18 June 2026. Still works with paid API keys</td></tr>
+<tr><td><b>Antigravity CLI</b></td><td>The replacement terminal agent. Closed source. The command is <code>agy</code></td><td>Current</td></tr>
+<tr><td><b>Google Antigravity</b></td><td>An "agent-first" development platform. The IDE launched 18 Nov 2025; Antigravity 2.0 (desktop app, CLI and SDK) followed on 19 May 2026</td><td>Current. Which instruction file it reads was not verified for this book</td></tr>
+<tr><td><b>Jules</b></td><td>An asynchronous cloud coding agent: it copies your GitHub repository into a virtual machine, makes a plan, and opens a pull request. Reads <code>AGENTS.md</code></td><td>Current</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Lesson for tool owners</span><p>If your team had scripts or CI jobs that called Gemini CLI on a free personal account, they stopped working for that account type in June 2026. Whatever AI tool you adopt, Claude Code included, keep a short note of who owns it, what plan it runs on and what would break if it changed. Read release notes, and pin tool versions in CI jobs.</p></div>
+<p>Instruction files are a small but useful detail. Claude Code reads <code>CLAUDE.md</code>; Gemini CLI read <code>GEMINI.md</code>; Jules and many others read the cross-tool <code>AGENTS.md</code> standard. If your team uses more than one tool, <a href="#ch77">Chapter 77</a> explains how Claude Code falls back to <code>AGENTS.md</code> and how to keep these files from drifting apart.</p>
+
+<h3 id="ch28-6"><span class="num">28.6</span>Microsoft: Copilot everywhere, MAI models and Foundry</h3>
+<p>Microsoft was founded in 1975 by Bill Gates and Paul Allen and is based in Redmond, Washington. Its AI strategy has three parts that work together.</p>
+<div class="flow">
+<div><b>1. Distribution</b>Copilot inside Windows, Microsoft 365 (Word, Excel, Outlook, Teams), GitHub and the consumer Copilot app</div>
+<div class="hl"><b>2. Many models</b>OpenAI's GPT models, Microsoft's own MAI models, and third-party models such as Claude</div>
+<div><b>3. Platform</b>Azure and Microsoft Foundry sell model access to companies building their own apps</div>
+</div>
+<h4>The Microsoft AI division and the MAI models</h4>
+<p>Microsoft formed its <strong>Microsoft AI</strong> division on 19 March 2024, led by Mustafa Suleyman. It created an MAI Superintelligence team in November 2025, and in March 2026 a separate Copilot division (led by Jacob Andreou). The division builds Microsoft's own "MAI" models so that Microsoft does not depend only on OpenAI.</p>
+<ol class="timeline">
+<li><span class="yr">Aug 2025</span><span class="ev"><b>MAI-Voice-1 and MAI-1-preview</b>, Microsoft's first in-house models from the division.</span></li>
+<li><span class="yr">Oct 2025</span><span class="ev"><b>MAI-Image-1</b>, an image model.</span></li>
+<li><span class="yr">Jun 2026</span><span class="ev"><b>Seven new models around Build</b>, including <b>MAI-Code-1-Flash</b>, rolling out in GitHub Copilot in VS Code.</span></li>
+<li class="key"><span class="yr">Aug 2026</span><span class="ev"><b>MAI-Thinking-1</b> (12 August), Microsoft's <a class="gl" href="#g-reasoning-model">reasoning model</a>: a sparse Mixture-of-Experts model of about 1 trillion total and 35 billion active parameters, in public preview on Microsoft Foundry.</span></li>
+</ol>
+<h4>Products a tester will meet</h4>
+<ul>
+<li><b>Microsoft 365 Copilot</b>: AI in Word, Excel, PowerPoint, Outlook and Teams, sold per user ("per seat").</li>
+<li><b>GitHub Copilot</b>: code completion and chat in the editor, an agent mode, a <b>Copilot cloud agent</b> that works in the background and opens pull requests, <b>Copilot CLI</b> in the terminal, and Copilot code review. Its agents read <code>.github/copilot-instructions.md</code> and also accept <code>AGENTS.md</code>, <code>CLAUDE.md</code> or <code>GEMINI.md</code>.</li>
+<li><b>Microsoft Foundry</b> (on Azure): a catalogue where companies choose models, including OpenAI's, Microsoft's and Anthropic's, and build apps on them.</li>
+<li><b>Playwright</b>: not an AI product, but Microsoft's free browser-testing tool, and the Playwright MCP server you use in <a href="#ch102">Chapter 102</a> also comes from Microsoft.</li>
+</ul>
+<div class="box note"><span class="tag">Claude on Microsoft Foundry</span><p>Claude's current models are available in Microsoft Foundry with IDs such as <code>claude-opus-5-5</code>. Claude Code can use Foundry instead of Anthropic's own API: set the environment variable <code>CLAUDE_CODE_USE_FOUNDRY=1</code> and provide Azure credentials. One caution from the Claude Code docs: on Foundry, short aliases like <code>sonnet</code> can point to older models, so pin a full model name. In November 2025 Anthropic also committed $30 billion to Azure compute, with Microsoft investing up to $5 billion and NVIDIA up to $10 billion in Anthropic.</p></div>
+
+<h3 id="ch28-7"><span class="num">28.7</span>Microsoft and OpenAI: a partnership rewritten</h3>
+<p>For most people, "Microsoft AI" meant "OpenAI inside Microsoft products". The relationship is the most important partnership in the industry, and it has changed shape several times.</p>
+<ol class="timeline">
+<li><span class="yr">2019</span><span class="ev"><b>First investment.</b> Microsoft invests in OpenAI; Azure becomes OpenAI's cloud.</span></li>
+<li><span class="yr">2023</span><span class="ev"><b>Billions more.</b> After ChatGPT, Microsoft puts much larger sums into OpenAI and builds GPT models into Bing and Copilot.</span></li>
+<li class="key"><span class="yr">Oct 2025</span><span class="ev"><b>Recapitalisation.</b> OpenAI's for-profit arm becomes OpenAI Group PBC, controlled by the OpenAI Foundation. Microsoft receives a stake of about 27%.</span></li>
+<li class="key"><span class="yr">Apr 2026</span><span class="ev"><b>Deal rewritten</b> (27 April): Microsoft's licence to OpenAI's technology becomes non-exclusive, through 2032. OpenAI may serve its products on any cloud, though Azure stays primary and gets launches first. The "AGI clause" is removed. OpenAI keeps paying a 20% revenue share, now capped, through 2030.</span></li>
+</ol>
+<div class="cols2">
+<div><h4>What Microsoft gets</h4><p>A large ownership stake, a licence to OpenAI technology until 2032, revenue share until 2030, and first launches on Azure.</p></div>
+<div><h4>What OpenAI gets</h4><p>Freedom to use other clouds (it has deals with Oracle, AWS and others), and no longer has to worry about the AGI clause.</p></div>
+</div>
+<details class="deep"><summary>What was the "AGI clause"?</summary><div class="body">
+<p>Earlier versions of the agreement were widely reported to say that Microsoft's rights to OpenAI's technology would change once OpenAI's board declared it had reached <a class="gl" href="#g-agi">artificial general intelligence</a>. Because nobody agrees on how to define AGI, this made the contract's future uncertain for both sides. The April 2026 amendment removed it, so the deal now runs on fixed dates (2030 and 2032) instead.</p>
+<p>The lesson for readers: big AI partnerships are contracts with end dates and conditions, not permanent marriages. When a vendor says "we use model X", ask how long that arrangement is guaranteed.</p>
+</div></details>
+<div class="box opinion"><span class="tag">Opinion · industry analysts</span><p>Many analysts read Microsoft's MAI models and its Anthropic deal as hedging: if the OpenAI partnership weakens, Microsoft still has models to put in Copilot. Microsoft presents it as offering customers choice. Both readings fit the facts; neither is proven.</p></div>
+
+<h3 id="ch28-8"><span class="num">28.8</span>What this means for your team</h3>
+<p>Most workplaces already "belong" to Google or Microsoft through email, documents and cloud. That shapes which AI you can use without a long approval process.</p>
+<div class="tbl"><table>
+<tr><th>If your company runs on…</th><th>AI you may already have</th><th>Ways to use Claude</th><th>Questions to ask IT</th></tr>
+<tr><td>Google Workspace / Google Cloud</td><td>Gemini in Workspace, Gemini app, NotebookLM</td><td>claude.ai plans; Claude through Google Cloud (IDs like <code>claude-opus-5-5</code>); Claude Code with <code>CLAUDE_CODE_USE_VERTEX=1</code></td><td>Is Claude enabled in our Google Cloud project? Which region? Who pays?</td></tr>
+<tr><td>Microsoft 365 / Azure</td><td>Microsoft 365 Copilot, GitHub Copilot</td><td>claude.ai plans; Claude in Microsoft Foundry; Claude Code with <code>CLAUDE_CODE_USE_FOUNDRY=1</code>; Claude for Excel, PowerPoint and Word add-ins</td><td>Is Claude enabled in Foundry? Is GitHub Copilot allowed to use non-OpenAI models?</td></tr>
+<tr><td>Neither / mixed</td><td>Whatever individual teams buy</td><td>Anthropic's own plans and API directly</td><td>Is there an approved AI tool list? (<a href="#ch117">Chapter 117</a> covers vendor selection and governance)</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A QA lead at a Microsoft 365 company wants Claude Code for test automation. Instead of a new vendor contract, the platform team turns on Claude models in the company's existing Microsoft Foundry account. Billing goes through the existing Azure agreement, and the data stays under the company's Azure terms. The model is the same Claude; the route to it is different. <a href="#ch41">Chapter 41</a> explains these routes in detail.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Map the Google and Microsoft side of your AI supply chain</b><span>30 min · browser, optional Python 3</span></div><ol>
+<li>Write down which of these your company uses: Gmail/Google Docs, Google Cloud, Outlook/Word/Teams, Azure, GitHub. If you are not sure, look at your email address domain and the tools on your laptop.<span class="expect">a short list, for example "Microsoft 365, Azure, GitHub".</span></li>
+<li>For each item, note which AI assistant is built in (Gemini in Workspace, Microsoft 365 Copilot, GitHub Copilot) and whether you have access. Ask a colleague or IT if you can't tell.<span class="expect">a two-column table: tool, built-in AI (yes / no / unknown).</span></li>
+<li>Pick one small QA task, for example: "Write five boundary-value test cases for a password field that must be 8 to 64 characters." Give the same prompt to two assistants you have access to (for example Claude and Gemini, or Claude and Copilot). Save both answers.<span class="expect">two lists of test cases. They usually overlap but differ in detail, for example whether 7, 8, 64 and 65 characters are all covered.</span></li>
+<li>Optional, for the technical reader: save the script below as <code>hub_top.py</code> and run it. It asks the public Hugging Face Hub (a site where companies publish open-weight models) which Google and Microsoft models are downloaded most. No account or key is needed.<span class="expect">two short lists of model names with download counts and licences, like the sample output below. Your numbers will differ.</span></li>
+<li>Look at the Google list. Find the Gemma models and their licence tag. Then confirm that no Gemini model appears.<span class="expect">Gemma models appear with a licence tag; Gemini does not, because Gemini is proprietary and not downloadable.</span></li>
+</ol></div>
+<div class="code"><span class="cap">hub_top.py (Python 3, standard library only)</span><pre>"""List the most-downloaded public models for each organisation on the Hugging Face Hub."""
+import json
+import sys
+import urllib.parse
+import urllib.request
+
+API = "https://huggingface.co/api/models"
+
+
+def top_models(author, limit=5):
+    query = urllib.parse.urlencode({"author": author, "sort": "downloads", "limit": limit})
+    with urllib.request.urlopen(f"{API}?{query}", timeout=20) as resp:
+        return json.load(resp)
+
+
+def licence_of(model):
+    for tag in model.get("tags", []):
+        if tag.startswith("license:"):
+            return tag.split(":", 1)[1]
+    return "(not stated)"
+
+
+def main():
+    authors = sys.argv[1:] or ["google", "microsoft"]
+    for author in authors:
+        print(f"\n== {author} ==")
+        models = top_models(author)
+        if not models:
+            print("  no public models found (check the spelling)")
+        for m in models:
+            print(f"  {m['id']:&lt;50} {m.get('downloads', 0):&gt;12,}  {licence_of(m)}")
+
+
+if __name__ == "__main__":
+    main()</pre></div>
+<div class="code"><span class="cap">Terminal: sample run on 9 November 2026 (your numbers will differ)</span><pre>python3 hub_top.py google microsoft
+
+== google ==
+  google/vit-base-patch16-224                          15,008,966  apache-2.0
+  google/gemma-4-31B-it                                 7,222,936  apache-2.0
+  google/gemma-4-26B-A4B-it                             5,570,341  apache-2.0
+  google/gemma-4-E4B-it                                 4,199,413  apache-2.0
+  google/electra-base-discriminator                     4,045,925  apache-2.0
+
+== microsoft ==
+  microsoft/Florence-2-base                            11,733,723  mit
+  microsoft/mdeberta-v3-base                            5,291,975  mit
+  microsoft/TRELLIS.2-4B                                2,687,503  mit
+  microsoft/TRELLIS-image-large                         2,667,596  mit
+  microsoft/deberta-v3-base                             2,476,770  mit</pre></div>
+<p>Notice that "most downloaded" is not the same as "newest" or "best": an image model from 2022 tops Google's list because other software downloads it automatically. A name like <code>gemma-4-26B-A4B</code> is a hint about size: 26 billion total parameters, about 4 billion active, the Mixture-of-Experts pattern from section 28.3. Treat that as a reading of the name, and confirm details on the model card.</p>
+<div class="box note"><span class="tag">Troubleshooting</span><ul>
+<li><b><code>CERTIFICATE_VERIFY_FAILED</code> on a Mac:</b> the Python from python.org needs its certificates installed once. Run <code>Install Certificates.command</code> from your <code>/Applications/Python 3.x/</code> folder, then try again.</li>
+<li><b>Timeout or connection refused at work:</b> your company network may block the site. Try from home, or simply open <code>https://huggingface.co/google</code> and <code>https://huggingface.co/microsoft</code> in a browser and sort by downloads.</li>
+<li><b><code>python3: command not found</code> on Windows:</b> try <code>py hub_top.py</code> instead.</li>
+<li><b>"no public models found":</b> organisation names are case-sensitive on the Hub; check the spelling in the page address.</li>
+</ul></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Gemma is just a free version of Gemini."</dt><dd>Gemma is a separate open-weight family you can download and run yourself. Gemini is proprietary and only available as a service. They share research, but they are different models with different sizes and licences.</dd>
+<dt>"Microsoft owns OpenAI."</dt><dd>Microsoft holds a stake of about 27% in OpenAI Group PBC, which is controlled by the nonprofit OpenAI Foundation. Since April 2026 its licence to OpenAI technology is non-exclusive.</dd>
+<dt>"Copilot means GPT."</dt><dd>Copilot is a brand for Microsoft's AI features. Behind it Microsoft can use OpenAI models, its own MAI models, and in some products third-party models. Check which model a particular Copilot feature uses.</dd>
+<dt>"If my company uses Microsoft or Google, I can't use Claude."</dt><dd>Both Microsoft Foundry and Google Cloud offer Claude models, so a company can often enable Claude inside the cloud contract it already has.</dd>
+<dt>"Gemini CLI is gone."</dt><dd>It was retired for free and individual users in June 2026 and replaced by Antigravity CLI. It still works with paid API keys.</dd>
+</dl></div>
+
+<h3 id="ch28-r"><span class="num">28.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Google builds nearly the whole AI stack itself: TPUs, Google DeepMind, Gemini and Gemma, and products used by billions.</li>
+<li>DeepMind (founded 2010, bought by Google in 2014, merged with Google Brain in 2023) is known for AlphaGo and AlphaFold; Google researchers also published the Transformer, BERT and large-scale Mixture of Experts.</li>
+<li>Gemini 4 Argon is Google's frontier model (generally available in the API from 13 Oct 2026). Gemma is the open-weight family.</li>
+<li>Gemini CLI was retired for individuals in June 2026 and replaced by Antigravity CLI; Jules is Google's cloud coding agent.</li>
+<li>Microsoft's strategy is distribution (Copilot), many models (OpenAI, MAI, third parties including Claude) and platform (Azure, Foundry).</li>
+<li>The Microsoft–OpenAI deal was rewritten in April 2026: non-exclusive licence to 2032, any cloud for OpenAI, no AGI clause, capped revenue share to 2030.</li>
+<li>Both Google Cloud and Microsoft Foundry sell Claude, so your company's existing cloud can be a route to Claude.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Which of these did Google researchers publish in 2017?</p><div class="opts"><button>The GPT architecture</button><button data-ok>The Transformer, in "Attention Is All You Need"</button><button>Constitutional AI</button></div><p class="why" hidden>The Transformer came from Google. OpenAI later built GPT on it, and Constitutional AI is Anthropic's work.</p></div>
+<div class="qz"><p class="q">What is the main difference between Gemini and Gemma?</p><div class="opts"><button>Gemini is for images, Gemma is for text</button><button>Gemma is the newer name for Gemini</button><button data-ok>Gemini is proprietary and used as a service; Gemma is open-weight and can be downloaded</button></div><p class="why" hidden>Gemma models appear on the Hugging Face Hub with licence tags; Gemini models do not.</p></div>
+<div class="qz"><p class="q">MAI-Thinking-1 is described as about 1 trillion total and 35 billion active parameters. What does that tell you?</p><div class="opts"><button data-ok>It is a Mixture-of-Experts model that uses only a small part of itself for each token</button><button>Only 35 billion parameters were trained</button><button>It runs on a laptop</button></div><p class="why" hidden>A router sends each token to a few experts. All the experts still need memory, so it is not small to host.</p></div>
+<div class="qz"><p class="q">Which change was part of the April 2026 Microsoft–OpenAI amendment?</p><div class="opts"><button>Microsoft bought the rest of OpenAI</button><button data-ok>OpenAI may serve its products on any cloud, with Azure staying primary</button><button>OpenAI stopped paying Microsoft any revenue share</button></div><p class="why" hidden>The revenue share continues (capped) until 2030, and Microsoft holds about 27%, not all of OpenAI.</p></div>
+<div class="qz"><p class="q">Your company is all-in on Azure and wants Claude Code without a new vendor contract. What is a realistic route?</p><div class="opts"><button>It isn't possible; Claude only runs on Anthropic's servers</button><button>Use GitHub Copilot, which is the same thing</button><button data-ok>Enable Claude in Microsoft Foundry and set <code>CLAUDE_CODE_USE_FOUNDRY=1</code> with Azure credentials</button></div><p class="why" hidden>Foundry hosts Claude models. Pin a full model name, because short aliases can point to older models there.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Write a one-page "AI supply chain" note for your team. List the Google and Microsoft products your company uses, the AI built into each, whether Claude is available through your existing cloud (ask IT), and one risk for each (for example "tool retired for free accounts", "alias points to an older model"). Finish with one recommendation for a QA use case. Keep it; you will reuse it in <a href="#ch35">Chapter 35</a> when choosing models.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Google and Microsoft both matter in AI, but differently. Google builds almost everything itself: its own chips, the DeepMind lab that made AlphaGo and AlphaFold, the Gemini models and the open Gemma models. Google researchers even invented the Transformer that all chatbots use. Microsoft is mostly a distributor: it puts Copilot into Office, Windows and GitHub, and sells many companies' models through Azure, including OpenAI's, its own MAI models and Claude. Its OpenAI deal was rewritten in 2026, so it's no longer exclusive. For us, the practical point is that our existing Microsoft or Google cloud can often be our route to Claude."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Google, "Gemini 4 Argon" announcement: <a href="https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-4-argon/" target="_blank" rel="noopener">blog.google</a>; Gemini app availability: <a href="https://blog.google/innovation-and-ai/products/gemini-app/gemini-4-argon-availability/" target="_blank" rel="noopener">blog.google</a></li>
+<li>Gemini API changelog: <a href="https://aistudio.google.com/docs/changelog" target="_blank" rel="noopener">aistudio.google.com/docs/changelog</a></li>
+<li>Google Developers Blog, "An important update: transitioning Gemini CLI to Antigravity CLI": <a href="https://developers.googleblog.com/an-important-update-transitioning-gemini-cli-to-antigravity-cli/" target="_blank" rel="noopener">developers.googleblog.com</a></li>
+<li>Google–Apple joint statement (12 Jan 2026): <a href="https://blog.google/company-news/inside-google/company-announcements/joint-statement-google-apple/" target="_blank" rel="noopener">blog.google</a></li>
+<li>Wikipedia, "Google DeepMind": <a href="https://en.wikipedia.org/wiki/Google_DeepMind" target="_blank" rel="noopener">en.wikipedia.org/wiki/Google_DeepMind</a>; "Google Antigravity": <a href="https://en.wikipedia.org/wiki/Google_Antigravity" target="_blank" rel="noopener">en.wikipedia.org/wiki/Google_Antigravity</a></li>
+<li>A. Vaswani et al., "Attention Is All You Need" (2017): <a href="https://arxiv.org/abs/1706.03762" target="_blank" rel="noopener">arXiv:1706.03762</a>; N. Shazeer et al., "Outrageously Large Neural Networks: The Sparsely-Gated Mixture-of-Experts Layer" (2017): <a href="https://arxiv.org/abs/1701.06538" target="_blank" rel="noopener">arXiv:1701.06538</a>; J. Devlin et al., "BERT" (2018): <a href="https://arxiv.org/abs/1810.04805" target="_blank" rel="noopener">arXiv:1810.04805</a></li>
+<li>Microsoft AI, "Introducing MAI-Thinking-1": <a href="https://microsoft.ai/news/introducing-mai-thinking-1/" target="_blank" rel="noopener">microsoft.ai</a>; "Introducing MAI-Code-1-Flash": <a href="https://microsoft.ai/news/introducingmai-code-1-flash/" target="_blank" rel="noopener">microsoft.ai</a>; Wikipedia, "Microsoft AI": <a href="https://en.wikipedia.org/wiki/Microsoft_AI" target="_blank" rel="noopener">en.wikipedia.org/wiki/Microsoft_AI</a></li>
+<li>Microsoft, "The next chapter of the Microsoft–OpenAI partnership" (28 Oct 2025): <a href="https://blogs.microsoft.com/blog/2025/10/28/the-next-chapter-of-the-microsoft-openai-partnership/" target="_blank" rel="noopener">blogs.microsoft.com</a>; CNBC on the April 2026 amendment: <a href="https://www.cnbc.com/2026/04/27/openai-microsoft-partnership-revenue-cap.html" target="_blank" rel="noopener">cnbc.com</a></li>
+<li>Anthropic, "Microsoft, NVIDIA and Anthropic announce strategic partnerships": <a href="https://www.anthropic.com/news/microsoft-nvidia-anthropic-announce-strategic-partnerships" target="_blank" rel="noopener">anthropic.com</a>; "Expanding our use of Google Cloud TPUs": <a href="https://www.anthropic.com/news/expanding-our-use-of-google-cloud-tpus-and-services" target="_blank" rel="noopener">anthropic.com</a>; Claude models overview (platform IDs): <a href="https://platform.claude.com/docs/en/about-claude/models/overview" target="_blank" rel="noopener">platform.claude.com</a></li>
+<li>GitHub Docs, repository custom instructions for Copilot: <a href="https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions" target="_blank" rel="noopener">docs.github.com</a></li>
+<li>Hugging Face Hub API (models endpoint), used in the lab: <a href="https://huggingface.co/docs/hub/api" target="_blank" rel="noopener">huggingface.co/docs/hub/api</a></li>
+</ol><p class="verified">Verified 9 November 2026 against the official pages above and the project's research fact sheet. Unverified and left out: the 2026 status of Microsoft's Maia chip, the release status of Gemini 3.5 Pro, and which instruction file Antigravity reads.</p></div>

@@ -1,0 +1,153 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What an artifact is, and when Claude makes one instead of answering in the chat</li>
+<li>The kinds of artifacts and templates available today (documents, slides, designs, dashboards, small tools)</li>
+<li>How to edit, version, export and download artifacts</li>
+<li>Artifacts that use Claude, connect to apps, and store data, with the plan and admin differences</li>
+<li>How sharing works on individual plans versus Team and Enterprise, and the privacy traps</li>
+<li>How to build useful QA tools as artifacts: a release checklist, a results dashboard, a test-data helper</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> You should know how to chat and prompt (<a href="#ch43">Chapter 43</a>, <a href="#ch44">Chapter 44</a>), how code execution and file creation work (<a href="#ch46">Chapter 46</a>), and what projects are (<a href="#ch47">Chapter 47</a>). No coding is needed. The lab works on any plan; the storage step needs a paid plan.</div>
+
+<div class="bigidea"><p>An artifact is a piece of finished work that Claude puts in its own panel next to the conversation, instead of burying it in the chat: a document, a slide deck, a diagram, a dashboard or a small working web page. You can keep improving it by asking for changes, edit it directly, export it, and share it with colleagues. Some artifacts are little apps: they can call Claude, use your connected apps, and remember data between visits. For testers, that means you can describe a tool you need, such as a release checklist or a results dashboard, and have a working version in minutes. They are quick tools, not production software, and what you share can reveal more than you intend.</p></div>
+
+<h3 id="ch48-1"><span class="num">48.1</span>What an artifact is</h3>
+<p>Anthropic introduced artifacts with Claude 3.5 Sonnet in June 2024, and they are available on every plan today. The help centre defines an <a class="gl" href="#g-artifact">artifact</a> as content Claude makes that you could show to others. It opens beside your conversation, and you can edit it, come back to it and share it.</p>
+<p>Claude decides when to make one. According to the help centre, it does so when the content is:</p>
+<ul>
+<li>significant and self-contained, typically more than 15 lines;</li>
+<li>likely to be edited, reused or used outside the conversation;</li>
+<li>understandable without the rest of the conversation;</li>
+<li>something you're likely to refer back to.</li>
+</ul>
+<p>You can also just ask: "Make this an artifact" or "Build this as an interactive page". You need the "Code execution and file creation" capability on (shown as "Create and edit files" in the updated settings layout), because artifacts run in the same environment as file creation. On Team and Enterprise, owners control it under Organization settings &gt; Capabilities.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A chat reply is like talking something through with a colleague. An artifact is the whiteboard next to you: the thing you're both working on stays in view, you keep adjusting it, and at the end you take a photo (export) or let others look at it (share). Some whiteboards are smart: you can tick boxes on them, and they remember.</p></div>
+
+<h3 id="ch48-2"><span class="num">48.2</span>Kinds of artifacts and templates</h3>
+<p>The help centre lists documents, code snippets, single-page websites, images, diagrams and flowcharts, dashboards and small interactive tools. There is also an Artifacts tab where you can start from a template. Plan availability at the time of writing:</p>
+<input class="filter" data-filter="#ch48Kinds" data-empty="#ch48KindsEmpty" type="search" placeholder="Filter artifact kinds…" aria-label="Filter artifact kinds">
+<div class="tbl"><table id="ch48Kinds">
+<tr><th>Kind</th><th>Plans</th><th>QA example</th></tr>
+<tr class="group"><td colspan="3">Free-form artifacts in a chat</td></tr>
+<tr><td>Document, code snippet, diagram or flowchart</td><td>All plans</td><td>Test strategy draft; a flowchart of the checkout states</td></tr>
+<tr><td>Single-page website or small interactive tool</td><td>All plans</td><td>Boundary-value calculator; test-data generator</td></tr>
+<tr class="group"><td colspan="3">Templates (Artifacts tab)</td></tr>
+<tr><td>Docs, Slides, Design</td><td>All plans, on by default (Enterprise: on by default from 15 October 2026; owners could enable sooner)</td><td>Release readiness report; sprint demo deck</td></tr>
+<tr><td>Dashboards (beta)</td><td>Pro, Max, Ultra, Team, Enterprise (off by default on Enterprise until an owner enables it)</td><td>Nightly test results dashboard</td></tr>
+<tr><td>Motion (beta)</td><td>Team and Enterprise (on by default on Team, off on Enterprise)</td><td>Short animated walkthrough of a new feature</td></tr>
+<tr class="group"><td colspan="3">Capabilities an artifact can use</td></tr>
+<tr><td>Artifacts that use Claude</td><td>Not limited by plan in the help centre's table; usage counts against each user's own plan</td><td>A tool that rewrites bug titles in your house style</td></tr>
+<tr><td>Connect apps to an artifact</td><td>Pro, Max, Ultra, Team, Enterprise</td><td>A page listing your open Jira bugs through a connector</td></tr>
+<tr><td>Store data in an artifact</td><td>Pro, Max, Ultra, Team, Enterprise (web and desktop)</td><td>A checklist that remembers ticks between visits</td></tr>
+</table></div>
+<p id="ch48KindsEmpty" hidden>No rows match.</p>
+<div class="box note"><span class="tag">New and legacy artifacts</span><p>Anthropic reworked artifacts in 2026. Artifacts made in a chat before 16 September 2026 are now called <b>legacy artifacts</b>: they keep working and can still be published and shared, but you can't create new ones of that kind. Artifacts made in Claude Cowork before 19 August 2026 are "live artifacts" and can't be edited in place. Some settings and sharing buttons differ between legacy and new artifacts, and older guides online describe the legacy behaviour. Artifacts are also available in Claude Code, on every plan that includes Claude Code.</p></div>
+
+<h3 id="ch48-3"><span class="num">48.3</span>Editing, versions and export</h3>
+<p>You improve an artifact the same way you got it: by asking. "Add a column for owner", "make the failed rows red", "split this into two slides". In template artifacts (docs, slides, designs) you can also edit directly. In a doc or Markdown document you can highlight text and choose "Edit with Claude" to change just that part. If an interactive artifact shows an error, a "Try fixing with Claude" option asks Claude to repair it; the help centre notes this doesn't always succeed.</p>
+<p>If you edit an earlier message in the chat, you create a separate branch of the conversation with its own artifacts. That's useful for trying two designs, and confusing if you forget which branch you're on.</p>
+<div class="tbl"><table>
+<tr><th>Artifact</th><th>Export options (template artifacts, per the help centre)</th></tr>
+<tr><td>Docs</td><td>Word, PDF, Markdown, Google Docs</td></tr>
+<tr><td>Decks (Slides)</td><td>PowerPoint, PDF, Google Slides</td></tr>
+<tr><td>Designs</td><td>.zip, PDF, PowerPoint, standalone HTML</td></tr>
+<tr><td>Animations (Motion)</td><td>MP4</td></tr>
+<tr><td>Legacy artifacts</td><td>Controls at the top of the panel to view the code, copy, or download</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example</span><p>Before a release go/no-go meeting, a QA lead pastes the test summary, open S1 and S2 bugs and known risks into a chat and asks for a five-slide deck. She edits two slides by hand, asks Claude to turn a table into a chart, and exports to PowerPoint for the company template. Twenty minutes instead of an hour, and the numbers come straight from her data rather than retyped.</p></div>
+
+<h3 id="ch48-4"><span class="num">48.4</span>Artifacts that act: Claude, apps and storage</h3>
+<p>Beyond static content, an artifact can be a small app with three extra abilities.</p>
+<div class="cols2"><div><h4>Using Claude</h4><p>An artifact can call Claude itself, so the people using it interact with Claude through your page. No API key is needed and it costs the creator nothing: usage counts against each user's own plan. New artifacts ask permission the first time they use Claude. For legacy artifacts there is a setting, "AI-powered artifacts" (now "Artifacts that use Claude"), under Settings &gt; Capabilities.</p></div><div><h4>Connecting apps</h4><p>An artifact can use your connected apps (the help centre's examples are Asana, Google Calendar and Slack) and custom <a class="gl" href="#g-connector">connectors</a>. The first use asks for approval, and you can turn off individual tools. Connector tools that need approval for every action aren't available to artifacts. Each person connects their own apps, and Team and Enterprise owners can turn this off.</p></div></div>
+<h4>Storing data</h4>
+<p><a class="gl" href="#g-persistent-storage">Persistent storage</a> lets an artifact remember data between visits: ticked checklist items, a log of exploratory sessions, survey answers. It is on Pro, Max, Ultra, Team and Enterprise, on web and desktop.</p>
+<div class="tbl"><table>
+<tr><th>Question</th><th>Answer (help centre, November 2026)</th></tr>
+<tr><td>Who sees the data?</td><td><b>Personal storage</b> is private to each user. <b>Shared storage</b> is visible to everyone using the artifact; Claude asks you to confirm the first time.</td></tr>
+<tr><td>How much?</td><td>20 MB per artifact, text only: no images, files or binary data.</td></tr>
+<tr><td>Must I publish first?</td><td>New artifacts: no. Legacy artifacts: yes, storage only works once published.</td></tr>
+<tr><td>What deletes it?</td><td>Unpublishing a legacy artifact permanently deletes its stored data, personal and shared.</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Check which storage before typing anything sensitive</span><p>A checklist with shared storage shows your entries to everyone who opens it. The help centre advises checking which kind of storage an artifact uses before entering sensitive information. For QA tools, store test IDs and statuses, not customer data or credentials.</p></div>
+<details class="deep"><summary>Under the hood: what an interactive artifact really is</summary><div class="body">
+<p>An interactive artifact is a small web page, written by Claude in HTML, CSS and JavaScript (sometimes using a framework such as React), that runs in a protected area of your browser, separate from the rest of claude.ai. When you click a button, your browser runs that code; Claude isn't involved unless the page calls it.</p>
+<p>In general terms, the extra abilities work through permissions the page is granted by the Claude app: a way to ask Claude a question, a way to call your approved connector tools, and a small store for saved data. (This is a simplified picture; Anthropic doesn't publish every detail.) That is why each ability asks for approval on first use, why connector tools needing per-action approval are excluded (a page can't stop and ask you in the middle), and why usage is counted against whoever is using the page.</p>
+<p>Because it's generated code, an interactive artifact can contain bugs like any other software. Test it like software: try empty inputs, very long text and odd characters before trusting it.</p>
+</div></details>
+
+<h3 id="ch48-5"><span class="num">48.5</span>Sharing and publishing</h3>
+<p>Artifacts start private to you. What happens next depends on your plan and whether the artifact is new or legacy. Sharing settings need Claude on the web or desktop; on mobile you can view and edit, but not change sharing.</p>
+<div class="tbl"><table>
+<tr><th></th><th>Free, Pro, Max, Ultra</th><th>Team and Enterprise</th></tr>
+<tr><td>Sharing options</td><td>"Only you" or "Anyone with the link", plus email invitations (beta)</td><td>"Only people invited", "Anyone at [your organisation]", or "Anyone with the link" (only if an owner allows external sharing). Enterprise can also share with groups.</td></tr>
+<tr><td>Legacy artifacts</td><td>"Publish" creates a public link; "Unpublish" revokes it</td><td>"Share" then "Share &amp; copy link"; viewers sign in with their organisation account</td></tr>
+<tr><td>Who can open a link</td><td>Anyone with the link can view and use it without a Claude account; they're asked to sign up only for features that need Claude</td><td>By default, only people in your organisation</td></tr>
+<tr><td>Admin controls</td><td>None; you decide</td><td>Owners decide on external sharing, allow or remove outside access per artifact, and control email invitations outside the organisation (Organization settings &gt; Artifacts; on by default on Team, off on Enterprise)</td></tr>
+</table></div>
+<p>A published legacy artifact can be embedded in another website: choose "Get embed code" and list the "Allowed domains". After you unpublish, you can't republish that same artifact; you'd create a new one.</p>
+<div class="box warn"><span class="tag">Sharing can reveal more than the artifact</span><p>The help centre warns that people who view a shared chat artifact can also get access to the attachments and files in that chat. If you uploaded a raw log or a customer spreadsheet to build a dashboard, check before sharing. Rebuild the artifact in a clean chat with masked data if in doubt. Also, if the artifact was made inside a project, viewers need access to that project.</p></div>
+<div class="box opinion"><span class="tag">Opinion · this textbook's authors</span><p>Treat "Anyone with the link" as "public". Links get forwarded and pasted into tickets. For anything about unreleased features, defects or customers, keep sharing inside your organisation.</p></div>
+
+<h3 id="ch48-6"><span class="num">48.6</span>Interactive tools for QA</h3>
+<p>The real value for testers is building small tools you'd never get development time for. Describe the tool, its inputs and outputs, and how you'll check it.</p>
+<div class="tbl"><table>
+<tr><th>Tool</th><th>Prompt idea</th><th>Needs</th></tr>
+<tr><td>Release readiness checklist</td><td>Grouped checklist (functional, regression, performance, security, docs) with owner, status, notes, and a progress bar; remembers ticks</td><td>Storage for remembering (paid plans)</td></tr>
+<tr><td>Test results dashboard</td><td>Paste or upload a CSV; show pass rate per suite, failures list, slowest tests, a chart</td><td>Dashboards template (beta, paid) or a free-form page</td></tr>
+<tr><td>Boundary-value helper</td><td>Enter a min and max; list boundary and just-outside values for integers, lengths and dates</td><td>Nothing extra</td></tr>
+<tr><td>Bug-title polisher</td><td>Paste a rough bug description; get a title and summary in house style</td><td>Uses Claude (counts against each user's usage)</td></tr>
+<tr><td>Exploratory session log</td><td>Charter, timer, notes, bugs found, exported as Markdown</td><td>Storage to keep sessions</td></tr>
+</table></div>
+<div class="code"><span class="cap">Prompt: a release readiness checklist artifact</span><pre>Build an interactive artifact: "Release 4.2 readiness checklist".
+Sections: Functional, Regression, Performance, Security, Documentation.
+Each item has: description, owner (text), status (Not started / In progress /
+Done / Blocked), notes. Pre-fill 3 sensible items per section for a web shop.
+Show overall progress as "X of Y done" and a bar. Blocked items in red.
+A button "Copy summary" copies a Markdown summary to the clipboard.
+Save the state using personal storage so my ticks remain when I return.
+Keep it accessible: real buttons and labels, visible focus, good contrast.</pre></div>
+<div class="flow"><div><b>Describe</b>Purpose, inputs, outputs</div><div><b>Generate</b>Claude builds the artifact</div><div class="hl"><b>Test it</b>Edge cases, empty and long input</div><div><b>Refine</b>Ask for fixes one at a time</div><div><b>Share</b>Inside your organisation</div></div>
+<div class="box note"><span class="tag">Know the limits</span><p>An artifact is good for personal and small-team tools. It isn't a replacement for your test management system, your CI dashboard or anything audited. Data storage is capped at 20 MB of text per artifact, connector tools that need per-action approval can't be used, and the help centre doesn't promise uptime or versioned releases. If a tool becomes important to the team, give it a proper home.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Build and test a QA tool as an artifact</b><span>30 min · claude.ai (any plan; step 5 needs a paid plan)</span></div><ol>
+<li>Check Settings &gt; Capabilities: "Code execution and file creation" (or "Create and edit files") is on. On Team or Enterprise, ask your owner if it's off.<span class="expect">the capability is enabled.</span></li>
+<li>In a new chat, ask: "Build an interactive boundary-value helper. Inputs: field type (integer or string length), minimum, maximum. Output: a table of test values (min-1, min, min+1, a middle value, max-1, max, max+1) with a column saying valid or invalid. Validate that min is not greater than max."<span class="expect">an artifact panel opens beside the chat with a working form.</span></li>
+<li>Test the tool like software: enter min 6, max 12 (string length). Then try min 12, max 6. Then leave a field empty.<span class="expect">for 6 to 12: 5 (invalid), 6, 7, a middle value such as 9, 11, 12 (valid), 13 (invalid). For 12 and 6: an error message rather than a table. For an empty field: a clear message, not a crash. If anything misbehaves, describe it and ask Claude to fix it; that is your first bug report on an AI-built tool.</span></li>
+<li>Ask for one improvement: "Add a 'Copy as Markdown' button for the table." Then click it and paste into a text editor.<span class="expect">a Markdown table in your editor.</span></li>
+<li>Paid plans only: ask "Build the release readiness checklist" using the prompt in section 48.6. Tick two items, close the tab, and open the artifact again from the Artifacts area.<span class="expect">your two ticks are still there (personal storage). On Free, the ticks reset, because storage isn't available.</span></li>
+<li>Open the share options and read them, without sharing. Note which choices you have.<span class="expect">on individual plans, "Only you" and "Anyone with the link"; on Team or Enterprise, options limited to your organisation unless an owner allows external sharing.</span></li>
+</ol>
+<p><b>Troubleshooting.</b> <i>No artifact panel, just code in the chat:</i> check the capability in step 1, or say "make this an artifact". <i>The artifact shows an error:</i> use "Try fixing with Claude" or describe the error. <i>Ticks don't persist:</i> storage needs a paid plan and web or desktop; on legacy artifacts it also needs publishing. <i>No sharing options on your phone:</i> sharing settings need web or desktop.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Artifacts are just code blocks in a side panel."</dt><dd>They include documents, slides, designs, dashboards and working apps, with editing, export and sharing.</dd>
+<dt>"If I share an artifact that uses Claude, I pay for everyone's use."</dt><dd>Usage counts against each user's own plan, and no API key is needed.</dd>
+<dt>"Sharing an artifact shares only the artifact."</dt><dd>For shared chat artifacts, viewers can also get access to the chat's attachments. Check before sharing.</dd>
+<dt>"Data in an artifact is private."</dt><dd>Personal storage is private to each user; shared storage is visible to everyone who uses the artifact.</dd>
+<dt>"Unpublishing is like pausing."</dt><dd>For legacy artifacts, unpublishing permanently deletes stored data and you can't republish the same artifact.</dd>
+</dl></div>
+
+<h3 id="ch48-r"><span class="num">48.7</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>An artifact is substantial, self-contained work shown beside the chat that you can edit, export and share. It needs the code execution and file creation capability.</li>
+<li>Kinds include documents, code, diagrams, web pages and tools, plus templates for Docs, Slides and Design on all plans; Dashboards and Motion are beta with plan limits.</li>
+<li>Artifacts can use Claude (usage on each user's plan), connect apps and store data (20 MB of text, personal or shared) on paid plans.</li>
+<li>Individual plans share with "Anyone with the link"; Team and Enterprise keep artifacts inside the organisation unless owners allow external sharing.</li>
+<li>Shared chat artifacts can expose chat attachments, so build shareable tools with masked data.</li>
+<li>Test AI-built tools like any software, and give important tools a proper home.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">You share an artifact that calls Claude with 30 colleagues. Whose usage does it consume?</p><div class="opts"><button>Yours, as the creator</button><button data-ok>Each user's own plan usage</button><button>An API key you must provide</button></div><p class="why" hidden>The help centre says there is no API key and no cost to the creator; usage counts against each user's plan.</p></div>
+<div class="qz"><p class="q">Your team's checklist artifact uses shared storage. What should you avoid entering?</p><div class="opts"><button>Test case IDs</button><button>Item statuses</button><button data-ok>Customer data or credentials, because everyone using the artifact can see shared data</button></div><p class="why" hidden>Shared storage is visible to all users of the artifact. Store statuses and IDs, not sensitive data.</p></div>
+<div class="qz"><p class="q">On a Team plan, the "Anyone with the link" option is missing. Why?</p><div class="opts"><button data-ok>An owner hasn't enabled external sharing</button><button>Team plans can't share artifacts at all</button><button>You must be on mobile</button></div><p class="why" hidden>On Team and Enterprise, artifacts stay inside the organisation unless an owner allows external sharing.</p></div>
+<div class="qz"><p class="q">Which statement about artifact storage is accurate?</p><div class="opts"><button>Each artifact can store up to 20 GB of files and images</button><button data-ok>It holds up to 20 MB of text per artifact and is on paid plans</button><button>It is available on all plans including Free</button></div><p class="why" hidden>Storage is text only, 20 MB per artifact, on Pro, Max, Ultra, Team and Enterprise.</p></div>
+<div class="qz"><p class="q">Before sharing a dashboard you built from an uploaded raw log, what is the most important check?</p><div class="opts"><button>That the colours match the brand</button><button data-ok>That viewers won't also gain access to the sensitive attachment in the chat</button><button>That it has more than 15 lines</button></div><p class="why" hidden>Viewers of a shared chat artifact can also access that chat's attachments. Rebuild with masked data if needed.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick one repetitive QA chore in your team (for example, compiling the release summary, generating boundary values, or logging exploratory sessions). Build an artifact for it, test it with at least five edge cases and record what broke and how you fixed it. Decide and write down: who should see it, which storage it uses, and whether its data is safe to share. Demo it to your team and collect one improvement request.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"An artifact is Claude's finished work in its own panel: a doc, a deck, a diagram, or a small working tool. You keep asking for changes until it's right, then export or share it. Some artifacts are little apps that can call Claude, use your connected apps and remember data. For QA, that means a checklist or a results dashboard in minutes. Two cautions: test it like any software, and remember that sharing can expose more than you think, including the files you uploaded in that chat."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Claude Help Center, "What are artifacts and how do I use them?" <a href="https://support.claude.com/en/articles/9487310-what-are-artifacts-and-how-do-i-use-them" target="_blank" rel="noopener">support.claude.com/en/articles/9487310</a></li>
+<li>Claude Help Center, "Publishing and sharing artifacts". <a href="https://support.claude.com/en/articles/9547008-publishing-and-sharing-artifacts" target="_blank" rel="noopener">support.claude.com/en/articles/9547008</a></li>
+<li>Claude Help Center, "Create and edit files with Claude" (code execution environment). <a href="https://support.claude.com/en/articles/12111783-create-and-edit-files-with-claude" target="_blank" rel="noopener">support.claude.com/en/articles/12111783</a></li>
+<li>Anthropic, "Introducing Claude 3.5 Sonnet" (artifacts introduced, June 2024). <a href="https://www.anthropic.com/news/claude-3-5-sonnet" target="_blank" rel="noopener">anthropic.com/news/claude-3-5-sonnet</a></li>
+<li>Claude product overview and plans. <a href="https://claude.com/product/overview" target="_blank" rel="noopener">claude.com/product/overview</a> and <a href="https://claude.com/pricing" target="_blank" rel="noopener">claude.com/pricing</a></li>
+</ol><p class="verified">Verified 9 November 2026 against the Claude Help Center and claude.com. Artifacts changed substantially in 2026 (legacy cut-off 16 September 2026); button names, templates and plan availability are liable to change.</p></div>

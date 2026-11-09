@@ -1,0 +1,22 @@
+{
+ "Slash command": {
+  "d": "An instruction to Claude Code itself, typed at the start of a message inside a session, such as /model or /clear.",
+  "see": "ch73"
+ },
+ "Subcommand": {
+  "d": "A second word after a program's name that picks one of its jobs, as in 'claude mcp list' or 'claude doctor'. Run from your normal terminal.",
+  "see": "ch73"
+ },
+ "CLI flag": {
+  "d": "An option added to a command when you start it, beginning with - or --, such as --model opus. It takes effect once, at start-up.",
+  "see": "ch73"
+ },
+ "Shell mode": {
+  "d": "In Claude Code, starting a message with ! runs that shell command yourself straight away; the output joins the conversation and Claude responds to it.",
+  "see": "ch76"
+ },
+ "Keybindings file": {
+  "d": "~/.claude/keybindings.json, where you can change Claude Code's keyboard shortcuts. Open it with /keybindings.",
+  "see": "ch76"
+ }
+}

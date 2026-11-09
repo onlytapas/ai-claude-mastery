@@ -1,0 +1,34 @@
+{
+ "Incognito chat": {
+  "d": "A Claude conversation that is not saved to your chat history or memory and is not used for training. It is still retained by Anthropic for a period (30 days by default).",
+  "see": "ch43"
+ },
+ "Usage limit": {
+  "d": "The amount of work a Claude plan allows before you must wait for a reset, measured by how much each message costs (model, effort, length, files, tools), not by a fixed number of messages.",
+  "see": "ch43"
+ },
+ "XML tags": {
+  "d": "Made-up labels in angle brackets, such as <story> and </story>, used in a prompt to mark which text is instructions, examples or material to work on.",
+  "see": "ch44"
+ },
+ "Few-shot prompting": {
+  "d": "Including a few worked examples of input and ideal output in a prompt so the model copies their format, tone and approach. Also called multishot prompting.",
+  "see": "ch45"
+ },
+ "Structured output": {
+  "d": "A model answer in a strict machine-readable format, usually JSON matching a schema, so other programs can use it. The Claude API can enforce a JSON Schema.",
+  "see": "ch45"
+ },
+ "Prompt chaining": {
+  "d": "Splitting a big task into a sequence of smaller prompts, each using the previous step's output, so intermediate results can be checked or corrected.",
+  "see": "ch45"
+ },
+ "Prompt template": {
+  "d": "A tested prompt with placeholders, such as {{STORY_TEXT}}, for the parts that change each time it is used.",
+  "see": "ch45"
+ },
+ "Meta-prompting": {
+  "d": "Using an AI model to write, critique or improve prompts, or to generate test inputs for them.",
+  "see": "ch45"
+ }
+}

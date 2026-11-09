@@ -1,0 +1,275 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What a multi-agent system is, and the vocabulary: orchestrator, subagent, worker, teammate, handoff, shared state</li>
+<li>The four real benefits of splitting work across agents, and the published evidence for them</li>
+<li>The common ways to wire agents together, and what passes between them</li>
+<li>Why multi-agent systems cost more, how to estimate it, and how to cap it</li>
+<li>When <em>not</em> to use several agents</li>
+<li>How Claude Code's subagents, background sessions and agent teams, and the Agent SDK's <code>agents</code> option, put these ideas into practice</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch107">Chapter 107</a> (what makes an agent), <a href="#ch108">Chapter 108</a> (design patterns, especially orchestrator–workers) and <a href="#ch110">Chapter 110</a> (the Agent SDK). <a href="#ch81">Chapter 81</a> covers writing Claude Code subagent files in detail and <a href="#ch69">Chapter 69</a> covers background sessions. The lab's first part needs only Python 3; the second needs Claude Code.</div>
+
+<div class="bigidea"><p>A multi-agent system is several agents, each with its own context window, instructions and tools, working on one job. Usually a lead agent breaks the job up, hands pieces to other agents, and combines what comes back. Done well, this keeps each agent's context clean and focused, lets independent work run at the same time, and lets you give each worker only the tools it needs. Done badly, it multiplies cost, loses information at every handoff, and produces agents that contradict each other. The skill is knowing which jobs split cleanly, and designing exactly what crosses the boundary between agents.</p></div>
+
+<h3 id="ch111-1"><span class="num">111.1</span>From one agent to several</h3>
+<p>In <a href="#ch108">Chapter 108</a> you met <a class="gl" href="#g-orchestrator-workers">orchestrator–workers</a> as a workflow pattern: one model call splits a task, other calls do the parts. A multi-agent system takes the same idea further: each worker is a full agent with its own loop, so it can read files, run tools and decide its own steps before reporting back.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A test lead preparing a release doesn't personally run every check. They ask one tester to run regression on payments, another to do exploratory testing on the new search, and a third to check accessibility. Each tester works with their own notes and tools, and comes back with a short report. The lead never sees every click; they see three summaries, decide what matters, and write the release recommendation. That is a multi-agent system made of people, and it has the same failure modes: vague briefs, overlapping work, and reports that leave out the one detail that mattered.</p></div>
+<div class="tbl"><table>
+<tr><th>Term</th><th>Meaning here</th></tr>
+<tr><td><b>Orchestrator</b> or <b>lead</b></td><td>The agent that receives the job, plans, delegates and combines results</td></tr>
+<tr><td><b><a class="gl" href="#g-subagent">Subagent</a></b> or <b>worker</b></td><td>An agent started by another agent for a focused task. It reports back to whoever started it.</td></tr>
+<tr><td><b>Teammate</b></td><td>In Claude Code's <a class="gl" href="#g-agent-team">agent teams</a>: a full, independent session that can message other teammates directly</td></tr>
+<tr><td><b><a class="gl" href="#g-handoff">Handoff</a></b></td><td>The moment work and information pass from one agent to another: the brief going out, or the report coming back</td></tr>
+<tr><td><b>Shared state</b></td><td>Anything several agents read or write: files, a task list, a database, a ticket</td></tr>
+<tr><td><b><a class="gl" href="#g-context-isolation">Context isolation</a></b></td><td>Each agent's working memory is separate; only what you hand over crosses the boundary</td></tr>
+</table></div>
+
+<h3 id="ch111-2"><span class="num">111.2</span>Why split the work at all?</h3>
+<p>Anthropic's Agent SDK documentation lists four benefits of subagents. They are a good checklist for any multi-agent design:</p>
+<div class="tbl"><table>
+<tr><th>Benefit</th><th>What it means</th><th>QA example</th></tr>
+<tr><td><b>Context isolation</b></td><td>The worker's file reads and tool results stay in its own context; only its final message returns</td><td>A worker reads 40 failure logs; the lead receives one page of findings, not 40 logs</td></tr>
+<tr><td><b>Parallelisation</b></td><td>Independent parts run at the same time, so the job takes as long as the slowest part</td><td>Security, performance and test-coverage reviews of one pull request at once</td></tr>
+<tr><td><b>Specialised instructions</b></td><td>Each worker has a focused system prompt</td><td>An accessibility reviewer primed with WCAG checks (<a href="#ch123">Chapter 123</a>)</td></tr>
+<tr><td><b>Tool restrictions</b></td><td>Each worker gets only the tools it needs</td><td>The log analyst can read but never edit or run commands</td></tr>
+</table></div>
+<p>Context isolation matters more than it first appears. Every turn, an agent re-reads its whole conversation, and quality drops as the window fills with old tool output (<a class="gl" href="#g-context-rot">context rot</a>, <a href="#ch20">Chapter 20</a>). A worker that reads twelve logs and returns a summary keeps that clutter out of the lead's window.</p>
+<h4>The best-known evidence</h4>
+<p>In June 2025 Anthropic published how it built the multi-agent Research feature in Claude. The figures below are from that article, about that system and Anthropic's own internal evaluations; they are not general laws.</p>
+<div class="figure" role="img" aria-label="Token use relative to a chat: chat 1x, single agent about 4x, multi-agent system about 15x"><div class="bars"><div class="bt">Tokens used, relative to an ordinary chat</div>
+<div class="bar-row"><span>Chat</span><span class="track"><span class="fill" style="width:6.7%">1×</span></span></div>
+<div class="bar-row"><span>Single agent</span><span class="track"><span class="fill" style="width:26.7%">about 4×</span></span></div>
+<div class="bar-row"><span>Multi-agent</span><span class="track"><span class="fill hl" style="width:100%">about 15×</span></span></div></div>
+<div class="cap">Source: Anthropic, "How we built our multi-agent research system", 13 June 2025.</div></div>
+<ul>
+<li>A lead agent on Claude Opus 4 with Claude Sonnet 4 subagents "outperformed single-agent Claude Opus 4 by 90.2%" on Anthropic's internal research evaluation.</li>
+<li>On the BrowseComp benchmark, three factors explained 95% of the variance in performance, and "token usage by itself explains 80% of the variance". In other words, much of the gain came from spending more tokens, spread across parallel context windows.</li>
+<li>The same article says multi-agent systems fit poorly where "all agents [must] share the same context" or there are many dependencies between agents, and notes that "most coding tasks involve fewer truly parallelizable tasks than research".</li>
+</ul>
+<div class="box opinion"><span class="tag">Opinion · two published views</span><p>Anthropic's engineers argue multi-agent designs pay off for broad, parallel work such as research, where the extra tokens buy better answers. Walden Yan of Cognition (makers of the Devin coding agent) argued the opposite for many tasks in "Don't Build Multi-Agents" (12 June 2025), with two principles: "Share context, and share full agent traces, not just individual messages" and "Actions carry implicit decisions, and conflicting decisions carry bad results". He concluded that running multiple agents in collaboration "only results in fragile systems". The two views mostly agree on the facts: split work that is genuinely independent, and keep work that depends on shared decisions in one context.</p></div>
+
+<h3 id="ch111-3"><span class="num">111.3</span>Ways to wire agents together</h3>
+<div class="tbl"><table>
+<tr><th>Shape</th><th>How it works</th><th>Strength</th><th>Weakness</th></tr>
+<tr><td><b>Orchestrator and subagents</b> (hub and spokes)</td><td>The lead sends each worker a brief; each returns one report to the lead</td><td>Simple, easy to trace; the lead stays in control</td><td>The lead is a bottleneck; workers can't correct each other</td></tr>
+<tr><td><b>Pipeline</b></td><td>Agent A's output is agent B's input (plan → write tests → review)</td><td>Clear stages, easy to test each stage</td><td>Nothing runs in parallel; an early mistake flows downstream</td></tr>
+<tr><td><b>Team with shared task list</b></td><td>Agents claim tasks from a shared list and message each other</td><td>Workers can challenge findings and pick up spare work</td><td>More tokens, more coordination, harder to debug</td></tr>
+<tr><td><b>Handoff (peer to peer)</b></td><td>One agent passes the whole conversation to a specialist, which takes over</td><td>Good for routing a user to the right specialist</td><td>Context can be lost or bloated at each pass</td></tr>
+</table></div>
+<div class="flow">
+<div><b>Lead</b>reads the job and plans</div>
+<div class="hl"><b>Briefs</b>one per worker: goal, scope, output format</div>
+<div><b>Workers</b>run in parallel in their own contexts</div>
+<div class="hl"><b>Reports</b>short, structured, with evidence</div>
+<div><b>Lead</b>checks, resolves conflicts, writes the answer</div>
+</div>
+
+<h3 id="ch111-4"><span class="num">111.4</span>Handoffs and shared state</h3>
+<p>The boundary between agents is where most multi-agent systems fail. In Claude Code and the Agent SDK, a (non-fork) subagent's context "starts fresh": it gets its own system prompt, the project's <code>CLAUDE.md</code> if settings are loaded, its tool definitions, and the prompt string the lead writes when it calls the Agent tool. It does <em>not</em> get the lead's conversation history, tool results or system prompt. Coming back, only the subagent's final message returns to the lead.</p>
+<div class="box example"><span class="tag">Real-world example: a weak and a strong brief</span><p><b>Weak:</b> "Look into the checkout failures." The worker doesn't know which run, which files, what "look into" means, or what to send back, so it explores widely and returns a long essay.</p><p><b>Strong:</b> "Read the JUnit files in results/ from build 1842 (checkout.xml and payment.xml only). For each failing test, give: test name, error message, whether the same test failed in results/previous/ (yes/no), and a one-line likely cause. Do not edit files. Reply as a Markdown table, at most 30 lines." Anthropic's article makes the same point: each worker needs "an objective, an output format", guidance on tools and sources, and clear task boundaries, or agents duplicate work.</p></div>
+<h4>What crosses the boundary</h4>
+<ul>
+<li><strong>Going out:</strong> everything the worker needs and can't find for itself: paths, build numbers, decisions already made, what <em>not</em> to do.</li>
+<li><strong>Coming back:</strong> a fixed format with evidence (file and line, log excerpt) so the lead can check claims rather than trust them. If you need the full detail, have the worker write it to a file and return the path.</li>
+</ul>
+<h4>Shared state without collisions</h4>
+<ul>
+<li><strong>Give each agent its own files.</strong> Claude Code's agent-team guidance is blunt: "Two teammates editing the same file leads to overwrites."</li>
+<li><strong>Read-only workers, one writer.</strong> Let many agents analyse, and only the lead (or a human) change things.</li>
+<li><strong>Make writes idempotent</strong> (<a class="gl" href="#g-idempotency">idempotency</a>, <a href="#ch109">Chapter 109</a>). Two workers that both "create a Jira bug for the login failure" must not create two bugs.</li>
+<li><strong>Isolate code changes in worktrees</strong> (<a href="#ch69">Chapter 69</a>), so parallel edits land on separate branches and meet in review.</li>
+</ul>
+<details class="deep"><summary>Under the hood: the "telephone game" and how to measure it</summary><div class="body">
+<p>Every handoff compresses information. A worker that read 50,000 tokens of logs and returned 300 tokens has thrown away more than 99% of what it saw; that is the point, but it means the lead cannot notice a pattern the worker didn't report. Errors also compound: if each of three stages keeps the important detail 90% of the time, all three together keep it only about 73% of the time (0.9 × 0.9 × 0.9; illustrative). Two practical defences: make reports structured so missing fields are obvious, and keep the full worker transcripts so you can audit them. Claude Code stores subagent transcripts in separate files, the SDK marks every message produced inside a subagent with <code>parent_tool_use_id</code>, and a <code>SubagentStop</code> hook receives <code>agent_transcript_path</code>, so you can trace any claim back to the tool output it came from.</p>
+</div></details>
+
+<h3 id="ch111-5"><span class="num">111.5</span>Cost, and how to cap it</h3>
+<p>Each agent carries its own system prompt and tool definitions, re-reads its own conversation each turn, and spends a few turns getting its bearings. More agents means more of all three. Anthropic's agent-team page says token costs "scale linearly" with the number of teammates. Parallel agents finish sooner, but you pay for every one.</p>
+<p>The lab's small script makes this concrete. It is a model with made-up numbers, not a measurement, but its shape is real: splitting long work cuts each agent's peak context sharply; total tokens fall a little at first (shorter conversations are cheaper to re-read), then rise as each extra agent adds fixed overhead. When each piece of work is small, a single agent wins outright.</p>
+<h4>Hard limits in the Agent SDK</h4>
+<p>Claude decides how many subagents to start, and subagents can start their own. The SDK documentation gives three caps (for Python SDK 0.2.127+ and TypeScript SDK 0.3.219+):</p>
+<div class="tbl"><table>
+<tr><th>Limit</th><th>Set with</th><th>Default</th></tr>
+<tr><td>Nesting depth</td><td><code>CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH</code> (environment)</td><td>3 layers below the main agent; <code>1</code> stops subagents spawning their own</td></tr>
+<tr><td>Running at once</td><td><code>CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS</code> (environment)</td><td>20; further spawns get "Concurrent subagent limit reached"</td></tr>
+<tr><td>Spend</td><td><code>max_budget_usd</code> (Python) / <code>maxBudgetUsd</code> (TypeScript)</td><td>No limit; counts subagent requests too, and ends the run with <code>error_max_budget_usd</code></td></tr>
+</table></div>
+<div class="code"><span class="cap">Capping a multi-agent run (Python, adapted from the SDK docs)</span><pre>options = ClaudeAgentOptions(
+    allowed_tools=["Read", "Grep", "Glob", "Agent"],
+    env={"CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "1",
+         "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS": "5"},
+    max_budget_usd=5.0,
+)</pre></div>
+<div class="box note"><span class="tag">Newer models delegate more</span><p>The SDK docs note that Claude Opus 5 "delegates to subagents more readily than earlier models", so these limits matter most there. With the <code>claude_code</code> system prompt preset, Claude Code adds a line telling Opus 5 not to call the Agent tool unless asked; with your own system prompt, add a delegation instruction yourself, and set the limits anyway.</p></div>
+
+<h3 id="ch111-6"><span class="num">111.6</span>When not to use several agents</h3>
+<div class="tbl"><table>
+<tr><th>Use one agent when…</th><th>Consider several when…</th></tr>
+<tr><td>Steps depend on each other (write the fixture, then the test that uses it)</td><td>Parts are genuinely independent (review five separate services)</td></tr>
+<tr><td>Everyone needs the same context (one tricky bug in one module)</td><td>Each part needs lots of reading the others don't need</td></tr>
+<tr><td>The work edits the same files</td><td>Each worker can own its own files, or only reads</td></tr>
+<tr><td>The job is small; setup would outweigh the work</td><td>The job is broad: many sources, many hypotheses</td></tr>
+<tr><td>You can't yet evaluate the single-agent version</td><td>You have a baseline and evidence the split improves it</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Start with one</span><p>Build the single-agent version first, measure it (<a href="#ch125">Chapter 125</a>), and split only the part that is failing for a reason a split would fix: an overflowing context, or slow work that could run in parallel. A multi-agent design you can't compare to a baseline is a guess with a bigger bill.</p></div>
+
+<h3 id="ch111-7"><span class="num">111.7</span>Multi-agent work in Claude Code and the Agent SDK</h3>
+<h4>Subagents (Claude Code)</h4>
+<p>A subagent is a Markdown file in <code>.claude/agents/</code> (project) or <code>~/.claude/agents/</code> (personal). The frontmatter names it and limits it; the body is its system prompt. Only <code>name</code> and <code>description</code> are required; other fields include <code>tools</code>, <code>disallowedTools</code>, <code>model</code>, <code>permissionMode</code>, <code>maxTurns</code>, <code>background</code> and <code>isolation: worktree</code>. Built-in subagents include <b>Explore</b> (fast, read-only search), <b>Plan</b> and <b>general-purpose</b>. Claude picks a subagent from its <code>description</code>, or you name it: "Use the failure-analyst agent to…". Files are picked up within seconds; <code>/agents</code> now only prints a reminder of where they live.</p>
+<h4>Subagents (Agent SDK)</h4>
+<p>In code, pass <code>AgentDefinition</code> objects in the <code>agents</code> option and allow the <code>Agent</code> tool:</p>
+<div class="code"><span class="cap">Two specialist subagents (Python, Agent SDK)</span><pre>from claude_agent_sdk import query, ClaudeAgentOptions, AgentDefinition
+
+options = ClaudeAgentOptions(
+    allowed_tools=["Read", "Grep", "Glob", "Agent"],
+    agents={
+        "failure-analyst": AgentDefinition(
+            description="Analyses failing tests in JUnit XML. Use for test-result triage.",
+            prompt="You analyse test failures. Report test, error, likely cause. Never edit files.",
+            tools=["Read", "Grep", "Glob"],      <span class="c"># read-only</span>
+            model="haiku",
+        ),
+        "flake-checker": AgentDefinition(
+            description="Checks whether a failing test also failed in earlier runs.",
+            prompt="Compare results/ with results/previous/. Reply with a yes/no table.",
+            tools=["Read", "Glob"],
+        ),
+    },
+    max_budget_usd=1.0,
+)
+<span class="c"># async for message in query(prompt="Triage results/ using both agents", options=options): ...</span></pre></div>
+<p>To see delegation in the stream, look for <code>ToolUseBlock</code>s named <code>"Agent"</code> (older versions said <code>"Task"</code>, so match both); messages produced inside a subagent carry <code>parent_tool_use_id</code>. By default a spawned subagent runs in the background and its report arrives in a later turn; Claude waits when its next step needs the result, or when you say "run it and wait".</p>
+<h4>Background sessions (Claude Code)</h4>
+<p>These are separate whole sessions, not subagents: <code>claude --bg "task"</code> starts one and prints its id, <code>claude agents</code> opens agent view to watch and attach, and <code>/background</code> sends the current session there (<a href="#ch69">Chapter 69</a>). They're a research preview, run on your machine, and use your quota like any session. The <code>/batch</code> skill uses this idea at scale: it plans a large change, splits it into 5–30 units and runs each in its own git worktree with a background subagent.</p>
+<h4>Agent teams (Claude Code, experimental)</h4>
+<p>Agent teams are off by default; you turn them on with <code>CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1</code> in your environment or in the <code>env</code> block of <code>settings.json</code>. One session is the <b>lead</b>; <b>teammates</b> are separate Claude Code sessions sharing a task list (pending, in progress, completed, with dependencies) and a mailbox for direct messages. You can talk to any teammate yourself.</p>
+<div class="tbl"><table>
+<tr><th></th><th>Subagents</th><th>Agent teams</th></tr>
+<tr><td>Context</td><td>Own window; results return to the caller</td><td>Own window; fully independent</td></tr>
+<tr><td>Communication</td><td>Report back to the caller</td><td>Teammates message each other directly</td></tr>
+<tr><td>Coordination</td><td>The main agent manages all work</td><td>Shared task list and messages</td></tr>
+<tr><td>Token cost</td><td>Lower: summaries return to the main context</td><td>Higher: each teammate is a separate Claude instance</td></tr>
+<tr><td>Best for</td><td>Focused tasks where only the result matters</td><td>Work that needs discussion and challenge</td></tr>
+</table></div>
+<p>The docs suggest starting with 3–5 teammates and with research or review tasks that don't write code. Known limitations include no session resumption for in-process teammates, task status that can lag, one team per session, no nested teams, and no teammates in non-interactive (<code>-p</code>) or Agent SDK sessions.</p>
+<div class="box warn"><span class="tag">Permissions travel with the work</span><p>Subagents inherit <code>acceptEdits</code>, <code>auto</code> and <code>bypassPermissions</code> from the main session (Claude Code never applies a <code>bypassPermissions</code> value that a subagent definition sets for itself, but a bypassing parent passes bypass down). New teammates start in the lead's mode. And a message from another agent is never your consent: Claude Code tells the receiving agent that the message came from another Claude session, and a teammate can't approve a permission prompt on your behalf. Treat agent-to-agent messages as untrusted input, as you would a web page (<a href="#ch131">Chapter 131</a>).</p></div>
+
+<h3 id="ch111-8"><span class="num">111.8</span>How multi-agent systems fail</h3>
+<div class="tbl"><table>
+<tr><th>Failure</th><th>Symptom</th><th>Defence</th></tr>
+<tr><td>Duplicated work</td><td>Two workers investigate the same thing</td><td>Explicit, non-overlapping scopes in each brief</td></tr>
+<tr><td>Lost detail</td><td>The crucial log line never reaches the lead</td><td>Structured reports with evidence; keep transcripts</td></tr>
+<tr><td>Conflicting decisions</td><td>Workers assume different things (test data, API version)</td><td>Decide shared facts up front and put them in every brief</td></tr>
+<tr><td>Overwrites</td><td>Two agents edit the same file</td><td>One owner per file; worktrees; read-only workers</td></tr>
+<tr><td>Runaway spawning</td><td>Dozens of agents, a surprising bill</td><td>Depth, concurrency and budget caps</td></tr>
+<tr><td>Lead stops early, or does the work itself</td><td>Unfinished tasks; teammates idle</td><td>Tell it to wait for workers; check task status</td></tr>
+<tr><td>Hard to debug</td><td>"It got it wrong" with no trace</td><td><code>SubagentStart</code>/<code>SubagentStop</code> hooks, <code>parent_tool_use_id</code>, saved transcripts (<a href="#ch109">Chapter 109</a>)</td></tr>
+</table></div>
+
+<h3 id="ch111-9"><span class="num">111.9</span>Lab: measure the trade-off, then delegate</h3>
+<p>Part A runs anywhere with Python 3. Part B needs Claude Code (<a href="#ch64">Chapter 64</a>). It reuses the sample results from the <a href="#ch110">Chapter 110</a> lab; if you skipped it, the step below creates similar files.</p>
+<div class="code"><span class="cap">context_budget.py (complete; Python 3 standard library only)</span><pre>"""Compare one agent with an orchestrator plus workers (illustrative numbers only).
+
+Every agent re-reads its whole conversation on every turn, so input tokens add up.
+Change the numbers at the top and run again: python3 context_budget.py
+"""
+LOGS = 12             # failure logs to analyse
+LOG_TOKENS = 6_000    # tokens per log
+OVERHEAD = 8_000      # system prompt + tool definitions that every agent carries
+BRIEF = 400           # the task text, or the lead's brief to one worker
+SUMMARY = 300         # tokens in one worker's report back to the lead
+SETUP_TURNS = 3       # turns a fresh worker spends getting its bearings
+SETUP_TOKENS = 4_500  # tokens those turns add (listing files, reading the README...)
+
+
+def agent_run(logs: int, setup_turns: int = 0) -&gt; tuple[int, int]:
+    """One agent: optional setup turns, then one log per turn, then an answer.
+    Returns (peak context, total input tokens over all turns)."""
+    context = OVERHEAD + BRIEF
+    sizes = [context]
+    for _ in range(setup_turns):
+        context += SETUP_TOKENS // max(setup_turns, 1)
+        sizes.append(context)
+    for _ in range(logs):
+        context += LOG_TOKENS
+        sizes.append(context)
+    return max(sizes), sum(sizes)
+
+
+def team(workers: int) -&gt; tuple[int, int, int]:
+    """Lead plans, workers split the logs, lead merges the reports."""
+    share = -(-LOGS // workers)                         # ceiling division
+    worker_peak, worker_total = agent_run(share, SETUP_TURNS)
+    lead_turns = [OVERHEAD + BRIEF, OVERHEAD + BRIEF + workers * SUMMARY]
+    peak = max(worker_peak, *lead_turns)
+    total = workers * worker_total + sum(lead_turns)
+    return peak, total, workers + 1
+
+
+if __name__ == "__main__":
+    print(f"{LOGS} logs x {LOG_TOKENS:,} tokens; {OVERHEAD:,} overhead per agent (illustrative)\n")
+    print(f"{'Design':&lt;20}{'Agents':&gt;7}{'Peak context':&gt;14}{'Total input':&gt;14}")
+    peak, total = agent_run(LOGS)
+    print(f"{'Single agent':&lt;20}{1:&gt;7}{peak:&gt;14,}{total:&gt;14,}")
+    for w in (2, 3, 4, 6, 12):
+        peak, total, agents = team(w)
+        print(f"{'Lead + ' + str(w) + ' workers':&lt;20}{agents:&gt;7}{peak:&gt;14,}{total:&gt;14,}")</pre></div>
+<div class="lab"><div class="lab-h"><b>Context budgets and a two-subagent triage</b><span>35 min · Python 3, then Claude Code</span></div><ol>
+<li><b>Part A.</b> Save the script as <code>context_budget.py</code> and run <code>python3 context_budget.py</code>.<span class="expect">this output:</span><div class="code"><pre>12 logs x 6,000 tokens; 8,000 overhead per agent (illustrative)
+
+Design               Agents  Peak context   Total input
+Single agent              1        80,400       577,200
+Lead + 2 workers          3        48,900       509,400
+Lead + 3 workers          4        36,900       480,300
+Lead + 4 workers          5        30,900       487,200
+Lead + 6 workers          7        24,900       537,000
+Lead + 12 workers        13        18,900       758,400</pre></div></li>
+<li>Read the two columns separately. Which design keeps every agent's context under 40,000 tokens with the lowest total?<span class="expect">Lead + 3 workers: peak 36,900, total 480,300. Beyond 4 workers the total rises again, because each worker pays the 8,000-token overhead and setup turns.</span></li>
+<li>Change <code>LOG_TOKENS</code> to <code>800</code> (short logs) and run again.<span class="expect">Single agent: peak 18,000, total 171,600. Lead + 2 workers already costs 291,000, and Lead + 12 workers 696,000. With small pieces of work, splitting only adds overhead. Set it back to <code>6_000</code>.</span></li>
+<li><b>Part B.</b> In a practice folder containing <code>results/checkout.xml</code> and <code>results/login.xml</code> (from Chapter 110, or ask Claude Code: "create two small JUnit XML files in results/ with a mix of passing and failing tests"), create <code>.claude/agents/failure-analyst.md</code>:<div class="code"><span class="cap">.claude/agents/failure-analyst.md</span><pre>---
+name: failure-analyst
+description: Analyses failing tests in one JUnit XML file. Use for test-result triage.
+tools: Read, Grep, Glob
+model: haiku
+---
+You analyse test failures in exactly one JUnit XML file that you are given.
+For each failing or erroring test, report: test name, message, likely cause (one line).
+Never edit files. Reply as a Markdown table, at most 15 lines.</pre></div><span class="expect">The file is saved; no restart is needed if the <code>.claude/agents/</code> folder already existed when the session started (otherwise restart Claude Code).</span></li>
+<li>Start <code>claude</code> in that folder and ask: <code>Use the failure-analyst agent once per file in results/, in parallel. Then combine their tables into one triage summary with totals.</code><span class="expect">Claude starts two failure-analyst subagents (shown in the session as agent activity), each reports a small table, and the main session writes a combined summary. The main conversation never shows the raw XML from the subagents' reads.</span></li>
+<li>Run <code>/context</code> (or check the context indicator) and compare with asking the main session to read both files itself in a fresh session.<span class="expect">With such small files the difference is small, matching Part A's short-log result. The benefit grows with large inputs.</span></li>
+<li>Test the tool restriction: ask <code>Use the failure-analyst agent to fix the failing test in results/login.xml.</code><span class="expect">The subagent has no Write or Edit tools, so it can only report; the main session may then offer to make the change itself, asking permission as usual.</span></li>
+</ol></div>
+<div class="box note"><span class="tag">Troubleshooting</span><p><strong>Claude doesn't use the subagent:</strong> name it explicitly ("use the failure-analyst agent"), and make the <code>description</code> say when to use it. <strong>Agent not found:</strong> check the YAML frontmatter (three dashes above and below, <code>name</code> spelled exactly) and that the file is in <code>.claude/agents/</code> of the folder where you started <code>claude</code>; restart if the folder is new. <strong><code>haiku</code> not available on your plan or provider:</strong> delete the <code>model</code> line so it inherits the main model. <strong>No Claude Code access:</strong> Part A plus the SDK example in 110.7 (with an API key) cover the same ideas.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"More agents means better results."</dt><dd>Gains come from spending more tokens on genuinely parallel work. For dependent or small tasks, extra agents add cost and failure points.</dd>
+<dt>"Subagents can see what the main conversation saw."</dt><dd>A non-fork subagent starts fresh. Only the brief you write crosses over, so include paths, ids and decisions.</dd>
+<dt>"Running in parallel makes it cheaper."</dt><dd>It makes it faster. You still pay for every agent's tokens, and each carries its own overhead.</dd>
+<dt>"A teammate said the user approved it, so it's fine."</dt><dd>Messages between agents are not user consent. Claude Code labels them as coming from another Claude session.</dd>
+<dt>"Agent teams are the upgraded version of subagents."</dt><dd>They are a different, experimental tool for work that needs discussion, at a higher token cost. Subagents remain the default for focused delegation.</dd>
+</dl></div>
+
+<h3 id="ch111-r"><span class="num">111.10</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>A multi-agent system splits one job across agents with separate contexts: usually a lead plus workers who report back.</li>
+<li>The benefits are context isolation, parallelism, specialised prompts and restricted tools. Anthropic reported a 90.2% gain on its internal research evaluation, at roughly 15 times the tokens of a chat.</li>
+<li>Handoffs are where systems fail: write briefs with an objective, scope, boundaries and output format; return structured reports with evidence.</li>
+<li>Share state carefully: one owner per file, read-only workers, idempotent writes, worktrees for parallel code changes.</li>
+<li>Cap depth, concurrency and budget. Start with one agent, measure, and split only what a split would fix.</li>
+<li>In Claude Code: subagent files in <code>.claude/agents/</code>, background sessions with <code>claude --bg</code>, and experimental agent teams. In the SDK: <code>AgentDefinition</code> in <code>agents</code>, with <code>Agent</code> allowed.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What does a (non-fork) subagent receive from the lead agent?</p><div class="opts"><button>The lead's full conversation history</button><button data-ok>Its own system prompt, its tools, project context if loaded, and the brief the lead writes</button><button>Nothing; it must ask the lead questions</button></div><p class="why" hidden>The brief is the only content passed from parent to subagent, so it must contain the paths, ids and decisions the worker needs.</p></div>
+<div class="qz"><p class="q">According to Anthropic's research-system article, what explained most of the performance variance on BrowseComp?</p><div class="opts"><button>The number of agents</button><button data-ok>Token usage</button><button>The choice of programming language</button></div><p class="why" hidden>The article says token usage alone explained 80% of the variance; tool-call count and model choice were the other two factors.</p></div>
+<div class="qz"><p class="q">Three agents will each update the same <code>test-plan.md</code>. What is the safest design?</p><div class="opts"><button>Let them all edit it and merge later</button><button>Run them one after another with bypass permissions</button><button data-ok>Have them report findings and let one agent (or a person) own the file</button></div><p class="why" hidden>Concurrent edits to one file cause overwrites. One owner per file avoids conflicts.</p></div>
+<div class="qz"><p class="q">How do you turn on Claude Code agent teams?</p><div class="opts"><button>They're on by default</button><button data-ok>Set <code>CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1</code> in the environment or settings <code>env</code></button><button>Run <code>/agents --teams</code></button></div><p class="why" hidden>Agent teams are experimental and disabled by default; the environment variable enables them.</p></div>
+<div class="qz"><p class="q">In the lab model with short (800-token) logs, why does every multi-agent design cost more in total than one agent?</p><div class="opts"><button data-ok>Each extra agent adds fixed overhead and setup turns that outweigh the small savings from shorter conversations</button><button>Workers can't run in parallel</button><button>The lead re-reads every log</button></div><p class="why" hidden>Overhead per agent dominates when each piece of work is small: a single agent is cheaper and simpler.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick one recurring QA job that might split well, such as a release-readiness check across several services, or reviewing a large pull request. Write a one-page design: the lead's job, each worker's brief (objective, inputs, boundaries, tools, output format), what state is shared and who owns it, and the caps you'd set. Then argue the opposite case: what would go wrong with one agent, and what would go wrong with your split? Finish with how you would measure which design is better (<a href="#ch125">Chapter 125</a>).</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"A multi-agent system is a lead agent handing pieces of a job to worker agents, each with its own memory and tools, and combining their reports. It helps when the pieces are independent and each needs a lot of reading, because the lead's context stays clean and the work runs in parallel. It costs more: Anthropic measured about fifteen times the tokens of a chat. The weak point is the handoff: the worker only knows what the brief says, and the lead only knows what the report says. So write tight briefs, ask for structured reports with evidence, give each file one owner, and cap the number of agents and the budget. And try it with one agent first."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic Engineering, <a href="https://www.anthropic.com/engineering/multi-agent-research-system" target="_blank" rel="noopener">How we built our multi-agent research system</a> (13 June 2025).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/agent-sdk/subagents" target="_blank" rel="noopener">Subagents in the SDK</a> (benefits, AgentDefinition, what subagents inherit, detection, depth/concurrency/spend caps).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/sub-agents" target="_blank" rel="noopener">Claude Code subagents</a>, <a href="https://code.claude.com/docs/en/agent-teams" target="_blank" rel="noopener">Orchestrate teams of Claude Code sessions</a> and <a href="https://code.claude.com/docs/en/agent-view" target="_blank" rel="noopener">agent view and background sessions</a>.</li>
+<li>Anthropic, <a href="https://www.anthropic.com/research/building-effective-agents" target="_blank" rel="noopener">Building effective agents</a> (orchestrator–workers and when to use agents).</li>
+<li>Walden Yan (Cognition), <a href="https://cognition.com/blog/dont-build-multi-agents" target="_blank" rel="noopener">Don't Build Multi-Agents</a> (12 June 2025).</li>
+</ol><p class="verified">Verified 9 November 2026 against the Claude Code and Agent SDK documentation and the cited articles. The lab script was run with Python 3.11; the Claude Code part was not run here (no subscription or API key was available in the test environment).</p></div>

@@ -1,0 +1,252 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What an operating system is and what it does for every program you run</li>
+<li>The difference between a graphical interface (GUI) and a command-line interface (CLI), and why the CLI still matters</li>
+<li>The difference between a terminal, a shell, a prompt and a command, in plain words</li>
+<li>The main shells you will meet: zsh, bash, PowerShell and Command Prompt</li>
+<li>How to open a terminal on macOS, Linux and Windows</li>
+<li>How to read a prompt, type your first commands, cancel a command and recover from mistakes</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> nothing. This chapter assumes you have never opened a terminal. You need a computer running macOS, Linux or Windows, and about 20 minutes for the lab. It is the first chapter of Part VII; the next two are <a href="#ch53">Chapter 53</a> (files, folders and paths) and <a href="#ch54">Chapter 54</a> (your first commands).</div>
+
+<div class="bigidea"><p>Your computer has a manager, the operating system, that runs every program and looks after every file. Normally you talk to it by clicking icons and menus. A terminal is a window where you talk to it by typing instead. Inside that window a program called the shell reads each line you type, works out what you mean, runs it, and prints the answer. Learning a handful of typed commands lets you understand exactly what tools like Claude Code are doing on your machine, and lets you do repetitive work faster and more reliably than clicking.</p></div>
+
+<h3 id="ch52-1"><span class="num">52.1</span>What an operating system does</h3>
+<p>An <a class="gl" href="#g-operating-system">operating system</a> (OS) is the software that runs your computer. When you switch the machine on, the OS starts first, and everything else runs on top of it. It has four main jobs:</p>
+<ul>
+<li><strong>Run programs.</strong> It starts and stops apps, and shares the processor between them so that your browser, Slack and Excel can all run at once.</li>
+<li><strong>Look after files.</strong> It stores your documents on the disk, organised into folders, and remembers where everything is (<a href="#ch53">Chapter 53</a>).</li>
+<li><strong>Talk to hardware.</strong> Keyboard, screen, Wi-Fi, camera and printer all go through it. Apps ask the OS; they don't drive the hardware directly.</li>
+<li><strong>Keep users apart and safe.</strong> It knows who you are, which files you may read or change, and which actions need an administrator password (<a href="#ch56">Chapter 56</a>).</li>
+</ul>
+<p>The core of an OS, the part that does this low-level managing, is called the <a class="gl" href="#g-kernel">kernel</a>. Around the kernel sit the parts you see: the desktop, the file browser, the settings app, and the terminal.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a large office building. The operating system is the building management: it runs the lifts, the power, the keycards and the post room. The tenants (your apps) get on with their work and ask building management whenever they need something. You can reach building management in two ways: through the friendly reception desk with signs and buttons (the graphical desktop), or by phoning the facilities line and saying exactly what you need (the terminal).</p></div>
+<p>Three operating systems cover almost every computer you will meet at work:</p>
+<div class="tbl"><table>
+<tr><th>OS</th><th>Where you meet it</th><th>Family</th><th>Default shell (see 52.4)</th></tr>
+<tr><td><b>macOS</b></td><td>Apple laptops and desktops</td><td>Unix-like. Its core, called Darwin, comes from the Unix tradition</td><td>zsh</td></tr>
+<tr><td><b>Linux</b></td><td>Servers, cloud machines, CI runners, Docker containers, some laptops (Ubuntu, Fedora and others)</td><td>Unix-like</td><td>Usually bash</td></tr>
+<tr><td><b>Windows</b></td><td>Most office PCs</td><td>Its own lineage, different from Unix</td><td>PowerShell (with Command Prompt still available)</td></tr>
+</table></div>
+<p>macOS and Linux are cousins. Commands you learn on a Mac work almost the same on Linux, which matters because the machines that run your team's tests in CI are very often Linux. Windows is different, but it can run Linux inside it through WSL (52.5).</p>
+<p>You can ask your Mac which kernel it runs. This is real output from a Mac used to write this chapter:</p>
+<div class="code"><span class="cap">Terminal (macOS)</span><pre>uname          <span class="c"># "Unix name": which kernel family is this?</span>
+Darwin
+uname -m       <span class="c"># -m = machine: which kind of processor?</span>
+arm64
+sw_vers        <span class="c"># macOS only: software version</span>
+ProductName:		macOS
+ProductVersion:		26.6.2
+BuildVersion:		25G83</pre></div>
+<p><code>Darwin</code> is the name of macOS's Unix-based core. <code>arm64</code> means an Apple silicon processor (an Intel Mac says <code>x86_64</code>). Your version numbers will differ. On Linux, <code>uname</code> prints <code>Linux</code>; <code>sw_vers</code> doesn't exist there.</p>
+
+<h3 id="ch52-2"><span class="num">52.2</span>Clicking versus typing: GUI and CLI</h3>
+<p>A <a class="gl" href="#g-gui">GUI</a> (graphical user interface, said "gooey") is what you use every day: windows, icons, menus and a mouse pointer. A <a class="gl" href="#g-cli">CLI</a> (command-line interface) is the older, text-only way: you type an instruction, press Enter, and read the reply as text.</p>
+<div class="cols2"><div><h4>GUI: good for</h4><p>Discovering what's possible (the menus show you the options), visual work such as images and layouts, and one-off tasks. Easy to learn; hard to repeat exactly or to automate.</p></div><div><h4>CLI: good for</h4><p>Repeating work exactly, doing things to hundreds of files at once, working on remote servers that have no screen, and automation. Harder to start; every command can be saved, shared, scripted and reviewed.</p></div></div>
+<p>Why should a tester or analyst care about the CLI in 2026? Four reasons:</p>
+<ol>
+<li><strong>AI coding tools live there.</strong> Claude Code runs in a terminal and runs shell commands on your behalf (<a href="#ch63">Chapter 63</a>). When it asks "Allow <code>rm -rf build</code>?", you need to know what that means before you say yes.</li>
+<li><strong>Test tools are command-line tools.</strong> <code>npx playwright test</code>, <code>pytest</code>, <code>mvn test</code>, <code>git</code> and <code>curl</code> are all typed commands.</li>
+<li><strong>CI is a terminal with no human.</strong> A CI pipeline is just a list of shell commands run on a Linux machine. Reading its log is reading terminal output.</li>
+<li><strong>Repeatability.</strong> "Run these three commands" is a reproducible bug report step. "Click around until it breaks" isn't.</li>
+</ol>
+<div class="box example"><span class="tag">Real-world example</span><p>A release checklist says "collect the last 200 lines of the server log and attach them to the Jira ticket". In a GUI you open the file, scroll to the end, select and copy. In a terminal it is one line, <code>tail -n 200 app.log</code> (<a href="#ch54">Chapter 54</a>), and the same line works on every server, every time, and can be put in a script.</p></div>
+
+<h3 id="ch52-3"><span class="num">52.3</span>Terminal, shell, prompt, command: four words people mix up</h3>
+<p>These four words are used loosely, even by experienced engineers. Here is what each one precisely means.</p>
+<div class="tbl"><table>
+<tr><th>Word</th><th>What it is</th><th>Examples</th></tr>
+<tr><td><b><a class="gl" href="#g-terminal">Terminal</a></b> (also "terminal emulator", "console")</td><td>The <em>window</em>: an app that shows text and sends your key presses on. It doesn't understand commands itself.</td><td>Terminal (macOS), Windows Terminal, GNOME Terminal, iTerm2, the terminal panel in VS Code</td></tr>
+<tr><td><b><a class="gl" href="#g-shell">Shell</a></b></td><td>The <em>interpreter</em>: a program running inside the terminal that reads each line you type, works out what it means, runs it and returns the result.</td><td>zsh, bash, PowerShell, cmd.exe</td></tr>
+<tr><td><b><a class="gl" href="#g-command-prompt">Prompt</a></b></td><td>The short text the shell prints to say "I'm ready, type now".</td><td><code>alex@Alexs-MacBook-Air ~ %</code></td></tr>
+<tr><td><b><a class="gl" href="#g-command">Command</a></b></td><td>The line you type: a program name, plus options and arguments (<a href="#ch54">Chapter 54</a>).</td><td><code>ls -l Documents</code></td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>The terminal is a telephone handset. The shell is the operator on the other end of the line: it listens, understands your request and connects you to the right department (the program). The prompt is the operator saying "Go ahead". The command is what you say. You can swap handsets (a different terminal app) and keep the same operator, or keep the handset and talk to a different operator (a different shell).</p></div>
+<p>Here is what happens every time you press Enter:</p>
+<div class="flow"><div><b>You type</b>a line in the terminal window</div><div><b>Terminal</b>passes the characters to the shell</div><div class="hl"><b>Shell interprets</b>splits the line into words, finds the program</div><div><b>Program runs</b>e.g. <code>ls</code> reads the folder</div><div><b>Output</b>text flows back to the terminal; a new prompt appears</div></div>
+<details class="deep"><summary>Under the hood: why it's called a "terminal"</summary><div class="body">
+<p>In the 1960s and 1970s, one large computer served many people. Each person sat at a <em>terminal</em>: a keyboard and a printer (later a screen) connected by cable to the distant computer. The terminal had no brain of its own; it only sent keystrokes and displayed replies. Today's terminal apps imitate, or "emulate", those devices in software, which is why they are formally called <em>terminal emulators</em>, and why some terminal settings still mention models like "xterm" or "VT100".</p>
+<p>The "shell" got its name because it is the outer layer around the kernel: the part you touch. The first Unix shell was written in 1971; bash ("Bourne Again SHell", a pun on the earlier Bourne shell) arrived in 1989. On a Mac you can see which shells are installed by reading the file <code>/etc/shells</code>:</p>
+<div class="code"><span class="cap">Terminal (macOS, real output)</span><pre>cat /etc/shells
+# List of acceptable shells for chpass(1).
+# Ftpd will not allow users to connect who are not using
+# one of these shells.
+
+/bin/bash
+/bin/csh
+/bin/dash
+/bin/ksh
+/bin/sh
+/bin/tcsh
+/bin/zsh</pre></div>
+<p>Lines starting with <code>#</code> are comments for humans. The rest are the full locations of each shell program on disk (paths are explained in <a href="#ch53">Chapter 53</a>).</p>
+</div></details>
+
+<h3 id="ch52-4"><span class="num">52.4</span>The shells you'll meet</h3>
+<p>There are many shells, but four cover nearly everything at work.</p>
+<div class="tbl"><table>
+<tr><th>Shell</th><th>Where it's the default</th><th>Notes for beginners</th></tr>
+<tr><td><b><a class="gl" href="#g-zsh">zsh</a></b> ("zee-shell" or "zed-shell")</td><td>macOS since macOS 10.15 Catalina (2019)</td><td>Very close to bash for everyday commands. This book's examples are typed in zsh.</td></tr>
+<tr><td><b><a class="gl" href="#g-bash">bash</a></b></td><td>Most Linux systems; inside WSL; Git Bash on Windows; most CI runners</td><td>The most common shell in documentation and scripts. macOS still includes an old version (3.2).</td></tr>
+<tr><td><b><a class="gl" href="#g-powershell">PowerShell</a></b></td><td>Windows</td><td>A different design: commands are named Verb-Noun (<code>Get-ChildItem</code>) and pass structured objects rather than plain text. It accepts some familiar short names, such as <code>cd</code> and <code>dir</code>, as aliases.</td></tr>
+<tr><td><b>Command Prompt</b> (<code>cmd.exe</code>)</td><td>Windows (older)</td><td>The DOS-style shell. Still present, still used by some install instructions. Different commands again (<code>dir</code>, <code>copy</code>, <code>del</code>).</td></tr>
+</table></div>
+<p>zsh and bash belong to the same family (both follow a standard called POSIX for their basic behaviour), so almost every command in Chapters 53–57 works the same in both. PowerShell and Command Prompt are different languages, and this book gives Windows notes where they differ.</p>
+<p>To find out which shell you're using, type this and press Enter:</p>
+<div class="code"><span class="cap">Terminal (macOS, real output)</span><pre>echo $SHELL      <span class="c"># print the value of the SHELL variable</span>
+/bin/zsh
+zsh --version    <span class="c"># ask zsh itself for its version</span>
+zsh 5.9 (arm64-apple-darwin25.0)
+bash --version
+GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)
+...</pre></div>
+<p><code>echo</code> prints whatever follows it. <code>$SHELL</code> is a <a class="gl" href="#g-environment-variable">variable</a>, a named value the system keeps; the <code>$</code> means "the value of" (<a href="#ch56">Chapter 56</a>). <code>/bin/zsh</code> is the location of your login shell. <code>--version</code> is an <em>option</em> that most programs understand; options are explained fully in <a href="#ch54">Chapter 54</a>. (The <code>...</code> here stands for further licence lines that bash prints; it isn't part of a command.)</p>
+<div class="box note"><span class="tag">Windows: which one am I in?</span><p>If the prompt starts with <code>PS</code>, you're in PowerShell. If it looks like <code>C:\Users\alex&gt;</code> with no <code>PS</code>, it's Command Prompt. Installation instructions often have separate lines for each, and using the wrong one gives telling errors. Claude Code's own troubleshooting notes that <code>irm is not recognized</code> means you're in Command Prompt rather than PowerShell, and <code>The token '&amp;&amp;' is not a valid statement separator</code> means you're in PowerShell rather than Command Prompt.</p></div>
+<div class="box warn"><span class="tag">Don't change your shell yet</span><p>Apple documents how to change the default shell (<code>chsh -s /bin/bash</code>, or System Settings → Users &amp; Groups → right-click your name → Advanced Options). Beginners have no reason to. Stay on the default until you know why you'd want something else.</p></div>
+
+<h3 id="ch52-5"><span class="num">52.5</span>Opening a terminal on each system</h3>
+<h4>macOS</h4>
+<ul>
+<li><strong>Fastest:</strong> press <kbd>Cmd</kbd>+<kbd>Space</kbd> to open Spotlight, type <code>Terminal</code>, press Enter.</li>
+<li><strong>From Finder:</strong> Applications → Utilities → Terminal.</li>
+<li><strong>Keep it handy:</strong> while it's open, right-click its Dock icon → Options → Keep in Dock.</li>
+</ul>
+<p>A window opens with a line of text ending in <code>%</code> and a blinking cursor. That's the prompt; the shell is waiting. <kbd>Cmd</kbd>+<kbd>T</kbd> opens a new tab, <kbd>Cmd</kbd>+<kbd>N</kbd> a new window, and <kbd>Cmd</kbd>+<kbd>+</kbd> / <kbd>Cmd</kbd>+<kbd>-</kbd> make the text bigger or smaller.</p>
+<h4>Linux</h4>
+<ul>
+<li>On Ubuntu and many other desktops, <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd> opens a terminal.</li>
+<li>Or open the app launcher (Activities on Ubuntu) and type <code>Terminal</code>.</li>
+</ul>
+<p>The prompt usually ends in <code>$</code>. Copy and paste are <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> and <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>, because plain <kbd>Ctrl</kbd>+<kbd>C</kbd> means "cancel" in a terminal (52.7).</p>
+<h4>Windows</h4>
+<ul>
+<li>Press the Windows key, type <code>Terminal</code>, press Enter. On current Windows 11 this opens Windows Terminal, which can host PowerShell, Command Prompt and Linux shells in tabs.</li>
+<li>Or right-click the Start button and choose Terminal.</li>
+<li>If you only find "Windows PowerShell" or "Command Prompt", those work too.</li>
+</ul>
+<p>Windows Terminal's default copy shortcut is <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd>; new tab is <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>.</p>
+<div class="box note"><span class="tag">Windows: follow along with WSL or Git Bash</span><p>The commands in this Part are Unix-style. To type them exactly as shown on Windows, use either <strong>WSL</strong> (Windows Subsystem for Linux, which runs a real Linux such as Ubuntu inside Windows and appears as a tab in Windows Terminal) or <strong>Git Bash</strong> (a bash shell installed with Git for Windows). Claude Code's documentation recommends Git for Windows on native Windows so its Bash tool can be used. PowerShell notes are given where a beginner is likely to try a command there.</p></div>
+<h4>Other terminal apps</h4>
+<p>You don't have to use the built-in app. iTerm2, Ghostty, Warp and others are popular on macOS, and VS Code has its own terminal panel (<kbd>Ctrl</kbd>+<kbd>`</kbd>, the backtick key, on every system). They're all just different windows around the same shell. Claude Code works in all of these.</p>
+
+<h3 id="ch52-6"><span class="num">52.6</span>Anatomy of a prompt</h3>
+<p>The prompt tells you three useful things: who you are, which computer you're on, and which folder you're in. Here is a default macOS prompt:</p>
+<div class="code"><span class="cap">macOS zsh default prompt</span><pre>alex@Alexs-MacBook-Air ~ % <span class="c">█ (cursor)</span></pre></div>
+<div class="tbl"><table>
+<tr><th>Part</th><th>Meaning</th></tr>
+<tr><td><code>alex</code></td><td>Your user name on this computer</td></tr>
+<tr><td><code>@Alexs-MacBook-Air</code></td><td>"at" this computer's name. Useful when you're connected to a remote server and need to know which machine you're typing into</td></tr>
+<tr><td><code>~</code></td><td>The current folder. <code>~</code> is shorthand for your home folder (<a href="#ch53">Chapter 53</a>). Move into Documents and it changes to <code>Documents</code></td></tr>
+<tr><td><code>%</code></td><td>The end of the prompt in zsh. Type after it</td></tr>
+</table></div>
+<p>Other systems look slightly different but carry the same information:</p>
+<div class="tbl"><table>
+<tr><th>Where</th><th>Typical prompt</th><th>Ends with</th></tr>
+<tr><td>macOS, zsh</td><td><code>alex@Alexs-MacBook-Air ~ %</code></td><td><code>%</code></td></tr>
+<tr><td>Linux / WSL, bash</td><td><code>alex@laptop:~$</code></td><td><code>$</code></td></tr>
+<tr><td>Any Unix shell as the administrator ("root")</td><td><code>root@server:~#</code></td><td><code>#</code>: be extra careful</td></tr>
+<tr><td>Windows PowerShell</td><td><code>PS C:\Users\alex&gt;</code></td><td><code>&gt;</code></td></tr>
+<tr><td>Windows Command Prompt</td><td><code>C:\Users\alex&gt;</code></td><td><code>&gt;</code></td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Don't type the prompt</span><p>Documentation often shows commands as <code>$ npm install</code> or <code>% ls</code>. The <code>$</code> or <code>%</code> is the prompt, shown to say "this is a command". Type only what comes after it. Copying the <code>$</code> gives an error such as <code>command not found: $</code>. In this book, code boxes show only what you type, and output appears on the lines underneath without a prompt.</p></div>
+<div class="box note"><span class="tag">Your prompt may look fancier</span><p>Colleagues often customise their prompts with colours, the current Git branch, or the time. Tools such as Oh My Zsh and Oh My Posh do this. The parts underneath are the same. If your prompt shows something odd, don't worry: it's decoration.</p></div>
+
+<h3 id="ch52-7"><span class="num">52.7</span>Talking to the shell: typing, Enter, output and getting unstuck</h3>
+<p>Type a command, press Enter, read the output. Here are four harmless first commands with real output (the user name has been changed to <code>alex</code>; yours will show your own):</p>
+<div class="code"><span class="cap">Terminal (macOS, real output)</span><pre>whoami                 <span class="c"># who am I logged in as?</span>
+alex
+date                   <span class="c"># current date, time and time zone</span>
+Mon Nov  9 14:43:23 IST 2026
+echo Hello, terminal   <span class="c"># print the words back</span>
+Hello, terminal
+hostname               <span class="c"># this computer's network name</span>
+Alexs-MacBook-Air</pre></div>
+<p>Notice the pattern: the command on one line, its output underneath, then a fresh prompt (not shown) waiting for the next one. <code>IST</code> is the time zone the computer is set to; yours will show your own.</p>
+<h4>The golden rules of reading output</h4>
+<ul>
+<li><strong>No news is good news.</strong> Many commands print nothing when they succeed. A new prompt with no message usually means "done, no problems".</li>
+<li><strong>Errors name the culprit.</strong> Mistype <code>whoami</code> and zsh says exactly what went wrong:</li>
+</ul>
+<div class="code"><span class="cap">Terminal (zsh)</span><pre>whoam
+zsh: command not found: whoam</pre></div>
+<p>Read it left to right: <em>who</em> is complaining (<code>zsh</code>), <em>what</em> went wrong (<code>command not found</code>) and <em>which word</em> caused it (<code>whoam</code>). bash puts it the other way round: <code>bash: whoam: command not found</code>. PowerShell prints a longer red message starting <code>The term 'whoam' is not recognized</code>. <a href="#ch62">Chapter 62</a> is entirely about reading errors.</p>
+<h4>Keys that save you</h4>
+<div class="tbl"><table>
+<tr><th>Key</th><th>What it does</th></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd></td><td><strong>Cancel</strong> the running command and get your prompt back. On a Mac this is the Control key, not Cmd. Your first rescue move when something seems stuck.</td></tr>
+<tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Step back and forward through commands you typed before, so you can rerun or edit them.</td></tr>
+<tr><td><kbd>Tab</kbd></td><td><strong>Complete</strong> a command or file name. Type <code>Docu</code> and press Tab; the shell fills in <code>Documents/</code>. Fewer typos.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd> / <kbd>Ctrl</kbd>+<kbd>E</kbd></td><td>Jump to the start / end of the line (zsh and bash).</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>L</kbd> or <code>clear</code></td><td>Clear the screen. Nothing is undone; it only tidies the window. On macOS Terminal, <kbd>Cmd</kbd>+<kbd>K</kbd> also clears.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>D</kbd> or <code>exit</code></td><td>Close the shell (and usually the tab).</td></tr>
+<tr><td><kbd>q</kbd></td><td>Quit a full-screen viewer such as <code>man</code> or <code>less</code> (<a href="#ch54">Chapter 54</a>).</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p><kbd>Ctrl</kbd>+<kbd>C</kbd> is the "stop" button on a lift. If you got in by mistake or it's taking far too long, you press it. It's always safe to try, and it's the first thing to try when a terminal "freezes".</p></div>
+<details class="deep"><summary>Under the hood: what "running a program" means</summary><div class="body">
+<p>When you type <code>whoami</code>, the shell doesn't know the answer itself. It searches a list of folders (the <a class="gl" href="#g-path">PATH</a>, <a href="#ch56">Chapter 56</a>) for a program file called <code>whoami</code>, asks the kernel to start it as a new <em>process</em>, connects that process's output to your terminal, and waits for it to finish. When the program ends it hands back a number called an <a class="gl" href="#g-exit-code">exit code</a>: <code>0</code> means success, anything else means some kind of failure (<a href="#ch55">Chapter 55</a>). Only then does the shell print a new prompt.</p>
+<p>A few commands, such as <code>cd</code> and <code>echo</code>, are <em>built into</em> the shell instead of being separate programs. You can ask which is which with <code>type</code>:</p>
+<div class="code"><span class="cap">Terminal (zsh, real output)</span><pre>type cd pwd
+cd is a shell builtin
+pwd is a shell builtin</pre></div>
+</div></details>
+
+<h3 id="ch52-8"><span class="num">52.8</span>Safety: the terminal does exactly what you say</h3>
+<p>The terminal is powerful because it doesn't second-guess you, and that is also its risk.</p>
+<ul>
+<li><strong>There's usually no undo and no Bin.</strong> A file deleted with <code>rm</code> doesn't go to the Trash or Recycle Bin (<a href="#ch54">Chapter 54</a>).</li>
+<li><strong>No "Are you sure?".</strong> Most commands just act.</li>
+<li><strong>Pasted commands run with your permissions.</strong> A command copied from a web page can read, change or delete anything you can. Read before you paste, and never paste one you don't understand from an untrusted source.</li>
+<li><strong>Watch for <code>sudo</code> and <code>#</code>.</strong> <code>sudo</code> runs a command as the administrator, and a <code>#</code> prompt means you already are one. Both remove most safety nets (<a href="#ch56">Chapter 56</a>).</li>
+</ul>
+<div class="box example"><span class="tag">Real-world example</span><p>Claude Code runs shell commands for you, but by default it asks permission first, showing the exact command. A tester who can read <code>rm -rf test-results</code> ("delete the test-results folder and everything in it, without asking") can approve it with confidence. One who can't is either blocking all useful work or approving blindly. That gap is why this Part exists. Permission settings are covered in <a href="#ch78">Chapter 78</a>.</p></div>
+<div class="box opinion"><span class="tag">Opinion · this book's authors</span><p>Learning the terminal used to be optional for testers who didn't write automation. With AI agents now proposing and running commands, we think basic terminal literacy is becoming as important as reading a bug report: not to type everything yourself, but to supervise what is typed on your behalf.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Open a terminal and hold your first conversation</b><span>20 min · your own computer</span></div><ol>
+<li>Open a terminal: <kbd>Cmd</kbd>+<kbd>Space</kbd>, type <code>Terminal</code>, Enter (Linux: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd>; Windows: open Terminal and, if you have it, an Ubuntu (WSL) or Git Bash tab).<span class="expect">a window with a prompt ending in <code>%</code> (macOS) or <code>$</code> (Linux, WSL, Git Bash) and a blinking cursor.</span></li>
+<li>Read your prompt aloud: user name, computer name, folder, end symbol.<span class="expect">something like <code>yourname@yourcomputer ~ %</code>. The <code>~</code> means you're in your home folder.</span></li>
+<li>Type <code>whoami</code> and press Enter.<span class="expect">your user name on one line, then a fresh prompt.</span></li>
+<li>Type <code>echo $SHELL</code>.<span class="expect"><code>/bin/zsh</code> on a Mac; <code>/bin/bash</code> or <code>/usr/bin/bash</code> on most Linux systems.</span></li>
+<li>Type <code>date</code>, then <code>uname</code>.<span class="expect">today's date and time; then <code>Darwin</code> on a Mac or <code>Linux</code> on Linux/WSL.</span></li>
+<li>Make a deliberate mistake: type <code>whoam</code>.<span class="expect"><code>zsh: command not found: whoam</code> (or the bash form). Nothing broke; you just got feedback.</span></li>
+<li>Press <kbd>↑</kbd> twice, then Enter.<span class="expect">the shell brings back an earlier command and runs it again.</span></li>
+<li>Type <code>sleep 30</code> and press Enter. This command waits 30 seconds doing nothing. Before it finishes, press <kbd>Ctrl</kbd>+<kbd>C</kbd>.<span class="expect"><code>^C</code> appears and the prompt returns immediately. You've just stopped a running command.</span></li>
+<li>Type <code>ec</code> and press <kbd>Tab</kbd>.<span class="expect">the shell completes it to <code>echo</code> (if several commands match, it lists them; type one more letter and press Tab again).</span></li>
+<li>Type <code>clear</code>, then <code>exit</code>.<span class="expect">the screen empties, then the shell ends and the tab says the process has completed or closes.</span></li>
+</ol>
+<p><b>If something goes wrong:</b> nothing happens after Enter → the command may still be running; press <kbd>Ctrl</kbd>+<kbd>C</kbd>. You see a <code>&gt;</code> or <code>quote&gt;</code> on a new line → you typed an unmatched quote mark; press <kbd>Ctrl</kbd>+<kbd>C</kbd> and retype. The window shows <code>PS</code> and <code>uname</code> isn't found → you're in PowerShell; open a WSL or Git Bash tab, or just note the difference and continue.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"The terminal and the shell are the same thing."</dt><dd>The terminal is the window; the shell is the program inside that understands commands. You can run different shells in the same terminal.</dd>
+<dt>"The terminal is for programmers only."</dt><dd>It is a different way of using the same computer. Testers, analysts and support staff use it to read logs, run test suites, and check servers.</dd>
+<dt>"No output means it didn't work."</dt><dd>Usually the opposite. Many commands are silent on success and only speak when something goes wrong.</dd>
+<dt>"Ctrl+C copies text in the terminal."</dt><dd>In a terminal, Ctrl+C cancels the running command. On macOS copy is Cmd+C; on Linux and in Windows Terminal it's Ctrl+Shift+C.</dd>
+<dt>"I can break my computer by typing a wrong command."</dt><dd>A mistyped command almost always just gives "command not found". Real damage needs a real, destructive command (like deleting files), which is why you learn to read commands before running them.</dd>
+</dl></div>
+
+<h3 id="ch52-r"><span class="num">52.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>The operating system runs programs, manages files, talks to hardware and keeps users apart. macOS and Linux are Unix-like cousins; Windows is different.</li>
+<li>A GUI is for clicking; a CLI is for typing. The CLI is repeatable, scriptable and where AI coding tools, test runners and CI live.</li>
+<li>Terminal = the window. Shell = the interpreter inside it. Prompt = "ready". Command = what you type.</li>
+<li>zsh is the macOS default, bash is common on Linux and CI, PowerShell and Command Prompt are on Windows.</li>
+<li>The prompt shows user, computer and current folder; don't copy the <code>$</code> or <code>%</code> from documentation.</li>
+<li><kbd>Ctrl</kbd>+<kbd>C</kbd> cancels, <kbd>↑</kbd> recalls, <kbd>Tab</kbd> completes. Read every command before you run it.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What is the shell?</p><div class="opts"><button>The window you type into</button><button data-ok>The program that reads each command you type, interprets it and runs it</button><button>The core of the operating system that controls hardware</button></div><p class="why" hidden>The window is the terminal; the hardware-controlling core is the kernel. The shell is the interpreter in between.</p></div>
+<div class="qz"><p class="q">Your prompt reads <code>alex@build-server:~#</code>. What should catch your attention?</p><div class="opts"><button>The <code>~</code> means something is wrong</button><button data-ok>The <code>#</code> means you're the administrator (root), so commands have no safety net</button><button>It's a PowerShell prompt</button></div><p class="why" hidden>A <code>#</code> at the end of a Unix prompt signals root. <code>~</code> just means the home folder.</p></div>
+<div class="qz"><p class="q">A command seems frozen and the prompt hasn't come back. What do you try first?</p><div class="opts"><button>Close the laptop lid</button><button>Press Cmd+C</button><button data-ok>Press Ctrl+C</button></div><p class="why" hidden>Ctrl+C (Control, even on a Mac) sends "stop" to the running command. Cmd+C on a Mac is copy.</p></div>
+<div class="qz"><p class="q">Install instructions say <code>$ npm install</code>. What do you type?</p><div class="opts"><button><code>$ npm install</code></button><button data-ok><code>npm install</code></button><button><code>% npm install</code></button></div><p class="why" hidden>The <code>$</code> is a printed prompt marking the line as a command. Only the text after it is typed.</p></div>
+<div class="qz"><p class="q">Which shell is the default on a Mac running a recent macOS?</p><div class="opts"><button>bash</button><button data-ok>zsh</button><button>PowerShell</button></div><p class="why" hidden>Apple made zsh the default login shell starting with macOS 10.15 Catalina.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Find one place in your team's work where a command line is already used: a README's setup steps, a CI pipeline file, or a test runner command in a Jira ticket. Copy three commands from it into a note. For each, write which shell it is meant for (look for <code>$</code>, <code>%</code>, <code>PS</code>, or <code>bash</code> in the file), and which parts you can't yet explain. Keep the note: you'll be able to explain each part after <a href="#ch54">Chapter 54</a> and <a href="#ch55">Chapter 55</a>.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Your computer has a manager, the operating system. Usually you talk to it by clicking. The terminal lets you talk to it by typing. The terminal is just the window; inside it runs a shell, like zsh on a Mac or PowerShell on Windows, which reads what you type and runs it. The prompt, the bit ending in a percent or dollar sign, tells you who and where you are. Many commands say nothing when they work. If anything seems stuck, press Control-C. And read a command before you run it, because the terminal doesn't ask 'are you sure?'."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Apple, <a href="https://support.apple.com/en-us/102360" target="_blank" rel="noopener">Use zsh as the default shell on your Mac</a> (zsh default from macOS 10.15; changing the login shell).</li>
+<li>Apple, <a href="https://support.apple.com/guide/terminal/welcome/mac" target="_blank" rel="noopener">Terminal User Guide for Mac</a>.</li>
+<li>Microsoft, <a href="https://learn.microsoft.com/en-us/windows/terminal/" target="_blank" rel="noopener">Windows Terminal overview</a> (hosts PowerShell, Command Prompt and WSL shells; default shortcuts).</li>
+<li>Microsoft, <a href="https://learn.microsoft.com/en-us/windows/wsl/install" target="_blank" rel="noopener">Install WSL</a>.</li>
+<li>Microsoft, <a href="https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_aliases" target="_blank" rel="noopener">about_Aliases (PowerShell)</a>.</li>
+<li>GNU, <a href="https://www.gnu.org/software/bash/manual/" target="_blank" rel="noopener">Bash Reference Manual</a>; <a href="https://zsh.sourceforge.io/Doc/" target="_blank" rel="noopener">Zsh documentation</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/setup" target="_blank" rel="noopener">Claude Code setup</a> (supported shells; Git for Windows recommendation) and <a href="https://code.claude.com/docs/en/troubleshoot-install" target="_blank" rel="noopener">installation troubleshooting</a> (wrong-shell errors).</li>
+</ol>
+<p class="verified">Verified 9 November 2026: commands run on macOS 26.6.2 with zsh 5.9 (user and computer names changed); Apple and Microsoft documentation as linked.</p></div>

@@ -1,0 +1,210 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How to use Claude as a partner in exploratory testing without letting it do your thinking</li>
+<li>How to generate strong test charters with heuristics, tours and personas</li>
+<li>What an AI exploring your app through Playwright MCP notices, and what it misses</li>
+<li>How to investigate a bug faster: narrowing reproduction steps, reading logs and stack traces, and finding the change that caused it</li>
+<li>How to write excellent bug reports, spot duplicates in Jira, and judge severity yourself</li>
+<li>Why AI sometimes "finds" bugs that aren't real, and how to catch that</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 102 (Playwright MCP) and Chapter 101 (Jira MCP) make the hands-on parts easier. Chapter 22 (hallucinations) explains why the last section matters. Some Git knowledge (Chapter 61) helps for 115.6.</div>
+
+<div class="bigidea"><p>Exploratory testing is where a tester's curiosity and judgement matter most, so AI doesn't replace it. It makes you faster around the edges. Claude can suggest areas to explore, take notes while you test, drive a browser to check ideas quickly, read a 5,000-line log in seconds, help you narrow down the exact steps that trigger a bug, and draft a clear bug report. You still decide what's worth exploring, whether something is really a bug, and how serious it is.</p></div>
+
+<h3 id="ch124-1"><span class="num">124.1</span>What exploratory testing is, and where AI fits</h3>
+<p><strong>Exploratory testing</strong> means learning about the product, designing tests and running them all at the same time, guided by what you discover. It isn't random clicking. A good exploratory session has a mission (a "charter"), a time box, and notes on what was covered and found.</p>
+<div class="flow">
+<div><b>Plan</b>Pick a charter: what to explore and why</div>
+<div><b>Explore</b>Try things, follow surprises, vary inputs</div>
+<div><b>Investigate</b>Something odd? Narrow it down, collect evidence</div>
+<div><b>Report</b>Write the bug, notes and coverage</div>
+<div class="hl"><b>Debrief</b>What did we learn? What's next?</div>
+</div>
+<div class="tbl"><table>
+<tr><th>Stage</th><th>Where Claude helps</th><th>What stays with you</th></tr>
+<tr><td>Plan</td><td>Suggests charters, risks, heuristics and test ideas from the story or spec</td><td>Choosing what matters most for this release</td></tr>
+<tr><td>Explore</td><td>Drives a browser to try variations quickly (Playwright MCP); generates odd test data</td><td>Noticing what "feels wrong"; following hunches</td></tr>
+<tr><td>Investigate</td><td>Reads logs and stack traces, narrows reproduction steps, searches code history</td><td>Confirming the bug is real and reproducible</td></tr>
+<tr><td>Report</td><td>Drafts the report, checks Jira for duplicates</td><td>Severity, priority and final wording</td></tr>
+<tr><td>Debrief</td><td>Turns rough notes into a session summary</td><td>Deciding next steps with the team</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a detective with a very fast research assistant. The assistant can pull records, read hundreds of pages and draft notes in minutes. But the detective decides which leads are worth following, interviews the witnesses, and stands up in court. In exploratory testing, you're the detective and Claude is the assistant.</p></div>
+
+<h3 id="ch124-2"><span class="num">124.2</span>Generating charters with heuristics, tours and personas</h3>
+<p>A <strong>charter</strong> is a short mission statement for a session. A common format is: <em>Explore [target] with [resources] to discover [information].</em> For example: "Explore the checkout with expired, invalid and stacked coupons to discover pricing errors."</p>
+<p>Testers use <strong>heuristics</strong> (rules of thumb) to think of things to try. Claude knows the well-known ones and can apply them to your feature, which is a great way to avoid blind spots.</p>
+<div class="tbl"><table>
+<tr><th>Heuristic</th><th>What it means</th><th>Example for a checkout page</th></tr>
+<tr><td><b>SFDIPOT</b> ("San Francisco Depot")</td><td>A checklist of product elements, from James Bach's Heuristic Test Strategy Model: Structure, Function, Data, Interfaces, Platform, Operations, Time</td><td>Time: what happens if a coupon expires while the cart is open?</td></tr>
+<tr><td><b>Tours</b></td><td>Explore the product as if on a themed tour, an idea popularised by James Whittaker</td><td>"Money tour": follow every path where money changes hands</td></tr>
+<tr><td><b>Personas</b></td><td>Explore as a specific kind of user</td><td>A first-time buyer on a slow phone; a power user with 200 items</td></tr>
+<tr><td><b>Boundaries and oddities</b></td><td>Edges, empty values, huge values, special characters</td><td>Quantity 0, 1, 999, -1; a name with an emoji or an apostrophe</td></tr>
+<tr><td><b>Interruptions</b></td><td>Break the flow</td><td>Back button during payment; two tabs; session timeout</td></tr>
+</table></div>
+<div class="code"><span class="cap">Prompt: generate charters</span><pre>Here is the user story and acceptance criteria for the new coupon feature:
+&lt;story&gt;
+...paste the story...
+&lt;/story&gt;
+
+Act as an experienced exploratory tester.
+1. Using SFDIPOT, list the risks you see for this feature.
+2. Turn the top 6 risks into session charters in the form
+   "Explore &lt;target&gt; with &lt;resources&gt; to discover &lt;information&gt;".
+3. For each charter, suggest 3 concrete things to try first,
+   one persona to test as, and how long the session should be.
+Don't invent requirements: if something is unclear, list it as a question.</pre></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A tester gets a story for "apply a discount code at checkout". Claude's SFDIPOT pass flags something the story never mentions: what happens to the discount if the customer removes an item and drops below the minimum spend? That becomes a charter, and the session finds the discount stays applied. That's a real pricing bug, found because the AI widened the tester's thinking, not because it tested anything itself.</p></div>
+
+<h3 id="ch124-3"><span class="num">124.3</span>Letting AI explore: Playwright MCP as a test partner</h3>
+<p>With the Playwright MCP server connected (Chapter 102), Claude can open a browser, click, type and read the page. That makes it useful for quickly checking many variations you'd find tedious by hand.</p>
+<div class="code"><span class="cap">Prompt: a guided exploration</span><pre>Using the Playwright browser, open http://localhost:3000/checkout as the
+test user in our CLAUDE.md. Charter: explore coupon codes to discover pricing errors.
+Try: an expired code, a lowercase version of a valid code, a code with spaces
+around it, two codes in a row, and removing items after applying a code.
+After each attempt, record: what you did, the total shown, any message shown.
+Don't submit any real payment. Stop and ask me if anything needs a real card.
+Finish with a table of attempts and anything that looked inconsistent.</pre></div>
+<div class="cols2">
+<div><h4>What an AI explorer is good at</h4><ul><li>Trying many input variations quickly and consistently</li><li>Recording exactly what it did (great session notes)</li><li>Reading page text, error messages and the structure of forms</li><li>Spotting inconsistencies between what the page says and the spec you gave it</li><li>Checking accessibility basics like missing labels, using the accessibility tree</li></ul></div>
+<div><h4>What it tends to miss</h4><ul><li>Things that "look wrong": layout glitches, overlapping elements, odd colours (it reads structure, not pixels, unless it takes and studies screenshots)</li><li>Timing problems a human feels, like a sluggish button or flicker</li><li>Business context it wasn't given: "that price is obviously wrong for this customer"</li><li>Real-device behaviour: touch, slow networks, assistive technology</li><li>Anything outside the charter you gave it</li></ul></div>
+</div>
+<div class="box note"><span class="tag">A good split</span><p>Let Claude run the wide, repetitive variations while you spend your own attention on the hunches, the odd behaviour and the "what would a real customer do here?" questions. Then compare notes.</p></div>
+
+<h3 id="ch124-4"><span class="num">124.4</span>Session-based testing with AI note-taking</h3>
+<p><strong>Session-based test management</strong> (SBTM) gives exploratory testing structure: time-boxed sessions, each with a charter, notes, bugs found, issues (questions and blockers) and a debrief. The tedious part is the notes. Claude is excellent at turning rough notes into a clean session report.</p>
+<div class="code"><span class="cap">Prompt: turn rough notes into a session report</span><pre>Here are my rough notes from a 60-minute exploratory session:
+&lt;notes&gt;
+10:02 started on staging build 4.12.0, user qa_buyer_03
+coupons: SAVE10 ok. save10 lowercase -> "invalid code"?? spec says case-insensitive
+removed 2nd item, total < £50 min spend, discount still applied!!
+checked w/ product (Priya) - min spend should be enforced. bug.
+back btn during payment -> blank page, couldn't repro 2nd time
+...
+&lt;/notes&gt;
+
+Write a session report with these sections: Charter, Build and environment,
+Areas covered, Bugs (with one-line summaries), Issues and questions,
+Not covered / next charters. Keep my facts exactly; don't add anything I didn't note.
+Mark the back-button issue as "not yet reproducible".</pre></div>
+<p>The last two instructions matter. You're asking Claude to organise, not to invent. Always reread the report against your notes.</p>
+
+<h3 id="ch124-5"><span class="num">124.5</span>Investigating a bug: narrowing it down</h3>
+<p>Finding a bug is half the job. The other half is making it easy to fix: the shortest reliable steps, the evidence, and ideally where in the system it comes from. Claude can speed up each part.</p>
+<h4>Narrowing the reproduction steps</h4>
+<p>Start from the long, messy path you took and ask Claude (with the browser connected) to find the smallest version that still fails.</p>
+<div class="code"><span class="cap">Prompt: minimise the repro</span><pre>I can reproduce this bug with the 11 steps below. Using the Playwright browser,
+try removing steps one at a time to find the shortest sequence that still
+shows the discount applied below the minimum spend. Report each attempt and
+the final minimal steps. Use the test account only.</pre></div>
+<h4>Reading logs and stack traces</h4>
+<p>A <strong>stack trace</strong> is the list of functions a program was in when it crashed, from the innermost upwards. It looks frightening but follows a pattern, and Claude reads them well.</p>
+<div class="code"><span class="cap">An example error from a server log</span><pre>2026-11-09T10:14:22Z ERROR checkout.pricing  CouponValidationError: min_spend check skipped
+  at applyCoupon (src/pricing/coupons.ts:88:11)
+  at recalculateCart (src/cart/cart.ts:142:5)
+  at removeItem (src/cart/cart.ts:97:3)
+  at CartController.delete (src/api/cart.controller.ts:41:12)</pre></div>
+<div class="code"><span class="cap">Prompt: explain the trace</span><pre>Here is an error from the staging log (above). In plain words:
+1. What was the system doing when this happened? Read the stack from the bottom up.
+2. Which file and line is the most likely place to look first, and why?
+3. Search the logs/ folder for other occurrences between 10:00 and 10:30 and
+   tell me if they all follow a "remove item" action.
+Don't change any code.</pre></div>
+<p>Read from the bottom: the user deleted an item (<code>removeItem</code>), the cart recalculated, and coupon validation ran but skipped its minimum-spend check. That gives the developer a precise starting point, <code>coupons.ts</code> line 88, and fits your exploratory finding.</p>
+<details class="deep"><summary>Finding the change that caused it, with git bisect</summary><div class="body">
+<p>If a bug appeared recently, the fastest way to find the cause is often to find <em>which change</em> introduced it. <code>git bisect</code> does this by binary search: you tell Git one version that's good and one that's bad, and it checks out the commit halfway between. You test it and say "good" or "bad", and it halves the range again. Even across 1,000 commits, it needs only about 10 checks.</p>
+<div class="code"><span class="cap">Terminal</span><pre>git bisect start
+git bisect bad                 <span class="c"># the current version has the bug</span>
+git bisect good v4.11.0        <span class="c"># this release didn't</span>
+<span class="c"># Git checks out a commit in the middle. Test it, then:</span>
+git bisect good                <span class="c"># or: git bisect bad</span>
+<span class="c"># ...repeat until Git names the first bad commit...</span>
+git bisect reset               <span class="c"># go back to where you started</span></pre></div>
+<p>If you have an automated test that shows the bug, Git can run it for you at each step with <code>git bisect run</code> followed by the test command, which exits with 0 for good and non-zero for bad. In Claude Code you can ask: "Use git bisect between v4.11.0 and HEAD, running this Playwright test at each step, to find the commit that introduced the bug. Show me the commit and explain the change." Approve the commands as it goes, and check the final answer by reading the named commit's diff.</p>
+</div></details>
+
+<h3 id="ch124-6"><span class="num">124.6</span>Writing excellent bug reports</h3>
+<p>A great bug report gets fixed quickly because the developer can reproduce it on the first try and understands why it matters. Claude is very good at turning messy findings into this shape, especially with a team <a class="gl" href="#g-skill">skill</a> that holds your format (Chapter 80).</p>
+<div class="tbl"><table>
+<tr><th>Section</th><th>Good</th><th>Weak</th></tr>
+<tr><td>Title</td><td>[Checkout] Discount stays applied after cart drops below £50 minimum spend</td><td>Coupon broken</td></tr>
+<tr><td>Environment</td><td>Staging, build 4.12.0, Chrome 131, user qa_buyer_03</td><td>Staging</td></tr>
+<tr><td>Steps</td><td>Numbered, minimal, one action each</td><td>"Add some items and use a coupon, then remove stuff"</td></tr>
+<tr><td>Expected vs actual</td><td>Expected: discount removed with message. Actual: £5 discount remains; total £41.</td><td>"Wrong total"</td></tr>
+<tr><td>Evidence</td><td>Screenshot, log line with timestamp, the request/response</td><td>None</td></tr>
+<tr><td>Impact</td><td>Customers can get discounts they don't qualify for; revenue loss on every affected order</td><td>"Bad"</td></tr>
+</table></div>
+<div class="code"><span class="cap">Prompt: draft the report (with or without a skill)</span><pre>/bug-report Discount stays applied after removing items below minimum spend.
+Minimal steps, the log line and the session notes are above.
+Use only facts from this conversation; mark anything missing as "TO CONFIRM".</pre></div>
+<div class="box note"><span class="tag">Why "TO CONFIRM" matters</span><p>Asked to fill a template, a model may fill the gaps with plausible guesses: a browser version, a build number. Telling it to mark missing facts explicitly turns a hidden risk into a visible to-do.</p></div>
+
+<h3 id="ch124-7"><span class="num">124.7</span>Duplicates, severity and priority</h3>
+<h4>Checking for duplicates with Jira MCP</h4>
+<p>With the Jira connection from Chapter 101, Claude can search existing issues before you file a new one:</p>
+<div class="code"><span class="cap">Prompt: duplicate check</span><pre>Before I file this bug, search Jira project SHOP for open or recently closed
+issues about coupons, discounts or minimum spend from the last 90 days.
+List likely duplicates with key, title, status and why they might match.
+Don't create or change any issue.</pre></div>
+<p>Similar wording isn't the same bug. Read the candidates yourself. Two reports with similar titles can have different causes; two with different titles can be the same defect.</p>
+<h4>Severity and priority stay human</h4>
+<p><strong>Severity</strong> is how bad the impact is; <strong>priority</strong> is how soon it should be fixed. Claude can suggest them with reasons, which is useful as a second opinion, but the decision needs context it usually lacks: how many customers use this path, whether a release is due, contractual or legal exposure, and what the business cares about this week. Record the human decision, not the model's suggestion.</p>
+
+<h3 id="ch124-8"><span class="num">124.8</span>When AI "finds" bugs that aren't real</h3>
+<p>This is the biggest risk in AI-assisted bug hunting. A model asked to look for problems is inclined to find some. It may:</p>
+<ul>
+<li><strong>Misread the spec</strong> and report correct behaviour as a bug.</li>
+<li><strong>Report something it didn't actually observe</strong>, such as a message it expected to see. This is a form of <a class="gl" href="#g-hallucination">hallucination</a>.</li>
+<li><strong>Confuse its own mistakes with product bugs</strong>: clicking the wrong element, typing into the wrong field, or reading a page before it finished loading.</li>
+<li><strong>Overstate severity</strong> because "critical" sounds more helpful.</li>
+<li><strong>Be steered by text on the page</strong>: content in the app could contain instructions that mislead it (prompt injection, Chapter 131).</li>
+</ul>
+<div class="box warn"><span class="tag">The rule</span><p><strong>No bug is filed until a person has reproduced it.</strong> Ask Claude for evidence with every finding (the exact steps, the page text or screenshot, the log line) and reproduce it yourself before it goes into Jira. A false bug report costs a developer time and costs the QA team trust.</p></div>
+<div class="code"><span class="cap">Prompt: make it prove its findings</span><pre>For each problem you reported, give: the exact steps you performed, the exact
+text or element you saw (quote it), and whether you saw it once or repeatedly.
+If you're inferring rather than observing, say "inferred". Then re-run each one
+and tell me which ones you could reproduce.</pre></div>
+
+<div class="lab"><div class="lab-h"><b>An AI-assisted exploratory session</b><span>45 min · Claude Code + Playwright MCP</span></div><ol>
+<li>Pick a target: your team's test environment, or the public demo at https://demo.playwright.dev/todomvc.</li>
+<li>Ask Claude for four charters using SFDIPOT and tours (prompt in 115.2). Choose one.<span class="expect">charters in the "Explore… with… to discover…" form, each with first things to try.</span></li>
+<li>Run a 20-minute session yourself, keeping rough timestamped notes. In parallel, ask Claude to try 10 input variations in the browser (prompt in 115.3).<span class="expect">a table of attempts and observations from Claude, plus your own notes.</span></li>
+<li>Compare: what did Claude notice that you didn't, and what did you notice that it didn't?<span class="expect">Claude is usually more systematic; you're usually better at "this looks wrong". Write down at least one of each.</span></li>
+<li>Ask Claude to prove its findings (prompt in 115.8), then reproduce any you'd file.<span class="expect">at least some findings marked "inferred" or not reproducible. Those don't get filed.</span></li>
+<li>Turn your notes into a session report (prompt in 115.4) and check it line by line against your notes.<span class="expect">a clean report with nothing added that you didn't observe.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"AI can do exploratory testing for me."</dt><dd>It can run variations and take notes. Exploration is driven by curiosity, context and judgement, and those remain yours.</dd>
+<dt>"If Claude says it saw an error, it did."</dt><dd>Ask for the quoted text, steps and repeat runs. Reproduce before filing.</dd>
+<dt>"Similar titles mean duplicate bugs."</dt><dd>Duplicate detection gives candidates. A person decides whether they share a cause.</dd>
+<dt>"A long, detailed report is a good report."</dt><dd>The best reports are short: minimal steps, clear expected vs actual, evidence and impact.</dd>
+</dl></div>
+
+<h3 id="ch124-r"><span class="num">124.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Exploratory testing is structured learning: charter, time box, notes, debrief. Claude speeds up each stage.</li>
+<li>Use heuristics like SFDIPOT, tours and personas with Claude to generate charters and widen your thinking.</li>
+<li>Playwright MCP lets Claude run many variations quickly; it's weaker at visual, timing and business-context problems.</li>
+<li>For investigation, Claude can minimise reproduction steps, explain stack traces, search logs and help with <code>git bisect</code>.</li>
+<li>Draft bug reports with Claude (ideally via a team skill), marking missing facts as "TO CONFIRM".</li>
+<li>Duplicate checks, severity and priority are suggestions; people decide.</li>
+<li>Nothing is filed until a person has reproduced it.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What is a test charter?</p><div class="opts"><button>A detailed list of test steps</button><button data-ok>A short mission for an exploratory session: what to explore, with what, to discover what</button><button>A contract with the developer</button></div><p class="why" hidden>"Explore [target] with [resources] to discover [information]."</p></div>
+<div class="qz"><p class="q">Which kind of problem is an AI exploring through Playwright MCP most likely to miss?</p><div class="opts"><button>An error message that contradicts the spec</button><button data-ok>A button that overlaps another one on screen</button><button>A missing label on a form field</button></div><p class="why" hidden>It mostly reads the page's structure, not its visual layout, unless it takes and studies screenshots.</p></div>
+<div class="qz"><p class="q">How should you read a stack trace?</p><div class="opts"><button>Only the first line matters</button><button data-ok>From the bottom up, following the calls that led to the error</button><button>It can't be read without the source code author</button></div><p class="why" hidden>The bottom shows where the action started; the top shows where it failed.</p></div>
+<div class="qz"><p class="q">Claude reports a "critical" bug in the checkout. What do you do first?</p><div class="opts"><button>File it in Jira straight away</button><button data-ok>Ask for its evidence and reproduce it yourself</button><button>Ignore it, because AI findings are unreliable</button></div><p class="why" hidden>AI findings can be real or invented. Reproduce before filing, every time.</p></div>
+<div class="qz"><p class="q">What does <code>git bisect</code> help you find?</p><div class="opts"><button>Duplicate bugs</button><button data-ok>The commit that introduced a bug</button><button>The severity of a bug</button></div><p class="why" hidden>It binary-searches the history between a good and a bad version.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Run two exploratory sessions on the same feature in your real work: one on your own, and one with Claude as a partner (charters, browser variations, notes and investigation). For each, record time spent, bugs found, bugs that turned out not to be real, and coverage notes. Write half a page on what changed. This becomes evidence for the value discussion in Chapter 126.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Use Claude as an exploration partner, not a replacement. It suggests charters with heuristics like SFDIPOT, tries lots of input variations in the browser, takes notes, reads logs and stack traces, and drafts bug reports. You decide what's worth exploring, what's really a bug and how serious it is. And the golden rule: nothing gets filed until a person has reproduced it."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>J. Bach, <a href="https://www.satisfice.com/download/heuristic-test-strategy-model" target="_blank" rel="noopener">Heuristic Test Strategy Model</a> (Satisfice), the source of the SFDIPOT product elements.</li>
+<li>J. Bach, "Session-Based Test Management", <i>Software Testing and Quality Engineering</i> (2000).</li>
+<li>J. Whittaker, <i>Exploratory Software Testing: Tips, Tricks, Tours, and Techniques to Guide Test Design</i> (2009).</li>
+<li>E. Hendrickson, <i>Explore It! Reduce Risk and Increase Confidence with Exploratory Testing</i> (2013), for the charter format.</li>
+<li>Git documentation, <a href="https://git-scm.com/docs/git-bisect" target="_blank" rel="noopener">git-bisect</a>.</li>
+<li>Microsoft, <a href="https://github.com/microsoft/playwright-mcp" target="_blank" rel="noopener">Playwright MCP</a> README; this book's Chapters 101 and 102 for setup.</li>
+</ol><p class="verified">Content type: established testing practice plus verified tooling · Last reviewed 9 November 2026</p></div>

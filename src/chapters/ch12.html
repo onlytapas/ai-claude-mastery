@@ -1,0 +1,271 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What a <a class="gl" href="#g-loss-function">loss function</a> is and why a network needs one to learn</li>
+<li>How <a class="gl" href="#g-gradient-descent">gradient descent</a> works, using the "walking down a foggy hill" picture</li>
+<li>What the <a class="gl" href="#g-learning-rate">learning rate</a> does, and what happens when it's too small or too big</li>
+<li>How <a class="gl" href="#g-backpropagation">backpropagation</a> shares out the blame for a mistake, worked by hand with a two-weight network</li>
+<li>What <a class="gl" href="#g-epoch">epochs</a> and <a class="gl" href="#g-batch">batches</a> are</li>
+<li>How to spot <a class="gl" href="#g-overfitting">overfitting</a> and <a class="gl" href="#g-underfitting">underfitting</a> with a <a class="gl" href="#g-validation-set">validation set</a></li>
+<li>How to run a 30-line Python program that learns, with no libraries</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch11">Chapter 11</a> (neurons, <a class="gl" href="#g-weight">weights</a>, biases and the forward pass). <a href="#ch10">Chapter 10</a> helps for the idea of learning from labelled examples. You don't need calculus: every step is shown with plain numbers.</div>
+
+<div class="bigidea"><p>A new neural network starts with random weights, so its answers are rubbish. Learning means changing those weights, a tiny bit at a time, so the answers get less wrong. First we need a single number that says how wrong the network is: the loss. Then we ask, for every weight, "if I nudge this up a little, does the loss go up or down, and by how much?" That direction is the gradient, and backpropagation is the efficient way to work it out for millions or billions of weights at once. Take a small step in the direction that lowers the loss, repeat millions of times, and the network gets good. Every model in this book, Claude included, learned this way.</p></div>
+
+<h3 id="ch12-1"><span class="num">12.1</span>The problem: a network that knows nothing</h3>
+<p>In <a href="#ch11">Chapter 11</a> you saw that a network is just arithmetic: inputs are multiplied by weights, added up with a bias, passed through an <a class="gl" href="#g-activation-function">activation function</a>, and sent to the next <a class="gl" href="#g-layer">layer</a>. The weights decide everything the network does. But where do good weights come from?</p>
+<p>Nobody types them in. A modern language model has billions of <a class="gl" href="#g-parameter">parameters</a>; no person could set them by hand. Instead, training starts with random weights and then improves them automatically, using examples where we already know the right answer. This chapter is about that improvement loop.</p>
+<div class="flow">
+<div><b>1. Predict</b>Run an example through the network (forward pass)</div>
+<div><b>2. Measure</b>Compare the prediction with the right answer: the loss</div>
+<div class="hl"><b>3. Assign blame</b>Work out how each weight affected the loss (backpropagation)</div>
+<div><b>4. Adjust</b>Nudge every weight a little in the helpful direction (gradient descent)</div>
+<div><b>5. Repeat</b>Thousands to billions of times</div>
+</div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of learning to throw darts. You throw (predict). You see how far you missed (measure). You think "I released too late and my elbow was too high" (assign blame). Next throw, you adjust slightly (adjust). You don't rebuild your whole technique after each dart; you make small corrections, many times. A network learns the same way, except it can make billions of tiny corrections, all calculated exactly.</p></div>
+
+<h3 id="ch12-2"><span class="num">12.2</span>Loss: one number for "how wrong"</h3>
+<p>To improve, the network needs a score. A <strong>loss function</strong> takes the network's prediction and the correct answer and returns a single number. Zero means perfect; bigger means worse. Training is the job of making this number small.</p>
+<p>The simplest loss is the <strong>squared error</strong>: subtract the right answer from the prediction and square the result. Squaring does two useful things. It makes every error positive, so misses in both directions count. And it punishes big misses much more than small ones: missing by 4 costs 16, but missing by 1 costs only 1.</p>
+<div class="tbl"><table>
+<tr><th>Suite size (hundreds of tests)</th><th>Real run time (min)</th><th>Network predicts</th><th>Error</th><th>Squared error</th></tr>
+<tr><td>2</td><td>5</td><td>3</td><td>−2</td><td>4</td></tr>
+<tr><td>4</td><td>9</td><td>10</td><td>+1</td><td>1</td></tr>
+<tr><td>5</td><td>11</td><td>7</td><td>−4</td><td>16</td></tr>
+<tr><td colspan="4"><b>Mean squared error (average)</b></td><td><b>7</b></td></tr>
+</table></div>
+<p>All numbers in this chapter are illustrative. The average of the squared errors is called the <strong>mean squared error</strong> (MSE), and it is the standard loss when a network predicts a number such as a duration, a price or a temperature.</p>
+<p>Different jobs use different losses, but the idea is always the same:</p>
+<div class="tbl"><table>
+<tr><th>Task</th><th>Typical loss</th><th>In plain words</th></tr>
+<tr><td>Predict a number (run time, story points)</td><td>Mean squared error</td><td>Average of the squared misses</td></tr>
+<tr><td>Pick a category (bug is UI / API / data)</td><td>Cross-entropy</td><td>Small when the network gave high probability to the right category, large when it was confidently wrong</td></tr>
+<tr><td>Predict the next token (language models)</td><td>Cross-entropy over the <a class="gl" href="#g-vocabulary">vocabulary</a></td><td>How surprised the model was by the real next token. <a href="#ch17">Chapter 17</a> covers this.</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A team trains a small model to classify incoming bug reports as UI, API or data issues. For one report labelled "API", the model says UI 70%, API 20%, data 10%. Cross-entropy loss is high because the right answer got only 20%. After some training it says API 85%: the loss for that report drops sharply. The model has never been told any rule about APIs; it just keeps adjusting weights until the loss over thousands of labelled reports is low.</p></div>
+<div class="box note"><span class="tag">The loss defines "good"</span><p>A network becomes good at exactly what the loss measures, and nothing else. If the loss only rewards getting the category right, the network has no reason to be calibrated, fair or explainable. QA people will recognise this: you get what you test for. It's a cousin of <a class="gl" href="#g-goodhart-s-law">Goodhart's law</a>.</p></div>
+
+<h3 id="ch12-3"><span class="num">12.3</span>Gradient descent: walking down a foggy hill</h3>
+<p>Picture every possible setting of the weights as a place on a huge landscape. The height at each place is the loss. Training means finding a low valley. The trouble is that you can't see the landscape: with billions of weights it has billions of dimensions.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>You are on a hillside in thick fog and want to get down to the valley. You can't see more than a metre, but you can feel the slope under your feet. So you feel which way is steepest downhill, take a step that way, feel again, and take another step. You never see the whole hill, yet you keep getting lower. That is gradient descent.</p></div>
+<p>The <strong>gradient</strong> is the "feel of the slope". For each weight it says two things: which direction increases the loss, and how steeply. Gradient descent takes a step in the <em>opposite</em> direction, because we want the loss to go down. The update rule for every weight is one line:</p>
+<div class="code"><span class="cap">The gradient descent update</span><pre>new weight = old weight − learning rate × gradient   <span class="c"># step downhill</span></pre></div>
+<p>If the gradient for a weight is positive (raising the weight raises the loss), the rule lowers the weight. If it's negative, the rule raises it. If it's near zero, the weight is already about right and barely moves.</p>
+<details class="deep"><summary>What a gradient really is (gentle maths)</summary><div class="body">
+<p>For one weight, the gradient is the <em>derivative</em> of the loss with respect to that weight: "if I change this weight by a tiny amount, how much does the loss change, per unit of change?" You can estimate it without calculus. Nudge the weight by 0.000001, recompute the loss, and divide the change in loss by 0.000001. The lab in 12.8 does exactly this as a check.</p>
+<p>For many weights, the gradient is the list of all these derivatives, one per weight. Together they point in the direction of steepest uphill on the loss landscape. Subtracting them (times the learning rate) moves you downhill.</p>
+<p>The nudge-and-measure method works but is far too slow for a big network: you'd need one extra forward pass per weight, billions of them. Backpropagation (12.5) gets every gradient from a single backward pass.</p>
+</div></details>
+
+<h3 id="ch12-4"><span class="num">12.4</span>The learning rate: how big a step</h3>
+<p>The <strong>learning rate</strong> is the size of each step. It's a setting the engineer chooses, not something the network learns. Settings like this are called <strong>hyperparameters</strong>.</p>
+<div class="cols2">
+<div><h4>Too small</h4><p>Each step is tiny. The loss goes down, but painfully slowly. You waste time and computing money, and may stop before reaching the valley.</p></div>
+<div><h4>Too large</h4><p>You overshoot the valley and land higher up the other side. The next step overshoots further. The loss bounces around or explodes to enormous numbers. This is called <strong>divergence</strong>.</p></div>
+</div>
+<p>Here is what happened when the program in 12.8 was run with three learning rates on the same data. The numbers are real output from that toy program, not from a real system.</p>
+<div class="tbl"><table>
+<tr><th>Learning rate</th><th>Loss at start</th><th>After 40 epochs</th><th>After 200 epochs</th><th>Verdict</th></tr>
+<tr><td>0.001</td><td>57.2</td><td>8.48</td><td>0.059</td><td>Too slow: still improving at the end</td></tr>
+<tr><td>0.05</td><td>57.2</td><td>0.031</td><td>0.021</td><td>Good: fast and stable</td></tr>
+<tr><td>0.1</td><td>57.2</td><td>about 4 × 10<sup>12</sup></td><td>about 9 × 10<sup>55</sup></td><td>Too big: diverged</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example</span><p>Large models are trained with a <em>schedule</em>: the learning rate starts small for a "warm-up" period, rises, then gradually decreases so the final steps are gentle. Engineers also use improved versions of plain gradient descent, such as the widely used <strong>Adam</strong> optimiser (Kingma and Ba, 2014), which keeps a running average of recent gradients and adapts the step size for each weight. The core idea is still "step downhill".</p></div>
+<div class="box warn"><span class="tag">Valleys are not always the bottom</span><p>The foggy-hill walker can end up in a small dip that isn't the lowest point, or on a nearly flat plateau where the slope is too gentle to feel. In practice, very large networks rarely get badly stuck, for reasons researchers still study. But it is why training runs are monitored, and why two runs with different random starting weights can give slightly different models.</p></div>
+
+<h3 id="ch12-5"><span class="num">12.5</span>Backpropagation: sharing out the blame</h3>
+<p>Gradient descent needs the gradient for every weight. In a network with many layers, a weight deep inside affects the output only indirectly, through all the layers after it. <strong>Backpropagation</strong> ("backprop") is the method that works out each weight's share of the blame, starting at the output and working backwards, layer by layer.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A release goes out with a serious bug. The post-mortem starts at the end (the customer saw a crash) and works backwards: the crash came from a null value, the null came from an API change, the API change slipped through because a contract test was missing. Each step back asks "how much did this contribute to the step after it?" Backprop does the same thing with numbers, and it multiplies the contributions along the chain.</p></div>
+<p>That multiplying-along-the-chain idea is the <strong>chain rule</strong> from calculus: if A affects B, and B affects the loss, then A's effect on the loss is (A's effect on B) × (B's effect on the loss).</p>
+
+<h4>A worked example with two weights</h4>
+<p>Take the smallest possible "deep" network: one input, one hidden value, one output, and two weights. No bias and no activation function, so the arithmetic stays simple.</p>
+<div class="flow">
+<div><b>Input</b>x = 2</div>
+<div><b>Weight 1</b>h = w1 × x</div>
+<div><b>Weight 2</b>ŷ = w2 × h</div>
+<div class="hl"><b>Loss</b>(ŷ − target)², target = 8</div>
+</div>
+<p>Both weights start at 1, and the learning rate is 0.01.</p>
+<div class="tbl"><table>
+<tr><th>Step</th><th>Calculation</th><th>Result</th><th>Meaning</th></tr>
+<tr><td colspan="4"><b>Forward pass</b></td></tr>
+<tr><td>Hidden value</td><td>h = 1 × 2</td><td>2</td><td></td></tr>
+<tr><td>Prediction</td><td>ŷ = 1 × 2</td><td>2</td><td>We wanted 8</td></tr>
+<tr><td>Loss</td><td>(2 − 8)²</td><td>36</td><td>Very wrong</td></tr>
+<tr><td colspan="4"><b>Backward pass</b></td></tr>
+<tr><td>Loss vs prediction</td><td>2 × (ŷ − target) = 2 × (−6)</td><td>−12</td><td>Raising ŷ would lower the loss</td></tr>
+<tr><td>Loss vs w2</td><td>−12 × h = −12 × 2</td><td>−24</td><td>w2 multiplied h, so its blame is scaled by h</td></tr>
+<tr><td>Loss vs h</td><td>−12 × w2 = −12 × 1</td><td>−12</td><td>Blame passed back to the hidden value</td></tr>
+<tr><td>Loss vs w1</td><td>−12 × x = −12 × 2</td><td>−24</td><td>w1 multiplied x, so its blame is scaled by x</td></tr>
+<tr><td colspan="4"><b>Update</b></td></tr>
+<tr><td>New w2</td><td>1 − 0.01 × (−24)</td><td>1.24</td><td>Negative gradient, so the weight goes up</td></tr>
+<tr><td>New w1</td><td>1 − 0.01 × (−24)</td><td>1.24</td><td></td></tr>
+<tr><td>New loss</td><td>(1.24 × 1.24 × 2 − 8)²</td><td>24.25</td><td>Down from 36 after one step</td></tr>
+</table></div>
+<p>Notice the pattern. The backward pass reused numbers saved from the forward pass (h, w2, x). That's the trick that makes backprop cheap: one forward pass, one backward pass, and you have the gradient for <em>every</em> weight, no matter how many there are. The cost is roughly two to three forward passes, rather than one per weight.</p>
+<details class="deep"><summary>Backprop in a real network</summary><div class="body">
+<p>Real networks add biases, activation functions and many neurons per layer, but nothing new in principle. Each operation (multiply, add, ReLU, softmax) has a simple local rule for passing blame backwards. For ReLU, for example, the rule is: if the neuron's input was positive, pass the blame straight through; if it was negative, pass back zero, because the neuron was switched off and couldn't have contributed.</p>
+<p>Frameworks such as PyTorch and JAX record every operation during the forward pass and apply these local rules in reverse automatically. This is called <strong>automatic differentiation</strong>. Engineers almost never write backprop by hand any more; they define the forward pass and call one function to get all gradients.</p>
+<p>A known problem in deep networks is the <strong>vanishing gradient</strong>: when blame is multiplied by many small numbers on the way back, it shrinks towards zero and the early layers barely learn. Better activation functions (ReLU instead of sigmoid), careful starting weights, and the "residual connections" you'll meet in <a href="#ch16">Chapter 16</a> were all partly invented to fix this.</p>
+</div></details>
+<ol class="timeline">
+<li><span class="yr">1847</span><span class="ev"><b>Augustin-Louis Cauchy</b> describes the method of steepest descent for solving equations, the ancestor of gradient descent.</span></li>
+<li><span class="yr">1970</span><span class="ev"><b>Seppo Linnainmaa</b> publishes reverse-mode automatic differentiation, the mathematical core of backprop.</span></li>
+<li class="key"><span class="yr">1986</span><span class="ev"><b>Rumelhart, Hinton and Williams</b> publish "Learning representations by back-propagating errors" in <i>Nature</i>, showing it trains multi-layer networks that learn useful internal features. This made backprop famous (<a href="#ch5">Chapter 5</a>).</span></li>
+<li><span class="yr">2012</span><span class="ev"><b>AlexNet</b> trains a large network with backprop on GPUs and wins the ImageNet competition, starting the deep-learning boom.</span></li>
+</ol>
+
+<h3 id="ch12-6"><span class="num">12.6</span>Epochs and batches: the rhythm of training</h3>
+<p>Two more words come up constantly in training logs.</p>
+<div class="tbl"><table>
+<tr><th>Term</th><th>Meaning</th><th>Analogy</th></tr>
+<tr><td><b>Batch</b></td><td>A small group of examples processed together. The network averages their gradients and makes one update.</td><td>Marking a stack of 32 exam papers, then adjusting your teaching once, rather than after every paper</td></tr>
+<tr><td><b>Step (iteration)</b></td><td>One update of the weights, from one batch</td><td>One adjustment</td></tr>
+<tr><td><b>Epoch</b></td><td>One full pass through the whole training set</td><td>Reading the whole textbook once</td></tr>
+</table></div>
+<p>Why batches? Updating after every single example is noisy: one weird example can push the weights the wrong way. Using the whole dataset for every update is accurate but slow. A batch of, say, 32 to a few thousand examples is a practical middle ground, and it suits <a class="gl" href="#g-gpu">GPUs</a>, which are built to do many calculations at once. Gradient descent on random batches is called <strong>stochastic gradient descent</strong> (SGD); "stochastic" just means "involving randomness".</p>
+<p>Illustrative arithmetic: 10,000 training examples with a batch size of 100 gives 100 steps per epoch. Ten epochs is 1,000 steps. Small models are often trained for many epochs. Large language models are different: they see so much text that they typically pass over most of it only about once (<a href="#ch17">Chapter 17</a>).</p>
+
+<h3 id="ch12-7"><span class="num">12.7</span>Overfitting, underfitting and the validation set</h3>
+<p>A low training loss doesn't prove the network is good. It might have just memorised the training examples. What we really want is <strong>generalisation</strong>: doing well on examples it has never seen.</p>
+<div class="tbl"><table>
+<tr><th></th><th>Underfitting</th><th>Good fit</th><th>Overfitting</th></tr>
+<tr><td><b>What it means</b></td><td>The model is too simple, or hasn't trained enough, to capture the pattern</td><td>It has learned the real pattern</td><td>It has learned the noise and quirks of the training data too</td></tr>
+<tr><td><b>Training loss</b></td><td>High</td><td>Low</td><td>Very low</td></tr>
+<tr><td><b>Validation loss</b></td><td>High</td><td>Low, close to training</td><td>Higher than training, and often rising</td></tr>
+<tr><td><b>Student analogy</b></td><td>Skimmed the book; fails everything</td><td>Understands the subject</td><td>Memorised last year's paper word for word; lost on new questions</td></tr>
+</table></div>
+<p>To tell them apart, you hold some data back. The <strong>training set</strong> is used to adjust the weights. The <strong>validation set</strong> is never trained on; you check the loss on it regularly to see whether the model generalises. A separate <strong>test set</strong> is kept for one final, honest score at the very end. <a href="#ch13">Chapter 13</a> covers these splits in detail.</p>
+<div class="figure" role="img" aria-label="Illustrative training and validation loss over epochs: both fall, then validation loss starts rising while training loss keeps falling">
+<div class="bars"><div class="bt">Illustrative: validation loss over time (overfitting begins after epoch 30)</div>
+<div class="bar-row"><span>Epoch 1</span><span class="track"><span class="fill" style="width:90%">0.90</span></span></div>
+<div class="bar-row"><span>Epoch 10</span><span class="track"><span class="fill" style="width:40%">0.40</span></span></div>
+<div class="bar-row"><span>Epoch 20</span><span class="track"><span class="fill" style="width:24%">0.24</span></span></div>
+<div class="bar-row"><span>Epoch 30</span><span class="track"><span class="fill hl" style="width:20%">0.20 best</span></span></div>
+<div class="bar-row"><span>Epoch 50</span><span class="track"><span class="fill" style="width:27%">0.27</span></span></div>
+<div class="bar-row"><span>Epoch 80</span><span class="track"><span class="fill" style="width:38%">0.38</span></span></div>
+</div>
+<div class="cap">Made-up numbers to show the typical shape. Training loss (not shown) keeps falling throughout. The best model is the one saved at the lowest validation loss.</div></div>
+<p>Common defences against overfitting:</p>
+<ul>
+<li><strong>Early stopping:</strong> keep the weights from the epoch with the lowest validation loss and stop when it starts rising.</li>
+<li><strong>More and more varied data:</strong> harder to memorise, easier to generalise.</li>
+<li><strong>Regularisation:</strong> techniques that discourage extreme weights, such as <em>weight decay</em>, or <em>dropout</em>, which randomly switches off some neurons during training so the network can't rely on any single one.</li>
+<li><strong>A smaller model:</strong> fewer parameters means less capacity to memorise. (Cuts the other way if you're underfitting.)</li>
+</ul>
+<div class="box example"><span class="tag">Real-world example</span><p>A team builds a flaky-test predictor from six months of CI history. On the training data it is 99% accurate (illustrative). On last week's runs, which it never saw, it's barely better than guessing. Investigation shows it learned that tests with certain build numbers were flaky: a quirk of when an unstable test machine was in service, not a real signal. Classic overfitting, caught only because someone kept a validation set from a later time period.</p></div>
+<div class="box note"><span class="tag">For testers</span><p>The validation set plays the same role as a regression suite the developers never saw. If the people building a model tune it again and again against the same validation set, it slowly "leaks" into the training process and stops being an honest check. That's why the test set is kept locked away until the end, just as you wouldn't let developers tune code against the exact acceptance tests used for sign-off.</p></div>
+
+<h3 id="ch12-8"><span class="num">12.8</span>Watch a program learn</h3>
+<p>This lab uses plain Python, no libraries. The "network" is a single neuron with one weight and one bias: it predicts a test suite's run time from its size. It's deliberately tiny so every number is visible, but the loop is exactly the one used to train large models: predict, measure loss, compute gradients, step downhill, repeat.</p>
+<div class="code"><span class="cap">learn.py</span><pre># learn.py - a tiny model that learns by gradient descent (no libraries needed)
+import sys
+
+# Illustrative data: x = hundreds of tests in a suite, y = run time in minutes
+train = [(1, 3.1), (2, 4.9), (3, 7.2), (4, 8.8), (5, 11.1)]
+valid = [(6, 12.9), (7, 15.2)]   # held back: the model never trains on these
+
+def predict(w, b, x):
+    return w * x + b
+
+def mse(w, b, data):
+    return sum((predict(w, b, x) - y) ** 2 for x, y in data) / len(data)
+
+lr = float(sys.argv[1]) if len(sys.argv) &gt; 1 else 0.05
+epochs = 200
+w, b = 0.0, 0.0                   # start knowing nothing
+
+for epoch in range(epochs + 1):
+    if epoch % 40 == 0:
+        print(f"epoch {epoch:3d}  w={w:8.4g}  b={b:8.4g}  "
+              f"train loss={mse(w, b, train):9.4g}  valid loss={mse(w, b, valid):9.4g}")
+    # gradients of the mean squared error with respect to w and b
+    n = len(train)
+    dw = sum(2 * (predict(w, b, x) - y) * x for x, y in train) / n
+    db = sum(2 * (predict(w, b, x) - y) for x, y in train) / n
+    # step downhill
+    w -= lr * dw
+    b -= lr * db
+
+print(f"\nPrediction for 800 tests: {predict(w, b, 8):.4g} minutes")</pre></div>
+<div class="code"><span class="cap">backprop.py</span><pre># backprop.py - one training step on a two-weight network, by hand
+x, target = 2.0, 8.0
+w1, w2 = 1.0, 1.0
+lr = 0.01
+
+# forward pass
+h = w1 * x            # hidden value
+y_hat = w2 * h        # prediction
+loss = (y_hat - target) ** 2
+print(f"forward:  h={h}  y_hat={y_hat}  loss={loss}")
+
+# backward pass (chain rule, from the loss back to each weight)
+d_yhat = 2 * (y_hat - target)   # how loss changes with the prediction
+d_w2 = d_yhat * h               # w2 multiplied h
+d_h = d_yhat * w2               # blame passed back to h
+d_w1 = d_h * x                  # w1 multiplied x
+print(f"backward: dL/dy_hat={d_yhat}  dL/dw2={d_w2}  dL/dh={d_h}  dL/dw1={d_w1}")
+
+# check with a numerical estimate: nudge w1 a tiny amount
+eps = 1e-6
+num = (((w2 * (w1 + eps) * x) - target) ** 2 - loss) / eps
+print(f"check:    numerical dL/dw1 = {num:.3f}")
+
+# update
+w1 -= lr * d_w1
+w2 -= lr * d_w2
+new_loss = (w2 * w1 * x - target) ** 2
+print(f"update:   w1={w1:.2f}  w2={w2:.2f}  new loss={new_loss:.2f}")</pre></div>
+
+<div class="lab"><div class="lab-h"><b>Make a program learn, then break it</b><span>25 min · your computer, Python 3</span></div><ol>
+<li>Check Python is installed: open a <a class="gl" href="#g-terminal">terminal</a> and run <code>python3 --version</code>. On Windows, try <code>py --version</code> and use <code>py</code> instead of <code>python3</code> below.<span class="expect">A version such as Python 3.12.x. Any Python 3 works.</span></li>
+<li>Make a folder, save the two programs above as <code>learn.py</code> and <code>backprop.py</code>, then run <code>python3 backprop.py</code>.<span class="expect">Four lines: <code>forward: h=2.0 y_hat=2.0 loss=36.0</code>, then gradients of −12, −24, −12, −24, a numerical check of <code>-24.000</code>, and <code>update: w1=1.24 w2=1.24 new loss=24.25</code>. These match the table in 12.5.</span></li>
+<li>Run <code>python3 learn.py</code> (learning rate 0.05).<span class="expect">The first line shows train loss 57.22. By epoch 40 it's about 0.031 and w is about 2.06, b about 0.82. At epoch 200, w ≈ 1.994, b ≈ 1.035, and the prediction for 800 tests is about 16.99 minutes. The program discovered "about 2 minutes per hundred tests plus 1 minute of setup" from five examples.</span></li>
+<li>Run <code>python3 learn.py 0.001</code> (a tiny learning rate).<span class="expect">Loss falls slowly: about 8.5 at epoch 40 and 0.06 at epoch 200. Still improving at the end.</span></li>
+<li>Run <code>python3 learn.py 0.1</code> (too big).<span class="expect">The loss explodes to numbers like 3.963e+12 by epoch 40 and keeps growing. w swings to huge negative values. This is divergence.</span></li>
+<li>Compare the train and valid loss columns in step 3.<span class="expect">They stay close (both around 0.02–0.03), which means the model generalises to suite sizes 6 and 7, which it never trained on. A straight line is too simple to overfit five points much.</span></li>
+<li>Stretch: change <code>valid</code> to <code>[(6, 30.0), (7, 15.2)]</code> (a measurement error) and rerun.<span class="expect">Training loss is unchanged, but validation loss jumps to about 145. A bad validation label makes a good model look bad: data quality matters (<a href="#ch13">Chapter 13</a>).</span></li>
+</ol></div>
+<div class="box note"><span class="tag">Troubleshooting</span><p><b>"command not found: python3"</b>: install Python from python.org, or use <code>py</code> on Windows. <b>SyntaxError on an f-string</b>: you're on Python 2; use Python 3. <b>IndentationError</b>: the code lost its spaces when copied; make sure lines inside <code>for</code> and <code>def</code> are indented by four spaces. <b>Slightly different decimals</b>: fine, as long as the trend is the same.</p></div>
+
+<div class="box opinion"><span class="tag">Opinion · many deep-learning researchers</span><p>A view widely held among researchers, often summarised in Richard Sutton's 2019 essay "The Bitter Lesson", is that general methods which scale with computing power, like gradient descent on large networks, have beaten hand-crafted cleverness again and again. Others argue that pure scaling will hit limits and that new ideas are needed. Both camps agree that gradient descent and backprop are, so far, how every major model has been trained.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"The network understands why it was wrong."</dt><dd>It only receives a number (the loss) and follows the slope. There is no reflection; "blame" is arithmetic.</dd>
+<dt>"Claude learns from my conversation as we talk."</dt><dd>No. Training happens beforehand. During a chat, the weights are frozen; the model is only doing forward passes (<a class="gl" href="#g-inference">inference</a>). Whether your data is used for <em>future</em> training is a separate policy question, covered in <a href="#ch13">Chapter 13</a>.</dd>
+<dt>"Lower training loss is always better."</dt><dd>Not if validation loss is rising. That's overfitting.</dd>
+<dt>"Backpropagation is how the brain learns."</dt><dd>It was loosely inspired by neuroscience, but whether brains do anything like it is an open research question. Treat it as an engineering method.</dd>
+<dt>"A bigger learning rate means faster learning."</dt><dd>Only up to a point. Past it, training diverges, as the lab shows.</dd>
+</dl></div>
+
+<h3 id="ch12-r"><span class="num">12.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>The loss function turns "how wrong" into one number. The network becomes good at exactly what the loss measures.</li>
+<li>Gradient descent lowers the loss by stepping each weight against its gradient: new = old − learning rate × gradient.</li>
+<li>The learning rate sets step size: too small is slow, too big diverges.</li>
+<li>Backpropagation uses the chain rule to get every weight's gradient in one backward pass, reusing values from the forward pass.</li>
+<li>Training runs in batches (one update each) and epochs (one pass over the data).</li>
+<li>Watch the validation loss: rising validation loss with falling training loss means overfitting.</li>
+<li>Once trained, a model's weights are fixed while you use it. Chatting doesn't train it.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">A weight's gradient is +3. What does gradient descent do to that weight?</p><div class="opts"><button>Increases it, because the gradient is positive</button><button data-ok>Decreases it, because raising it would increase the loss</button><button>Leaves it alone</button></div><p class="why" hidden>The update subtracts learning rate × gradient. A positive gradient means "uphill this way", so the weight moves the other way.</p></div>
+<div class="qz"><p class="q">During training, the loss shoots up to enormous numbers within a few epochs. What is the most likely cause?</p><div class="opts"><button>The learning rate is too small</button><button>The validation set is too large</button><button data-ok>The learning rate is too large</button></div><p class="why" hidden>Steps that are too big overshoot the valley and climb ever higher. The lab showed this at 0.1.</p></div>
+<div class="qz"><p class="q">What does backpropagation compute?</p><div class="opts"><button data-ok>How much each weight contributed to the loss (its gradient)</button><button>The model's final prediction</button><button>The best learning rate</button></div><p class="why" hidden>Backprop works backwards from the loss through each layer using the chain rule. Gradient descent then uses those gradients to update the weights.</p></div>
+<div class="qz"><p class="q">Training loss keeps falling, but validation loss started rising ten epochs ago. What's happening?</p><div class="opts"><button>Underfitting</button><button data-ok>Overfitting</button><button>Divergence</button></div><p class="why" hidden>The model is learning quirks of the training data that don't carry over to new examples. Early stopping would keep the weights from ten epochs ago.</p></div>
+<div class="qz"><p class="q">You have 50,000 examples and a batch size of 500. How many weight updates happen in one epoch?</p><div class="opts"><button>500</button><button>50,000</button><button data-ok>100</button></div><p class="why" hidden>One update per batch: 50,000 ÷ 500 = 100 steps per epoch.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Find one place in your team's work where something is "trained" or tuned against data: a flaky-test detector, an alert threshold, a test-selection rule, or even a spreadsheet forecast. Write half a page answering: (1) What is the "loss": how is wrongness measured? (2) What is the training data, and what is held back for validation? (3) What would overfitting look like here? (4) How would you, as a tester, check it generalises? If nothing in your team is trained, apply the same questions to the <code>learn.py</code> model and propose a better validation set for it.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"A neural network starts with random weights, so it's useless. We show it an example, see how wrong it is, and turn that into one number called the loss. Then backpropagation works backwards through the network and figures out, for every weight, whether nudging it up would make the loss bigger or smaller. Gradient descent nudges every weight a tiny step in the helpful direction, like walking downhill in fog by feeling the slope. Do that millions of times and the network gets good. The step size, the learning rate, matters: too small is slow, too big and it blows up. And we always check on data it never trained on, because memorising isn't learning."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>D. E. Rumelhart, G. E. Hinton and R. J. Williams, "<a href="https://www.nature.com/articles/323533a0" target="_blank" rel="noopener">Learning representations by back-propagating errors</a>", <i>Nature</i> 323 (1986).</li>
+<li>S. Linnainmaa, master's thesis, University of Helsinki (1970): reverse-mode automatic differentiation.</li>
+<li>A.-L. Cauchy, "Méthode générale pour la résolution des systèmes d'équations simultanées", <i>Comptes rendus</i> (1847).</li>
+<li>D. P. Kingma and J. Ba, "<a href="https://arxiv.org/abs/1412.6980" target="_blank" rel="noopener">Adam: A Method for Stochastic Optimization</a>" (2014).</li>
+<li>N. Srivastava et al., "<a href="https://jmlr.org/papers/v15/srivastava14a.html" target="_blank" rel="noopener">Dropout: A Simple Way to Prevent Neural Networks from Overfitting</a>", <i>JMLR</i> (2014).</li>
+<li>R. Sutton, "<a href="http://www.incompleteideas.net/IncIdeas/BitterLesson.html" target="_blank" rel="noopener">The Bitter Lesson</a>" (2019).</li>
+<li>I. Goodfellow, Y. Bengio and A. Courville, <a href="https://www.deeplearningbook.org/" target="_blank" rel="noopener"><i>Deep Learning</i></a> (MIT Press, 2016), chapters 6–8. Free online.</li>
+<li>3Blue1Brown, <a href="https://www.3blue1brown.com/topics/neural-networks" target="_blank" rel="noopener">Neural networks</a> video series: visual explanations of gradient descent and backprop.</li>
+</ol><p class="verified">Content type: established concepts · Last reviewed 9 November 2026. Program output in 12.4 and the lab was produced by running the code shown with Python 3; all data is illustrative.</p></div>

@@ -1,0 +1,214 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>The six permission modes in Claude Code, their exact names, and what each one lets Claude do without asking</li>
+<li>Why new sessions now start in <code>auto</code> mode, and how auto mode's safety checker works at a high level</li>
+<li>How to switch modes with <kbd>Shift</kbd>+<kbd>Tab</kbd>, with <code>--permission-mode</code>, and in settings</li>
+<li>How to use plan mode properly: explore, plan, approve, then execute</li>
+<li>How to read a permission prompt and when to choose "don't ask again"</li>
+<li>How checkpoints and <code>/rewind</code> let you undo, and what they <em>can't</em> undo</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 65 (your first session) and Chapter 66 (the life of a task). Chapter 61 (Git) helps for the checkpoints section.</div>
+
+<div class="bigidea"><p>Claude Code can read files, change files and run commands on your computer. A <a class="gl" href="#g-permission-mode">permission mode</a> decides how much of that it may do without asking you first. Choosing the right mode is like choosing how closely to supervise a new colleague: sometimes you check every step, sometimes you only want a plan first, and sometimes you let them get on with it while an automatic checker watches. And if something goes wrong anyway, <a class="gl" href="#g-checkpoint">checkpoints</a> let you rewind Claude's file edits, much like an "undo" button, though one with important limits.</p></div>
+
+<h3 id="ch67-1"><span class="num">67.1</span>Why permission modes exist</h3>
+<p>Every time Claude wants to do something beyond reading (edit a file, run <code>npm test</code>, delete a folder), Claude Code checks whether it's allowed. The answer comes from three things, in this order:</p>
+<div class="flow">
+<div><b>Deny rules</b>Things that are never allowed, in any mode (Chapter 78)</div>
+<div><b>Allow and ask rules</b>Your saved "always allow" or "always ask" choices</div>
+<div class="hl"><b>Permission mode</b>The general level of freedom for everything else</div>
+<div><b>Result</b>Run it, ask you, or refuse</div>
+</div>
+<p>The mode is the "default setting" for everything not covered by a specific rule. It's the main dial you'll turn day to day.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a new tester joining your team. On day one, you review every bug they file before it goes to developers. After a month, you let them file bugs directly but still review anything marked "critical". After a year, you trust them with most things, and a team lead spot-checks the risky ones. Permission modes are the same idea: different levels of trust for different situations.</p></div>
+
+<h3 id="ch67-2"><span class="num">67.2</span>The six modes</h3>
+<p>Each mode has a <em>config value</em> (what you type in settings or flags) and a <em>label</em> (what you see on screen).</p>
+<div class="tbl"><table>
+<tr><th>Config value</th><th>Label on screen</th><th>What runs without asking</th><th>Best for</th></tr>
+<tr><td><code>default</code> (alias <code>manual</code>)</td><td>Manual</td><td>Reading files only. Everything else asks you first.</td><td>Learning; sensitive repositories; reviewing every action</td></tr>
+<tr><td><code>acceptEdits</code></td><td>Accept edits</td><td>Reading, editing files and common file commands such as <code>mkdir</code>, <code>touch</code>, <code>mv</code>, <code>cp</code></td><td>Iterating on code you'll review as a diff</td></tr>
+<tr><td><code>plan</code></td><td>Plan</td><td>Reading (plus commands the auto-mode checker approves, where auto mode is available). File edits are blocked until you approve a plan.</td><td>Exploring and planning before any change</td></tr>
+<tr><td><code>auto</code></td><td>Auto</td><td>Everything, with a background <a class="gl" href="#g-classifier">classifier</a> reviewing actions before they run</td><td>Long tasks with fewer interruptions</td></tr>
+<tr><td><code>dontAsk</code></td><td>Don't ask</td><td>Reading in the working folders and pre-approved tools only. Anything that would normally ask is <strong>refused</strong> instead.</td><td>Locked-down scripts and CI jobs</td></tr>
+<tr><td><code>bypassPermissions</code></td><td>Bypass permissions</td><td>Everything, with no checks</td><td>Isolated, throwaway containers or virtual machines only</td></tr>
+</table></div>
+<p>The status bar at the bottom of the screen always shows the current mode, for example <code>⏸ manual mode on</code>, <code>⏵⏵ accept edits on</code>, <code>⏸ plan mode on</code>, <code>⏵⏵ auto mode on</code>, <code>⏵⏵ don't ask on</code> or <code>⏵⏵ bypass permissions on</code>.</p>
+<div class="box warn"><span class="tag">Some things always ask or always stop</span><p>Deny rules block in <em>every</em> mode, including bypass. Explicit "ask" rules, and dangerous operations such as deleting critical paths with <code>rm</code>, still prompt you in every mode. Modes loosen the everyday checks; they don't switch off your safety net.</p></div>
+
+<h3 id="ch67-3"><span class="num">67.3</span>Which mode you start in, and why it's now "auto"</h3>
+<p>Older guides (including the first version of this book) said Claude Code starts by asking before everything. That changed. <strong>Since version 2.1.283, new interactive sessions in the terminal and in VS Code start in <code>auto</code> mode</strong>, if auto mode is available to you. Print mode (<code>claude -p</code>) and the Claude Agent SDK still start in <code>default</code> (Manual).</p>
+<p>The starting mode is decided in this order:</p>
+<ol>
+<li>The <code>--permission-mode</code> flag, if you used one.</li>
+<li><code>permissions.defaultMode</code> in your settings.</li>
+<li>The built-in default: <code>auto</code> for interactive sessions, <code>default</code> for <code>claude -p</code>.</li>
+</ol>
+<p>If auto mode isn't available (for example, the model doesn't support it, or your organisation has turned it off), the session starts in Manual instead.</p>
+<div class="code"><span class="cap">Terminal: choosing the starting mode</span><pre>claude --permission-mode plan          <span class="c"># start in plan mode</span>
+claude --permission-mode manual        <span class="c"># start in Manual (same as "default")</span>
+claude --permission-mode acceptEdits   <span class="c"># start accepting edits</span></pre></div>
+<div class="code"><span class="cap">~/.claude/settings.json: always start in Manual</span><pre>{
+  "permissions": {
+    "defaultMode": "default"
+  }
+}</pre></div>
+<div class="box note"><span class="tag">Where you set it matters</span><p><code>auto</code> and <code>bypassPermissions</code> do <strong>not</strong> take effect from project or local settings files. To make one of them your default, put it in your user settings (<code>~/.claude/settings.json</code>). This stops a repository you clone from quietly switching your safety level. An organisation can also remove auto mode entirely with the <code>disableAutoMode</code> setting.</p></div>
+
+<h3 id="ch67-4"><span class="num">67.4</span>Switching modes with Shift+Tab</h3>
+<p>During a session, press <kbd>Shift</kbd>+<kbd>Tab</kbd> to move to the next mode. The cycle goes:</p>
+<div class="flow">
+<div><b>Manual</b><code>default</code></div>
+<div><b>Accept edits</b><code>acceptEdits</code></div>
+<div><b>Plan</b><code>plan</code></div>
+<div><b>Bypass</b>only if enabled at start</div>
+<div class="hl"><b>Auto</b>last, when available</div>
+</div>
+<ul>
+<li>From <code>auto</code>, the next press goes back to Manual.</li>
+<li><code>bypassPermissions</code> only appears in the cycle if you started with <code>--permission-mode bypassPermissions</code>, <code>--dangerously-skip-permissions</code>, <code>--allow-dangerously-skip-permissions</code>, or <code>defaultMode: "bypassPermissions"</code> in user, <code>--settings</code> or managed settings.</li>
+<li><code>dontAsk</code> <strong>never</strong> appears in the cycle. You can only choose it with <code>--permission-mode dontAsk</code>.</li>
+<li><code>/plan</code> jumps straight into plan mode, and can take a task: <code>/plan add tests for the coupon rules</code>.</li>
+</ul>
+<p>In other surfaces the same modes appear differently: a mode indicator in VS Code, a selector in the desktop app, and a drop-down on claude.ai/code. Cloud sessions offer only Accept edits, Plan and Auto.</p>
+
+<h3 id="ch67-5"><span class="num">67.5</span>Auto mode: how the checker works</h3>
+<p>In <a class="gl" href="#g-auto-mode">auto mode</a>, Claude doesn't stop to ask you about routine actions. Instead, a separate automatic checker (Anthropic's documentation calls it a background <em>classifier</em>) reviews each action before it runs, and refuses ones it judges risky. You get far fewer interruptions on long tasks, without switching off safety completely.</p>
+<div class="flow">
+<div><b>Claude wants to act</b>e.g. run <code>npx playwright test</code></div>
+<div><b>Rules first</b>Deny and ask rules still apply</div>
+<div class="hl"><b>Classifier review</b>An automatic check judges whether the action looks safe for this task</div>
+<div><b>Run or refuse</b>Safe-looking actions run; risky ones are denied</div>
+</div>
+<p>You can inspect and tune it:</p>
+<div class="tbl"><table>
+<tr><th>Command</th><th>What it does</th></tr>
+<tr><td><code>/permissions</code></td><td>Manage allow / ask / deny rules, and review actions auto mode denied</td></tr>
+<tr><td><code>/auto-mode-setup</code></td><td>Drafts <code>autoMode.environment</code> entries describing your project, and saves them to user settings after you review them</td></tr>
+<tr><td><code>claude auto-mode config</code></td><td>Prints the auto-mode configuration currently in effect, as JSON</td></tr>
+<tr><td><code>claude auto-mode defaults</code></td><td>Prints the built-in classifier rules</td></tr>
+<tr><td><code>claude auto-mode critique</code></td><td>Gets AI feedback on your custom auto-mode rules</td></tr>
+<tr><td><code>claude auto-mode reset</code></td><td>Removes the <code>autoMode</code> section from your user settings</td></tr>
+</table></div>
+<p>In Manual or Accept edits mode, a Bash permission prompt may offer <strong>"Yes, and switch to auto mode"</strong>: a quick way to hand over once you're comfortable with where a task is going.</p>
+<div class="box warn"><span class="tag">Limits of auto mode</span><p>The classifier is an automated judgement, not a guarantee. It can't know your company's unwritten rules (for example, "never touch the shared staging database"). Write those down as deny rules (Chapter 78), keep secrets out of reach, and still review the diff at the end. For high-stakes repositories, Manual or plan mode is the safer choice.</p></div>
+<details class="deep"><summary>The old flag that no longer exists</summary><div class="body">
+<p>Early versions had a flag called <code>--enable-auto-mode</code>. It was removed in version 2.1.111. The correct way today is <code>--permission-mode auto</code>, or simply nothing at all, since auto is the interactive default. If you find the old flag in a team script or wiki page, update it.</p>
+</div></details>
+
+<h3 id="ch67-6"><span class="num">67.6</span>Plan mode in depth</h3>
+<p><a class="gl" href="#g-plan-mode">Plan mode</a> is the single most valuable habit for serious work. In plan mode Claude can read and investigate, but it <strong>cannot edit files</strong> until you approve its plan.</p>
+<div class="flow">
+<div><b>1 · Explore</b>Claude reads code, tests and docs</div>
+<div><b>2 · Plan</b>It proposes a step-by-step plan</div>
+<div class="hl"><b>3 · You review</b>Correct mistakes, add constraints</div>
+<div><b>4 · Approve</b>Choose how to proceed (for example, with auto or accept edits)</div>
+<div><b>5 · Execute</b>Claude carries out the approved plan</div>
+</div>
+<h4>When to use plan mode</h4>
+<ul>
+<li>Any change touching more than one or two files.</li>
+<li>Unfamiliar code or a repository you don't own.</li>
+<li>Anything where a wrong first step is expensive (database migrations, shared test data, CI configuration).</li>
+<li>When you're not sure what you want yet. Asking for a plan is a cheap way to think.</li>
+</ul>
+<div class="box example"><span class="tag">Real-world example: a QA plan</span><p>You type: <em>"/plan Add Playwright tests for the expired-coupon rules in docs/CHK-412.md. Follow the conventions in CLAUDE.md."</em> Claude reads the story, the existing tests and page objects, then proposes: three test cases, a new fixture for an expired coupon, no changes to <code>src/</code>. You notice it missed "two coupons can't stack", add it, and approve. The tests it then writes match what you actually needed, first time.</p></div>
+<div class="box note"><span class="tag">The opusplan alias</span><p>The model alias <code>opusplan</code> uses Opus in plan mode and Sonnet for execution: a stronger model for thinking, a faster one for doing. Chapter 68 covers models and aliases.</p></div>
+
+<h3 id="ch67-7"><span class="num">67.7</span>Reading a permission prompt</h3>
+<p>When Claude needs permission, it shows exactly what it wants to do, for example the full command. You typically choose between allowing it once, allowing it and not being asked again for that kind of action (which saves a rule), or refusing, optionally telling Claude what to do instead.</p>
+<div class="tbl"><table>
+<tr><th>The prompt shows</th><th>Ask yourself</th></tr>
+<tr><td>A command, e.g. <code>npx playwright test checkout</code></td><td>Do I know what this does? Does it only touch test files and a test environment?</td></tr>
+<tr><td>A delete, e.g. <code>rm -rf test-results/</code></td><td>Is that folder safe to lose? Is the path exactly right?</td></tr>
+<tr><td>A push or deploy, e.g. <code>git push</code></td><td>Have I reviewed the diff? Is this the right branch?</td></tr>
+<tr><td>A network call, e.g. <code>curl</code> to an unknown address</td><td>Why is it contacting that site? Could data be leaving my machine?</td></tr>
+</table></div>
+<p>"Don't ask again" is a good choice for <strong>safe, repetitive</strong> commands such as running your test suite or linter. It's a poor choice for anything destructive, anything that sends data elsewhere, or anything you don't fully understand. Saved rules can be reviewed and removed later with <code>/permissions</code>. Chapter 78 explains the rule syntax in full.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A permission prompt is a test step with an expected result. A tester would never click "pass" without checking the outcome. Treat "Allow" the same way: read, understand, then approve.</p></div>
+
+<h3 id="ch67-8"><span class="num">67.8</span>Checkpoints and rewind</h3>
+<p>Every prompt you send that starts a turn creates a <a class="gl" href="#g-checkpoint">checkpoint</a> of the files Claude edits. If something goes wrong, you can go back.</p>
+<ul>
+<li>Open the rewind menu with <code>/rewind</code> (aliases <code>/checkpoint</code> and <code>/undo</code>), or press <kbd>Esc</kbd> <kbd>Esc</kbd> on an empty prompt.</li>
+<li>Pick the point you want to return to, then choose an action:</li>
+</ul>
+<div class="tbl"><table>
+<tr><th>Action</th><th>What happens</th></tr>
+<tr><td>Restore code and conversation</td><td>Files and the conversation both go back to that point</td></tr>
+<tr><td>Restore conversation</td><td>The conversation goes back; files stay as they are now</td></tr>
+<tr><td>Restore code</td><td>Files go back; the conversation stays</td></tr>
+<tr><td>Summarize from here / Summarize up to here</td><td>Condense part of the conversation to save context (Chapter 68)</td></tr>
+<tr><td>Never mind</td><td>Close the menu without changing anything</td></tr>
+</table></div>
+<p>Snapshots are kept for the 100 most recent checkpoints, survive resuming a session, and are cleaned up after about 30 days (controlled by the <code>cleanupPeriodDays</code> setting).</p>
+<div class="box warn"><span class="tag">What rewind can't undo</span><ul>
+<li><strong>Files changed by shell commands are not tracked.</strong> If Claude ran a script that rewrote files, or <code>rm</code> deleted something, rewind won't bring it back.</li>
+<li>Most edits made by subagents aren't restored.</li>
+<li>Edits made outside Claude Code (by you, your editor or another tool) aren't tracked.</li>
+<li>Symlinks and hard links are skipped.</li>
+<li>Anything that left your machine, such as a pushed commit, a Jira comment, an email or a database write through MCP, can't be "rewound" at all.</li>
+</ul><p>Checkpoints are a convenience, <strong>not a replacement for Git</strong>. Commit good states often (Chapter 61).</p></div>
+<details class="deep"><summary>Why shell commands escape checkpoints</summary><div class="body">
+<p>Claude Code takes a snapshot when <em>its own file tools</em> (Edit and Write) change a file, because it knows exactly which file is about to change. A shell command is a black box: <code>npm run generate</code> might touch hundreds of files, a database, or the network. Claude Code can't know in advance what to snapshot, so it doesn't try. This is one more reason to read Bash permission prompts carefully: they're the actions you can't easily undo.</p>
+</div></details>
+
+<h3 id="ch67-9"><span class="num">67.9</span>Worktrees: a safe separate copy</h3>
+<p>When you want Claude to try something risky or work on two things at once, a Git worktree gives it a separate working copy of your repository on its own branch:</p>
+<div class="code"><span class="cap">Terminal</span><pre>claude --worktree coupon-tests      <span class="c"># or: claude -w coupon-tests</span></pre></div>
+<p>This creates <code>.claude/worktrees/coupon-tests/</code> on a branch called <code>worktree-coupon-tests</code>. Your main folder stays untouched. Chapter 69 covers worktrees and parallel work in detail.</p>
+
+<h3 id="ch67-10"><span class="num">67.10</span>Choosing a mode: a QA cheat sheet</h3>
+<div class="tbl"><table>
+<tr><th>Situation</th><th>Suggested mode</th></tr>
+<tr><td>First time in a repository, or learning Claude Code</td><td>Manual</td></tr>
+<tr><td>Designing new tests or a refactor</td><td>Plan, then approve into Accept edits or Auto</td></tr>
+<tr><td>Writing tests you'll review as a diff before committing</td><td>Accept edits</td></tr>
+<tr><td>Long, well-understood task such as fixing many lint errors</td><td>Auto, with deny rules for secrets and pushes</td></tr>
+<tr><td>Nightly CI summary job</td><td><code>dontAsk</code> with a short list of allowed tools</td></tr>
+<tr><td>Disposable container with no access to real systems</td><td>Bypass permissions (only here)</td></tr>
+</table></div>
+
+<div class="lab"><div class="lab-h"><b>Modes, plans and rewind</b><span>40 min · a practice repository such as ~/claude-lab</span></div><ol>
+<li>Start <code>claude</code> and look at the status bar.<span class="expect"><code>⏵⏵ auto mode on</code> (or Manual if auto isn't available to you).</span></li>
+<li>Press <kbd>Shift</kbd>+<kbd>Tab</kbd> several times and watch the status bar change.<span class="expect">Manual → Accept edits → Plan → Auto, and back to Manual.</span></li>
+<li>Enter plan mode and ask: "Plan how you would add a 'mark all done' button to index.html. Don't change anything yet."<span class="expect">a written plan and no file changes. Run <code>!git status</code> to confirm nothing changed.</span></li>
+<li>Correct one detail in the plan, then approve it.<span class="expect">Claude edits the file following your corrected plan.</span></li>
+<li>Press <kbd>Esc</kbd> <kbd>Esc</kbd> on an empty prompt, pick the checkpoint before the edit and choose "Restore code".<span class="expect">index.html goes back to how it was; <code>!git diff</code> shows no changes.</span></li>
+<li>Run <code>/permissions</code> and look at your saved rules.<span class="expect">a list of allow, ask and deny rules (possibly empty).</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Claude Code always asks before doing anything."</dt><dd>Not any more. Interactive sessions start in auto mode since version 2.1.283, where a classifier reviews actions instead of asking you.</dd>
+<dt>"Auto mode and bypass mode are the same."</dt><dd>Auto mode still checks each action and refuses risky ones. Bypass mode checks nothing and belongs only in isolated containers.</dd>
+<dt>"Rewind undoes everything Claude did."</dt><dd>It restores files changed by Claude's own edit tools. Shell-command changes, external edits and anything sent elsewhere aren't covered.</dd>
+<dt>"Plan mode is slower, so skip it."</dt><dd>A two-minute plan review usually saves far more time than undoing a wrong change.</dd>
+<dt>"Setting auto in the project's settings file will turn it on for everyone."</dt><dd><code>auto</code> and <code>bypassPermissions</code> are ignored in project and local settings files; they only work from user settings or the command line.</dd>
+</dl></div>
+
+<h3 id="ch67-r"><span class="num">67.11</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Six modes: <code>default</code> (Manual), <code>acceptEdits</code>, <code>plan</code>, <code>auto</code>, <code>dontAsk</code> and <code>bypassPermissions</code>.</li>
+<li>Interactive sessions start in <code>auto</code> since v2.1.283; <code>claude -p</code> starts in <code>default</code>.</li>
+<li><kbd>Shift</kbd>+<kbd>Tab</kbd> cycles Manual → Accept edits → Plan → (Bypass) → Auto; <code>dontAsk</code> is never in the cycle.</li>
+<li>Deny rules work in every mode; auto mode adds a classifier, bypass removes all checks.</li>
+<li>Plan first for anything significant: explore, plan, review, approve, execute.</li>
+<li><code>/rewind</code> or <kbd>Esc</kbd> <kbd>Esc</kbd> restores Claude's own file edits, but not shell-command changes. Use Git as well.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">You start an interactive Claude Code session in the terminal with no flags or settings (version 2.1.319). Which mode are you in, if it's available?</p><div class="opts"><button>Manual</button><button data-ok>Auto</button><button>Plan</button></div><p class="why" hidden>Since v2.1.283 interactive sessions start in auto mode. <code>claude -p</code> starts in default (Manual).</p></div>
+<div class="qz"><p class="q">How do you get into <code>dontAsk</code> mode?</p><div class="opts"><button>Press Shift+Tab until it appears</button><button data-ok>Start with <code>--permission-mode dontAsk</code></button><button>Type /dontask</button></div><p class="why" hidden><code>dontAsk</code> never appears in the Shift+Tab cycle; it's set with the flag.</p></div>
+<div class="qz"><p class="q">Claude ran a code-generation script that rewrote 40 files. You rewind to the checkpoint before it. What happens to those 40 files?</p><div class="opts"><button>They are restored</button><button data-ok>They are not restored, because files changed by shell commands aren't tracked</button><button>They are deleted</button></div><p class="why" hidden>Checkpoints track Claude's own edit tools only. Use Git to recover.</p></div>
+<div class="qz"><p class="q">What is the main difference between auto mode and bypass permissions?</p><div class="opts"><button>Auto mode is slower</button><button data-ok>Auto mode has a classifier that reviews actions; bypass performs no checks</button><button>Bypass mode only works on Mac</button></div><p class="why" hidden>Bypass belongs only in isolated, throwaway environments.</p></div>
+<div class="qz"><p class="q">A teammate puts <code>"defaultMode": "auto"</code> in the repository's <code>.claude/settings.json</code>. What happens?</p><div class="opts"><button>Everyone who clones the repo starts in auto</button><button data-ok>It has no effect; auto only takes effect from user settings or the command line</button><button>Claude Code refuses to start</button></div><p class="why" hidden>This prevents a repository from silently changing your safety level.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Write a one-page "Claude Code modes policy" for your QA team. For each of five real situations in your work, state which permission mode to use and why, which commands are safe to "always allow", and which should be deny rules. Include a rule about when plan mode is mandatory. Review it with a colleague.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Permission modes set how much Claude Code can do without asking. Manual asks for everything except reading; Accept edits lets it change files; Plan lets it only investigate and propose; Auto lets it work while an automatic checker blocks risky actions; Don't ask refuses anything not pre-approved; Bypass checks nothing and is only for throwaway containers. New sessions start in Auto. Plan first for big changes, read every prompt, and remember rewind can't undo shell commands, so commit often."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/permission-modes" target="_blank" rel="noopener">Permission modes</a>, Claude Code documentation.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/checkpointing" target="_blank" rel="noopener">Checkpointing</a>, Claude Code documentation.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/cli-reference" target="_blank" rel="noopener">CLI reference</a>, and <a href="https://code.claude.com/docs/en/settings" target="_blank" rel="noopener">Settings</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/worktrees" target="_blank" rel="noopener">Worktrees</a>.</li>
+<li>Output of <code>claude --help</code> and <code>claude auto-mode --help</code>, Claude Code 2.1.319.</li>
+</ol><p class="verified">Verified 9 November 2026 against Claude Code 2.1.319</p></div>

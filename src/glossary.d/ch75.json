@@ -1,0 +1,22 @@
+{
+ "Flag": {
+  "d": "An option you add to a command to change how it behaves, written with one dash and a letter (-p) or two dashes and a word (--print). Some flags take a value, such as --model opus.",
+  "see": "ch75"
+ },
+ "Subcommand": {
+  "d": "A word after a program's name that selects a separate job it can do, such as the 'mcp' in 'claude mcp list' or the 'commit' in 'git commit'.",
+  "see": "ch75"
+ },
+ "Exit code": {
+  "d": "A number a command returns when it finishes: 0 usually means success, anything else means some kind of failure. Scripts and CI pipelines check it to decide what to do next.",
+  "see": "ch55"
+ },
+ "Git worktree": {
+  "d": "An extra working copy of the same git repository, in its own folder and on its own branch, so separate tasks can change files without getting in each other's way.",
+  "see": "ch69"
+ },
+ "Print mode": {
+  "d": "Running Claude Code with -p (--print): it answers once, prints the result and exits instead of opening a conversation. Used in scripts and CI pipelines.",
+  "see": "ch75"
+ }
+}

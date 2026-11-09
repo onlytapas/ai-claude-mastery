@@ -1,0 +1,126 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>Why early AI hit a wall in the late 1960s and 1970s</li>
+<li>What expert systems were, how they worked, and why businesses loved them</li>
+<li>What caused the two "AI winters"</li>
+<li>Lessons from those failures that still apply to AI products today</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 3 (symbolic AI and the Perceptron).</div>
+
+<div class="bigidea"><p>Twice, AI was hyped far beyond what it could deliver, and twice the money and interest collapsed. These collapses are called <a class="gl" href="#g-ai-winter">AI winters</a>. In between came a boom in "expert systems": programs built from thousands of rules taken from human experts. They worked impressively in narrow areas but were expensive, brittle and hard to maintain. Understanding why helps you judge today's AI more wisely.</p></div>
+
+<h3 id="ch4-1"><span class="num">4.1</span>Hitting the wall</h3>
+<p>By the late 1960s it was clear that early AI programs didn't scale. Three problems stood out:</p>
+<div class="tbl"><table>
+<tr><th>Problem</th><th>Plain meaning</th><th>Example</th></tr>
+<tr><td><b>Combinatorial explosion</b></td><td>The number of possibilities grows impossibly fast as problems get bigger</td><td>Checking every possible chess game would take longer than the age of the universe</td></tr>
+<tr><td><b>Common-sense knowledge</b></td><td>Real tasks need vast background knowledge nobody had written down</td><td>Knowing that a "bank" by a river isn't a place to deposit money</td></tr>
+<tr><td><b>Limited computers</b></td><td>Machines had tiny memory and slow processors</td><td>Speech or image tasks were simply out of reach</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life: the combinatorial explosion</span><p>Choosing an outfit from 3 shirts and 3 trousers is 9 combinations. Add 3 jackets and 3 pairs of shoes and it's 81. With 10 of each of 10 clothing items, it's 10 billion. Every extra choice multiplies the total. Early AI tried to search through possibilities like this, and real-world problems quickly became impossible to search.</p></div>
+
+<h3 id="ch4-2"><span class="num">4.2</span>The Perceptrons book (1969)</h3>
+<p>In 1969 Marvin Minsky and Seymour Papert published <i>Perceptrons</i>, a careful mathematical study of Rosenblatt's learning machine. They proved that a single-layer perceptron can't learn certain simple patterns. The famous example is "exclusive or" (XOR): output yes if exactly one of two inputs is on, but not both.</p>
+<p>Networks with several layers could in principle solve XOR, but nobody yet knew a good way to train them. The book was widely read as showing that neural networks were a dead end, and research into them largely stalled for over a decade. It took until the mid-1980s for a training method for multi-layer networks to become widely known (Chapter 5).</p>
+<details class="deep"><summary>Why a single layer can't learn XOR</summary><div class="body">
+<p>A single perceptron draws one straight line to separate "yes" cases from "no" cases. Plot the four XOR cases on a grid: (0,0)→no, (1,1)→no, (0,1)→yes, (1,0)→yes. The two "yes" points sit on one diagonal and the two "no" points on the other. No single straight line can put both yeses on one side and both nos on the other. You need two lines, which means a second layer. This is why "deep" (many-layer) networks matter so much later on.</p>
+</div></details>
+
+<h3 id="ch4-3"><span class="num">4.3</span>The first AI winter (mid-1970s)</h3>
+<p>Funders noticed the gap between promises and results:</p>
+<ul>
+<li><strong>Machine translation</strong>: a 1966 US government report (the ALPAC report) concluded that machine translation was slower, less accurate and more expensive than human translation. Funding was cut sharply.</li>
+<li><strong>The Lighthill Report (1973)</strong>: the British mathematician Sir James Lighthill, asked by the UK government to review AI research, concluded it had failed to meet its "grandiose objectives". UK funding was drastically reduced.</li>
+<li><strong>US defence funding</strong> through DARPA shifted towards projects with specific, near-term military uses.</li>
+</ul>
+<p>From roughly 1974 to 1980, AI research shrank. Researchers often avoided calling their work "AI" at all.</p>
+
+<h3 id="ch4-4"><span class="num">4.4</span>Expert systems: AI goes to work</h3>
+<p>AI recovered by narrowing its ambition. Instead of general intelligence, researchers captured the knowledge of human experts in one specialised area and wrote it down as rules. These <a class="gl" href="#g-expert-system">expert systems</a> became the first commercially successful AI.</p>
+<div class="flow">
+<div><b>Expert</b>A doctor or engineer explains how they make decisions</div>
+<div><b>Knowledge engineer</b>Interviews them and writes rules</div>
+<div class="hl"><b>Knowledge base</b>Hundreds or thousands of IF–THEN rules</div>
+<div><b>Inference engine</b>Applies the rules to a new case</div>
+<div><b>Advice</b>A diagnosis or recommendation, with the rules that led to it</div>
+</div>
+<div class="code"><span class="cap">The style of rule an expert system used (simplified)</span><pre>IF   the infection is in the blood
+AND  the organism is gram-negative
+AND  the organism is rod-shaped
+THEN there is suggestive evidence (0.6) that the organism is E. coli</pre></div>
+<h4>Famous examples</h4>
+<div class="tbl"><table>
+<tr><th>System</th><th>When</th><th>What it did</th></tr>
+<tr><td>DENDRAL</td><td>From 1965, Stanford</td><td>Worked out the structure of chemical molecules from lab measurements</td></tr>
+<tr><td>MYCIN</td><td>1970s, Stanford</td><td>Recommended antibiotics for blood infections. In studies it performed comparably to specialists, but it was never used routinely in hospitals.</td></tr>
+<tr><td>XCON (R1)</td><td>From 1980, Digital Equipment Corporation</td><td>Configured customers' computer orders, reportedly saving the company tens of millions of dollars a year</td></tr>
+</table></div>
+<p>By the mid-1980s, many large companies had AI departments, and a whole industry sold specialised "LISP machines" to run AI software. Japan launched its ambitious Fifth Generation Computer project in 1982, and other countries responded with their own programmes.</p>
+
+<h3 id="ch4-5"><span class="num">4.5</span>Why expert systems faded</h3>
+<div class="cols2">
+<div><h4>Strengths</h4><ul><li>Worked well in narrow, well-defined areas</li><li>Could explain their reasoning by showing the rules used</li><li>Behaved predictably for situations the rules covered</li></ul></div>
+<div><h4>Weaknesses</h4><ul><li><b>Knowledge bottleneck:</b> getting rules out of experts was slow and costly</li><li><b>Brittleness:</b> anything slightly outside the rules caused nonsense</li><li><b>Maintenance:</b> thousands of rules interacted unpredictably as they were changed</li><li>Couldn't learn from new data by themselves</li></ul></div>
+</div>
+<div class="box example"><span class="tag">Real-world example: a tester's view</span><p>If you've ever maintained a large set of business rules or a huge suite of hard-coded test conditions, you've felt the expert-system problem. Each new rule fixes one case and may break three others. Edge cases nobody anticipated slip through. That's brittleness, and it's exactly why the field turned towards systems that learn from data.</p></div>
+
+<h3 id="ch4-6"><span class="num">4.6</span>The second AI winter (late 1980s to mid-1990s)</h3>
+<p>Around 1987 the market for specialised LISP machines collapsed as ordinary desktop computers became powerful enough. Expert systems proved too costly to maintain. Japan's Fifth Generation project ended in the early 1990s without meeting its goals. Funding and commercial interest dropped again. "AI" became an unfashionable label, though useful work continued under other names such as "machine learning", "knowledge systems" and "computational intelligence".</p>
+<ol class="timeline">
+<li><span class="yr">1966</span><span class="ev"><b>ALPAC report</b> cuts machine-translation funding in the US.</span></li>
+<li><span class="yr">1969</span><span class="ev"><b><i>Perceptrons</i></b> dampens neural-network research.</span></li>
+<li class="key"><span class="yr">1973–80</span><span class="ev"><b>First AI winter</b>, triggered partly by the Lighthill Report.</span></li>
+<li><span class="yr">1980–87</span><span class="ev"><b>Expert-system boom</b>: XCON, LISP machines, corporate AI groups, Japan's Fifth Generation project (1982).</span></li>
+<li><span class="yr">1984</span><span class="ev"><b>Cyc</b>, Douglas Lenat's project to hand-encode common-sense knowledge, begins. It continued for decades.</span></li>
+<li class="key"><span class="yr">1987–mid-90s</span><span class="ev"><b>Second AI winter</b>: the LISP machine market collapses and expert systems lose favour.</span></li>
+</ol>
+
+<h3 id="ch4-7"><span class="num">4.7</span>Lessons that still apply</h3>
+<ol>
+<li><strong>Hype has a cost.</strong> Overpromising led to collapses that set research back years. Watch for claims that outrun evidence.</li>
+<li><strong>Narrow success doesn't mean general success.</strong> A system brilliant in a demo can fail outside its comfort zone.</li>
+<li><strong>Maintenance is part of the product.</strong> A system that's expensive to update will be abandoned.</li>
+<li><strong>Explainability is valuable.</strong> Expert systems could show their reasoning; modern neural networks mostly can't, which is why research into explaining them (Chapter 38) matters.</li>
+<li><strong>Useful work survives winters.</strong> Ideas from these years (search, logic, knowledge representation, and neural networks) returned later in better forms.</li>
+</ol>
+<div class="box opinion"><span class="tag">Opinion · a debate today</span><p>Some commentators argue that today's AI boom could be followed by another winter if products fail to justify the huge investment. Others argue this time is different because AI products already earn substantial revenue and are used by hundreds of millions of people. Both views are held by serious people; neither is settled fact.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Build a tiny expert system</b><span>30 min · claude.ai</span></div><ol>
+<li>Ask Claude: "Write five IF–THEN rules to decide whether a reported bug is critical, high, medium or low severity."<span class="expect">a short rule set covering crashes, data loss, workarounds and cosmetic issues.</span></li>
+<li>Give it three real or invented bug descriptions and ask it to apply only those rules, showing which rule fired.<span class="expect">a classification for each bug, with the rule that triggered it.</span></li>
+<li>Now describe an unusual bug the rules don't cover (for example, a typo in the legal terms that changes their meaning).<span class="expect">the rules either fail or give a poor answer. That's brittleness.</span></li>
+<li>Ask Claude to classify the same bug using its own judgement instead of the rules, and compare.<span class="expect">a more sensible answer. You've just seen the difference between rule-based and learned systems.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"The AI winters proved AI was impossible."</dt><dd>They showed that particular approaches and timelines were wrong. The field kept advancing underneath.</dd>
+<dt>"Rule-based systems are obsolete."</dt><dd>They're still widely used where predictability and auditability matter, such as some fraud checks, tax calculations and validation logic, often alongside machine learning.</dd>
+<dt>"Minsky and Papert killed neural networks on purpose."</dt><dd>Their analysis was correct about single-layer networks. The wider reaction to it, and the lack of a training method for deeper networks, caused the stall.</dd>
+</dl></div>
+
+<h3 id="ch4-r"><span class="num">4.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Early AI ran into combinatorial explosion, missing common-sense knowledge and weak computers.</li>
+<li>Minsky and Papert (1969) showed single-layer perceptrons can't learn some simple patterns, and neural-network research stalled.</li>
+<li>The first AI winter (about 1974–1980) followed the ALPAC and Lighthill reports.</li>
+<li>Expert systems (DENDRAL, MYCIN, XCON) brought commercial success in the 1980s using hand-written rules.</li>
+<li>They were costly to build, brittle and hard to maintain, and a second winter followed from about 1987.</li>
+<li>The lessons about hype, brittleness, maintenance and explainability still apply to AI products today.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What is an "AI winter"?</p><div class="opts"><button>A season when computers run slower</button><button data-ok>A period of reduced funding and interest after AI failed to meet expectations</button><button>A type of training algorithm</button></div><p class="why" hidden>There were two major ones: mid-1970s and late 1980s to mid-1990s.</p></div>
+<div class="qz"><p class="q">How did an expert system get its knowledge?</p><div class="opts"><button>By reading the internet</button><button data-ok>People interviewed human experts and wrote their knowledge down as rules</button><button>By playing against itself</button></div><p class="why" hidden>This slow, expensive step was called the knowledge-acquisition bottleneck.</p></div>
+<div class="qz"><p class="q">What does "brittle" mean for an AI system?</p><div class="opts"><button>It runs on fragile hardware</button><button data-ok>It works for expected cases but fails badly on anything slightly outside them</button><button>It forgets what it learned</button></div><p class="why" hidden>Expert systems were brittle because they knew only the rules written for them.</p></div>
+<div class="qz"><p class="q">What did Minsky and Papert's 1969 book show?</p><div class="opts"><button data-ok>A single-layer perceptron cannot learn some simple patterns, such as XOR</button><button>Neural networks can never work</button><button>Computers will never play chess</button></div><p class="why" hidden>Multi-layer networks can learn XOR; training them well came later.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Find one AI product announcement from the last year. List its claims, then write which are demonstrated (shown working on real tasks) and which are promises. Note one way the product could be "brittle" outside its demo. This is the habit that would have prevented both AI winters.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Early AI overpromised. When it couldn't handle real-world complexity, funding collapsed: the first AI winter. Then expert systems, programs built from thousands of hand-written expert rules, succeeded in narrow areas like medical diagnosis and computer configuration. But they were brittle and costly to maintain, so a second winter followed. The lessons are to watch the hype, test outside the demo and plan for maintenance."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>M. Minsky and S. Papert, <i>Perceptrons: An Introduction to Computational Geometry</i> (1969).</li>
+<li>Automatic Language Processing Advisory Committee (ALPAC), <i>Language and Machines: Computers in Translation and Linguistics</i> (1966).</li>
+<li>J. Lighthill, "Artificial Intelligence: A General Survey", in <i>Artificial Intelligence: a paper symposium</i>, UK Science Research Council (1973).</li>
+<li>B. G. Buchanan and E. H. Shortliffe (eds.), <i>Rule-Based Expert Systems: The MYCIN Experiments of the Stanford Heuristic Programming Project</i> (1984).</li>
+<li>J. McDermott, "R1: A Rule-Based Configurer of Computer Systems", <i>Artificial Intelligence</i> 19 (1982).</li>
+<li>S. Russell and P. Norvig, <i>Artificial Intelligence: A Modern Approach</i>, 4th ed. (2020), section 1.3 on the history of AI.</li>
+</ol><p class="verified">Content type: established history · Last reviewed 9 November 2026</p></div>

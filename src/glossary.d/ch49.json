@@ -1,0 +1,30 @@
+{
+ "Web search": {
+  "d": "A Claude feature that lets it search the public web and read pages during a chat, showing citations for what it found. On all plans; Team and Enterprise owners must enable it.",
+  "see": "ch49"
+ },
+ "Research mode": {
+  "d": "A Claude feature (paid plans) that runs many linked web and connector searches for a broad question and writes a longer, sourced report.",
+  "see": "ch49"
+ },
+ "Citation": {
+  "d": "A link or quote showing which source a claim came from. It shows where an AI says it got the claim, not that the claim is correct.",
+  "see": "ch49"
+ },
+ "Chat memory": {
+  "d": "Claude app feature that saves lasting facts about you and your work as editable topics and applies them in new chats. Separate from Claude Code's CLAUDE.md memory.",
+  "see": "ch50"
+ },
+ "Instructions for Claude": {
+  "d": "Standing instructions you write in your Claude settings that apply to every conversation, such as preferred format or spelling. Older guides call them profile preferences.",
+  "see": "ch50"
+ },
+ "Incognito chat": {
+  "d": "A temporary Claude chat that isn't saved to your history or memory. It is still kept for 30 days by default and, on work plans, can appear in organisation exports.",
+  "see": "ch50"
+ },
+ "Snapshot link": {
+  "d": "A shared-chat link that shows the conversation as it was when shared. Later messages and attached files are not included.",
+  "see": "ch51"
+ }
+}

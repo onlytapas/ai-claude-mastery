@@ -1,0 +1,54 @@
+{
+ "Git": {
+  "d": "The most widely used version control system: a free program that records the history of a folder as a series of snapshots (commits), with branches and merges. It works offline; GitHub is a separate website that hosts Git repositories.",
+  "see": "ch61"
+ },
+ "Repository": {
+  "d": "A folder whose history Git tracks, together with that history (kept in a hidden .git folder). Often shortened to \"repo\". Copies can live on your computer and on a host such as GitHub.",
+  "see": "ch61"
+ },
+ "Staging area": {
+  "d": "In Git, the list of changes chosen to go into the next commit. git add puts changes there; git commit saves everything in it as one snapshot.",
+  "see": "ch61"
+ },
+ "Remote repository": {
+  "d": "Another copy of a Git repository, usually on a server such as GitHub, that you push your commits to and pull other people's commits from. The main one is conventionally called origin.",
+  "see": "ch61"
+ },
+ "gitignore": {
+  "d": "A file named .gitignore that lists patterns for files Git should not track, such as .env secrets, test reports and node_modules. It does not remove files that were already committed.",
+  "see": "ch61"
+ },
+ "SSH key": {
+  "d": "A pair of matching keys used to sign in to servers such as GitHub without a password: a private key that never leaves your computer and a public key you give to the server.",
+  "see": "ch61"
+ },
+ "Standard error": {
+  "d": "The separate output channel (stderr) programs use for error messages, so errors still reach the screen when normal output is redirected to a file or another command.",
+  "see": "ch55"
+ },
+ "Port": {
+  "d": "A numbered network endpoint on a computer that a server listens on, such as 3000 or 8080. Only one program can listen on a given port at a time, hence \"address already in use\" errors.",
+  "see": "ch62"
+ },
+ "DNS": {
+  "d": "Domain Name System: the internet's directory that turns host names like example.com into numeric addresses. \"Could not resolve host\" means this lookup failed.",
+  "see": "ch62"
+ },
+ "Man page": {
+  "d": "The built-in manual for a command on macOS and Linux, opened with man followed by the command name (for example man ls). Press q to quit.",
+  "see": "ch62"
+ },
+ "CLAUDE.local.md": {
+  "d": "A personal, project-specific instructions file for Claude Code at the project root. It loads after CLAUDE.md and should be added to .gitignore so it is not shared.",
+  "see": "ch77"
+ },
+ "AGENTS.md": {
+  "d": "An instructions file for AI coding agents used by several tools. Claude Code (2.1.277 and later) reads it directly when the project has no CLAUDE.md or CLAUDE.local.md; otherwise it can be imported with @AGENTS.md.",
+  "see": "ch77"
+ },
+ "Path-scoped rule": {
+  "d": "A Claude Code rule file in .claude/rules/ with paths frontmatter, so it loads only when Claude works with files matching those patterns.",
+  "see": "ch77"
+ }
+}

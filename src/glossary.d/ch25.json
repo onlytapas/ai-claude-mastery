@@ -1,0 +1,46 @@
+{
+ "Data centre": {
+  "d": "A large building full of servers, networking, power supplies and cooling. AI models are trained and served from data centres, not from your own computer.",
+  "see": "ch25"
+ },
+ "TPU": {
+  "d": "Tensor processing unit: an AI accelerator chip designed by Google for neural-network maths, used for Gemini and rented out through Google Cloud.",
+  "see": "ch25"
+ },
+ "Memory bandwidth": {
+  "d": "How fast a chip can move data from its memory to its calculating units. For generating text token by token, it is often the main limit on speed.",
+  "see": "ch25"
+ },
+ "KV cache": {
+  "d": "Stored intermediate results (attention keys and values) for the tokens a model has already processed, kept in chip memory so they don't have to be recalculated for every new token. It grows with conversation length.",
+  "see": "ch25"
+ },
+ "Prompt caching": {
+  "d": "Reusing the already-processed form of a repeated prompt prefix (such as long instructions or a document) across requests. Cached input is charged at a small fraction of the normal price.",
+  "see": "ch25"
+ },
+ "Latency": {
+  "d": "How long one user waits for a response. For AI, often measured as time to first token plus how fast the rest of the reply streams.",
+  "see": "ch25"
+ },
+ "Time to first token": {
+  "d": "How long after sending a request the first piece of the model's reply appears. It is what people feel most as 'waiting' in a chat.",
+  "see": "ch25"
+ },
+ "Throughput": {
+  "d": "How much total work a system gets through, such as tokens or requests per second across all users. Batching raises throughput, sometimes at the cost of latency.",
+  "see": "ch25"
+ },
+ "Foundation model": {
+  "d": "A large, general-purpose model trained on broad data that many different products and tasks can be built on, such as GPT, Claude, Gemini or Llama.",
+  "see": "ch26"
+ },
+ "Hyperscaler": {
+  "d": "A cloud provider operating at enormous scale, chiefly Amazon Web Services, Microsoft Azure and Google Cloud. All three also sell access to AI models.",
+  "see": "ch26"
+ },
+ "Public benefit corporation": {
+  "d": "A for-profit company legally required to weigh a stated public benefit alongside shareholders' interests. Both Anthropic and OpenAI's operating company are public benefit corporations.",
+  "see": "ch27"
+ }
+}

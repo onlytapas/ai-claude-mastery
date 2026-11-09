@@ -1,0 +1,217 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What fills Claude Code's context window, and how to see it with <code>/context</code></li>
+<li>How compaction works, automatically and with <code>/compact</code>, and when to <code>/clear</code> instead</li>
+<li>How to choose and switch models: aliases, <code>/model</code>, <code>--model</code> and fallback models</li>
+<li>What effort levels are and how to set them</li>
+<li>How sessions are saved, named, resumed, branched and deleted</li>
+<li>How to check your usage and costs</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 20 (context windows) explains the idea in general; Chapter 65 (your first session) and Chapter 67 (permission modes) cover the basics of driving Claude Code.</div>
+
+<div class="bigidea"><p>Three settings shape every Claude Code session: <strong>how much it can see</strong> (the <a class="gl" href="#g-context-window">context window</a>), <strong>which brain it uses</strong> (the <a class="gl" href="#g-model">model</a>), and <strong>how hard it thinks</strong> (the <a class="gl" href="#g-effort-level">effort level</a>). A fourth, the <a class="gl" href="#g-session">session</a>, is the saved conversation you can come back to. Managing these well is the difference between a session that stays sharp for hours and one that gets slow, confused and expensive.</p></div>
+
+<h3 id="ch68-1"><span class="num">68.1</span>What fills the context window</h3>
+<p>Everything Claude can "see" during a session sits in its context window, measured in <a class="gl" href="#g-token">tokens</a>. The current Claude models have a 1-million-token window. That's large, but it fills faster than you'd think, because it holds far more than your messages:</p>
+<div class="tbl"><table>
+<tr><th>What's in the context</th><th>Example</th></tr>
+<tr><td>Claude Code's own instructions</td><td>How to use its tools, safety rules</td></tr>
+<tr><td>Your memory files</td><td>CLAUDE.md files (Chapter 77)</td></tr>
+<tr><td>Tool and server descriptions</td><td>Descriptions of MCP tools, skills and subagents</td></tr>
+<tr><td>The conversation</td><td>Your prompts and Claude's replies</td></tr>
+<tr><td>Tool results</td><td>Every file Claude read, every command output, every web page</td></tr>
+</table></div>
+<p>Tool results are usually the biggest item. One large log file or a long test run can use more tokens than an hour of conversation.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>The context window is like a desk. Your notes, the specification, three open reports and yesterday's test logs are all spread out on it. A bigger desk helps, but when it's covered in papers, finding the right one gets slower and mistakes creep in. Tidying the desk (compacting) or starting with a clean one (clearing) keeps the work sharp.</p></div>
+
+<h3 id="ch68-2"><span class="num">68.2</span>Seeing it: /context</h3>
+<p>Type <code>/context</code> to see how full the window is, shown as a coloured grid with a breakdown by category and suggestions for freeing space. <code>/context all</code> shows more detail.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>Two hours into investigating a flaky checkout test, Claude starts repeating ideas it already tried. You run <code>/context</code> and see most of the window is old test logs. That's your signal to compact with a focus, or to clear and restart with a short summary of what you've learned.</p></div>
+
+<h3 id="ch68-3"><span class="num">68.3</span>Compaction: tidying the desk</h3>
+<p><a class="gl" href="#g-compaction">Compaction</a> replaces the conversation so far with a summary, freeing space while keeping the important points.</p>
+<ul>
+<li><strong>Automatic:</strong> Claude Code compacts on its own as the window fills up.</li>
+<li><strong>Manual:</strong> <code>/compact</code> compacts now. Add instructions to say what matters: <code>/compact keep the failing test names, error messages and the fix we agreed</code>.</li>
+<li><strong>Setting the threshold:</strong> <code>/autocompact 500k</code> (or <code>/autocompact auto</code>) sets how full the context gets before automatic compaction, and saves it to your user settings. For one session only, start with <code>claude --autocompact 500k</code>; the flag accepts <code>auto</code> or a value from 100k to 1M tokens.</li>
+<li><strong>From a checkpoint:</strong> the <code>/rewind</code> menu also offers "Summarize from here" and "Summarize up to here", to condense just part of the conversation (Chapter 67).</li>
+</ul>
+<div class="box warn"><span class="tag">Summaries lose detail</span><p>A summary is shorter than the original by design. Exact error text, line numbers or a small decision can get lost. Tell <code>/compact</code> what to keep, and put permanent facts in CLAUDE.md, where they're reloaded every session.</p></div>
+<details class="deep"><summary>When compaction "thrashes"</summary><div class="body">
+<p>If you see "Autocompact is thrashing", Claude Code is compacting again and again because each new step immediately refills the window, usually because it keeps reading something huge. The documented fixes: read large files in chunks, run a focused <code>/compact</code>, hand the heavy reading to a <a class="gl" href="#g-subagent">subagent</a> (its reading doesn't fill your main context; only its summary comes back), or <code>/clear</code> and start fresh.</p>
+</div></details>
+
+<h3 id="ch68-4"><span class="num">68.4</span>Clearing: a fresh desk</h3>
+<p><code>/clear</code> starts a new conversation with empty context. The old conversation isn't deleted: it stays resumable, and you can label it with a name (<code>/clear coupon-investigation</code>). Aliases are <code>/reset</code> and <code>/new</code>.</p>
+<div class="cols2">
+<div><h4>Compact when…</h4><ul><li>You're still on the same task</li><li>The history matters, but not every detail</li><li>You want to keep going without losing the thread</li></ul></div>
+<div><h4>Clear when…</h4><ul><li>You're switching to an unrelated task</li><li>Claude is stuck in a loop of failed ideas</li><li>The old context is misleading it</li></ul></div>
+</div>
+<p>Two more helpers keep the main conversation clean:</p>
+<ul>
+<li><code>/btw [question]</code> asks a quick side question about the session without adding it to the conversation history.</li>
+<li><code>/branch [name]</code> copies the conversation at this point and switches you into the copy, so you can try a different direction while the original stays resumable.</li>
+</ul>
+<h4>Context hygiene habits</h4>
+<ol>
+<li>One task per session; <code>/clear</code> between unrelated tasks.</li>
+<li>Point at specific files with <code>@</code> instead of asking Claude to search everything.</li>
+<li>Ask Claude to search large logs (for example with <code>grep</code>) instead of pasting them.</li>
+<li>Send side research to a subagent.</li>
+<li>Only connect the MCP servers you need, since their tool descriptions take space.</li>
+<li>Keep permanent knowledge in CLAUDE.md, short and specific.</li>
+</ol>
+
+<h3 id="ch68-5"><span class="num">68.5</span>Models and aliases</h3>
+<p>Claude Code lets you pick the model by a short <em>alias</em> or by its full name. Verified aliases:</p>
+<div class="tbl"><table>
+<tr><th>Alias</th><th>Meaning (on the Anthropic API)</th></tr>
+<tr><td><code>default</code></td><td>Clears any override and uses your account's default: Opus 5.5 on Pro, Max, Ultra, Team, Enterprise and the API</td></tr>
+<tr><td><code>fable</code></td><td>The Fable model (Fable 5.1 unless overridden), for the hardest, longest tasks</td></tr>
+<tr><td><code>best</code></td><td>Same as <code>fable</code> where Fable is available, otherwise <code>opus</code></td></tr>
+<tr><td><code>opus</code></td><td>The latest Opus: Opus 5.5</td></tr>
+<tr><td><code>sonnet</code></td><td>The latest Sonnet: Sonnet 5.5</td></tr>
+<tr><td><code>haiku</code></td><td>The fast Haiku: Haiku 5.5</td></tr>
+<tr><td><code>opusplan</code></td><td>Opus in plan mode, Sonnet for carrying out the plan</td></tr>
+<tr><td><code>sonnet[1m]</code>, <code>opus[1m]</code></td><td>1-million-token context variants (no effect where the model already has a 1M window)</td></tr>
+</table></div>
+<p>On Amazon Bedrock, Google Cloud's Agent Platform (formerly Vertex AI) and Microsoft Foundry, aliases can point to older models. To pin an exact version, use a full name such as <code>claude-opus-5-5</code>.</p>
+<h4>The current models <span class="vchip">Verified 9 Nov 2026</span></h4>
+<div class="tbl"><table>
+<tr><th></th><th>Fable 5.1</th><th>Opus 5.5</th><th>Sonnet 5.5</th><th>Haiku 5.5</th></tr>
+<tr><td>Anthropic's positioning</td><td>Demanding reasoning, long-horizon agent work</td><td>Long-running agentic coding and knowledge work; recommended starting point</td><td>Best mix of speed and intelligence</td><td>High-volume, latency-sensitive tasks</td></tr>
+<tr><td>Speed</td><td>Slower</td><td>Moderate</td><td>Fast</td><td>Fastest</td></tr>
+<tr><td>API price per million tokens (input / output)</td><td>$10 / $50</td><td>$4 / $20</td><td>$2 / $10</td><td>$0.10 / $0.50 (prompts up to 100K tokens)</td></tr>
+<tr><td>Context window</td><td colspan="4">1 million tokens for all four</td></tr>
+</table></div>
+<p>API prices apply when you pay per token. On a subscription plan, heavier models use your allowance faster instead (see 65.9).</p>
+
+<h3 id="ch68-6"><span class="num">68.6</span>Switching models</h3>
+<p>The model is chosen from these sources, highest priority first:</p>
+<ol>
+<li><code>/model &lt;alias or name&gt;</code> during the session.</li>
+<li><code>claude --model &lt;alias or name&gt;</code> at start.</li>
+<li>The <code>ANTHROPIC_MODEL</code> environment variable.</li>
+<li>The <code>"model"</code> key in settings.</li>
+<li><code>ANTHROPIC_DEFAULT_MODEL</code>, the default for new sessions.</li>
+</ol>
+<div class="code"><span class="cap">In a session and in the terminal</span><pre>/model                     <span class="c"># opens a picker</span>
+/model sonnet              <span class="c"># switch to the latest Sonnet</span>
+claude --model haiku       <span class="c"># start a session on Haiku</span>
+claude --fallback-model sonnet,haiku   <span class="c"># use these if the main model is overloaded</span></pre></div>
+<ul>
+<li><strong><code>/model</code> saves your choice</strong> as the default for new sessions (it writes <code>model</code> to your user settings). In the picker, <kbd>Enter</kbd> saves it as the default, <kbd>s</kbd> applies it to this session only, and the left and right arrows adjust effort.</li>
+<li><kbd>Option</kbd>+<kbd>P</kbd> (Mac) or <kbd>Alt</kbd>+<kbd>P</kbd> switches model while you're writing a prompt.</li>
+<li>Resumed sessions keep the model they were saved with. <code>/status</code> shows the current model.</li>
+<li><code>--fallback-model</code> takes a comma-separated chain (up to 3 models), tried in order when the main model is overloaded or unavailable. The switch lasts only for the current turn.</li>
+</ul>
+<h4>Which model for QA work?</h4>
+<div class="tbl"><table>
+<tr><th>Task</th><th>A sensible choice</th></tr>
+<tr><td>Everyday test writing, reviews, investigations</td><td>The default (Opus 5.5), as Anthropic recommends for most work</td></tr>
+<tr><td>Quick, repetitive jobs: classifying test failures, renaming, simple summaries</td><td>Sonnet or Haiku: faster and cheaper</td></tr>
+<tr><td>A hard root-cause investigation that Opus keeps getting wrong</td><td>Raise the effort first; if it still falls short, try Fable</td></tr>
+<tr><td>Big design or refactoring work where planning matters most</td><td><code>opusplan</code> or plan mode with Opus</td></tr>
+</table></div>
+
+<h3 id="ch68-7"><span class="num">68.7</span>Effort levels: how hard it thinks</h3>
+<p>The <a class="gl" href="#g-effort-level">effort level</a> controls how much reasoning the model does before acting. Higher effort is slower and uses more of your allowance, but helps with hard problems.</p>
+<div class="tbl"><table>
+<tr><th>Level</th><th>Use it for</th></tr>
+<tr><td><code>low</code></td><td>Simple, mechanical edits</td></tr>
+<tr><td><code>medium</code></td><td>Everyday work. The Claude Code default on Opus 5.5, Sonnet 5.5 and Haiku 5.5</td></tr>
+<tr><td><code>high</code></td><td>Trickier debugging and design</td></tr>
+<tr><td><code>xhigh</code></td><td>Very hard problems</td></tr>
+<tr><td><code>max</code></td><td>The hardest problems; applies to the current session only</td></tr>
+</table></div>
+<div class="code"><span class="cap">Ways to set effort</span><pre>/effort                 <span class="c"># slider</span>
+/effort high            <span class="c"># set a level</span>
+/effort status          <span class="c"># show the current level</span>
+/effort auto            <span class="c"># clear your saved level</span>
+claude --effort xhigh   <span class="c"># for this session</span></pre></div>
+<ul>
+<li>The left and right arrows in the <code>/model</code> picker also adjust effort.</li>
+<li>The <code>CLAUDE_CODE_EFFORT_LEVEL</code> environment variable has the highest priority.</li>
+<li>If a model doesn't support a level, Claude Code falls back to the highest level it does support below it.</li>
+<li>Writing <code>ultrathink</code> in a prompt asks for deeper reasoning for that one turn. Other phrases such as "think hard" are treated as ordinary text.</li>
+<li>On the current models, extended thinking can't be switched off; effort is how you control the amount. <kbd>Ctrl</kbd>+<kbd>O</kbd> shows collapsed thinking.</li>
+</ul>
+<div class="box note"><span class="tag">Defaults differ by product</span><p>Default effort depends on where you use the model. In Claude Code, Opus 5.5, Sonnet 5.5 and Haiku 5.5 default to <code>medium</code>; Anthropic's API documentation lists its own defaults per model (for example <code>high</code> for Fable 5.1). Check with <code>/effort status</code> rather than assuming.</p></div>
+
+<h3 id="ch68-8"><span class="num">68.8</span>Sessions: saving, finding and resuming</h3>
+<p>Every conversation is saved automatically as a <a class="gl" href="#g-session">session</a>, so you can stop and pick up later.</p>
+<div class="tbl"><table>
+<tr><th>Command</th><th>What it does</th></tr>
+<tr><td><code>claude -c</code> (<code>--continue</code>)</td><td>Reopens the most recent session in this folder</td></tr>
+<tr><td><code>claude -r</code> (<code>--resume</code>)</td><td>Opens the session picker</td></tr>
+<tr><td><code>claude -r &lt;name or id&gt;</code></td><td>Resumes a specific session</td></tr>
+<tr><td><code>claude -n &lt;name&gt;</code></td><td>Starts a session with a display name</td></tr>
+<tr><td><code>/rename &lt;name&gt;</code></td><td>Renames the current session</td></tr>
+<tr><td><code>/resume [session]</code></td><td>Switches session from inside Claude Code</td></tr>
+<tr><td><code>claude -c --fork-session</code></td><td>Resumes into a new session ID, leaving the original untouched</td></tr>
+<tr><td><code>/branch [name]</code></td><td>Branches the conversation at this point</td></tr>
+<tr><td><code>claude --from-pr &lt;number or URL&gt;</code></td><td>Opens sessions linked to a pull request</td></tr>
+<tr><td><code>claude --session-id &lt;uuid&gt;</code></td><td>Uses a specific session ID (must be a valid UUID); useful in scripts</td></tr>
+</table></div>
+<p>In the picker: arrow keys (or <kbd>j</kbd>/<kbd>k</kbd>) to move, <kbd>Enter</kbd> to resume, <kbd>Space</kbd> to preview, <kbd>/</kbd> to search, <kbd>Ctrl</kbd>+<kbd>R</kbd> to rename, <kbd>Ctrl</kbd>+<kbd>A</kbd> for all projects.</p>
+<h4>Where sessions live, and how to delete them</h4>
+<p>Transcripts are stored on your computer at <code>~/.claude/projects/&lt;project&gt;/&lt;session-id&gt;.jsonl</code> and kept for 30 days by default (the <code>cleanupPeriodDays</code> setting). To delete a project's local Claude Code data (transcripts, tasks, file history and its entry in <code>~/.claude.json</code>):</p>
+<div class="code"><span class="cap">Terminal</span><pre>claude purge --dry-run      <span class="c"># show what would be deleted for this folder</span>
+claude purge                <span class="c"># delete it (asks for confirmation)</span></pre></div>
+<p>In print mode, <code>--no-session-persistence</code> stops a run from being saved at all.</p>
+<div class="box warn"><span class="tag">Transcripts can contain sensitive data</span><p>A transcript holds everything Claude read and every command output. If a session touched secrets or customer data, treat its transcript accordingly, and consider purging it.</p></div>
+
+<h3 id="ch68-9"><span class="num">68.9</span>Usage and cost</h3>
+<div class="tbl"><table>
+<tr><th>Command</th><th>What it shows or does</th></tr>
+<tr><td><code>/usage</code></td><td>Session cost, plan limits and activity statistics. Aliases <code>/cost</code> and <code>/stats</code></td></tr>
+<tr><td><code>/usage-credits</code></td><td>Configures or requests usage credits (it was called <code>/extra-usage</code> before)</td></tr>
+<tr><td><code>/insights</code></td><td>Writes an HTML report analysing your recent sessions</td></tr>
+<tr><td><code>--max-budget-usd</code></td><td>In print mode, a spending cap for API-key users</td></tr>
+</table></div>
+<p>On a subscription, the bigger the model, the higher the effort and the fuller the context, the faster you use your allowance. The cheapest habits are also the best ones: clear between tasks, keep the context focused, and use a smaller model or lower effort for simple work.</p>
+
+<div class="lab"><div class="lab-h"><b>Manage a long session</b><span>40 min · any practice repository</span></div><ol>
+<li>Start with a name: <code>claude -n context-lab</code>. Run <code>/status</code>.<span class="expect">your model, account and version.</span></li>
+<li>Run <code>/context</code>.<span class="expect">a coloured grid showing how full the window is, mostly system instructions and memory at this point.</span></li>
+<li>Ask Claude to read three or four large files and summarise them, then run <code>/context</code> again.<span class="expect">a noticeably fuller window, mostly from tool results.</span></li>
+<li>Run <code>/compact keep only the file names and one-line summaries</code>, then <code>/context</code>.<span class="expect">much less space used.</span></li>
+<li>Run <code>/model</code>, press <kbd>s</kbd> on Sonnet to switch for this session only, and use the arrows to change effort. Check with <code>/effort status</code>.<span class="expect">the new model and effort level.</span></li>
+<li>Run <code>/clear practice-done</code>, then <code>/exit</code>. Start again with <code>claude -r</code>.<span class="expect">the picker lists "context-lab" and the cleared conversation, both resumable.</span></li>
+<li>Run <code>/usage</code>.<span class="expect">your session cost or plan usage.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"A 1-million-token window means I never need to clear."</dt><dd>Quality drops as the window fills with old, irrelevant material. Clear between tasks regardless of size.</dd>
+<dt>"/clear deletes my conversation."</dt><dd>It starts a fresh context; the old conversation stays resumable.</dd>
+<dt>"/model only changes this session."</dt><dd><code>/model</code> saves your choice as the default for new sessions. Press <kbd>s</kbd> in the picker for this session only.</dd>
+<dt>"Typing 'think hard' makes Claude think harder."</dt><dd>Only <code>ultrathink</code> is recognised. Use <code>/effort</code> for lasting changes.</dd>
+<dt>"The biggest model is always best."</dt><dd>Anthropic recommends starting with Opus 5.5; use Fable only when Opus at higher effort still falls short, and smaller models for simple, high-volume jobs.</dd>
+</dl></div>
+
+<h3 id="ch68-r"><span class="num">68.10</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>The context holds instructions, memory, tool descriptions, the conversation and every tool result; <code>/context</code> shows it.</li>
+<li>Compact (automatically, or with <code>/compact &lt;what to keep&gt;</code>) on the same task; <code>/clear</code> for a new one.</li>
+<li>Aliases: <code>default</code>, <code>fable</code>, <code>best</code>, <code>opus</code>, <code>sonnet</code>, <code>haiku</code>, <code>opusplan</code>. Opus 5.5 is the recommended starting point.</li>
+<li>Effort levels run from <code>low</code> to <code>max</code>; set them with <code>/effort</code>, <code>--effort</code> or the <code>/model</code> picker.</li>
+<li>Sessions are saved locally for 30 days by default; resume with <code>-c</code> or <code>-r</code>, name with <code>-n</code>, delete with <code>claude purge</code>.</li>
+<li><code>/usage</code> (also <code>/cost</code>) shows cost and limits.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">You're halfway through debugging one flaky test and the context is getting full. What's the best move?</p><div class="opts"><button>/clear</button><button data-ok>/compact, saying what to keep (test names, errors, findings)</button><button>Switch to Haiku</button></div><p class="why" hidden>Same task, so keep the thread with a focused summary. Clear is for switching tasks.</p></div>
+<div class="qz"><p class="q">What does <code>/model sonnet</code> do?</p><div class="opts"><button>Switches this session only</button><button data-ok>Switches to the latest Sonnet and saves it as the default for new sessions</button><button>Shows information about Sonnet</button></div><p class="why" hidden>/model writes your choice to user settings; use <kbd>s</kbd> in the picker for this session only.</p></div>
+<div class="qz"><p class="q">Which effort level applies to the current session only and can't be saved in settings files?</p><div class="opts"><button>high</button><button>xhigh</button><button data-ok>max</button></div><p class="why" hidden><code>max</code> lasts for the session unless set through the environment variable.</p></div>
+<div class="qz"><p class="q">Where are Claude Code session transcripts stored by default?</p><div class="opts"><button>Only on Anthropic's servers</button><button data-ok>On your computer under <code>~/.claude/projects/</code>, kept for 30 days by default</button><button>In your Git repository</button></div><p class="why" hidden>Use <code>claude purge</code> to delete a project's local data.</p></div>
+<div class="qz"><p class="q">Which statement about choosing models matches Anthropic's guidance?</p><div class="opts"><button>Always use Fable</button><button data-ok>Start with Opus 5.5; use Fable when Opus at higher effort still falls short</button><button>Always use Haiku to save money</button></div><p class="why" hidden>Pick by task: smaller models for simple, high-volume jobs; Fable for the hardest work.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>For one week, keep a short log of your Claude Code sessions: the task, model, effort level, whether you compacted or cleared, and how the session went. At the end of the week, write five personal rules ("For flaky-test investigations I use… and clear after…"). Share them with your team as a starting point for a shared guide.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Claude Code's context is its desk: instructions, memory, the conversation and everything it has read. Check it with /context, tidy it with /compact on the same task, and start fresh with /clear for a new one. Choose the model with /model: Opus 5.5 is the default, Sonnet and Haiku are faster and cheaper, Fable is for the hardest work. Effort sets how hard it thinks. Sessions are saved locally, so you can resume with claude -c or -r."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/model-config" target="_blank" rel="noopener">Model configuration</a>, Claude Code documentation.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/sessions" target="_blank" rel="noopener">Sessions</a> and <a href="https://code.claude.com/docs/en/checkpointing" target="_blank" rel="noopener">Checkpointing</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/commands" target="_blank" rel="noopener">Commands reference</a> and <a href="https://code.claude.com/docs/en/cli-reference" target="_blank" rel="noopener">CLI reference</a>.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/models/overview" target="_blank" rel="noopener">Models overview</a> and <a href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Pricing</a>.</li>
+<li>Output of <code>claude --help</code>, Claude Code 2.1.319.</li>
+</ol><p class="verified">Verified 9 November 2026 against Claude Code 2.1.319</p></div>

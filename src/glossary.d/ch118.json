@@ -1,0 +1,34 @@
+{
+ "Quality engineering": {
+  "d": "A modern view of QA in which testers help build quality in from the start (requirements, design, automation, monitoring) rather than only checking finished software at the end.",
+  "see": "ch118"
+ },
+ "Shift-left testing": {
+  "d": "Moving testing activities earlier in the development process, for example reviewing requirements for gaps before any code is written, so problems are found when they are cheapest to fix.",
+  "see": "ch119"
+ },
+ "Exploratory testing": {
+  "d": "Testing where the tester designs and runs tests at the same time, learning about the product as they go, instead of following a fixed script.",
+  "see": "ch124"
+ },
+ "Flaky test": {
+  "d": "An automated test that sometimes passes and sometimes fails without any change to the code, usually because of timing, shared data or unstable environments.",
+  "see": "ch122"
+ },
+ "Regression testing": {
+  "d": "Re-testing existing features after a change to make sure nothing that used to work has broken.",
+  "see": "ch119"
+ },
+ "Test oracle": {
+  "d": "Whatever tells you the correct expected result for a test: a requirement, a rule, a previous version, or a person's judgement.",
+  "see": "ch118"
+ },
+ "Context engineering": {
+  "d": "Deciding everything an AI model gets to see for a task (instructions, examples, documents, tool results, memory files) and what to leave out, so it can do the job well.",
+  "see": "ch118"
+ },
+ "Impact-effort matrix": {
+  "d": "A simple 2×2 grid for prioritising ideas: how much value each would bring against how much work it takes. Start with high-impact, low-effort ideas.",
+  "see": "ch119"
+ }
+}

@@ -1,0 +1,228 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How to connect Claude to GitHub with the official GitHub MCP server, safely and read-only</li>
+<li>How to use it for real QA work: pull-request reviews, CI failures and issues</li>
+<li>How to let Claude check test data in a database without risking that data</li>
+<li>Which other servers testers commonly use (Sentry, Linear, BrowserStack, Slack, Figma, files and git), and how each signs in</li>
+<li>A checklist for judging any MCP server before you connect it</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 97 (what MCP is) and Chapter 98 (keys and tokens). Chapters 101 and 102 show the same process for Jira and Playwright. You need Claude Code installed (Chapter 64) and a GitHub account.</div>
+
+<div class="bigidea"><p>A tester's day touches many systems: the code in GitHub, the test pipeline, the database behind the app, the error tracker, the issue tracker, the design files. Each one can be connected to Claude through its own MCP server. Once connected, you can ask one question, such as "why did last night's checkout tests fail, and is it the same bug as last week?", and Claude can gather the answer from all of them. The skill is to connect only what you need, with the smallest permissions that work, and to pick servers you can trust.</p></div>
+
+<h3 id="ch103-1"><span class="num">103.1</span>The QA tool chain, connected</h3>
+<p>Think about where the evidence lives when a test fails:</p>
+<div class="flow">
+<div><b>GitHub</b>What changed in the code, and the CI run that failed</div>
+<div><b>Database</b>Whether the app saved the right data</div>
+<div><b>Error tracker</b>Whether production users hit the same error</div>
+<div><b>Issue tracker</b>Whether this bug is already reported</div>
+<div class="hl"><b>Claude</b>Pulls it together into one answer, with links</div>
+</div>
+<p>Without MCP you'd open five browser tabs and copy text between them. With an <a class="gl" href="#g-mcp-server">MCP server</a> for each system, Claude can look things up itself, inside the same conversation. Chapter 101 covered Jira and Confluence and Chapter 102 covered Playwright. This chapter covers the rest of a typical QA toolbox.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Imagine a detective who can phone the bank, the phone company and the CCTV office directly, instead of waiting for someone to bring printouts. Each MCP server is one of those phone lines. The detective still decides what to ask, and every call is logged, but the investigation is much faster.</p></div>
+
+<h3 id="ch103-2"><span class="num">103.2</span>GitHub's official MCP server</h3>
+<p>GitHub publishes its own MCP server, maintained by GitHub itself at <code>github/github-mcp-server</code>. (An older GitHub server in the MCP reference collection has been archived; use the official one.) It comes in two forms:</p>
+<div class="tbl"><table>
+<tr><th>Form</th><th>How it runs</th><th>Address or command</th><th>Best for</th></tr>
+<tr><td><b>Remote</b></td><td>GitHub hosts it; Claude connects over the internet (HTTP)</td><td><code>https://api.githubcopilot.com/mcp/</code></td><td>Most people: nothing to install</td></tr>
+<tr><td><b>Local</b></td><td>Runs on your computer in Docker or as a downloaded program</td><td><code>ghcr.io/github/github-mcp-server</code> (Docker image)</td><td>GitHub Enterprise Server, or teams that want everything on their own machines</td></tr>
+</table></div>
+<h4>Toolsets: switch on only what you need</h4>
+<p>The server has a lot of tools, grouped into <strong>toolsets</strong>. If you don't choose, you get the <code>default</code> set: <code>context</code>, <code>repos</code>, <code>issues</code>, <code>pull_requests</code> and <code>users</code>. Other toolsets include <code>actions</code> (CI workflows and their logs), <code>code_security</code>, <code>dependabot</code>, <code>labels</code>, <code>notifications</code> and <code>projects</code>.</p>
+<p>Fewer tools is better for two reasons. Claude picks the right tool more reliably from a short list, and every tool description takes up space in Claude's <a class="gl" href="#g-context-window">context window</a>.</p>
+<h4>Read-only mode</h4>
+<p>For a tester, read access is usually all you need: read the pull request, read the CI log, read the issue. GitHub offers a read-only switch that removes every tool able to change something. On the remote server you add <code>/readonly</code> to the end of the address (for example <code>https://api.githubcopilot.com/mcp/readonly</code>) or send the header <code>X-MCP-Readonly: true</code>. On the local server you use the <code>--read-only</code> flag or <code>GITHUB_READ_ONLY=1</code>.</p>
+<div class="box note"><span class="tag">Two layers of protection</span><p>Read-only mode limits which tools the server offers. Your <a class="gl" href="#g-personal-access-token">personal access token</a> limits what GitHub allows. Use both: a read-only server and a token that only has read permissions on the repositories you test. If one layer is misconfigured, the other still protects you.</p></div>
+
+<h3 id="ch103-3"><span class="num">103.3</span>Connecting GitHub in Claude Code, step by step</h3>
+<p>The method GitHub documents for Claude Code is the remote server plus a personal access token (PAT). OAuth sign-in support varies between AI tools, and GitHub notes that each tool has to register its own app for it, so the token route is the one that works everywhere.</p>
+<h4>Step 1: create a fine-grained token</h4>
+<ol>
+<li>On GitHub, open <b>Settings → Developer settings → Personal access tokens → Fine-grained tokens</b>, then <b>Generate new token</b>.</li>
+<li>Give it a clear name ("Claude Code – read-only QA") and a short expiry, such as 30 or 90 days.</li>
+<li>Under <b>Repository access</b>, choose <b>Only select repositories</b> and pick the ones you test.</li>
+<li>Under permissions, grant <b>read-only</b> access to what you need: typically Contents, Pull requests, Issues and Actions. Leave everything else as "No access".</li>
+<li>Copy the token. GitHub shows it only once.</li>
+</ol>
+<h4>Step 2: keep the token out of your files</h4>
+<p>Store it in an <a class="gl" href="#g-environment-variable">environment variable</a> rather than typing it into a command that lands in your shell history or a shared file (Chapter 98 explains why).</p>
+<div class="code"><span class="cap">In your terminal (macOS or Linux)</span><pre>read -s GITHUB_PAT        <span class="c"># paste the token, press Enter; nothing is shown on screen</span>
+export GITHUB_PAT          <span class="c"># make it available to programs started from this terminal</span></pre></div>
+<ul>
+<li><code>read -s GITHUB_PAT</code> waits for you to type or paste a value and stores it in a variable called <code>GITHUB_PAT</code>. The <code>-s</code> means "silent": the token isn't shown or saved in your history.</li>
+<li><code>export</code> makes the variable visible to the next command.</li>
+</ul>
+<h4>Step 3: add the server</h4>
+<div class="code"><span class="cap">Run in your terminal, not inside a Claude session</span><pre>claude mcp add --transport http github \
+  https://api.githubcopilot.com/mcp/readonly \
+  --header "Authorization: Bearer $GITHUB_PAT"</pre></div>
+<div class="tbl"><table>
+<tr><th>Part</th><th>Meaning</th></tr>
+<tr><td><code>claude mcp add</code></td><td>Add an MCP server to Claude Code</td></tr>
+<tr><td><code>--transport http</code></td><td>It's a remote server reached over the web</td></tr>
+<tr><td><code>github</code></td><td>The name you'll see in <code>/mcp</code>; tools will be called <code>mcp__github__…</code></td></tr>
+<tr><td><code>…/mcp/readonly</code></td><td>The read-only version of the default toolsets</td></tr>
+<tr><td><code>--header "Authorization: Bearer $GITHUB_PAT"</code></td><td>Sends your token with every request. The shell replaces <code>$GITHUB_PAT</code> with the real value. See Chapter 98 for what "Bearer" means.</td></tr>
+</table></div>
+<p>The default scope is <code>local</code>: just you, just this project. Add <code>--scope user</code> to use it in every project.</p>
+<div class="warn"><span class="tag">Where the token ends up</span><p>Claude Code saves this configuration, including the header value, in its own settings file on your computer (<code>~/.claude.json</code>). That's fine for a personal, local-scope server. Never put a real token into a shared <code>.mcp.json</code> file that gets committed to git. For shared setups, the file can refer to an environment variable instead, such as <code>"Authorization": "Bearer ${GITHUB_PAT}"</code>, so each person supplies their own.</p></div>
+<h4>Step 4: check it</h4>
+<div class="code"><pre>claude mcp list          <span class="c"># lists every server and whether it connects</span>
+claude mcp get github    <span class="c"># details and health of this one server</span></pre></div>
+<p>Inside a session, <code>/mcp</code> shows the same information and lets you browse the tools.</p>
+<details class="deep"><summary>Choosing toolsets on the remote server</summary><div class="body">
+<p>Each toolset also has its own address: <code>https://api.githubcopilot.com/mcp/x/actions</code> gives just the Actions tools, and <code>…/mcp/x/actions/readonly</code> gives just the read-only ones. To mix several, send the <code>X-MCP-Toolsets</code> header with a comma-separated list. <code>claude mcp add</code> accepts <code>--header</code> more than once:</p>
+<div class="code"><pre>claude mcp add --transport http github https://api.githubcopilot.com/mcp/ \
+  --header "Authorization: Bearer $GITHUB_PAT" \
+  --header "X-MCP-Toolsets: repos,pull_requests,actions" \
+  --header "X-MCP-Readonly: true"</pre></div>
+<p>GitHub notes that unknown toolset names in this header are silently ignored, so if a tool you expect is missing, check the spelling. <code>X-MCP-Tools</code> lists individual tools instead; an unknown tool name there stops the server from starting. Read-only mode always wins: write tools are left out even if you ask for them by name.</p>
+</div></details>
+
+<h3 id="ch103-4"><span class="num">103.4</span>QA work with the GitHub server</h3>
+<div class="tbl"><table>
+<tr><th>Task</th><th>What to ask</th><th>Tools Claude will use</th></tr>
+<tr><td>Test ideas for a pull request</td><td>"Read PR #482 in shop/web. Summarise what changed for a tester and list what I should test manually."</td><td><code>pull_request_read</code> (details and diff)</td></tr>
+<tr><td>Why did CI fail?</td><td>"The last run of the e2e workflow on main failed. Get the failed job's log and explain the first real error."</td><td><code>actions_list</code>, <code>actions_get</code>, <code>get_job_logs</code> (needs the <code>actions</code> toolset)</td></tr>
+<tr><td>Is this bug already reported?</td><td>"Search issues in shop/web for 'coupon' opened in the last 30 days."</td><td><code>search_issues</code>, <code>issue_read</code></td></tr>
+<tr><td>Where is this behaviour coded?</td><td>"Find where the coupon expiry check lives in shop/web."</td><td><code>search_code</code>, <code>get_file_contents</code></td></tr>
+<tr><td>Regression scope</td><td>"List files changed in PRs merged to main this week, grouped by feature area."</td><td>Pull request and repository tools</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A tester starts the day with: "Summarise every failed workflow run on main since yesterday 6 pm. For each, give the failing test, the first error line and the PR that was merged just before it." Claude lists the runs, reads each failed job's log, matches them to recent merges, and produces a short table with links. The tester checks two of them by hand, then files bugs for the real failures. Twenty minutes of tab-switching becomes two.</p></div>
+<div class="box note"><span class="tag">GitHub server or the gh command?</span><p>If the <code>gh</code> command-line tool is installed and signed in, Claude Code can often do the same things by running <code>gh</code> commands in the terminal, with no MCP server at all. The MCP server is most useful in places with no terminal (claude.ai, Claude Desktop), when you want strict read-only toolsets, or when your team has standardised on it. Both are fine; don't set up both and forget one.</p></div>
+
+<h3 id="ch103-5"><span class="num">103.5</span>Databases: checking test data safely</h3>
+<p>Testers query databases all the time. Did the order save with the right total? Which test accounts are locked? How many rows did the migration change? Letting Claude run those queries saves time, but a database is where mistakes become expensive. A single wrong <code>DELETE</code> can wipe test data that took a week to build.</p>
+<h4>Which server?</h4>
+<p>The first-generation PostgreSQL and SQLite servers in the official MCP reference collection are now <strong>archived</strong>, meaning no longer maintained. Don't use them. Two maintained options:</p>
+<div class="tbl"><table>
+<tr><th>Server</th><th>Maintained by</th><th>Databases</th><th>Notes</th></tr>
+<tr><td><b>DBHub</b> (<code>@bytebase/dbhub</code>)</td><td>Bytebase</td><td>PostgreSQL, MySQL, MariaDB, SQL Server, Oracle, SQLite</td><td>Used as the example in Anthropic's Claude Code MCP documentation. Two tools by default (<code>execute_sql</code>, <code>search_objects</code>), so it uses little context. Supports read-only mode and row limits.</td></tr>
+<tr><td><b>MCP Toolbox for Databases</b></td><td>Google (open source)</td><td>Many, including PostgreSQL, MySQL and cloud databases</td><td>Ready-made tools plus a framework for defining your own safe, structured queries.</td></tr>
+</table></div>
+<h4>The golden rules</h4>
+<ol>
+<li><strong>Use a test or staging database, not production</strong>, unless your organisation has explicitly approved read-only production access.</li>
+<li><strong>Connect with a read-only database user.</strong> Ask your database administrator for one. This is the strongest protection, because the database itself refuses changes, whatever the AI tries.</li>
+<li><strong>Turn on the server's read-only mode and row limits</strong> as a second layer.</li>
+<li><strong>Watch out for personal data.</strong> Anything a query returns is sent to the model. Prefer anonymised test data.</li>
+</ol>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A read-only database user is like giving a visitor a museum ticket instead of the curator's keys. They can look at everything on display, but they can't move, take or break anything, however persuasive they are at the front desk.</p></div>
+<h4>Connecting DBHub</h4>
+<div class="code"><span class="cap">From Anthropic's Claude Code documentation</span><pre>claude mcp add --transport stdio db -- npx -y @bytebase/dbhub \
+  --dsn "postgresql://readonly:pass@staging.db.example.com:5432/shop"</pre></div>
+<ul>
+<li><code>--transport stdio</code>: DBHub runs as a small program on your computer, started by Claude Code (Chapter 99 explains stdio).</li>
+<li><code>db</code>: the name for this server.</li>
+<li><code>--</code>: everything after this is the command that starts the server.</li>
+<li><code>npx -y @bytebase/dbhub</code>: download (if needed) and run DBHub. <code>npx</code> comes with Node.js (Chapter 58); <code>-y</code> skips the "install this package?" question.</li>
+<li><code>--dsn "postgresql://readonly:pass@…/shop"</code>: the <a class="gl" href="#g-connection-string">connection string</a>: database type, user name, password, address, port and database name. Here the user is called <code>readonly</code>.</li>
+</ul>
+<div class="warn"><span class="tag">The password is in the command</span><p>The connection string contains a password, and Claude Code stores the command in its config file. Use a password that belongs to the read-only test user only, and never commit it to a shared file. For team setups, put the connection details in DBHub's own configuration file and keep that file out of git.</p></div>
+<details class="deep"><summary>DBHub's read-only mode and row limits</summary><div class="body">
+<p>DBHub's guardrails are set in a TOML configuration file (TOML is a simple settings-file format). Read-only mode makes DBHub check each statement against an allow-list of read-only commands such as <code>SELECT</code> and <code>SHOW</code>, and also uses the database's own read-only mode. <code>max_rows</code> caps how many rows a <code>SELECT</code> returns.</p>
+<div class="code"><span class="cap">dbhub.toml (keep this file out of git if it contains a password)</span><pre>[[sources]]
+id = "staging"
+dsn = "postgres://readonly:pass@staging.db.example.com:5432/shop"
+
+[[tools]]
+name = "execute_sql"
+source = "staging"
+readonly = true
+max_rows = 200</pre></div>
+<p>Start DBHub with <code>--config dbhub.toml</code> instead of <code>--dsn</code>. When a result is cut off at the limit, DBHub marks it <code>"truncated": true</code>, so Claude can tell a capped result from a table that really has exactly 200 rows.</p>
+</div></details>
+
+<h3 id="ch103-6"><span class="num">103.6</span>Other servers testers use</h3>
+<p>These servers are run by the companies that make the tools, and each was checked against its official documentation. Remote servers use OAuth sign-in in a browser unless stated otherwise (see Chapter 98).</p>
+<div class="tbl"><table>
+<tr><th>Server</th><th>What QA can do with it</th><th>How it connects and signs in</th><th>Official docs</th></tr>
+<tr><td><b>GitHub</b></td><td>Read PRs, diffs, CI logs, issues and code</td><td>Remote HTTP, <code>https://api.githubcopilot.com/mcp/</code>; personal access token (OAuth in some tools)</td><td><a href="https://github.com/github/github-mcp-server" target="_blank" rel="noopener">github/github-mcp-server</a></td></tr>
+<tr><td><b>Sentry</b></td><td>Look up production errors, stack traces and how many users are affected; turn real crashes into test cases</td><td>Remote HTTP, <code>https://mcp.sentry.dev/mcp</code>; OAuth</td><td><a href="https://docs.sentry.io/product/sentry-mcp/" target="_blank" rel="noopener">docs.sentry.io</a></td></tr>
+<tr><td><b>Linear</b></td><td>Search, read and (if allowed) create issues; check whether a bug is known</td><td>Remote HTTP, <code>https://mcp.linear.app/mcp</code> (read-only: <code>…/mcp/readonly</code>); OAuth</td><td><a href="https://linear.app/docs/mcp" target="_blank" rel="noopener">linear.app/docs/mcp</a></td></tr>
+<tr><td><b>BrowserStack</b></td><td>Run and debug tests on real browsers and devices; accessibility checks</td><td>Remote HTTP, <code>https://mcp.browserstack.com/mcp</code>; sign in through <code>/mcp</code>. A local version also exists.</td><td><a href="https://github.com/browserstack/mcp-server" target="_blank" rel="noopener">browserstack/mcp-server</a></td></tr>
+<tr><td><b>Slack</b></td><td>Search discussions about a bug; post a test summary</td><td>Remote HTTP, <code>https://mcp.slack.com/mcp</code>; requires an approved Slack app, so usually set up by your Slack admin or through Claude's Slack connector</td><td><a href="https://docs.slack.dev/ai/mcp-server" target="_blank" rel="noopener">docs.slack.dev</a></td></tr>
+<tr><td><b>Figma</b></td><td>Compare a built screen with its design; read spacing, colours and text</td><td>Remote HTTP, <code>https://mcp.figma.com/mcp</code>; Figma sign-in. Check Figma's guide for which AI tools are supported.</td><td><a href="https://help.figma.com/hc/en-us/articles/32132100833559" target="_blank" rel="noopener">help.figma.com</a></td></tr>
+<tr><td><b>Filesystem</b>, <b>Git</b>, <b>Fetch</b> (reference servers)</td><td>Give Claude Desktop or claude.ai access to a folder, a local git repository or a web page</td><td>Local stdio. Claude Code already has these abilities built in, so you rarely need them there.</td><td><a href="https://github.com/modelcontextprotocol/servers" target="_blank" rel="noopener">modelcontextprotocol/servers</a></td></tr>
+</table></div>
+<p>Adding a remote OAuth server always follows the same pattern, for example for Sentry:</p>
+<div class="code"><pre>claude mcp add --transport http sentry https://mcp.sentry.dev/mcp
+claude mcp login sentry     <span class="c"># or run /mcp inside a session; a browser window opens to sign in</span></pre></div>
+<div class="box note"><span class="tag">Already connected in claude.ai?</span><p>Connectors you've set up in claude.ai (for example Slack or Atlassian) can also appear in Claude Code when you're signed in with the same account. Chapter 100 explains how. Check <code>/mcp</code> before adding a second copy of the same service.</p></div>
+
+<h3 id="ch103-7"><span class="num">103.7</span>How to judge any MCP server</h3>
+<p>Thousands of MCP servers exist, and anyone can publish one. The official <strong>MCP Registry</strong> (<a href="https://registry.modelcontextprotocol.io/" target="_blank" rel="noopener">registry.modelcontextprotocol.io</a>) lists published servers, but being listed is not the same as being safe. Before you connect a server, ask these questions:</p>
+<div class="tbl"><table>
+<tr><th>Question</th><th>Good sign</th><th>Warning sign</th></tr>
+<tr><td>Who publishes it?</td><td>The company behind the service (GitHub, Sentry, Atlassian), or a well-known organisation</td><td>An unknown individual, or a name that imitates a real company</td></tr>
+<tr><td>Is it maintained?</td><td>Recent releases, open issues being answered</td><td>No updates for a year, or marked archived</td></tr>
+<tr><td>What access does it ask for?</td><td>Only what its job needs; read-only options</td><td>Full account access for a read-only job</td></tr>
+<tr><td>Can you see the code?</td><td>Open source, or a clear security page</td><td>A closed program with no information</td></tr>
+<tr><td>Where does your data go?</td><td>Documented; runs locally or on the vendor's own service</td><td>Sends data to a third party you've never heard of</td></tr>
+<tr><td>Does your company allow it?</td><td>On your organisation's approved list</td><td>Not reviewed by security</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Why it matters</span><p>A local MCP server is a program running on your computer with your permissions. A remote one sees whatever data you send it. Treat installing an MCP server like installing a browser extension that can read your work accounts. Chapter 105 covers the security side in depth.</p></div>
+
+<h3 id="ch103-8"><span class="num">103.8</span>Keeping it lean</h3>
+<p>Every connected server costs something, even when idle: its tool names (and sometimes descriptions) use context, and each one is another thing that can break. Claude Code reduces the context cost with <strong>tool search</strong>, which is on by default: at the start of a session only tool names and server instructions are loaded, and full definitions are fetched when needed. Good habits still help:</p>
+<ul>
+<li>Connect servers at <code>local</code> scope for the project that needs them, not <code>user</code> scope for everything.</li>
+<li>Use toolsets and read-only modes to trim what a server offers.</li>
+<li>Remove servers you no longer use: <code>claude mcp remove &lt;name&gt;</code>.</li>
+<li>Ask for targeted results ("the first error in the failed job"), not whole logs. Claude Code warns when one tool result exceeds 10,000 tokens and, by default, limits a result to 25,000 tokens (the <code>MAX_MCP_OUTPUT_TOKENS</code> environment variable changes that limit).</li>
+</ul>
+
+<div class="lab"><div class="lab-h"><b>Connect GitHub read-only and investigate a CI failure</b><span>40 min · needs a GitHub account</span></div><ol>
+<li>Create a fine-grained token with read-only Contents, Pull requests, Issues and Actions permissions for one repository you can see (your own test repository is fine).<span class="expect">a token starting with <code>github_pat_</code>, copied somewhere safe for the next step.</span></li>
+<li>Store it with <code>read -s GITHUB_PAT</code> and <code>export GITHUB_PAT</code>, then add the server using the command from the "Choosing toolsets" box with <code>X-MCP-Toolsets: repos,pull_requests,actions</code> and <code>X-MCP-Readonly: true</code>.<span class="expect">a message that the server was added to local config.</span></li>
+<li>Run <code>claude mcp get github</code>.<span class="expect">the server's address and a "Connected" status. If it says unauthorised, re-check the token and its repository access.</span></li>
+<li>Start <code>claude</code>, run <code>/mcp</code> and open the github entry.<span class="expect">a list of tools. None should create, update, merge or delete anything.</span></li>
+<li>Ask: "List the five most recent workflow runs in &lt;owner&gt;/&lt;repo&gt; and their status. For any failure, fetch the failed job log and summarise the first real error."<span class="expect">a table of runs and, for failures, an explanation that quotes the log. Claude asks permission before each tool the first time.</span></li>
+<li>Ask: "Create an issue for this failure."<span class="expect">Claude explains that it has no tool to create issues, because the server is read-only. That's your safety layer working.</span></li>
+</ol></div>
+<div class="lab"><div class="lab-h"><b>Query a sample database safely</b><span>25 min · needs Node.js</span></div><ol>
+<li>Add DBHub in demo mode, which uses a bundled sample "employee" database in SQLite: <code>claude mcp add --transport stdio dbdemo -- npx -y @bytebase/dbhub --demo</code><span class="expect">the server added. No real data is involved.</span></li>
+<li>In a session, ask: "What tables are in the dbdemo database? Describe each in one line."<span class="expect">Claude uses <code>search_objects</code> and lists tables such as employees and departments.</span></li>
+<li>Ask a tester's question: "Are there any employees with a salary record but no department? Show the SQL you ran."<span class="expect">a query, its result, and the SQL. Check whether the SQL actually answers the question.</span></li>
+<li>Remove the demo server when you're done: <code>claude mcp remove dbdemo</code>.</li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Read-only mode on the server is enough."</dt><dd>It's one layer. Also use a token or database user that can only read. Then even a misconfigured server can't change anything.</dd>
+<dt>"Any server in the registry is safe."</dt><dd>The registry lists servers; it doesn't vouch for them. Check who publishes and maintains each one.</dd>
+<dt>"The old reference Postgres server is the standard choice."</dt><dd>It's archived. Use a maintained server such as DBHub or MCP Toolbox for Databases.</dd>
+<dt>"More servers make Claude smarter."</dt><dd>More servers make Claude's choices harder and use context. Connect what the task needs.</dd>
+<dt>"It's fine to paste my token into the command."</dt><dd>It ends up in your shell history and possibly in shared files. Use an environment variable, and short-lived, narrowly scoped tokens.</dd>
+</dl></div>
+
+<h3 id="ch103-r"><span class="num">103.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Use GitHub's official server (<code>github/github-mcp-server</code>): remote at <code>https://api.githubcopilot.com/mcp/</code>, or local in Docker.</li>
+<li>Limit it with toolsets and read-only mode (<code>/readonly</code>, <code>X-MCP-Readonly</code> or <code>--read-only</code>), and use a fine-grained, read-only, short-lived token.</li>
+<li>For databases, use a maintained server (DBHub, MCP Toolbox), a test database and a read-only database user. The old reference servers are archived.</li>
+<li>Official servers exist for Sentry, Linear, BrowserStack, Slack, Figma and more; remote ones usually sign in with OAuth.</li>
+<li>Judge every server by publisher, maintenance, permissions, code visibility, data flow and company approval.</li>
+<li>Keep connections lean: local scope, trimmed toolsets, targeted questions.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">How do you make GitHub's remote MCP server offer only read tools?</p><div class="opts"><button>Ask Claude politely not to change anything</button><button data-ok>Add /readonly to the address or send the X-MCP-Readonly header</button><button>Use the user scope</button></div><p class="why" hidden>Read-only mode removes write tools. Pair it with a read-only token.</p></div>
+<div class="qz"><p class="q">Which toolset do you need for Claude to read CI job logs?</p><div class="opts"><button>issues</button><button data-ok>actions</button><button>users</button></div><p class="why" hidden>The actions toolset covers GitHub Actions workflows, runs, jobs and logs. It isn't in the default set.</p></div>
+<div class="qz"><p class="q">What is the strongest protection against Claude changing data in a database?</p><div class="opts"><button>A careful prompt</button><button data-ok>Connecting with a database user that only has read permission</button><button>Using a faster model</button></div><p class="why" hidden>The database itself refuses changes, whatever any tool or prompt tries.</p></div>
+<div class="qz"><p class="q">The reference PostgreSQL MCP server in the official servers repository is…</p><div class="opts"><button>The recommended production choice</button><button data-ok>Archived and no longer maintained</button><button>Required by Claude Code</button></div><p class="why" hidden>Use a maintained alternative such as DBHub or MCP Toolbox for Databases.</p></div>
+<div class="qz"><p class="q">A server in the MCP Registry asks for full admin access to your company's GitHub organisation just to read issues. What should you do?</p><div class="opts"><button>Install it; it's in the registry</button><button data-ok>Don't connect it: the access it asks for is far more than its job needs</button><button>Install it at user scope instead</button></div><p class="why" hidden>Being listed isn't an endorsement. Over-broad permissions are a major warning sign.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Map your own QA tool chain. List every system you check when a test fails (code, CI, database, error tracker, issue tracker, chat, design). For each, find out whether an official MCP server exists, how it signs in, and whether it has a read-only option. Pick the two that would save you the most time, write down the exact <code>claude mcp add</code> commands with least-privilege credentials, and get your security team's approval before connecting them.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Each tool we use, such as GitHub, the database or Sentry, can have its own MCP server, so Claude can gather evidence from all of them in one conversation. GitHub's official server can run read-only with just the toolsets we need, and we pair that with a read-only token. For databases we use a maintained server, a test database and a read-only user. Before connecting any server, we check who publishes it, what access it wants and whether our company allows it."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>GitHub, <a href="https://github.com/github/github-mcp-server" target="_blank" rel="noopener">GitHub MCP Server</a> (README, toolsets, read-only mode) and <a href="https://github.com/github/github-mcp-server/blob/main/docs/remote-server.md" target="_blank" rel="noopener">remote server documentation</a> (toolset URLs, X-MCP headers).</li>
+<li>GitHub, <a href="https://github.com/github/github-mcp-server/blob/main/docs/installation-guides/install-claude.md" target="_blank" rel="noopener">Install GitHub MCP Server in Claude applications</a>.</li>
+<li>GitHub Docs, <a href="https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens" target="_blank" rel="noopener">Managing your personal access tokens</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/mcp" target="_blank" rel="noopener">Connect Claude Code to tools via MCP</a> (claude mcp add, scopes, the DBHub example, OAuth, tool search and output limits).</li>
+<li>Model Context Protocol, <a href="https://github.com/modelcontextprotocol/servers" target="_blank" rel="noopener">reference servers and archived servers</a>; <a href="https://registry.modelcontextprotocol.io/" target="_blank" rel="noopener">MCP Registry</a>.</li>
+<li>Bytebase, <a href="https://github.com/bytebase/dbhub" target="_blank" rel="noopener">DBHub</a> and <a href="https://dbhub.ai/tools/execute-sql" target="_blank" rel="noopener">execute_sql read-only mode and row limits</a>.</li>
+<li>Google, <a href="https://github.com/googleapis/mcp-toolbox" target="_blank" rel="noopener">MCP Toolbox for Databases</a>.</li>
+<li>Vendor documentation: <a href="https://docs.sentry.io/product/sentry-mcp/" target="_blank" rel="noopener">Sentry MCP</a>, <a href="https://linear.app/docs/mcp" target="_blank" rel="noopener">Linear MCP</a>, <a href="https://github.com/browserstack/mcp-server" target="_blank" rel="noopener">BrowserStack MCP</a>, <a href="https://docs.slack.dev/ai/mcp-server" target="_blank" rel="noopener">Slack MCP</a>, <a href="https://help.figma.com/hc/en-us/articles/32132100833559" target="_blank" rel="noopener">Figma MCP</a>.</li>
+</ol><p class="verified">Verified 9 November 2026 against the sources above and Claude Code 2.1.319.</p></div>

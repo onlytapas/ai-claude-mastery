@@ -1,0 +1,180 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>Which Claude apps exist beyond the website, and which plans each needs</li>
+<li>What the desktop app adds: Quick Entry, screenshots, local connectors, and the Cowork and Code tabs</li>
+<li>What the mobile apps are good for, and their limits</li>
+<li>How Claude in Chrome works, why it carries extra risk, and how to use it safely for testing</li>
+<li>What the Excel, PowerPoint, Word and Outlook add-ins and the Slack options do</li>
+<li>How voice mode differs from dictation</li>
+<li>How to share a chat, unshare it, and export all your data</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch43">Chapter 43</a> (getting started) and <a href="#ch49">Chapter 49</a> (connectors). <a href="#ch112">Chapter 112</a> goes deeper into browser automation and computer use; <a href="#ch63">Chapter 63</a> introduces Claude Code.</div>
+
+<div class="bigidea"><p>Claude isn't only a website. The same account works in a desktop app for Mac, Windows and (in beta) Linux, in phone apps, as a Chrome extension that can click and type in web pages, inside Excel, PowerPoint, Word and Outlook, and in Slack. Each place suits different work: desktop for quick questions and local tools, mobile for voice and on-the-go checks, Chrome for web tasks, Office for documents, Slack for team threads. Features and plan rules differ between them, and they change often, so this chapter dates every interface detail. It ends with sharing and exporting, which work the same wherever you started.</p></div>
+
+<h3 id="ch51-1"><span class="num">51.1</span>The map: where Claude runs</h3>
+<p>This table reflects Anthropic's download page and help center on 9 November 2026. "Paid" means Pro, Max, Ultra, Team or Enterprise.</p>
+<input class="filter" data-filter="#ch51Apps" data-empty="#ch51AppsEmpty" type="search" placeholder="Filter apps…" aria-label="Filter apps">
+<div class="tbl"><table id="ch51Apps">
+<tr><th>App</th><th>Where</th><th>Plans</th><th>Status</th></tr>
+<tr class="group"><td colspan="4">Main apps</td></tr>
+<tr><td>claude.ai</td><td>Any modern browser</td><td>All</td><td>Generally available</td></tr>
+<tr><td>Desktop app</td><td>macOS; Windows (x64 and ARM64, also via the Microsoft Store); Linux (Ubuntu and Debian)</td><td>All (some features need paid)</td><td>Linux is in beta</td></tr>
+<tr><td>Mobile apps</td><td>iOS and Android</td><td>All</td><td>Generally available</td></tr>
+<tr class="group"><td colspan="4">Extensions and add-ins</td></tr>
+<tr><td>Claude in Chrome</td><td>Google Chrome only (not other Chromium browsers, not mobile)</td><td>Paid</td><td>Beta</td></tr>
+<tr><td>Excel, PowerPoint, Word add-ins</td><td>Microsoft 365, installed from Microsoft's marketplace</td><td>Paid</td><td>Generally available</td></tr>
+<tr><td>Outlook add-in</td><td>Microsoft 365</td><td>Paid</td><td>Beta</td></tr>
+<tr><td>Google Workspace add-on</td><td>Google Workspace Marketplace</td><td>See listing</td><td>Beta</td></tr>
+<tr class="group"><td colspan="4">Team tools</td></tr>
+<tr><td>Claude Tag (Claude in Slack)</td><td>Slack</td><td>Team and Enterprise</td><td>See section 51.5</td></tr>
+<tr><td>Claude Code</td><td>Terminal, VS Code, JetBrains (beta), desktop app, web, Slack</td><td>Paid or API account</td><td>See <a href="#ch63">Chapter 63</a></td></tr>
+</table></div>
+<p id="ch51AppsEmpty" hidden>No apps match.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a bank. You can use the website, the phone app, a card in a shop, or a branch. It's the same account, but each place is good at different things, and a few services only exist in one of them. Claude's apps work the same way: your chats, projects and memory follow you, while some features belong to one app.</p></div>
+
+<h3 id="ch51-2"><span class="num">51.2</span>The desktop app</h3>
+<p>Download it from <code>claude.com/download</code>. It does everything the website does and adds features that need access to your computer.</p>
+<div class="tbl"><table>
+<tr><th>Desktop feature</th><th>What it does</th><th>Notes (as of 9 November 2026)</th></tr>
+<tr><td><b>Chat, Cowork and Code</b></td><td>The app has areas for normal chat, Claude Cowork (Claude working through multi-step tasks on your files and apps) and Claude Code</td><td>Cowork and Code need a paid plan</td></tr>
+<tr><td><b>Quick Entry</b> (Mac)</td><td>Double-tap Option from any app to open a small Claude box. You can also set Option + Space or your own shortcut.</td><td>macOS 12 or later; the app must be running (it can be in the background). Not on Windows.</td></tr>
+<tr><td><b>Screenshot capture</b> (Mac)</td><td>From Quick Entry, drag over part of the screen to attach a screenshot, or click a window to attach its contents</td><td>Needs the Screen Recording permission in macOS</td></tr>
+<tr><td><b>Dictation</b> (Mac)</td><td>Press Caps Lock to start and stop speech-to-text in Quick Entry</td><td>Off by default because it takes over Caps Lock; macOS 14 or later</td></tr>
+<tr><td><b>Local connectors</b></td><td>Desktop extensions run MCP servers on your own computer</td><td>See <a href="#ch100">Chapter 100</a>. Research mode can't use them.</td></tr>
+</table></div>
+<p>Quick Entry settings are under <b>Settings &gt; Desktop app</b> (older layouts: <b>Settings &gt; System</b>). macOS permissions (Accessibility, Screen Recording, Speech Recognition) are managed in <b>System Settings &gt; Privacy &amp; Security</b>. On Linux, Anthropic notes that computer use and dictation aren't available yet.</p>
+<div class="box example"><span class="tag">Real-world example: faster bug reports</span><p>A tester spots a misaligned error message in a staging build. She double-taps Option, drags over the broken area, and types: "Write a bug report for this. Expected: error text aligned under the field. Use our template: title, environment, steps, expected, actual, severity." Thirty seconds later she has a draft to paste into Jira, with the screenshot already described. She still checks the steps herself, because Claude can only see the picture, not how she got there. (<a href="#ch46">Chapter 46</a> covers screenshots and privacy.)</p></div>
+<div class="box warn"><span class="tag">Screens show more than you think</span><p>A screenshot can include customer names, tokens in a URL bar, or a chat window in the corner. Crop to the area that matters, and use test data on test environments.</p></div>
+
+<h3 id="ch51-3"><span class="num">51.3</span>The mobile apps</h3>
+<p>The iOS and Android apps carry your chats, projects and connectors with you. They're strongest at short tasks and voice.</p>
+<ul>
+<li><b>Photos and files:</b> photograph a device screen, a whiteboard of test ideas or an error on a kiosk, and ask about it.</li>
+<li><b>Voice mode and dictation:</b> covered in section 51.6; voice mode is designed mainly for phones.</li>
+<li><b>Phone integrations:</b> Anthropic's help center documents iOS features such as working with system apps, Shortcuts and widgets, and an Android widget. Availability varies by country, plan and device; check the mobile collection in the help center for your platform.</li>
+</ul>
+<div class="box note"><span class="tag">Mobile limits worth knowing</span><p>Research on mobile searches only the web and silently skips connectors (<a href="#ch49">Chapter 49</a>). The per-chat memory switch locks after the first message (<a href="#ch50">Chapter 50</a>). Data export can't be started from the mobile apps. Installing new connectors on mobile is in beta, so add them on the web or desktop first.</p></div>
+
+<h3 id="ch51-4"><span class="num">51.4</span>Claude in Chrome</h3>
+<p>Claude in Chrome is a browser extension that lets Claude read, click and navigate websites with you. You give it a task in Chrome's side panel ("find the cheapest plan on this pricing page and fill in the sign-up form with my test details") and it works through the page step by step. It can also be started from Claude Cowork or Claude Code.</p>
+<ul>
+<li><b>Plans:</b> paid plans only. Anthropic launched it as an experiment in August 2025 and made it a beta for all paid plans in December 2025.</li>
+<li><b>Browser:</b> Google Chrome only, installed from the Chrome Web Store with <b>Add to Chrome</b>. Pin it from the puzzle-piece menu.</li>
+<li><b>Permissions:</b> it asks for powerful browser permissions, including <code>debugger</code> (to click, type and take screenshots), <code>scripting</code> (to read page text), <code>tabs</code> and <code>tabGroups</code>, and <code>webNavigation</code>.</li>
+<li><b>Modes:</b> as of 9 November 2026 the side panel starts in <b>Automatically approve</b> mode, where Claude keeps working, checks each action and pauses when it needs your approval. A mode you choose is kept for future sessions.</li>
+<li><b>Shortcuts and schedules:</b> you can save prompts as shortcuts (run them by typing <code>/</code>), record a workflow for Claude to repeat, and schedule tasks daily, weekly, monthly or yearly while Chrome is open.</li>
+<li><b>Admin controls:</b> on Team and Enterprise, admins control whether the extension is allowed and can set site allowlists and blocklists.</li>
+</ul>
+<div class="box warn"><span class="tag">Anthropic's own words: "still risky"</span><p>Anthropic's help page says the extension uses safety classifiers but is "still risky", and points to its safety guide. A browser agent reads web pages written by others, and any of them can contain hidden instructions (<a class="gl" href="#g-prompt-injection">prompt injection</a>). Because the extension can act in sites where you're logged in, an injected instruction could try to send email, change settings or copy data. Use a separate Chrome profile with only test accounts, keep it away from banking, email and admin consoles, and read every approval request.</p></div>
+<div class="cols2"><div><h4>Good QA uses</h4><ul>
+<li>Exploring a staging site and listing what looks broken</li>
+<li>Running through a manual smoke checklist and recording results</li>
+<li>Filling long test forms with varied test data</li>
+<li>Checking that links on a release page all resolve</li>
+</ul></div><div><h4>Better done another way</h4><ul>
+<li>Regression checks you'll repeat: write Playwright tests (<a href="#ch102">Chapter 102</a>)</li>
+<li>Anything in production with real customer data</li>
+<li>Exploration inside Claude Code: Playwright MCP gives you more control</li>
+<li>Pass/fail evidence for an audit: use scripted tests with reports</li>
+</ul></div></div>
+
+<h3 id="ch51-5"><span class="num">51.5</span>Office add-ins and Slack</h3>
+<h4>Claude for Microsoft 365</h4>
+<p>Anthropic's product page lists four add-ins, installed from Microsoft's marketplace. As of 9 November 2026:</p>
+<div class="tbl"><table>
+<tr><th>Add-in</th><th>Status</th><th>What Anthropic says it does</th><th>A QA use</th></tr>
+<tr><td>Excel</td><td>Generally available, paid plans</td><td>Ask about any cell, update assumptions without breaking formulas, build models</td><td>Explain a test-metrics workbook; add a defect-trend sheet; find broken formulas</td></tr>
+<tr><td>PowerPoint</td><td>Generally available, paid plans</td><td>Build slides in your template, edit selected content, create native charts</td><td>Turn a release-readiness summary into slides in the company template</td></tr>
+<tr><td>Word</td><td>Generally available, paid plans</td><td>Edit with tracked changes, respond to comment threads</td><td>Review a test strategy with tracked changes the team can accept or reject</td></tr>
+<tr><td>Outlook</td><td>Beta, paid plans</td><td>Triage an inbox, find meeting times; drafts wait for you to send</td><td>Summarise overnight CI-failure emails</td></tr>
+</table></div>
+<p>Organisations that use Claude through Amazon Bedrock, Google Cloud or Microsoft Foundry can deploy the add-ins with those credentials instead of individual Claude accounts. A Google Workspace version is listed separately and is in beta.</p>
+<h4>Slack: three different things</h4>
+<p>"Claude and Slack" can mean three products, and people mix them up.</p>
+<div class="tbl"><table>
+<tr><th>Product</th><th>What it is</th><th>Plans</th></tr>
+<tr><td><b>Claude Tag</b> (current)</td><td>An @Claude assistant in Slack channels, set up by an admin with one shared Claude identity. Reads threads, keeps channel memory, can use connected tools such as GitHub or Jira, and can work on long tasks in the background.</td><td>Team and Enterprise</td></tr>
+<tr><td>The earlier Claude in Slack app</td><td>A per-user app: DM @Claude or mention it in threads. Anthropic says Claude Tag replaces it in place.</td><td>Paid Slack plans, with Slack admin approval</td></tr>
+<tr><td>The Slack connector</td><td>Lets Claude in claude.ai search your Slack channels, DMs and files (<a href="#ch49">Chapter 49</a>)</td><td>Team and Enterprise</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example</span><p>In a team's #qa-triage channel, a developer posts a flaky-test failure. A tester writes "@Claude summarise this thread, check whether the same test failed in the last week's CI runs, and draft a Jira bug if it did." Claude Tag answers in the thread, using the tools the admin connected for that channel. Anyone in the channel can see what it did. Anthropic's Claude Tag docs explain how access is scoped per channel; it acts under its own identity, not as the person who asked.</p></div>
+<div class="box note"><span class="tag">Not verified here</span><p>Claude Tag is new and its pages change often. We haven't described setup steps, pricing or limits in detail; see Anthropic's Claude Tag documentation for the current version. A Microsoft Teams version is announced as "coming soon".</p></div>
+
+<h3 id="ch51-6"><span class="num">51.6</span>Voice: voice mode and dictation</h3>
+<p>Two features use your voice, and they're different:</p>
+<div class="cols2"><div><h4>Dictation</h4><p><a class="gl" href="#g-speech-to-text">Speech-to-text</a>. You speak, it becomes text in the message box, you review and send. Available in the apps, in Quick Entry on Mac, in Cowork and Claude Code, and in the Office add-ins.</p></div><div><h4>Voice mode (beta)</h4><p>A spoken, two-way conversation: you talk, Claude answers aloud. All plans, on iOS, Android, desktop and web. You can switch between voice and text in the same chat.</p></div></div>
+<p>How to start voice mode (as of 9 November 2026): on web and desktop, start a new chat and select the sound-wave icon at the lower right; select <b>Stop</b> to finish. On mobile, tap the sound-wave icon next to the microphone and pick a voice.</p>
+<ul>
+<li><b>Hands-free</b> (default): Claude listens and replies when you pause. Best somewhere quiet.</li>
+<li><b>Push-to-talk:</b> hold a button while you speak. Better in noisy places.</li>
+<li><b>Tools:</b> in voice mode Claude can use connected tools such as Gmail, Google Calendar, Google Docs and Slack.</li>
+<li><b>Limits:</b> voice counts toward your usage limits; Anthropic notes Claude Fable isn't available in voice mode; non-English languages are in beta. Voice mode isn't available in Cowork or Claude Code (dictation is).</li>
+</ul>
+<div class="box example"><span class="tag">Real-world example</span><p>On the way to work, a test lead uses voice mode: "Ask me questions to help plan exploratory testing for the new loyalty-points feature." Claude asks about risks, users and integrations, and she answers out loud. At her desk, the chat holds the whole conversation as text, ready to turn into test charters.</p></div>
+
+<h3 id="ch51-7"><span class="num">51.7</span>Sharing and exporting</h3>
+<h4>Sharing a chat</h4>
+<p>Select <b>Share</b> at the upper right of a chat, then <b>Share</b> again in the pop-out to create a link (as of 9 November 2026). The link points to a <a class="gl" href="#g-snapshot-link">snapshot</a>:</p>
+<ul>
+<li>It includes the messages sent before you shared, and any artifacts. Later messages stay private unless you unshare and share again, which updates the snapshot.</li>
+<li>Attached files are <b>not</b> included. Raw data from connector (MCP) tool calls is hidden; viewers see only the conversation and final output.</li>
+<li>On Free, Pro, Max and Ultra, anyone with the link can view it. Team and Enterprise users can share only with people in their organisation, and Owners can stop chats that used connectors from being shared at all.</li>
+</ul>
+<p>To unshare, open the <b>Share</b> menu and change the visibility from <b>Public</b> to <b>Private</b>. To review everything you've shared (Free, Pro, Max and Ultra), go to <b>Settings &gt; Privacy</b> and select <b>Manage</b> next to <b>Shared chats</b>, then <b>Unshare</b> any you no longer want public.</p>
+<div class="box warn"><span class="tag">A public link is public</span><p>Anyone who gets the link can read it, including people it was forwarded to. Before sharing a chat from a personal account, read it top to bottom for internal URLs, names, ticket numbers or logs. For work, a Team or Enterprise account keeps shares inside the organisation.</p></div>
+<h4>Exporting your data</h4>
+<p>Go to <b>Settings &gt; Privacy</b> on the web or desktop app (not mobile) and select <b>Export data</b>. A download link arrives by email at your account's address after a short wait.</p>
+<ul>
+<li>The export includes chats, projects, memory and account data. It doesn't include the original files you uploaded.</li>
+<li>The link needs you to be signed in, expires 24 hours after it's created, and may work only once, so download it straight away.</li>
+<li>On Team and Enterprise, members can export only their own chats, and only if an Owner has turned on <b>Allow members to export their own data</b>. Primary Owners export the whole organisation from <b>Organization settings &gt; Data and privacy</b>.</li>
+</ul>
+
+<div class="lab"><div class="lab-h"><b>Tour the apps and control what you share</b><span>30 min · desktop app + phone + claude.ai (Free plan works for all steps except the optional Chrome step)</span></div><ol>
+<li>Install the desktop app from <code>claude.com/download</code> and sign in.<span class="expect">Your existing chats and projects appear in the sidebar.</span></li>
+<li>(Mac) Open <b>Settings &gt; Desktop app</b> and check the Quick Entry shortcut. Double-tap Option in another app, drag over part of your screen showing a test web page, and ask <code>List three things a tester should check on this screen.</code> Grant Screen Recording permission if macOS asks.<span class="expect">A small entry box opens, your screenshot is attached, and Claude replies about what's visible. On Windows, use the app's normal chat with a pasted screenshot instead.</span></li>
+<li>On your phone, install the Claude app, open the chat from step 2, and continue it.<span class="expect">The same conversation, synced.</span></li>
+<li>Start voice mode on the phone (sound-wave icon) and say: <code>Ask me three questions to plan testing for a password reset feature.</code> Answer them aloud, then stop.<span class="expect">Claude speaks its questions and replies; afterwards the chat shows the conversation as text.</span></li>
+<li>On the web, share one harmless chat: <b>Share</b>, then <b>Share</b>. Open the link in a private browser window.<span class="expect">The snapshot shows the messages up to the moment you shared, without any attached files.</span></li>
+<li>Send another message in the chat, reload the shared link, then unshare (visibility <b>Private</b>) and reload again.<span class="expect">The new message doesn't appear in the snapshot; after unsharing the link no longer works.</span></li>
+<li>Go to <b>Settings &gt; Privacy</b> and select <b>Export data</b>. Download the file from the email within 24 hours and open it.<span class="expect">An email with a download link; the export contains your chats, projects and memory, but not your uploaded files.</span></li>
+<li>(Optional, paid plans) Install Claude in Chrome in a separate Chrome profile, open a public demo site such as <code>https://demo.playwright.dev/todomvc</code>, and ask it to add three to-do items and mark one complete.<span class="expect">Claude clicks and types in the page, pausing for approval when needed. Watch each step.</span></li>
+</ol>
+<p><b>Troubleshooting:</b> Quick Entry does nothing: the desktop app must be running, Accessibility permission must be granted, and macOS must be 12 or later. No export button: you're on mobile, or on a Team/Enterprise account where member export is off. Shared link opens a login page: Team and Enterprise shares are visible only to signed-in members of your organisation. Chrome extension won't install: it works only in Google Chrome on a paid plan, and your admin may have blocked it.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"A shared link always shows the latest version of the chat."</dt><dd>It's a snapshot of the moment you shared. Unshare and share again to update it.</dd>
+<dt>"Sharing includes the files I attached."</dt><dd>Attached files stay private and aren't part of the shared snapshot.</dd>
+<dt>"Claude in Chrome is safe because it asks before acting."</dt><dd>It pauses when it judges approval is needed, but Anthropic itself calls it "still risky". Use test accounts in a separate profile.</dd>
+<dt>"Voice mode and dictation are the same thing."</dt><dd>Dictation turns speech into text you send; voice mode is a spoken conversation where Claude answers aloud.</dd>
+<dt>"The Slack connector puts Claude in Slack."</dt><dd>The connector lets claude.ai search Slack. Claude Tag is what puts Claude inside Slack channels.</dd>
+</dl></div>
+
+<h3 id="ch51-r"><span class="num">51.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Web, desktop and mobile apps are on all plans; Chrome and the Office add-ins need a paid plan; Claude Tag is for Team and Enterprise.</li>
+<li>The desktop app adds Quick Entry, screenshots and dictation on Mac, local connectors, and the Cowork and Code areas.</li>
+<li>Mobile is best for quick tasks and voice; research there skips connectors, and export isn't available.</li>
+<li>Claude in Chrome acts in real web pages; treat it as risky and keep it to test accounts.</li>
+<li>Shared chats are snapshots without attached files; export from Settings &gt; Privacy on web or desktop, and download within 24 hours.</li>
+<li>Every UI location here is as of 9 November 2026 and is likely to change.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">You shared a chat, then asked Claude three more questions in it. What does someone opening the link see?</p><div class="opts"><button>The whole chat including the new questions</button><button data-ok>Only the messages up to when you shared</button><button>Nothing: the link breaks when you add messages</button></div><p class="why" hidden>Shared links point to a snapshot. Unshare and share again to update it.</p></div>
+<div class="qz"><p class="q">Which statement about Claude in Chrome is accurate?</p><div class="opts"><button>It works in any Chromium browser, including Edge</button><button>It's available on the Free plan</button><button data-ok>It needs a paid plan, runs in Google Chrome only, and Anthropic describes it as still risky</button></div><p class="why" hidden>The extension is paid-only, works only in Google Chrome, and Anthropic's help page calls it "still risky".</p></div>
+<div class="qz"><p class="q">A colleague wants to export their Claude data from the phone app. What do you tell them?</p><div class="opts"><button data-ok>Export isn't available on mobile; use Settings &gt; Privacy on the web or desktop app</button><button>Export is under the voice mode settings</button><button>Exports are only possible for Enterprise accounts</button></div><p class="why" hidden>Data export runs from Settings &gt; Privacy on the web or desktop app; the link arrives by email.</p></div>
+<div class="qz"><p class="q">Your team wants Claude to answer in a Slack channel when someone mentions it. Which product is that?</p><div class="opts"><button>The Slack connector</button><button data-ok>Claude Tag</button><button>Voice mode</button></div><p class="why" hidden>Claude Tag puts Claude in Slack channels. The Slack connector lets claude.ai search Slack.</p></div>
+<div class="qz"><p class="q">On a Mac with the desktop app, what's the quickest way to ask Claude about something on screen?</p><div class="opts"><button>Export your data and upload it</button><button data-ok>Open Quick Entry (double-tap Option by default) and drag to attach a screenshot</button><button>Use push-to-talk in voice mode</button></div><p class="why" hidden>Quick Entry opens from any app and can attach a screenshot or a window.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Write a one-page "Which Claude app for which job" guide for your team. List five real tasks from your week (for example: drafting a bug report from a screenshot, reviewing a test strategy document, triaging a Slack thread, summarising a metrics spreadsheet, planning on the move) and, for each, the app you'd use, the plan it needs, and one safety rule. Include your organisation's rules for shared links and for browser extensions. Check each plan requirement against the current help center before you circulate it.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Claude is the same account everywhere, but each app is good at different things. The desktop app is the one to install: on a Mac, double-tap Option and you can ask about anything on screen with a screenshot. The phone app is great for voice. Paid plans add Claude inside Chrome, which can click around websites, so only use it with test accounts, and inside Excel, PowerPoint and Word. Our Slack option is Claude Tag. If you share a chat, it's a snapshot without your files; and you can export all your data from Settings, Privacy."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://claude.com/download" target="_blank" rel="noopener">Download Claude</a> (desktop, mobile, Chrome, Office, Slack; plan note; Linux beta).</li>
+<li>Anthropic Help Center, <a href="https://support.claude.com/en/articles/12626668" target="_blank" rel="noopener">Use Quick Entry with Claude Desktop on Mac</a>.</li>
+<li>Anthropic Help Center, <a href="https://support.claude.com/en/articles/12012173-get-started-with-claude-in-chrome" target="_blank" rel="noopener">Get started with Claude in Chrome</a> and <a href="https://support.claude.com/en/articles/12138966-release-notes" target="_blank" rel="noopener">release notes</a>.</li>
+<li>Anthropic, <a href="https://claude.com/claude-for-microsoft-365" target="_blank" rel="noopener">Claude for Microsoft 365</a> and <a href="https://claude.com/docs/office-agents/overview" target="_blank" rel="noopener">Claude for M365 documentation</a>.</li>
+<li>Anthropic, <a href="https://claude.com/claude-for-slack" target="_blank" rel="noopener">Claude for Slack</a>, <a href="https://claude.com/docs/claude-tag/overview" target="_blank" rel="noopener">Claude Tag documentation</a> and <a href="https://claude.com/docs/connectors/slack/index" target="_blank" rel="noopener">Slack integration</a>.</li>
+<li>Anthropic Help Center, <a href="https://support.claude.com/en/articles/11101966" target="_blank" rel="noopener">Voice mode</a>.</li>
+<li>Anthropic Help Center, <a href="https://support.claude.com/en/articles/10593882-share-and-unshare-chats" target="_blank" rel="noopener">Share and unshare chats</a> and <a href="https://support.claude.com/en/articles/9450526-export-your-claude-data" target="_blank" rel="noopener">Export your Claude data</a>.</li>
+<li>Anthropic Help Center, <a href="https://support.claude.com/en/collections/9387080-claude-mobile-apps" target="_blank" rel="noopener">Claude mobile apps</a> collection.</li>
+</ol><p class="verified">Verified 9 November 2026 against claude.com, the Anthropic Help Center and claude.com documentation. Interface locations and beta statuses change often.</p></div>

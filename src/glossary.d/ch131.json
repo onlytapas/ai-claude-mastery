@@ -1,0 +1,62 @@
+{
+ "Jailbreak": {
+  "d": "An input designed to get an AI model to ignore its safety training and produce content it would normally refuse. A form of prompt injection aimed at the model's own rules.",
+  "see": "ch131"
+ },
+ "Lethal trifecta": {
+  "d": "Simon Willison's name for the risky combination of an AI agent having access to private data, exposure to untrusted content, and a way to send data out. Together they allow prompt injection to steal data.",
+  "see": "ch131"
+ },
+ "PII": {
+  "d": "Personally identifiable information: any information that identifies a person directly (name, email, phone, PAN, Aadhaar number) or indirectly when combined with other data.",
+  "see": "ch132"
+ },
+ "Pseudonymisation": {
+  "d": "Replacing identifying values with consistent stand-ins (such as customer_17) while keeping a separate key that can reverse it. Under GDPR, pseudonymised data is still personal data.",
+  "see": "ch132"
+ },
+ "Data loss prevention": {
+  "d": "DLP: tools and rules that detect sensitive data, such as card numbers or secrets, and warn or block when it is about to leave approved places.",
+  "see": "ch132"
+ },
+ "Data residency": {
+  "d": "Control over which country or region data is processed and stored in, often required by law, contracts or company policy.",
+  "see": "ch132"
+ },
+ "EU AI Act": {
+  "d": "Regulation (EU) 2024/1689, the European Union's law regulating AI systems by risk tier (prohibited, high-risk, transparency, minimal) plus rules for general-purpose AI models. It applies in stages from 2025 to 2028.",
+  "see": "ch133"
+ },
+ "High-risk AI system": {
+  "d": "Under the EU AI Act, an AI system used in a sensitive area such as recruitment, credit scoring or education (Annex III), or as a safety component of a regulated product (Annex I). It must meet strict testing, documentation, logging and oversight requirements.",
+  "see": "ch133"
+ },
+ "General-purpose AI model": {
+  "d": "Under the EU AI Act, a model trained on broad data that can perform many different tasks, such as a large language model. Its providers have documentation and copyright duties, with extra duties for models with systemic risk.",
+  "see": "ch133"
+ },
+ "GDPR": {
+  "d": "The EU's General Data Protection Regulation (2016/679), in force since May 2018. It governs how personal data of people in the EU is processed, including by organisations outside the EU.",
+  "see": "ch133"
+ },
+ "Data protection impact assessment": {
+  "d": "DPIA: a documented assessment of the risks a data-processing activity poses to people and how they will be reduced. Required by GDPR for high-risk processing and yearly for Significant Data Fiduciaries under India's DPDP Rules.",
+  "see": "ch133"
+ },
+ "DPDP Act": {
+  "d": "India's Digital Personal Data Protection Act, 2023, which governs digital personal data, made operational by the DPDP Rules, 2025, with core duties phased in over eighteen months.",
+  "see": "ch133"
+ },
+ "Data Fiduciary": {
+  "d": "Under India's DPDP Act, the organisation that decides why and how personal data is processed (similar to a 'controller' under GDPR).",
+  "see": "ch133"
+ },
+ "NIST AI RMF": {
+  "d": "The US National Institute of Standards and Technology's voluntary AI Risk Management Framework (2023), organised into four functions: Govern, Map, Measure and Manage.",
+  "see": "ch133"
+ },
+ "ISO/IEC 42001": {
+  "d": "The international standard (2023) for an AI management system: the policies, roles, risk processes and controls an organisation uses to manage AI. It can be certified by an accredited auditor.",
+  "see": "ch133"
+ }
+}

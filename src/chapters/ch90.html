@@ -1,0 +1,438 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How prompt caching works on the Claude API, what it costs, and how to read the cache fields in <code>usage</code></li>
+<li>When to use the Message Batches API for a 50% discount</li>
+<li>How rate limits are measured (RPM, ITPM, OTPM), what the usage tiers are, and which response headers to watch</li>
+<li>Which errors to retry, which never to retry, and how to write retries with exponential backoff and jitter</li>
+<li>How to estimate, measure and cap the cost of an AI feature, with a tested cost-calculator script</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch86">Chapter 86</a> (your first Claude API call: endpoint, headers, usage, error codes). <a href="#ch14">Chapter 14</a> (tokens) and <a href="#ch20">Chapter 20</a> (context windows, with a short introduction to caching) help. <a href="#ch87">Chapter 87</a> covers streaming, which matters for long requests.</div>
+
+<div class="bigidea"><p>Every Claude API call costs money and uses up a share of your organisation's limits, and both are measured in <a class="gl" href="#g-token">tokens</a>. Four levers keep them under control: <strong>prompt caching</strong> (pay about a twentieth of the price for input you've already sent recently), <strong>batching</strong> (half price if you can wait for results), <strong>model choice</strong>, and <strong>sending less</strong>. When you do hit a limit or a temporary fault, the API tells you with a status code and headers. Good code retries the right errors, waits sensibly between tries, and never retries the ones that can't succeed. Measure everything from the <code>usage</code> field rather than guessing.</p></div>
+
+<h3 id="ch90-1"><span class="num">90.1</span>Where the money and the limits go</h3>
+<p>Chapter 86 showed that you pay for input tokens (everything you send) and output tokens (everything Claude writes, including its thinking). A production AI feature usually sends the <em>same</em> large block of text again and again: a long system prompt, tool definitions, a test-strategy document, a style guide. Then it adds a small new part each time: one user story, one failing test log.</p>
+<p>That pattern is where most savings come from. If 20,000 tokens of every request are identical and only 500 are new, you are paying full price to have the model re-read the same 20,000 tokens on every call. Prompt caching fixes exactly that.</p>
+<div class="tbl"><table>
+<tr><th>Lever</th><th>What it saves</th><th>What it costs you</th><th>Section</th></tr>
+<tr><td><b>Prompt caching</b></td><td>Repeated input is billed at 0.025× to 0.1× of the base input price, and doesn't count toward input-token rate limits</td><td>A small surcharge the first time the cache is written; prompts must keep the same beginning</td><td>90.2–90.3</td></tr>
+<tr><td><b>Message Batches API</b></td><td>50% off input and output</td><td>Results arrive later: most within an hour, at most 24 hours</td><td>90.4</td></tr>
+<tr><td><b>Model choice</b></td><td>Haiku 5.5 costs 1/40 of Opus 5.5 per token</td><td>Quality may drop; measure with evals (<a href="#ch125">Chapter 125</a>)</td><td><a href="#ch40">Chapter 40</a></td></tr>
+<tr><td><b>Sending less</b></td><td>Every token you don't send</td><td>Design effort: trim history, retrieve only relevant documents (<a href="#ch92">Chapter 92</a>)</td><td><a href="#ch88">Chapter 88</a></td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Imagine hiring a consultant by the page. Every time you ask a question you hand over the same 80-page company handbook plus a one-page question. Caching is the consultant saying "I've still got the handbook on my desk from ten minutes ago; I'll charge you a fraction to glance at it again." Batching is "drop your questions in my tray and I'll answer them by tomorrow at half price."</p></div>
+
+<h3 id="ch90-2"><span class="num">90.2</span>Prompt caching: how it works</h3>
+<p><a class="gl" href="#g-prompt-caching">Prompt caching</a> stores the processed form of the <em>beginning</em> of your prompt (the prefix) for a short time. If the next request starts with exactly the same prefix, Claude reads it from the cache instead of processing it again. That is cheaper and faster. <span class="vchip">Verified 9 Nov 2026</span></p>
+<p>Three rules explain almost everything:</p>
+<ol>
+<li><strong>Order matters.</strong> The prompt is cached in the order <code>tools</code> → <code>system</code> → <code>messages</code>. Put stable things first and changing things last.</li>
+<li><strong>The prefix must be identical.</strong> A cache hit needs the content up to the cache point to be 100% the same. One changed character, such as a timestamp in the system prompt, means a miss.</li>
+<li><strong>It expires.</strong> The default lifetime is 5 minutes, refreshed free every time the cache is used. A 1-hour lifetime is available at a higher write price.</li>
+</ol>
+<h4>Turning it on</h4>
+<p>The simplest way is <strong>automatic caching</strong>: add one top-level <code>cache_control</code> field. The API places the cache point on the last cacheable block and moves it forward as a conversation grows.</p>
+<div class="code"><span class="cap">Automatic caching (curl)</span><pre>curl https://api.anthropic.com/v1/messages \
+  -H "content-type: application/json" \
+  -H "Authorization: Bearer $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2026-10-21" \
+  -d '{
+    "model": "claude-opus-5-5",
+    "max_tokens": 2000,
+    "cache_control": {"type": "ephemeral"},
+    "system": "You are a senior QA engineer. &lt;team test strategy, 20,000 tokens&gt;",
+    "messages": [
+      {"role": "user", "content": "Write test cases for story QA-1432: password reset by SMS."}
+    ]
+  }'</pre></div>
+<p>For finer control, put <code>cache_control</code> on individual content blocks. These are called <a class="gl" href="#g-cache-breakpoint">cache breakpoints</a>, and a request may have at most four (automatic caching uses one of the four).</p>
+<div class="code"><span class="cap">Python: an explicit breakpoint after a long system document, with a 1-hour lifetime</span><pre>import anthropic
+
+client = anthropic.Anthropic()
+strategy = open("test_strategy.md", encoding="utf-8").read()   <span class="c"># large and stable</span>
+
+message = client.messages.create(
+    model="claude-opus-5-5",
+    max_tokens=2000,
+    system=[
+        {"type": "text", "text": "You are a senior QA engineer. Use the team's test strategy below."},
+        {"type": "text", "text": strategy,
+         "cache_control": {"type": "ephemeral", "ttl": "1h"}},     <span class="c"># cache up to here</span>
+    ],
+    messages=[{"role": "user", "content": "Write test cases for story QA-1432: password reset by SMS."}],
+)
+u = message.usage
+print("written to cache:", u.cache_creation_input_tokens,
+      "| read from cache:", u.cache_read_input_tokens,
+      "| uncached input:", u.input_tokens, "| output:", u.output_tokens)</pre></div>
+<div class="tbl"><table>
+<tr><th>Rule</th><th>Value on the Claude API (current models)</th></tr>
+<tr><td>Minimum cacheable length</td><td>512 tokens for Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 5.5. Shorter prefixes are simply not cached; there is no error.</td></tr>
+<tr><td>Lifetimes</td><td><code>{"type": "ephemeral"}</code> = 5 minutes (default); add <code>"ttl": "1h"</code> for 1 hour. If you mix them, 1-hour entries must come before 5-minute ones.</td></tr>
+<tr><td>Breakpoints</td><td>Up to 4 explicit; automatic caching takes one of the slots</td></tr>
+<tr><td>Who shares a cache</td><td>Never shared between organisations. On the Claude API, isolated per <strong>workspace</strong> within an organisation.</td></tr>
+</table></div>
+<details class="deep"><summary>Under the hood: what breaks a cache</summary><div class="body">
+<p>Because the prefix is cached in layers (tools, then system, then messages), a change invalidates its own layer and everything after it:</p>
+<ul>
+<li>Changing <strong>tool definitions</strong> (names, descriptions, parameters) invalidates tools, system and messages: everything.</li>
+<li>Changing the <strong>system prompt</strong>, or switching web search or citations on or off, invalidates system and messages.</li>
+<li>Changing <code>tool_choice</code>, adding or removing <strong>images</strong>, the thinking configuration or the <strong>effort</strong> setting invalidates the messages layer (and on some models more).</li>
+<li>Switching between fast mode and standard speed invalidates system and messages.</li>
+</ul>
+<p>The API also looks back a limited distance for an earlier cache entry: at most 20 positions (content blocks) per breakpoint. In a very long conversation that only has a breakpoint at the end, an entry further back than that won't be found, which is one reason to add breakpoints at stable points.</p>
+<p>The cache stores the model's internal processed state for those tokens (related to the <a class="gl" href="#g-kv-cache">KV cache</a>), not a saved answer. Caching never changes what Claude says; it only changes cost and speed.</p>
+</div></details>
+<div class="box example"><span class="tag">Real-world example: the timestamp that cost a fortune</span><p>A team's triage bot started its system prompt with <code>Current time: 2026-11-09 14:03:27</code>. Every request had a different first line, so nothing after it was ever cached. Moving the time into the user message, after the stable instructions, raised their <a class="gl" href="#g-cache-hit-rate">cache hit rate</a> from almost zero to most of their input. A tester can catch this kind of thing: check <code>cache_read_input_tokens</code> on the second of two identical calls. If it's 0, something in the prefix is changing.</p></div>
+
+<h3 id="ch90-3"><span class="num">90.3</span>Caching prices and the usage fields</h3>
+<p>Caching changes how input is billed. Writing to the cache costs a little <em>more</em> than normal input; reading from it costs much less. <span class="vchip">Verified 9 Nov 2026</span></p>
+<div class="tbl"><table>
+<tr><th>Model</th><th>Base input</th><th>5-min cache write (1.25×)</th><th>1-hour cache write (2×)</th><th>Cache read</th><th>Output</th></tr>
+<tr><td>Claude Fable 5.1</td><td>$10</td><td>$12.50</td><td>$20</td><td>$0.25 (0.025×)</td><td>$50</td></tr>
+<tr><td>Claude Opus 5.5</td><td>$4</td><td>$5</td><td>$8</td><td>$0.20 (0.05×)</td><td>$20</td></tr>
+<tr><td>Claude Sonnet 5.5</td><td>$2</td><td>$2.50</td><td>$4</td><td>$0.10 (0.05×)</td><td>$10</td></tr>
+<tr><td>Claude Haiku 5.5 (prompts up to 100K tokens)</td><td>$0.10</td><td>$0.125</td><td>$0.20</td><td>$0.01 (0.1×)</td><td>$0.50</td></tr>
+<tr><td>Claude Haiku 5.5 (prompts over 100K tokens)</td><td>$0.50</td><td>$0.625</td><td>$1</td><td>$0.05</td><td>$2.50</td></tr>
+</table></div>
+<p><em>Prices in US dollars per million tokens, Claude API. Source: Anthropic pricing page. For Haiku 5.5, the prompt length that sets the price counts cache reads and writes too.</em></p>
+<h4>Reading <code>usage</code> when caching is on</h4>
+<div class="code"><span class="cap">The usage object of a cached call (annotated)</span><pre>"usage": {
+  "input_tokens": 50,                    <span class="c">← only tokens AFTER the last cache point</span>
+  "cache_creation_input_tokens": 0,      <span class="c">← tokens written to the cache this call</span>
+  "cache_read_input_tokens": 20000,      <span class="c">← tokens read from the cache this call</span>
+  "cache_creation": {
+    "ephemeral_5m_input_tokens": 0,      <span class="c">← the write, split by lifetime</span>
+    "ephemeral_1h_input_tokens": 0
+  },
+  "output_tokens": 1200
+}</pre></div>
+<div class="box warn"><span class="tag">The classic misreading</span><p><code>input_tokens</code> is <em>not</em> your total input once caching is on. Total input = <code>cache_read_input_tokens</code> + <code>cache_creation_input_tokens</code> + <code>input_tokens</code>. Dashboards that only add up <code>input_tokens</code> will show a suspiciously tiny number.</p></div>
+<h4>When does caching pay off?</h4>
+<p>Anthropic's pricing page puts it simply: with a 5-minute cache (write at 1.25×), caching pays off after <strong>one</strong> cache read; with a 1-hour cache (write at 2×), after <strong>two</strong>. On Opus 5.5 and Sonnet 5.5, where reads are 0.05×, the gap is even bigger.</p>
+<div class="code"><span class="cap">Worked example (illustrative): 1,000 calls/month, Opus 5.5, 20,000-token shared prefix, 500 new input tokens, 1,500 output tokens</span><pre>Without caching:   1,000 × (20,500 × $4 + 1,500 × $20) / 1M        = $112.00
+With caching, 90% of calls hit the cache:
+   100 misses × (500 × $4 + 20,000 × $5   + 1,500 × $20) / 1M     =  $13.20
+   900 hits   × (500 × $4 + 20,000 × $0.20 + 1,500 × $20) / 1M    =  $32.40
+                                                                    ───────
+                                                                     $45.60  (about 59% less)</pre></div>
+<p>Notice that output is now the biggest cost. After caching, the next saving usually comes from asking for shorter answers or a lower <a class="gl" href="#g-effort-level">effort level</a>.</p>
+<div class="box note"><span class="tag">Discounts stack</span><p>Caching multipliers combine with the Batch API discount and with data-residency pricing. For example, using <code>inference_geo: "us"</code> (US-only processing) applies a 1.1× multiplier to all token prices on Claude 4.6 and later models. Fast mode on Opus 5.5 costs $8 input / $40 output per million tokens, and caching multipliers apply on top of that. Fast mode can't be used with the Batch API.</p></div>
+
+<h3 id="ch90-4"><span class="num">90.4</span>Batch processing: half price if you can wait</h3>
+<p>The <a class="gl" href="#g-message-batches-api">Message Batches API</a> takes many ordinary Messages requests in one submission, processes them in the background, and charges <strong>50% of standard prices</strong> for both input and output. Most batches finish in under an hour. <span class="vchip">Verified 9 Nov 2026</span></p>
+<div class="tbl"><table>
+<tr><th>Fact</th><th>Value</th></tr>
+<tr><td>Endpoint</td><td><code>POST /v1/messages/batches</code> to create; <code>GET /v1/messages/batches/{id}</code> to check; <code>.../{id}/results</code> to read results</td></tr>
+<tr><td>Size limit</td><td>100,000 requests or 256 MB per batch, whichever comes first</td></tr>
+<tr><td>Deadline</td><td>Requests not processed within 24 hours expire (and aren't billed)</td></tr>
+<tr><td>Results kept</td><td>29 days after creation</td></tr>
+<tr><td>Status</td><td><code>processing_status</code> goes from <code>in_progress</code> to <code>ended</code></td></tr>
+<tr><td>Result types</td><td><code>succeeded</code>, <code>errored</code>, <code>canceled</code>, <code>expired</code>. Only <code>succeeded</code> is billed.</td></tr>
+<tr><td>Each request</td><td>A <code>custom_id</code> (1–64 letters, digits, <code>-</code> or <code>_</code>) plus normal <code>params</code></td></tr>
+</table></div>
+<div class="code"><span class="cap">Python: classify 300 overnight test failures in one batch</span><pre>import json, time
+import anthropic
+
+client = anthropic.Anthropic()
+failures = [json.loads(line) for line in open("failures.jsonl", encoding="utf-8")]
+<span class="c"># each line: {"test_id": "checkout_spec_14", "log": "..."}</span>
+
+batch = client.messages.batches.create(requests=[
+    {"custom_id": f["test_id"],
+     "params": {"model": "claude-haiku-5-5", "max_tokens": 300,
+                "messages": [{"role": "user", "content":
+                    "Classify this test failure as PRODUCT_BUG, TEST_BUG, ENVIRONMENT or FLAKY, "
+                    "then give one sentence of reasoning.\n\n" + f["log"]}]}}
+    for f in failures])
+print("Submitted", batch.id)
+
+while client.messages.batches.retrieve(batch.id).processing_status != "ended":
+    time.sleep(60)                                     <span class="c"># poll once a minute</span>
+
+for result in client.messages.batches.results(batch.id):
+    if result.result.type == "succeeded":
+        text = "".join(b.text for b in result.result.message.content if b.type == "text")
+        print(result.custom_id, "→", text)
+    else:
+        print(result.custom_id, "→", result.result.type)  <span class="c"># errored / canceled / expired</span></pre></div>
+<div class="cols2">
+<div><h4>Good fits for batching</h4><ul><li>Nightly classification of test failures</li><li>Generating draft test cases for a whole backlog</li><li>Running an eval set of hundreds of prompts (<a href="#ch125">Chapter 125</a>)</li><li>Back-filling summaries for old bug reports</li></ul></div>
+<div><h4>Poor fits</h4><ul><li>Anything a person is waiting for on screen</li><li>Agent loops where each step depends on the previous answer</li><li>Fast mode (not available with batches)</li></ul></div>
+</div>
+<div class="box note"><span class="tag">Batches and caching together</span><p>Batch requests that share a long prefix can use prompt caching too, and the discounts combine. Because a batch can take longer than 5 minutes, Anthropic suggests the 1-hour cache lifetime for shared context in batches. Results come back in any order, so always match them up by <code>custom_id</code>, never by position.</p></div>
+
+<h3 id="ch90-5"><span class="num">90.5</span>Rate limits and usage tiers</h3>
+<p>A <a class="gl" href="#g-rate-limit">rate limit</a> caps how much your organisation can send in a period of time. On the Messages API, each model has three separate limits. Exceed any one and you get a 429. <span class="vchip">Verified 9 Nov 2026</span></p>
+<div class="tbl"><table>
+<tr><th>Limit</th><th>Plain meaning</th><th>What counts</th></tr>
+<tr><td><b>RPM</b></td><td>Requests per minute</td><td>Every call</td></tr>
+<tr><td><b>ITPM</b></td><td>Input tokens per minute</td><td>Uncached input (<code>input_tokens</code>) and cache writes. <strong>Cache reads don't count.</strong></td></tr>
+<tr><td><b>OTPM</b></td><td>Output tokens per minute</td><td>Tokens actually produced. <code>max_tokens</code> doesn't count, so a generous cap costs nothing in limits.</td></tr>
+</table></div>
+<p>Limits depend on your organisation's <strong>usage tier</strong>. Organisations move up automatically as they build usage history; new ones may start in an Evaluation tier with lower limits. Here are the standard limits for Opus 5.5 and the monthly spend caps:</p>
+<div class="tbl"><table>
+<tr><th>Tier</th><th>Opus 5.5 RPM</th><th>Opus 5.5 ITPM</th><th>Opus 5.5 OTPM</th><th>Monthly spend cap</th></tr>
+<tr><td>Start</td><td>4,000</td><td>2,000,000</td><td>400,000</td><td>$500</td></tr>
+<tr><td>Build</td><td>10,000</td><td>5,000,000</td><td>1,000,000</td><td>$1,000</td></tr>
+<tr><td>Scale</td><td>13,000</td><td>10,000,000</td><td>2,000,000</td><td>$200,000</td></tr>
+<tr><td>Custom</td><td colspan="3">Arranged with Anthropic's sales team</td><td>None</td></tr>
+</table></div>
+<p><em>Sonnet 5.5 and Haiku 5.5 have the same numbers as Opus 5.5 in each tier; Fable 5.x has lower token limits. Each model has its own bucket. Your real limits are on the Console's Rate limits page (<code>platform.claude.com/usage/limits</code>).</em></p>
+<details class="deep"><summary>Under the hood: the token bucket</summary><div class="body">
+<p>Anthropic uses the <a class="gl" href="#g-token-bucket">token bucket</a> algorithm. Picture a bucket that holds your per-minute allowance and refills continuously, not all at once at the top of each minute. Each request takes some out. You can burst until the bucket is empty, then you must wait for it to refill.</p>
+<p>Two practical consequences: a limit of 60 RPM may be enforced as about 1 request per second, so a burst of 60 requests in the same second can fail even though you're "under 60 a minute"; and sudden large jumps in traffic can trigger separate <strong>acceleration limits</strong>, so ramp traffic up gradually.</p>
+</div></details>
+<p><strong>Caching raises your effective limits.</strong> Anthropic's own example: with a 2,000,000 ITPM limit and an 80% cache hit rate, you can process about 10,000,000 total input tokens a minute, because the 8 million cached tokens don't count.</p>
+<h4>The headers that tell you where you stand</h4>
+<div class="tbl"><table>
+<tr><th>Header</th><th>Meaning</th></tr>
+<tr><td><code>retry-after</code></td><td>Seconds to wait before retrying. Earlier retries fail. Not every 429 has it.</td></tr>
+<tr><td><code>anthropic-ratelimit-requests-limit</code> / <code>-remaining</code> / <code>-reset</code></td><td>Request limit, how many are left, and when it's fully refilled (RFC 3339 time)</td></tr>
+<tr><td><code>anthropic-ratelimit-input-tokens-limit</code> / <code>-remaining</code> / <code>-reset</code></td><td>The same for input tokens (remaining is rounded to the nearest thousand)</td></tr>
+<tr><td><code>anthropic-ratelimit-output-tokens-limit</code> / <code>-remaining</code> / <code>-reset</code></td><td>The same for output tokens</td></tr>
+<tr><td><code>anthropic-ratelimit-tokens-*</code></td><td>The most restrictive token limit currently in effect</td></tr>
+<tr><td><code>request-id</code></td><td>The unique ID to quote to support (also <code>request_id</code> in error bodies)</td></tr>
+</table></div>
+<div class="code"><span class="cap">Python: read rate-limit headers alongside the parsed message</span><pre>raw = client.messages.with_raw_response.create(
+    model="claude-haiku-5-5", max_tokens=200,
+    messages=[{"role": "user", "content": "Say OK."}])
+print("requests left:", raw.headers.get("anthropic-ratelimit-requests-remaining"))
+print("input tokens left:", raw.headers.get("anthropic-ratelimit-input-tokens-remaining"))
+message = raw.parse()                       <span class="c"># the normal Message object</span>
+print("request id:", message._request_id)</pre></div>
+<div class="box note"><span class="tag">Protect one team from another</span><p>An organisation can set lower rate and spend limits per <strong>workspace</strong>. Give your experimental QA scripts their own workspace with a modest limit, so a runaway loop can't starve the production chatbot. (You can't set spend limits on the default workspace.)</p></div>
+
+<h3 id="ch90-6"><span class="num">90.6</span>Errors and retries done properly</h3>
+<p>Chapter 86 listed the error codes. The production question is: <em>which ones should my code retry?</em> A retry only makes sense if trying again could succeed.</p>
+<div class="tbl"><table>
+<tr><th>Response</th><th>Retry?</th><th>Why</th></tr>
+<tr><td>429 <code>rate_limit_error</code> with <code>retry-after</code></td><td>Yes, after the stated wait</td><td>The bucket will refill</td></tr>
+<tr><td>429 with <code>error.details.error_code</code> = <code>enforced_spend_limit_reached</code></td><td><strong>No</strong></td><td>Monthly tier spend cap reached. It has no <code>retry-after</code> and keeps failing until the next month (00:00 UTC on the 1st) or a tier increase.</td></tr>
+<tr><td>500 <code>api_error</code>, 529 <code>overloaded_error</code>, connection errors</td><td>Yes, with backoff</td><td>Temporary trouble on Anthropic's side</td></tr>
+<tr><td>504 or other <code>timeout_error</code></td><td>Maybe; better to stream</td><td>Long non-streaming requests are fragile. Use streaming (<a href="#ch87">Chapter 87</a>) or batches for anything long.</td></tr>
+<tr><td>400 <code>invalid_request_error</code></td><td><strong>No</strong></td><td>The request is wrong (or a spend limit <em>you</em> set was reached). Fix it.</td></tr>
+<tr><td>401, 402, 403, 404, 413</td><td><strong>No</strong></td><td>Key, billing, permission, path or size problems won't fix themselves</td></tr>
+</table></div>
+<p>The official SDKs already retry connection errors, 408, 409, 429 and 5xx responses <strong>twice by default</strong>, with exponential backoff, honouring <code>retry-after</code>. You can change that with <code>max_retries</code>. For many scripts, that's enough.</p>
+<div class="code"><span class="cap">Python: configure SDK retries and catch typed errors</span><pre>import anthropic
+
+client = anthropic.Anthropic(max_retries=4, timeout=120.0)
+
+try:
+    message = client.messages.create(
+        model="claude-opus-5-5", max_tokens=1000,
+        messages=[{"role": "user", "content": "Summarise this test run: ..."}])
+except anthropic.RateLimitError as e:          <span class="c"># 429 after all retries</span>
+    print("Still rate limited. Request ID:", e.response.headers.get("request-id"))
+    raise
+except anthropic.BadRequestError as e:         <span class="c"># 400: fix the request, don't retry</span>
+    print("Bad request:", e.message)
+    raise
+except anthropic.APIStatusError as e:          <span class="c"># any other non-2xx status</span>
+    print("API error", e.status_code)
+    raise</pre></div>
+<h4>Writing your own backoff (and why jitter matters)</h4>
+<p><a class="gl" href="#g-exponential-backoff">Exponential backoff</a> doubles the wait after each failure: about 1 second, then 2, 4, 8. <a class="gl" href="#g-jitter">Jitter</a> randomises the wait. Without it, a hundred CI jobs that all hit a 529 at 02:00:00 all retry at 02:00:01, then 02:00:03, and keep colliding. With "full jitter" each one waits a random time between zero and the backoff ceiling, so they spread out.</p>
+<div class="flow"><div><b>Call</b>send the request</div><div><b>Error?</b>check status and type</div><div class="hl"><b>Retryable?</b>429 (not spend cap), 5xx, 529, connection</div><div><b>Wait</b><code>retry-after</code> if given, otherwise random(0, base × 2<sup>n</sup>)</div><div><b>Give up</b>after N attempts; log the request ID</div></div>
+<p>The script below is the logic on its own, with a fake API, so you can test it with no key. It's in the lab.</p>
+<div class="code"><span class="cap">retry_sim.py (standard library only; tested offline)</span><pre>"""retry_sim.py - retry with exponential backoff and full jitter, tested offline.
+Runs with the Python standard library only. No API key needed."""
+import random
+
+RETRYABLE = {408, 409, 429, 500, 502, 503, 504, 529}
+
+class APIError(Exception):
+    def __init__(self, status, retry_after=None, spend_cap=False):
+        super().__init__(f"HTTP {status}")
+        self.status, self.retry_after, self.spend_cap = status, retry_after, spend_cap
+
+def backoff_delay(attempt, retry_after=None, base=1.0, cap=60.0):
+    """Seconds to wait before retry number `attempt` (1, 2, 3...)."""
+    if retry_after is not None:          <span class="c"># the server told us: obey it</span>
+        return float(retry_after)
+    return random.uniform(0, min(cap, base * 2 ** (attempt - 1)))   <span class="c"># full jitter</span>
+
+def call_with_retries(fn, max_attempts=5, sleep=lambda s: None, log=print):
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return fn()
+        except APIError as e:
+            if e.spend_cap or e.status not in RETRYABLE or attempt == max_attempts:
+                log(f"  attempt {attempt}: HTTP {e.status} -&gt; giving up")
+                raise
+            wait = backoff_delay(attempt, e.retry_after)
+            log(f"  attempt {attempt}: HTTP {e.status} -&gt; waiting {wait:.1f}s")
+            sleep(wait)
+
+def fake_api(script):
+    """Returns a function that fails according to `script`, then succeeds."""
+    events = iter(script)
+    def fn():
+        ev = next(events, None)
+        if ev is None:
+            return "200 OK: test cases generated"
+        raise ev
+    return fn
+
+if __name__ == "__main__":
+    random.seed(7)
+    print("Case 1: two overloads, then success")
+    print(" ", call_with_retries(fake_api([APIError(529), APIError(529)])))
+    print("Case 2: rate limited, server sends retry-after: 12")
+    print(" ", call_with_retries(fake_api([APIError(429, retry_after=12)])))
+    print("Case 3: bad request (400) is never retried")
+    try:
+        call_with_retries(fake_api([APIError(400)]))
+    except APIError as e:
+        print("  raised", e)
+    print("Case 4: monthly spend cap (429, no retry-after) is not retried")
+    try:
+        call_with_retries(fake_api([APIError(429, spend_cap=True)]))
+    except APIError as e:
+        print("  raised", e)</pre></div>
+<p>In real code, pass <code>sleep=time.sleep</code> and map the SDK's exceptions onto the same decision (the SDK error has <code>status_code</code> and the response headers). The <code>sleep</code> parameter is a QA habit worth copying: injecting the clock makes retry logic testable in milliseconds.</p>
+<details class="deep"><summary>Under the hood: retries, duplicates and streaming errors</summary><div class="body">
+<ul>
+<li><strong>Duplicates.</strong> If a connection drops after Claude finished but before you got the reply, a retry runs (and bills) the request again. For a pure "generate text" call that's harmless. If your code then <em>acts</em> on the result (files a Jira bug, posts to Slack), make that action idempotent: check whether the bug already exists before creating it.</li>
+<li><strong>Errors after a 200.</strong> When streaming over server-sent events, an error can arrive mid-stream after the HTTP status was already 200. Your status-code handling won't see it; handle the stream's <code>error</code> event (<a href="#ch87">Chapter 87</a>).</li>
+<li><strong>Long requests.</strong> Anthropic recommends streaming or batches for requests that may run over 10 minutes. The SDK refuses non-streaming requests it expects to exceed a 10-minute timeout, and some networks silently drop idle connections.</li>
+<li><strong>Retry budgets.</strong> In a big system, cap the total share of traffic that may be retries, so an outage doesn't turn into a self-inflicted flood.</li>
+</ul>
+</div></details>
+
+<h3 id="ch90-7"><span class="num">90.7</span>Estimating, measuring and capping cost</h3>
+<p>Treat cost like performance: estimate before you build, measure in testing, monitor in production, and set a hard ceiling.</p>
+<div class="flow"><div><b>Estimate</b>count tokens, run the calculator</div><div><b>Measure</b>log <code>usage</code> for every call in test</div><div class="hl"><b>Optimise</b>cache, batch, smaller model, shorter output</div><div><b>Monitor</b>Console Usage and Cost pages, your own logs</div><div><b>Cap</b>spend limits per workspace</div></div>
+<h4>Step 1: count tokens before you send</h4>
+<p>The token counting endpoint, <code>POST /v1/messages/count_tokens</code>, takes the same body as a Messages request (without <code>max_tokens</code>) and returns <code>{"input_tokens": N}</code>. It is <strong>free</strong>, has its own rate limit, and gives an estimate (the real count can differ slightly). It doesn't use caching. Count with the model you'll actually use: Claude Opus 4.7 and later use a newer tokenizer that produces roughly 30% more tokens for the same text than older models.</p>
+<div class="code"><span class="cap">Python: count before sending</span><pre>count = client.messages.count_tokens(
+    model="claude-opus-5-5",
+    system=strategy,
+    messages=[{"role": "user", "content": "Write test cases for story QA-1432."}],
+)
+print(count.input_tokens)</pre></div>
+<h4>Step 2: a cost calculator</h4>
+<p>This script compares a month's bill with and without caching, and with batching. It uses only the standard library. Prices are written into the script, so re-check them against the pricing page before you rely on the numbers.</p>
+<div class="code"><span class="cap">cost_calc.py (tested with Python 3.11)</span><pre>"""cost_calc.py - estimate Claude API cost from token counts.
+Prices: USD per million tokens, Claude API, verified 9 Nov 2026
+(platform.claude.com/docs/en/about-claude/pricing). Re-check before use."""
+import argparse
+
+PRICES = {
+    <span class="c"># model: (base input, 5m cache write, 1h cache write, cache read, output)</span>
+    "claude-fable-5-1":  (10.00, 12.50, 20.00, 0.25, 50.00),
+    "claude-opus-5-5":   (4.00,  5.00,  8.00,  0.20, 20.00),
+    "claude-sonnet-5-5": (2.00,  2.50,  4.00,  0.10, 10.00),
+    "claude-haiku-5-5":  (0.10,  0.125, 0.20,  0.01, 0.50),   <span class="c"># prompts up to 100K tokens</span>
+}
+HAIKU_LONG = (0.50, 0.625, 1.00, 0.05, 2.50)                  <span class="c"># Haiku 5.5 prompts over 100K</span>
+
+def call_cost(model, uncached_in, cache_write, cache_read, out,
+              ttl="5m", batch=False):
+    p = PRICES[model]
+    prompt_len = uncached_in + cache_write + cache_read
+    if model == "claude-haiku-5-5" and prompt_len &gt; 100_000:
+        p = HAIKU_LONG
+    base, w5, w1, read, outp = p
+    write = w5 if ttl == "5m" else w1
+    dollars = (uncached_in * base + cache_write * write
+               + cache_read * read + out * outp) / 1_000_000
+    return dollars * (0.5 if batch else 1.0)
+
+def main():
+    ap = argparse.ArgumentParser(description="Estimate a monthly Claude API bill")
+    ap.add_argument("--model", default="claude-opus-5-5", choices=PRICES)
+    ap.add_argument("--calls", type=int, default=1000, help="calls per month")
+    ap.add_argument("--prefix", type=int, default=20000, help="shared prompt prefix tokens (cacheable)")
+    ap.add_argument("--unique", type=int, default=500, help="unique input tokens per call")
+    ap.add_argument("--out", type=int, default=1500, help="output tokens per call (incl. thinking)")
+    ap.add_argument("--hit-rate", type=float, default=0.9, help="share of calls that hit the cache")
+    ap.add_argument("--batch", action="store_true", help="use the Message Batches API (50%% off)")
+    a = ap.parse_args()
+
+    no_cache = a.calls * call_cost(a.model, a.prefix + a.unique, 0, 0, a.out, batch=a.batch)
+    hits = round(a.calls * a.hit_rate)
+    misses = a.calls - hits
+    cached = (misses * call_cost(a.model, a.unique, a.prefix, 0, a.out, batch=a.batch)
+              + hits * call_cost(a.model, a.unique, 0, a.prefix, a.out, batch=a.batch))
+    print(f"Model: {a.model}   calls: {a.calls:,}   batch: {a.batch}")
+    print(f"Without caching : ${no_cache:,.2f}")
+    print(f"With caching    : ${cached:,.2f}   (hit rate {a.hit_rate:.0%})")
+    print(f"Saving          : ${no_cache - cached:,.2f} ({1 - cached / no_cache:.0%})")
+
+if __name__ == "__main__":
+    main()</pre></div>
+<h4>Step 3: measure real calls</h4>
+<p>Estimates are a start; real <code>usage</code> numbers are the truth. Add this function to <code>cost_calc.py</code> and call it with <code>message.usage.model_dump()</code> after every request, then log the result with the feature name and request ID.</p>
+<div class="code"><span class="cap">Cost of one real call, from its usage object</span><pre>def cost_from_usage(model, usage, batch=False):
+    """usage: the 'usage' object from a Messages API response, as a dict."""
+    base, w5, w1, read, outp = PRICES[model]
+    cc = usage.get("cache_creation") or {}
+    w5_tok = cc.get("ephemeral_5m_input_tokens", usage.get("cache_creation_input_tokens", 0))
+    w1_tok = cc.get("ephemeral_1h_input_tokens", 0)
+    dollars = (usage.get("input_tokens", 0) * base + w5_tok * w5 + w1_tok * w1
+               + usage.get("cache_read_input_tokens", 0) * read
+               + usage.get("output_tokens", 0) * outp) / 1_000_000
+    return dollars * (0.5 if batch else 1.0)
+
+<span class="c"># the cached call from 90.3: 50 uncached, 20,000 read from cache, 1,200 out</span>
+print(f"${cost_from_usage('claude-opus-5-5', {'input_tokens': 50, 'cache_read_input_tokens': 20000, 'output_tokens': 1200}):.4f}")
+<span class="c"># → $0.0282</span></pre></div>
+<p>(For simplicity this ignores the Haiku long-prompt price and other multipliers. Extend it if you use them.)</p>
+<h4>Step 4: monitor and cap</h4>
+<ul>
+<li>The Console's <strong>Usage</strong> page shows token and request charts, including your cache rate and how close you run to your input- and output-token limits.</li>
+<li>Set a <a class="gl" href="#g-spend-limit">spend limit</a> under Settings → Billing below your tier's cap, and per-workspace limits for risky tools. When <em>your</em> limit is reached, requests return 400 with a message starting "You have reached your specified API usage limits".</li>
+<li>In your own logs, record per call: feature, model, all four token counts, cost, latency, request ID. That turns "the AI bill doubled" into "the release-notes feature started sending the full changelog on every call on 3 November". <a href="#ch95">Chapter 95</a> builds this into proper monitoring.</li>
+</ul>
+<div class="box opinion"><span class="tag">Opinion · common engineering practice</span><p>Many teams treat a sudden fall in cache hit rate as a defect, not a cost curiosity, and alert on it. It almost always means someone changed a prompt prefix (a date, a reordered tool list, a per-user detail in the system prompt). It's cheap to monitor and catches regressions that functional tests miss.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Cost calculator and retry logic, tested offline</b><span>25 min · terminal · Python 3 · no API key needed (optional last step needs one)</span></div><ol>
+<li>Make a folder, <code>mkdir cost-lab &amp;&amp; cd cost-lab</code>, and save <code>cost_calc.py</code> from 90.7 into it. Run <code>python3 cost_calc.py</code>.<span class="expect">Model: claude-opus-5-5, Without caching : $112.00, With caching : $45.60 (hit rate 90%), Saving : $66.40 (59%). These match the worked example in 90.3.</span></li>
+<li>Try a cheaper model with batching: <code>python3 cost_calc.py --model claude-haiku-5-5 --batch</code>.<span class="expect">Without caching : $1.40, With caching : $0.61. The same workload costs about 1/80 of the Opus figure. Whether Haiku is good enough is a quality question you answer with evals, not with the calculator.</span></li>
+<li>Now see caching backfire: <code>python3 cost_calc.py --model claude-sonnet-5-5 --hit-rate 0</code>.<span class="expect">Without caching : $56.00, With caching : $66.00, a negative saving of −18%. If the cache is never hit (for example, a timestamp at the start of the prompt), you pay the write surcharge for nothing.</span></li>
+<li>Save <code>retry_sim.py</code> from 90.6 and run <code>python3 retry_sim.py</code>.<span class="expect">Case 1 shows two "HTTP 529 -&gt; waiting …s" lines (small random waits under 2 seconds), then "200 OK". Case 2 waits exactly 12.0s, as <code>retry-after</code> says. Cases 3 and 4 give up on the first attempt and print "raised HTTP 400" and "raised HTTP 429".</span></li>
+<li>Write one extra test case yourself: six 529s in a row with <code>max_attempts=5</code>.<span class="expect">five attempts are logged; the fifth says "giving up" and the error is raised. Your retry loop is bounded.</span></li>
+<li><em>Optional, needs an API key with credits:</em> run the explicit-breakpoint example from 90.2 twice within five minutes, using any text file of at least about 2,000 words as <code>test_strategy.md</code>.<span class="expect">first run: a large "written to cache" number and "read from cache: 0". Second run: "written to cache: 0" and a large "read from cache". If both runs show 0 cached, your file is under the 512-token minimum or something in the prefix changed.</span></li>
+</ol>
+<p><b>Troubleshooting.</b> <code>python3: command not found</code> on Windows: use <code>py</code> instead. "invalid choice" for <code>--model</code>: use one of the four model IDs exactly. Different random waits in Case 1 are expected if you removed <code>random.seed(7)</code>.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Caching stores Claude's answers, so I'll get the same reply."</dt><dd>It stores the processed prompt prefix only. Replies are generated fresh every time.</dd>
+<dt>"input_tokens in usage is my total input."</dt><dd>With caching, it's only the part after the last cache point. Add the cache read and write fields to get the total.</dd>
+<dt>"A 429 always means slow down and retry."</dt><dd>A 429 caused by the monthly tier spend cap has no <code>retry-after</code> and won't succeed until access resumes. Check <code>error.details.error_code</code>.</dd>
+<dt>"Setting a big max_tokens uses up my output rate limit."</dt><dd>OTPM counts tokens actually produced, not <code>max_tokens</code>.</dd>
+<dt>"Retrying more is always safer."</dt><dd>Retrying 400s wastes time, retrying without jitter makes outages worse, and retrying actions with side effects can create duplicates.</dd>
+<dt>"Batches are only for huge jobs."</dt><dd>Any job nobody is waiting for qualifies, even 50 requests. The discount is the same.</dd>
+</dl></div>
+
+<h3 id="ch90-r"><span class="num">90.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Prompt caching reuses an identical prompt prefix (tools → system → messages). Turn it on with a top-level <code>cache_control</code> or up to four block-level breakpoints; minimum 512 tokens on current models; 5-minute default lifetime, 1-hour option.</li>
+<li>Cache writes cost 1.25× (5 min) or 2× (1 hour); reads cost 0.025×–0.1× depending on model. Cache reads don't count toward ITPM.</li>
+<li>With caching, total input = <code>cache_read_input_tokens</code> + <code>cache_creation_input_tokens</code> + <code>input_tokens</code>.</li>
+<li>The Message Batches API is 50% off, up to 100,000 requests per batch, results within 24 hours; match results by <code>custom_id</code>.</li>
+<li>Rate limits are RPM, ITPM and OTPM per model, set by usage tier (Start, Build, Scale, Custom), enforced with a token bucket; watch the <code>anthropic-ratelimit-*</code> and <code>retry-after</code> headers.</li>
+<li>Retry 429 (except spend cap), 5xx, 529 and connection errors with backoff and jitter; never retry 400/401/403/404; the SDK retries twice by default.</li>
+<li>Estimate with the free token-counting endpoint, measure with <code>usage</code>, monitor in the Console, and cap with spend limits.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Your second identical request shows <code>cache_read_input_tokens: 0</code>. What is the most likely cause?</p><div class="opts"><button>Caching only works on Haiku</button><button data-ok>Something early in the prompt changes on each call, such as a timestamp in the system prompt</button><button>The max_tokens value is too high</button></div><p class="why" hidden>A hit needs the prefix up to the cache point to be identical. A changing value near the start invalidates everything after it. (Other causes: the prefix is under 512 tokens, or more than 5 minutes passed.)</p></div>
+<div class="qz"><p class="q">A response's usage shows <code>input_tokens: 40</code>, <code>cache_creation_input_tokens: 0</code>, <code>cache_read_input_tokens: 30000</code>. How many input tokens did the request contain in total?</p><div class="opts"><button>40</button><button>30,000</button><button data-ok>30,040</button></div><p class="why" hidden>Total input is the sum of the three fields. <code>input_tokens</code> alone counts only what came after the last cache point.</p></div>
+<div class="qz"><p class="q">You get a 429 whose body includes <code>"error_code": "enforced_spend_limit_reached"</code> and no <code>retry-after</code> header. What should your code do?</p><div class="opts"><button>Retry with exponential backoff until it works</button><button data-ok>Stop retrying, alert a person, and raise the limit or wait for access to resume</button><button>Switch to a different model and retry immediately</button></div><p class="why" hidden>The monthly tier spend cap won't clear on its own until 00:00 UTC on the first of next month, unless the tier is raised. Retrying just fails again.</p></div>
+<div class="qz"><p class="q">Which job is the best fit for the Message Batches API?</p><div class="opts"><button>A chatbot answering testers live</button><button data-ok>Classifying 2,000 overnight test failures for a report read the next morning</button><button>An agent that decides each step based on the last tool result</button></div><p class="why" hidden>Batches suit independent requests nobody is waiting on. You get 50% off and results within 24 hours (usually under one).</p></div>
+<div class="qz"><p class="q">Why add random jitter to retry waits?</p><div class="opts"><button>It makes each retry cheaper</button><button>The API requires it</button><button data-ok>So that many clients that failed together don't all retry at the same instant and collide again</button></div><p class="why" hidden>Synchronised retries create waves of load. Randomised waits spread them out.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick one AI feature your team runs or plans (for example, generating test cases from Jira stories). Write a one-page cost and resilience note: (1) the stable prefix and the changing part of its prompt, with token counts from the counting endpoint or an estimate; (2) a monthly cost estimate from <code>cost_calc.py</code> for two models, with and without caching, labelled illustrative; (3) whether batching fits; (4) which errors your code retries and which it surfaces, as a table; (5) the spend limit and workspace you'll use; (6) three test cases for the cost and retry behaviour, such as "second identical call reads from cache".</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"You pay Claude per token, and most AI features resend the same big chunk of text every call. Prompt caching lets Claude reuse that chunk for a fraction of the price, as long as the beginning of the prompt stays identical, so put stable stuff first. If nobody's waiting, the Batch API halves the price. Rate limits are per minute for requests, input and output, and cached reads don't count. When something fails, retry rate limits and server errors with growing, randomised waits, but never retry bad requests or a spend-cap error. And always measure from the usage field, not guesses."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/prompt-caching" target="_blank" rel="noopener">Prompt caching</a>: automatic and explicit caching, lifetimes, minimum lengths, breakpoints, invalidation, isolation, usage fields.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Pricing</a>: model, cache, batch, long-context, data-residency and fast-mode prices; how discounts stack.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/batch-processing" target="_blank" rel="noopener">Batch processing</a>: Message Batches API limits, statuses, result types and examples.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/api/rate-limits" target="_blank" rel="noopener">Rate limits</a>: tiers, spend caps, token bucket, cache-aware ITPM, response headers, workspace limits.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/api/errors" target="_blank" rel="noopener">Claude API errors</a>: error types, SDK retries, request IDs, long requests.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/token-counting" target="_blank" rel="noopener">Token counting</a>: endpoint, free use, tokenizer note.</li>
+<li>Wikipedia, <a href="https://en.wikipedia.org/wiki/Token_bucket" target="_blank" rel="noopener">Token bucket</a> (linked from Anthropic's rate-limit page).</li>
+</ol><p class="verified">Verified 9 November 2026 against platform.claude.com documentation (API version 2026-10-21). Code in this chapter was run offline with Python 3.11; API calls were not executed (no key available).</p></div>

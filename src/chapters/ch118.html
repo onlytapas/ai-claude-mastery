@@ -1,0 +1,137 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How the QA role changes when AI can write test cases, scripts and bug reports in seconds</li>
+<li>Which parts of QA stay firmly human, and why they become more valuable, not less</li>
+<li>The new skill stack of an AI-powered QA engineer</li>
+<li>Three career paths that are opening up for testers</li>
+<li>The real risks (over-trust, shallow coverage, losing your own skills) and how to avoid them</li>
+<li>Where you stand today, with a self-assessment and a 30-day personal plan</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> nothing technical. It helps to have read Chapter 1 (what AI is) and Chapter 22 (why AI makes things up). This chapter opens Part XV, so it points you to the chapters where each skill is taught.</div>
+
+<div class="bigidea"><p>AI doesn't replace a good tester. It replaces a lot of the <em>typing</em> a tester does. Writing first drafts of test cases, boilerplate automation, test data and bug reports becomes fast and cheap. What becomes more valuable is everything AI can't own: deciding what's risky, knowing what the product is really for, noticing when something feels wrong, and taking responsibility for the release. The AI-powered QA engineer moves from <em>doing every step by hand</em> to <em>directing and checking a team of fast AI helpers</em>, and uses the time saved to test more, earlier and deeper.</p></div>
+
+<h3 id="ch118-1"><span class="num">118.1</span>What actually changes</h3>
+<p>Think about where a typical tester's week goes. A large share is spent producing things: writing test cases from a story, scripting automation, preparing data, writing up bugs, updating reports. Much less time is left for the work that finds the important problems, like thinking about risk and exploring the product.</p>
+<p>AI changes the cost of <em>producing</em>. Claude can draft fifty test cases from a user story, turn a manual test into a Playwright script, or generate a realistic set of test customers, in less time than it takes to open the template. The output still needs a careful review, but reviewing a good draft is usually far quicker than writing from a blank page.</p>
+<div class="tbl"><table>
+<tr><th>Activity</th><th>Before AI</th><th>With AI</th><th>What the tester now does</th></tr>
+<tr><td>Test case writing</td><td>Hours per feature, written by hand</td><td>Drafted in minutes from the story</td><td>Reviews, fills gaps, removes duplicates, adds risk insight</td></tr>
+<tr><td>Automation scripting</td><td>Days to script and debug</td><td>Claude Code drafts, runs and fixes the script</td><td>Sets conventions, reviews code, proves tests can fail</td></tr>
+<tr><td>Test data</td><td>Copied from production or typed by hand</td><td>Generated on demand, including edge cases</td><td>Defines the rules and checks no real personal data slips in</td></tr>
+<tr><td>Bug reports</td><td>Written one by one, varying quality</td><td>Consistent drafts from notes and screenshots</td><td>Confirms the reproduction steps and severity</td></tr>
+<tr><td>Failure triage</td><td>Scrolling through logs</td><td>Failures grouped and summarised automatically</td><td>Decides which are real bugs, which are flaky, which matter</td></tr>
+<tr><td>Requirement review</td><td>Often skipped under time pressure</td><td>Ambiguities listed before development starts</td><td>Takes the questions to the product owner</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>When spreadsheets arrived, accountants didn't disappear. The ones who learned spreadsheets stopped adding up columns by hand and spent their time on analysis and advice, and they became much more valuable than the ones who didn't. AI is doing the same to testing: the adding-up is automated, and the judgement becomes the job.</p></div>
+
+<h3 id="ch118-2"><span class="num">118.2</span>What stays human</h3>
+<p>Some parts of quality work depend on things AI doesn't have: a stake in the outcome, knowledge of your users and business, and accountability. These are the parts to invest in.</p>
+<div class="cols2">
+<div><h4>Risk judgement</h4><p>Knowing that the payment flow matters more than the "About us" page, that this release touches a fragile area, or that a small change in rounding could cost real money. AI can suggest risks; you decide which ones matter here.</p></div>
+<div><h4>Product sense</h4><p>Understanding what users are trying to achieve. A test can pass while the feature is still confusing or useless. You notice that; a script doesn't.</p></div>
+<div><h4>Exploratory instinct</h4><p>The feeling that "something is off here" that leads to the bug nobody wrote a test for. AI agents can explore too (Chapter 124), but curiosity guided by experience is still a human strength.</p></div>
+<div><h4>Accountability</h4><p>Someone has to say "this is ready to ship" and own that decision. AI can't be accountable. That responsibility stays with people, and so does the authority that comes with it.</p></div>
+</div>
+<p>There's one more: deciding what "correct" means. In testing terms, the <a class="gl" href="#g-test-oracle">test oracle</a> (the source of truth for the expected result) usually comes from people: product owners, regulations, customers. AI can only check against what it's told or what it assumes, and its assumptions can be wrong.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>Claude writes a neat set of checkout tests and every one passes. A tester notices none of them checks what happens when the discount code and the loyalty points are used together, the combination the marketing team is promoting next week. That single question, which needs business context, is worth more than the fifty generated tests. AI did the volume; the tester supplied the insight.</p></div>
+
+<h3 id="ch118-3"><span class="num">118.3</span>From test executor to quality orchestrator</h3>
+<p>The clearest way to picture the new role is as an orchestrator: someone who directs several fast, tireless helpers and checks their work.</p>
+<div class="flow">
+<div><b>Understand</b>Read the story, talk to the product owner, decide the risks</div>
+<div><b>Direct</b>Give Claude clear context: requirements, conventions, examples</div>
+<div class="hl"><b>AI produces</b>Test ideas, cases, scripts, data, reports</div>
+<div><b>Verify</b>Review, run, break on purpose, fill gaps</div>
+<div><b>Decide</b>Release judgement, bug priority, what to test next</div>
+</div>
+<p>Notice that the human steps are at both ends. The AI is powerful in the middle, but it starts with your context and ends with your verification. Skip either end and quality drops, however good the AI is.</p>
+<p>This is also how the industry has been moving for years under the name <a class="gl" href="#g-quality-engineering">quality engineering</a>: testers who build quality in throughout development rather than only checking at the end. AI makes that shift practical, because the time freed from producing artefacts can go into earlier involvement and better tooling.</p>
+
+<h3 id="ch118-4"><span class="num">118.4</span>The new skill stack</h3>
+<p>Your testing skills don't go away. They become the foundation for a new layer on top.</p>
+<div class="tbl"><table>
+<tr><th>Layer (top = most advanced)</th><th>What it means</th><th>Where to learn it</th></tr>
+<tr><td><b>7 · Evaluating AI itself</b></td><td>Testing features that use AI, with evals</td><td>Chapter 125</td></tr>
+<tr><td><b>6 · Building tools</b></td><td>Skills, MCP servers and scripts for your team</td><td>Chapters 104, 127</td></tr>
+<tr><td><b>5 · Connecting tools</b></td><td>MCP for Jira, Playwright, GitHub and databases</td><td>Part XII</td></tr>
+<tr><td><b>4 · Automation literacy</b></td><td>Reading code, the terminal, git, running tests</td><td>Parts VII and VIII</td></tr>
+<tr><td><b>3 · Reviewing AI output</b></td><td>Spotting gaps, duplicates and confident mistakes</td><td>Chapter 22</td></tr>
+<tr><td><b>2 · Prompting and context</b></td><td>Clear instructions, examples, project files</td><td>Chapters 44, 45, 77</td></tr>
+<tr><td><b>1 · Core testing skills</b></td><td>Risk analysis, test design techniques, exploratory testing, domain knowledge</td><td>Your experience, plus Chapter 120</td></tr>
+</table></div>
+<p>The lowest layers matter most. A tester with strong test-design skills and average prompting will get better results than an expert prompter who doesn't know what boundary values or state transitions are, because they can tell good AI output from bad.</p>
+<details class="deep"><summary>Why "context engineering" is the skill that multiplies the others</summary><div class="body">
+<p>An AI model only knows what's in front of it (Chapter 20). <a class="gl" href="#g-context-engineering">Context engineering</a> means deliberately choosing what it sees: the requirement, your team's test-case template, two good examples, the naming conventions, the list of known risks, and nothing irrelevant.</p>
+<p>For QA teams this mostly happens once and is reused: a <a class="gl" href="#g-claude-md">CLAUDE.md</a> in the test repository (Chapter 77), a claude.ai Project holding the product documentation (Chapter 47), a <a class="gl" href="#g-skill">skill</a> that captures your bug-report format (Chapter 80), and <a class="gl" href="#g-mcp">MCP</a> connections so Claude can read the real Jira story instead of a pasted summary (Chapter 101). Set that up well and every prompt afterwards gets better results with less typing. That's why the best AI-powered testers spend real time on setup.</p>
+</div></details>
+
+<h3 id="ch118-5"><span class="num">118.5</span>Three career paths opening up</h3>
+<div class="tbl"><table>
+<tr><th>Path</th><th>What you do</th><th>Skills to build</th><th>Where in this book</th></tr>
+<tr><td><b>AI-assisted test automation engineer</b></td><td>Build and maintain automation suites far faster, with Claude Code writing, running and fixing tests under your direction</td><td>Claude Code, Playwright, git, CI, MCP</td><td>Parts VIII, X, XII; Chapter 121</td></tr>
+<tr><td><b>AI quality and evals specialist</b></td><td>Test products that contain AI: chatbots, summarisers, agents. Design eval sets, measure accuracy and safety</td><td>Evals, prompt injection testing, statistics basics, API calls</td><td>Chapters 22, 24, 125, 131</td></tr>
+<tr><td><b>QA tooling and enablement builder</b></td><td>Build the team's AI setup: shared skills, MCP servers, dashboards, training</td><td>Skills, subagents, hooks, MCP servers, teaching</td><td>Chapters 80–84, 104, 127, 128, 145</td></tr>
+</table></div>
+<p>These aren't exclusive. Many testers will do some of each. All three share one thing: they're harder to replace than "person who writes test cases", because they combine testing judgement with the ability to direct AI.</p>
+
+<h3 id="ch118-6"><span class="num">118.6</span>The honest risks, and how to avoid them</h3>
+<div class="tbl"><table>
+<tr><th>Risk</th><th>What it looks like</th><th>How to avoid it</th></tr>
+<tr><td><b>Over-trust</b></td><td>Accepting generated tests or "all tests pass" without reading them</td><td>Review every artefact you ship; break the app on purpose to prove tests can fail</td></tr>
+<tr><td><b>Shallow coverage</b></td><td>Hundreds of similar happy-path tests that look impressive but miss the risky combinations</td><td>Ask for specific techniques (boundaries, state transitions, pairwise); judge coverage by risk, not by count</td></tr>
+<tr><td><b>Weakened tests</b></td><td>An agent "fixes" a failing test by changing the expected value</td><td>Tell Claude to report failures before changing anything; review diffs to assertions</td></tr>
+<tr><td><b>Losing your own skills</b></td><td>No longer able to design tests or read code without AI</td><td>Regularly design first, then compare with AI; ask AI to explain its choices</td></tr>
+<tr><td><b>Data leakage</b></td><td>Pasting real customer data or secrets into prompts</td><td>Follow your company's AI policy; use synthetic data; keep keys out of chats (Chapter 98)</td></tr>
+<tr><td><b>Unsafe automation</b></td><td>An agent with write access to Jira or production systems acting on bad instructions</td><td>Least-privilege tokens, approval for write actions, read-only modes (Chapter 105)</td></tr>
+</table></div>
+<div class="box opinion"><span class="tag">Opinion · on jobs</span><p>People disagree about what AI will do to the number of testing jobs. Some expect teams to shrink as AI takes over routine work; others expect testing demand to grow, because AI helps developers ship much more code, and more code needs more quality work. What most agree on is that the <em>content</em> of the job is changing, and testers who can direct and verify AI are in a stronger position than those who can't.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Your skills self-assessment</b><span>20 min</span></div><ol>
+<li>Score yourself 0–3 on each skill below (0 = never done it, 1 = with help, 2 = independently, 3 = could teach it): writing a structured prompt; reviewing AI-written test cases for gaps; using a claude.ai Project; running Claude Code in a repository; writing a CLAUDE.md; using plan mode; connecting an MCP server; writing a skill; running tests from the terminal; reading a git diff; designing an eval for an AI feature; explaining tokens and context windows.<span class="expect">a total out of 36. Most testers starting this part score between 6 and 15. That's normal.</span></li>
+<li>Circle your three lowest scores that matter most for your current job.</li>
+<li>Paste your scores into Claude and ask: "I'm a QA engineer. Based on these self-scores, suggest a 30-day learning order and one small real task per week where I could practise."<span class="expect">a plan that targets your gaps. Compare it with the plan in 109.7 and keep the parts that fit.</span></li>
+</ol></div>
+
+<h3 id="ch118-7"><span class="num">118.7</span>A 30-day personal plan</h3>
+<div class="tbl"><table>
+<tr><th>Week</th><th>Focus</th><th>Read</th><th>Do at work</th></tr>
+<tr><td>1</td><td>Foundations and quick wins</td><td>Chapters 22, 44, 47, 119</td><td>Set up a Project for your product; use it to review one story for ambiguities before refinement</td></tr>
+<tr><td>2</td><td>Test design and data</td><td>Chapters 120, 122</td><td>Generate test cases and synthetic data for one feature; review and measure how long it took</td></tr>
+<tr><td>3</td><td>Automation with Claude Code</td><td>Chapters 65, 67, 77, 121</td><td>Write a CLAUDE.md for your test repo; automate three of last week's cases</td></tr>
+<tr><td>4</td><td>Connecting tools and showing value</td><td>Chapters 97, 101, 102, 126</td><td>Connect Jira or Playwright via MCP; write a half-page "before and after" note for your lead</td></tr>
+</table></div>
+<p>The last step matters more than it looks. Recording what changed (time saved, extra cases covered, bugs found earlier) turns personal learning into a business case. Chapter 126 shows how.</p>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"AI will do the testing, so testers aren't needed."</dt><dd>AI does a lot of the producing. Deciding what to test, judging the results and owning the release remain human work.</dd>
+<dt>"More generated test cases means better coverage."</dt><dd>Coverage is about risks and behaviours tested, not the count. Fifty near-duplicates can cover less than ten well-designed cases.</dd>
+<dt>"I need to become a developer to use AI well."</dt><dd>You need automation literacy (reading code, using the terminal, running tests), not a developer career. Parts VII and VIII teach exactly that.</dd>
+<dt>"Prompting is the main skill."</dt><dd>Prompting helps, but testing knowledge plus good context (project files, conventions, real data through MCP) matters more.</dd>
+</dl></div>
+
+<h3 id="ch118-r"><span class="num">118.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>AI makes producing test artefacts fast and cheap; judgement and verification become the core of the job.</li>
+<li>Risk judgement, product sense, exploratory instinct, deciding what's correct, and accountability stay human.</li>
+<li>The new role is an orchestrator: give AI good context, let it produce, then verify and decide.</li>
+<li>Build the skill stack from the bottom: testing skills first, then prompting and context, reviewing, automation literacy, MCP, tool-building and evals.</li>
+<li>Three growing paths: AI-assisted automation, AI quality and evals, QA tooling and enablement.</li>
+<li>Guard against over-trust, shallow coverage, weakened tests, skill loss and data leakage.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Which part of QA work does AI change the most?</p><div class="opts"><button>Taking responsibility for the release</button><button data-ok>Producing first drafts of artefacts such as test cases, scripts and data</button><button>Deciding which business risks matter</button></div><p class="why" hidden>AI makes producing drafts cheap. Judgement and accountability stay with people.</p></div>
+<div class="qz"><p class="q">In the "orchestrator" model, where are the human steps?</p><div class="opts"><button>Only in the middle, while AI writes</button><button data-ok>At both ends: giving context and risks at the start, verifying and deciding at the end</button><button>Nowhere; the AI runs the whole process</button></div><p class="why" hidden>AI is strong in the middle, but quality depends on human context going in and human verification coming out.</p></div>
+<div class="qz"><p class="q">Claude generated 200 test cases for a login page. What's the best next step?</p><div class="opts"><button>Ship them; 200 is excellent coverage</button><button data-ok>Review them against the risks, remove duplicates and add missing risky combinations</button><button>Ask for 400 more</button></div><p class="why" hidden>Coverage means risks and behaviours, not count.</p></div>
+<div class="qz"><p class="q">An agent makes a failing test pass by changing its expected value. What does this illustrate?</p><div class="opts"><button>Good self-healing</button><button data-ok>The weakened-test risk: the app may be wrong, not the test</button><button>A flaky test</button></div><p class="why" hidden>Always ask Claude to report failures before changing assertions, and review assertion diffs.</p></div>
+<div class="qz"><p class="q">Which skill is the foundation everything else rests on?</p><div class="opts"><button>Writing clever prompts</button><button data-ok>Core testing skills: risk analysis and test design</button><button>Building MCP servers</button></div><p class="why" hidden>Without them you can't tell good AI output from bad.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick one feature you tested recently. Write down how long the main activities took (test design, data, automation, bug reports). Then redo just the test design with Claude, using a Project with the requirements. Record the time, what Claude found that you hadn't, and what you found that Claude missed. Keep this note: it's the first entry in the value log you'll build in Chapter 126.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"AI doesn't replace testers; it replaces a lot of the typing. Drafting test cases, scripts and data becomes fast, so our value moves to deciding what's risky, giving AI the right context, checking its work and owning the release. The new skills are prompting, reviewing AI output, automation literacy and connecting tools through MCP, built on top of the testing skills we already have."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://www.anthropic.com/research/the-anthropic-economic-index" target="_blank" rel="noopener">The Anthropic Economic Index</a>: research on how AI is used across occupations and tasks.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/overview" target="_blank" rel="noopener">Claude Code overview</a> and <a href="https://code.claude.com/docs/en/best-practices" target="_blank" rel="noopener">best practices</a>.</li>
+<li>ISTQB, <a href="https://www.istqb.org/" target="_blank" rel="noopener">Certified Tester syllabi</a>, including the AI Testing specialist syllabus, for test design techniques and testing AI-based systems.</li>
+<li>Chapters 22, 44, 77, 97, 125 and 126 of this book for the skills referenced here.</li>
+</ol><p class="verified">Content type: role guidance and clearly labelled opinion · Last reviewed 9 November 2026</p></div>

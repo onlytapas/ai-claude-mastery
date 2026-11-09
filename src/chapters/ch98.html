@@ -1,0 +1,190 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>The two completely different meanings of "token" in AI work, and how to tell them apart</li>
+<li>What API keys, personal access tokens and OAuth are, in plain words</li>
+<li>How tools prove who they are: bearer tokens, headers and scopes</li>
+<li>How Claude Code itself signs in, and how MCP servers sign in to Jira, GitHub and others</li>
+<li>Where to keep secrets safely, and exactly what to do if one leaks</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 97 (what MCP is). Chapter 56 (environment variables) is useful but not required; the basics are explained here.</div>
+
+<div class="bigidea"><p>Whenever Claude reads your Jira board or a test script calls GitHub, the other system needs to know two things: <em>who is asking</em> and <em>what they're allowed to do</em>. The answer is usually a long secret string called a key or a token. These secrets are like the keys to your office: whoever holds one can get in. This chapter explains the different kinds, how AI tools use them, and the simple habits that stop them leaking.</p></div>
+
+<h3 id="ch98-1"><span class="num">98.1</span>Two kinds of "token" (don't mix them up)</h3>
+<p>In AI work, the word "token" means two completely different things. Mixing them up causes a lot of confusion in meetings.</p>
+<div class="tbl"><table>
+<tr><th></th><th>AI text token</th><th>Access token</th></tr>
+<tr><td>What it is</td><td>A small chunk of text the model reads and writes (Chapter 14)</td><td>A secret string that proves who you are to a system</td></tr>
+<tr><td>Example</td><td>"testing" might be one token; "unbelievable" might be three</td><td><code>ghp_…</code> or a long random string from Jira</td></tr>
+<tr><td>You hear it in</td><td>"This prompt uses 2,000 tokens", "the context window is 1 million tokens"</td><td>"Paste your API token", "the token expired", "rotate the token"</td></tr>
+<tr><td>Is it secret?</td><td>No</td><td><b>Yes, always</b></td></tr>
+<tr><td>Costs money?</td><td>Yes: AI pricing is per text token</td><td>No, but a leaked one can cost a lot</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>It's like the word "bill". A restaurant bill and a bird's bill share a word and nothing else. When someone says "token", ask yourself: are we talking about <em>how much text</em> (AI tokens) or <em>who's allowed in</em> (access tokens)? The rest of this chapter is about the second kind.</p></div>
+
+<h3 id="ch98-2"><span class="num">98.2</span>Why systems need proof of identity</h3>
+<p>When you log in to Jira in a browser, you type your email and password (and maybe a code from your phone), and the browser keeps you signed in. Programs can't do that: they can't type passwords into web forms or read codes off your phone. So systems give programs a different kind of proof.</p>
+<p>Two separate questions are always being answered:</p>
+<div class="cols2">
+<div><h4>Authentication: "Who are you?"</h4><p>Proving identity. The key or token shows the request comes from you, or from a specific robot account.</p></div>
+<div><h4>Authorisation: "What may you do?"</h4><p>Permissions. Even once identified, you can only do what you've been allowed: read issues but not delete them, for example.</p></div>
+</div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A hotel key card does both. It proves you're a guest (authentication) and it only opens your room, the gym and the lift, not other guests' rooms (authorisation). Good access tokens work the same way: they identify you and limit what you can open.</p></div>
+
+<h3 id="ch98-3"><span class="num">98.3</span>API keys</h3>
+<p>An <a class="gl" href="#g-api-key">API key</a> is the simplest kind: one long secret string that a service gives you, which you send with every request. Anthropic's API uses keys like this. You create them in the Claude Console, and they start with <code>sk-ant-</code>.</p>
+<ul>
+<li><strong>Simple:</strong> one string, copy it, use it.</li>
+<li><strong>Powerful:</strong> anyone who has it can use the service as you and run up your bill.</li>
+<li><strong>Usually all-or-nothing:</strong> many API keys don't let you limit what they can do.</li>
+</ul>
+<div class="box example"><span class="tag">Real-world example</span><p>A developer accidentally commits a file containing an API key to a public GitHub repository. Automated bots scan public code constantly for keys, and they can find and abuse them within minutes. This is why GitHub runs "secret scanning", and why many API providers work with it to detect, and in some cases automatically revoke, leaked keys. It's also why this chapter keeps saying: <strong>never put keys in code.</strong></p></div>
+
+<h3 id="ch98-4"><span class="num">98.4</span>Personal access tokens</h3>
+<p>A <a class="gl" href="#g-personal-access-token">personal access token</a> (PAT) is like an API key tied to your own user account, which you create yourself in the tool's settings. It lets a program act as you. The two you'll meet most in QA:</p>
+<div class="tbl"><table>
+<tr><th></th><th>GitHub fine-grained PAT</th><th>Atlassian API token (Jira, Confluence)</th></tr>
+<tr><td>Where you create it</td><td>GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens</td><td>id.atlassian.com → Security → API tokens</td></tr>
+<tr><td>Limit what it can do?</td><td>Yes: choose specific repositories and specific permissions (for example "Issues: read")</td><td>Yes: "Create API token with scopes" lets you pick the app and scopes; Atlassian recommends this</td></tr>
+<tr><td>Expiry</td><td>You choose an expiry date when creating it</td><td>New tokens expire after one year by default; you can choose 1–365 days</td></tr>
+<tr><td>Shown again later?</td><td>No: copy it once, straight into safe storage</td><td>No: copy it once, straight into safe storage</td></tr>
+</table></div>
+<p>GitHub also has older "classic" tokens with broad permissions. Prefer fine-grained tokens: they follow the principle of least privilege (91.8).</p>
+
+<h3 id="ch98-5"><span class="num">98.5</span>OAuth: signing in without sharing your password</h3>
+<p>You've used <a class="gl" href="#g-oauth">OAuth</a> even if you've never heard the name. Whenever a website shows "Sign in with Google", or an app asks "Allow this app to read your calendar?", that's OAuth. It lets you give an app limited access to your account <em>without ever giving it your password</em>.</p>
+<div class="flow">
+<div><b>1 · App asks</b>Claude Code wants to use the Jira MCP server and opens your browser</div>
+<div><b>2 · You sign in</b>On Atlassian's own page, with your normal login and two-factor code</div>
+<div><b>3 · You approve</b>"Allow access to read and write Jira issues?" These permissions are the <em>scopes</em></div>
+<div class="hl"><b>4 · Token issued</b>Atlassian gives the app an access token, never your password</div>
+<div><b>5 · App works</b>The app sends the token with each request until it expires</div>
+</div>
+<p>OAuth usually issues two tokens:</p>
+<ul>
+<li>An <a class="gl" href="#g-access-token">access token</a>: short-lived, used on every request.</li>
+<li>A <strong>refresh token</strong>: used quietly in the background to get a new access token when the old one expires, so you don't have to sign in again every hour.</li>
+</ul>
+<p><strong>Remote MCP servers use OAuth.</strong> When you add a hosted server such as Atlassian's or GitHub's to Claude Code, you sign in through the browser with <code>/mcp</code> (or <code>claude mcp login &lt;name&gt;</code> from the terminal). Claude Code stores the tokens securely and refreshes them automatically. <code>claude mcp logout &lt;name&gt;</code> removes them.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>OAuth is like a hotel's valet key. You hand the valet a special key that starts the car and drives it, but doesn't open the boot or the glovebox. You never give them your house keys, and you can take the valet key back at any time.</p></div>
+
+<h3 id="ch98-6"><span class="num">98.6</span>How a token travels: headers and bearer tokens</h3>
+<p>Every request a program sends over the web (Chapter 85) has <em>headers</em>: labelled lines of extra information, like the details written on the outside of an envelope. Tokens usually travel in a header called <code>Authorization</code>.</p>
+<div class="code"><span class="cap">How tokens are attached to requests</span><pre><span class="c"># "Bearer" token: whoever bears (carries) this token gets access</span>
+Authorization: Bearer YOUR_TOKEN_HERE
+
+<span class="c"># Atlassian API tokens use "basic" auth: your email plus the token</span>
+curl -u you@example.com:$ATLASSIAN_TOKEN https://your-site.atlassian.net/rest/api/3/myself
+
+<span class="c"># Anthropic's API also accepts its key in an x-api-key header</span>
+x-api-key: $ANTHROPIC_API_KEY</pre></div>
+<p>A <strong>bearer token</strong> is named that way because whoever <em>bears</em> it gets in, like cash: no questions asked. That's why it must stay secret. For MCP servers that need a fixed token rather than OAuth, Claude Code lets you add a header when you add the server, for example <code>--header "Authorization: Bearer ${API_KEY}"</code> in <code>.mcp.json</code> (Chapter 100).</p>
+<details class="deep"><summary>Why HTTPS matters</summary><div class="body">
+<p>A token sent over plain HTTP could be read by anyone between you and the server, like a postcard. HTTPS encrypts the whole request, headers included, like a sealed envelope that only the recipient can open. Every legitimate API and remote MCP server uses <code>https://</code> addresses. If you're ever asked to send a token to an <code>http://</code> address that isn't on your own machine (<code>localhost</code>), stop and check.</p>
+</div></details>
+
+<h3 id="ch98-7"><span class="num">98.7</span>How Claude Code itself signs in</h3>
+<p>Claude Code also needs proof of identity, to Anthropic. It can sign in several ways:</p>
+<div class="tbl"><table>
+<tr><th>Method</th><th>How</th><th>Typical use</th></tr>
+<tr><td>Claude subscription login</td><td>Run <code>claude</code> and follow the browser sign-in, or <code>/login</code>, or <code>claude auth login</code></td><td>Most people. Uses OAuth; nothing to copy or paste.</td></tr>
+<tr><td>Claude Console account</td><td><code>claude auth login --console</code></td><td>Pay-per-use API billing through your organisation</td></tr>
+<tr><td>API key</td><td>Set the <code>ANTHROPIC_API_KEY</code> environment variable</td><td>Scripts and automation. In interactive use you approve it once; with <code>claude -p</code> it's always used.</td></tr>
+<tr><td>Long-lived token for CI</td><td><code>claude setup-token</code> prints a one-year token; store it as <code>CLAUDE_CODE_OAUTH_TOKEN</code></td><td>Running Claude Code in pipelines on a subscription</td></tr>
+<tr><td>Credential helper</td><td>The <code>apiKeyHelper</code> setting runs a script that prints a key</td><td>Companies that issue keys from a secret manager</td></tr>
+</table></div>
+<p>Check how you're signed in with <code>claude auth status</code> or <code>/status</code>. On a Mac, Claude Code keeps its sign-in in the macOS Keychain.</p>
+<div class="box warn"><span class="tag">A common trap</span><p>If <code>ANTHROPIC_API_KEY</code> is set in your terminal, it can take priority over your subscription login. If you see unexpected billing or an error like "This organization has been disabled" despite a working subscription, a stale key is the usual cause. Run <code>unset ANTHROPIC_API_KEY</code> and remove it from your shell profile (Chapter 56). <span class="vchip">Verified 9 Nov 2026 · Claude Code 2.1.319</span></p></div>
+
+<h3 id="ch98-8"><span class="num">98.8</span>Least privilege, expiry and rotation</h3>
+<p>Three habits make tokens far less dangerous:</p>
+<ol>
+<li><strong>Least privilege.</strong> Give each token only what the job needs. A token for "read Jira issues and add comments" shouldn't be able to delete projects. For an AI agent this matters doubly, because the AI decides which actions to take.</li>
+<li><strong>Expiry.</strong> Set an end date. A token that expires in 90 days is a much smaller risk if it leaks next year.</li>
+<li><strong>Rotation.</strong> Regularly create a new token, switch to it and delete the old one. Do it on a schedule, whenever someone leaves the team, and immediately after any suspected leak.</li>
+</ol>
+<div class="box example"><span class="tag">Real-world example: a QA robot account</span><p>Many teams create a dedicated test account (sometimes called a service account) for automation, instead of using a person's own login. It has access only to test projects, and its tokens are stored in the CI system's secret store. If a token leaks, the damage is limited to test data, and nobody's personal account is affected. Atlassian, for example, supports service accounts with scoped tokens, created by an administrator.</p></div>
+
+<h3 id="ch98-9"><span class="num">98.9</span>Where to keep secrets</h3>
+<p>A <a class="gl" href="#g-secret">secret</a> is anything that grants access: keys, tokens, passwords. Here's where they should and shouldn't live.</p>
+<div class="tbl"><table>
+<tr><th>Place</th><th>Safe?</th><th>Notes</th></tr>
+<tr><td>In your code or a committed config file</td><td>No</td><td>Anyone with access to the repository, now or ever, can read it. Git history keeps it even after you delete it.</td></tr>
+<tr><td>Pasted into a chat with an AI</td><td>No</td><td>It becomes part of the conversation, may be stored, and is sent to the model provider. Never paste secrets into Claude.</td></tr>
+<tr><td>In a screenshot or ticket</td><td>No</td><td>Easy to forget, easy to share.</td></tr>
+<tr><td><a class="gl" href="#g-environment-variable">Environment variable</a></td><td>OK</td><td>Set in your terminal, read by programs. Good for local work.</td></tr>
+<tr><td>A <code>.env</code> file listed in <code>.gitignore</code></td><td>OK</td><td>A local file of variables that git is told never to commit.</td></tr>
+<tr><td>Your OS keychain or a password manager</td><td>Good</td><td>Encrypted storage. Claude Code uses the macOS Keychain for its own sign-in.</td></tr>
+<tr><td>CI secret store (e.g. GitHub Actions secrets)</td><td>Good</td><td>Encrypted, hidden in logs, and injected only when a pipeline runs.</td></tr>
+<tr><td>Company secret manager (Vault, AWS Secrets Manager and similar)</td><td>Best for teams</td><td>Central, audited, easy to rotate.</td></tr>
+</table></div>
+<div class="code"><span class="cap">Environment variables and .env files</span><pre><span class="c"># set a variable for this terminal session only</span>
+export GITHUB_TOKEN="paste-token-here"
+
+<span class="c"># check it's set without printing the secret itself</span>
+[ -n "$GITHUB_TOKEN" ] &amp;&amp; echo "GITHUB_TOKEN is set"
+
+<span class="c"># a .env file (one per line) — and make sure git ignores it</span>
+echo 'GITHUB_TOKEN=paste-token-here' &gt;&gt; .env
+echo '.env' &gt;&gt; .gitignore
+
+<span class="c"># in a GitHub Actions workflow, read a stored secret</span>
+env:
+  GITHUB_TOKEN: ${{ secrets.QA_BOT_TOKEN }}</pre></div>
+<p>Claude Code's MCP configuration can read environment variables too: <code>.mcp.json</code> supports <code>${VAR}</code>, so the shared file contains <code>"Authorization": "Bearer ${API_KEY}"</code> and each person supplies their own key locally. The file can be committed safely because it contains no actual secret.</p>
+<div class="box warn"><span class="tag">Protect secrets from the AI too</span><p>Claude Code can read files in your project. Add a deny rule so it never reads secret files, for example <code>"deny": ["Read(./.env)", "Read(./secrets/**)"]</code> in <code>.claude/settings.json</code> (Chapter 78). Then even a confused or manipulated agent can't read them.</p></div>
+
+<h3 id="ch98-10"><span class="num">98.10</span>If a secret leaks</h3>
+<p>Leaks happen to everyone eventually. What matters is acting quickly and in the right order:</p>
+<ol>
+<li><strong>Revoke it immediately</strong> in the tool that issued it (GitHub settings, Atlassian API tokens page, Claude Console). Revoked tokens stop working at once. Do this first, before anything else.</li>
+<li><strong>Create a replacement</strong> with the least access needed and update wherever it's used.</li>
+<li><strong>Check for misuse</strong> in the tool's audit or activity logs: unusual logins, changes, unexpected spend.</li>
+<li><strong>Remove it from where it leaked.</strong> Deleting a file isn't enough if it was committed to git: the secret stays in the history. Treat it as permanently exposed, which is why step 1 comes first.</li>
+<li><strong>Tell your security team.</strong> Most companies want to know, and it's never a sacking offence to report quickly. Hiding it is what causes real damage.</li>
+</ol>
+
+<div class="lab"><div class="lab-h"><b>Create, store and test a token safely</b><span>30 min · terminal and browser</span></div><ol>
+<li>Create a GitHub fine-grained token: Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token. Give it a 7-day expiry, access to one test repository only, and read-only "Metadata" permission.<span class="expect">a token shown once. Copy it straight into the next step; don't save it in a document.</span></li>
+<li>In your terminal, run <code>export GITHUB_TOKEN="…"</code> (paste between the quotes), then <code>[ -n "$GITHUB_TOKEN" ] &amp;&amp; echo set</code>.<span class="expect">the word "set", and no token printed.</span></li>
+<li>Test it: <code>curl -s -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/user</code><span class="expect">JSON describing your GitHub account, such as your login name. A "Bad credentials" message means the token was copied wrongly.</span></li>
+<li>Ask Claude Code: "Without reading any secret values, explain what the curl command I just ran did, piece by piece."<span class="expect">an explanation of curl, the Authorization header, the bearer token and the API address. You didn't need to show Claude the token.</span></li>
+<li>Finish by revoking the token in GitHub settings and running the curl command again.<span class="expect">a "Bad credentials" error. Revocation works instantly. (Atlassian alternative: create a scoped API token at id.atlassian.com and test with <code>curl -u email:$ATLASSIAN_TOKEN https://your-site.atlassian.net/rest/api/3/myself</code>.)</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Tokens in AI pricing and tokens for logging in are the same thing."</dt><dd>Completely different. Text tokens measure text; access tokens prove identity. Only access tokens are secret.</dd>
+<dt>"It's fine to paste a token into Claude so it can help me."</dt><dd>Never do this. Put it in an environment variable and let tools read it from there. Claude doesn't need to see the value to help.</dd>
+<dt>"I deleted the file, so the leaked key is gone."</dt><dd>Git history keeps it. Revoke the key; deletion alone doesn't help.</dd>
+<dt>"OAuth means the app has my password."</dt><dd>The opposite. OAuth exists so the app gets a limited token and never sees your password.</dd>
+<dt>"One powerful token for everything is simpler."</dt><dd>Simpler to set up, much worse when it leaks. Use separate, narrow tokens per job.</dd>
+</dl></div>
+
+<h3 id="ch98-r"><span class="num">98.11</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>"Token" means two things: AI text tokens (amounts of text) and access tokens (secret proof of identity).</li>
+<li>Authentication asks who you are; authorisation asks what you may do.</li>
+<li>API keys are simple, powerful secrets; personal access tokens act as your account; prefer fine-grained, scoped, expiring ones.</li>
+<li>OAuth grants limited access without sharing your password, using access and refresh tokens. Remote MCP servers sign in this way.</li>
+<li>Tokens travel in the <code>Authorization</code> header over HTTPS; bearer tokens work for whoever holds them.</li>
+<li>Claude Code signs in by subscription login, Console, API key, a CI token from <code>claude setup-token</code>, or a credential helper. Check with <code>claude auth status</code>.</li>
+<li>Keep secrets in environment variables, ignored .env files, keychains or secret stores, never in code or chat. If one leaks, revoke it first.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">"Our prompt uses 3,000 tokens." Which kind of token is this?</p><div class="opts"><button data-ok>AI text tokens</button><button>Access tokens</button><button>OAuth refresh tokens</button></div><p class="why" hidden>It's an amount of text, not a secret.</p></div>
+<div class="qz"><p class="q">What does OAuth let you do?</p><div class="opts"><button>Share your password safely with an app</button><button data-ok>Give an app limited access to your account without sharing your password</button><button>Encrypt your hard drive</button></div><p class="why" hidden>You approve scopes and the app receives a token.</p></div>
+<div class="qz"><p class="q">Where should a Jira API token for your automation pipeline live?</p><div class="opts"><button>In the test script</button><button>In a Confluence page for the team</button><button data-ok>In the CI system's secret store</button></div><p class="why" hidden>Secret stores keep it encrypted and hidden from logs.</p></div>
+<div class="qz"><p class="q">You accidentally committed a token to the repository. What's the first thing to do?</p><div class="opts"><button>Delete the file and commit again</button><button data-ok>Revoke the token in the tool that issued it</button><button>Make the repository private</button></div><p class="why" hidden>Revoking stops it working at once. Git history keeps the old value anyway.</p></div>
+<div class="qz"><p class="q">Claude Code is unexpectedly using API billing instead of your subscription. A likely cause?</p><div class="opts"><button>The model changed</button><button data-ok>An ANTHROPIC_API_KEY environment variable is set</button><button>Your MCP server is offline</button></div><p class="why" hidden>The environment variable can take priority; unset it to return to your subscription.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Run a "secrets audit" of one test-automation repository. Search for anything that looks like a key or password (<code>grep -rn -i -E "token|apikey|api_key|password|secret" .</code>, ignoring dependency folders). Check <code>.gitignore</code> includes <code>.env</code>. List where each real secret should live instead. Then write a one-page "Tokens and secrets" guide for your team: which tokens you use, who owns them, where they're stored, expiry dates, and the five-step leak procedure from 91.10.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"There are two kinds of token. AI tokens measure text; access tokens prove who you are, and those are secret. API keys and personal access tokens are long secret strings; OAuth is the 'sign in and approve' flow that gives an app a limited token without your password, and that's how remote MCP servers connect. Keep tokens narrow and expiring, store them in environment variables or secret stores, never in code or chat, and if one leaks, revoke it first."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/authentication" target="_blank" rel="noopener">Claude Code authentication</a>, <a href="https://code.claude.com/docs/en/cli-reference" target="_blank" rel="noopener">CLI reference</a> (<code>claude auth</code>, <code>claude setup-token</code>) and <a href="https://code.claude.com/docs/en/mcp" target="_blank" rel="noopener">MCP</a> (OAuth, headers, environment variables in .mcp.json); checked against Claude Code 2.1.319 <code>--help</code>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/settings" target="_blank" rel="noopener">Claude Code settings</a> (<code>apiKeyHelper</code>, permission deny rules).</li>
+<li>GitHub Docs, <a href="https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens" target="_blank" rel="noopener">Managing your personal access tokens</a> and <a href="https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions" target="_blank" rel="noopener">Using secrets in GitHub Actions</a>.</li>
+<li>Atlassian Support, <a href="https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/" target="_blank" rel="noopener">Manage API tokens for your Atlassian account</a> (scoped tokens; one-year default expiry, 1–365 days).</li>
+<li>Model Context Protocol, <a href="https://modelcontextprotocol.io/specification/2026-07-28" target="_blank" rel="noopener">Specification 2026-07-28</a>, authorization section (OAuth for remote servers).</li>
+<li>OWASP, <a href="https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html" target="_blank" rel="noopener">Secrets Management Cheat Sheet</a>.</li>
+</ol><p class="verified">Verified 9 November 2026 against official documentation and Claude Code 2.1.319.</p></div>

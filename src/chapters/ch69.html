@@ -1,0 +1,220 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>When it pays to run several Claude Code tasks at the same time, and when it doesn't</li>
+<li>What a git worktree is, explained from zero, and how <code>claude --worktree</code> uses one</li>
+<li>How background sessions and agent view work: <code>claude --bg</code>, <code>claude agents</code>, <code>attach</code>, <code>logs</code>, <code>stop</code>, <code>rm</code> and <code>respawn</code></li>
+<li>The difference between background sessions, subagents, cloud sessions and Remote Control</li>
+<li>How to repeat work on a timer with <code>/loop</code> and <code>/schedule</code></li>
+<li>Safe habits for parallel work: one task per worktree, and review before merge</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 61 (git basics: branches and commits) and Chapter 66 (the life of a Claude Code task). Chapter 67 explains the permission modes mentioned here.</div>
+
+<div class="bigidea"><p>Most people use Claude Code one task at a time: ask, wait, review, repeat. But much of the waiting is Claude running tests or reading code, and you could hand it three independent jobs at once. The danger is that three helpers editing the same folder will trip over each other. Claude Code solves this with <strong>git worktrees</strong>, separate copies of your project that share one history, and with <strong>background sessions</strong>, which keep working while you do something else. This chapter shows how to run work in parallel safely, how to keep an eye on it, and how to bring the results back together.</p></div>
+
+<h3 id="ch69-1"><span class="num">69.1</span>Why run work in parallel?</h3>
+<p>Think about a typical morning for a QA engineer. The nightly run has three unrelated failures: a broken locator on the login page, a timeout in the checkout test, and a test that started failing after a date change. Each fix needs Claude to read code, change something and run the tests, which can take several minutes. Done one after another, you spend most of the morning waiting.</p>
+<p>Run in parallel, each fix gets its own Claude session. You check in on each one when it needs a decision, review each result, and merge the good ones.</p>
+<div class="tbl"><table>
+<tr><th>Good for parallel work</th><th>Better done one at a time</th></tr>
+<tr><td>Independent bug fixes in different files</td><td>Tasks that depend on each other's results</td></tr>
+<tr><td>Investigating several flaky tests</td><td>Two changes to the same file or the same page object</td></tr>
+<tr><td>Writing tests for separate features</td><td>Work you need to watch closely, step by step</td></tr>
+<tr><td>A long-running investigation while you do other work</td><td>Anything you can't review properly afterwards</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A kitchen with three cooks is faster than one cook, but only if each has their own chopping board. If all three chop on the same board, ingredients get mixed up and someone gets cut. In Claude Code, the worktree is the separate chopping board. You, as head chef, still taste every dish before it goes out.</p></div>
+<div class="box warn"><span class="tag">Cost to remember</span><p>Every session uses your plan's allowance (or API credit) independently. Five parallel sessions use roughly five times as much as one. Start with two or three, and only for tasks that are genuinely independent.</p></div>
+
+<h3 id="ch69-2"><span class="num">69.2</span>Git worktrees, from zero</h3>
+<p>Normally a git project has one folder on your computer, the <em>checkout</em>, and you can have one <strong>branch</strong> open in it at a time. A branch is a separate line of work (Chapter 61). If you switch branches, the files in the folder change to match.</p>
+<p>A <a class="gl" href="#g-git-worktree">git worktree</a> is an extra folder linked to the same project. Each worktree has its own files and its own branch, but they all share one history and one connection to the remote repository. So you can have the main branch open in one folder and three fix branches open in three other folders, all at the same time.</p>
+<div class="flow">
+<div><b>One repository</b>Shared history, shared remote (GitHub)</div>
+<div><b>Main checkout</b>Your normal folder, on <code>main</code></div>
+<div><b>Worktree A</b>Its own folder and branch: fix the login locator</div>
+<div><b>Worktree B</b>Its own folder and branch: fix the checkout timeout</div>
+<div class="hl"><b>Result</b>Changes stay separate until you merge them</div>
+</div>
+<p>You can create worktrees yourself with git's own command, <code>git worktree add</code>, but Claude Code can create and clean them up for you.</p>
+
+<h3 id="ch69-3"><span class="num">69.3</span>Starting Claude in a worktree: <code>--worktree</code></h3>
+<p>Pass <code>--worktree</code> (short form <code>-w</code>) with a name:</p>
+<div class="code"><span class="cap">Terminal</span><pre>cd ~/projects/shop-tests
+claude --worktree fix-login-locator</pre></div>
+<p>Claude Code creates a new folder at <code>.claude/worktrees/fix-login-locator/</code> inside your repository, on a new branch called <code>worktree-fix-login-locator</code>, and starts the session there. Open a second terminal and run the same command with a different name to start a second, fully separate session. If you leave out the name, Claude Code makes one up (something like <code>bright-running-fox</code>).</p>
+<div class="tbl"><table>
+<tr><th>Command</th><th>What it does</th></tr>
+<tr><td><code>claude -w fix-login-locator</code></td><td>New worktree and branch with that name; session starts inside it</td></tr>
+<tr><td><code>claude -w</code></td><td>Same, with a generated name</td></tr>
+<tr><td><code>claude -w '#123'</code></td><td>Branch from pull request 123 (a PR or merge-request URL also works)</td></tr>
+<tr><td><code>claude --worktree fix-login-locator --resume</code></td><td>Go back to a worktree session you kept earlier</td></tr>
+<tr><td><code>claude -w fix-login-locator --tmux</code></td><td>Open the worktree session in a tmux session (uses iTerm2 panes where available)</td></tr>
+</table></div>
+<h4>Things to know</h4>
+<ul>
+<li><strong>Trust first.</strong> If you've never run Claude in that repository, run plain <code>claude</code> there once and accept the trust prompt, or <code>--worktree</code> will stop with an error.</li>
+<li><strong>Fresh copy, fresh setup.</strong> A worktree starts as a clean checkout, so it has no <code>node_modules</code> and none of your git-ignored files such as <code>.env</code>. Ask Claude to install dependencies (for example <code>npm ci</code>) before running tests.</li>
+<li><strong>Keep the folder out of git.</strong> The documentation recommends adding <code>.claude/worktrees/</code> to your <code>.gitignore</code>, so the worktree folders don't show up as untracked files.</li>
+<li><strong>Must be a git repository.</strong> Otherwise you'll see "Can only use --worktree in a git repository".</li>
+</ul>
+<h4>Cleaning up</h4>
+<p>When you exit a worktree session, Claude Code checks for work you'd lose. A clean, unnamed worktree is removed automatically, along with its branch. If the worktree has changes or new commits, Claude asks whether to keep or remove it. Keeping it leaves the folder and branch, and Claude prints the exact command to resume later.</p>
+<details class="deep"><summary>Copying .env files into new worktrees, and what worktrees share</summary><div class="body">
+<p>Tests often need a git-ignored <code>.env</code> file with a base URL or a test account. To copy such files into every new worktree automatically, add a file called <code>.worktreeinclude</code> to the project root. It uses <code>.gitignore</code> syntax, and only files that match a pattern <em>and</em> are git-ignored are copied:</p>
+<div class="code"><span class="cap">.worktreeinclude</span><pre>.env
+.env.test</pre></div>
+<p>Copying secrets into more folders means more places they live on disk, so include only what tests really need (Chapter 98 covers handling secrets).</p>
+<p>Worktrees aren't completely isolated. According to the documentation they share:</p>
+<ul>
+<li>the repository's <code>.git</code> directory (so <code>git commit</code> works inside a worktree);</li>
+<li>plugins installed at project scope;</li>
+<li>permission approvals: "Yes, and don't ask again" in a worktree is saved to the main checkout's <code>.claude/settings.local.json</code> and applies everywhere in that repository;</li>
+<li>untracked project skills, agents and commands, if the worktree has no <code>.claude/skills</code> of its own.</li>
+</ul>
+<p>You can choose which branch worktrees start from with the <code>worktree.baseRef</code> setting; by default they branch from the repository's default branch, not from whatever you have checked out.</p>
+</div></details>
+
+<h3 id="ch69-4"><span class="num">69.4</span>Background sessions and agent view</h3>
+<p>Worktrees separate the <em>files</em>. Background sessions separate the <em>attention</em>: a session keeps working without a terminal window open, and you check on it when it needs you.</p>
+<div class="box note"><span class="tag">Research preview</span><p>Agent view and background sessions are marked as a <strong>research preview</strong> in the documentation (verified for Claude Code 2.1.319). Commands and keys may change. Check <code>claude agents --help</code> on your version.</p></div>
+<h4>Starting one from the shell</h4>
+<div class="code"><span class="cap">Terminal</span><pre>claude --bg --name "flaky-checkout" "investigate why the checkout test times out in the nightly run"</pre></div>
+<p>The prompt comes after the options, as normal text. Claude Code prints a short ID and the commands to manage it, for example:</p>
+<div class="code"><span class="cap">Output (shape from the documentation)</span><pre>backgrounded · 7c5dcf5d · flaky-checkout
+  claude agents             list sessions
+  claude attach 7c5dcf5d    open in this terminal
+  claude logs 7c5dcf5d      show recent output
+  claude stop 7c5dcf5d      stop this session</pre></div>
+<p>Note: <code>--bg</code> can't be combined with <code>-p</code> (print mode). Print mode answers once and exits, so there's nothing to come back to.</p>
+<h4>The commands</h4>
+<div class="tbl"><table>
+<tr><th>Command</th><th>What it does</th></tr>
+<tr><td><code>claude --bg "task"</code> (or <code>--background</code>)</td><td>Starts a session in the background and returns immediately</td></tr>
+<tr><td><code>claude agents</code></td><td>Opens <a class="gl" href="#g-agent-view">agent view</a>: one screen listing all background sessions and their state</td></tr>
+<tr><td><code>claude agents --json</code></td><td>Prints the active sessions as JSON for scripts (add <code>--all</code> to include finished ones)</td></tr>
+<tr><td><code>claude attach &lt;id or name&gt;</code></td><td>Opens a background session in this terminal as a full conversation</td></tr>
+<tr><td><code>claude logs &lt;id or name&gt;</code></td><td>Prints the session's recent output</td></tr>
+<tr><td><code>claude stop &lt;id&gt;</code> (alias <code>kill</code>)</td><td>Stops the session; the conversation is kept, and you can attach to it again</td></tr>
+<tr><td><code>claude rm &lt;id&gt;</code></td><td>Deletes a background session, and its worktree when that's safe</td></tr>
+<tr><td><code>claude respawn &lt;id&gt;</code> or <code>--all</code></td><td>Restarts sessions so they run the current Claude Code version (useful after an update)</td></tr>
+<tr><td><code>claude --bg --exec 'npx playwright test'</code></td><td>Runs a plain shell command as a background job</td></tr>
+</table></div>
+<h4>Inside agent view</h4>
+<p>Run <code>claude agents</code>. Type a prompt and press Enter to dispatch a new session; every prompt you enter there starts a <em>new</em> session, not a follow-up. Select a row with the arrow keys, press Space to <strong>peek</strong> (see the latest output or the question it's waiting on, and reply), and press Enter or → to <strong>attach</strong>. Press ← on an empty prompt to detach and go back to the list. Press <code>?</code> to see all shortcuts.</p>
+<div class="tbl"><table>
+<tr><th>Row state</th><th>Meaning</th></tr>
+<tr><td>Working</td><td>Claude is running tools or writing</td></tr>
+<tr><td>Needs input</td><td>Waiting for you: a question, a permission decision or another prompt</td></tr>
+<tr><td>Idle</td><td>Nothing to do; ready for your next prompt</td></tr>
+<tr><td>Completed / Failed</td><td>The task finished successfully, or ended with an error</td></tr>
+<tr><td>Stopped</td><td>You stopped it, or its process ended</td></tr>
+</table></div>
+<h4>Moving a session you already have open</h4>
+<p>Inside a normal session, type <code>/background</code> (alias <code>/bg</code>), or press ← on an empty prompt, to send it to the background. <code>/fork</code> copies the conversation into a new background session while you keep working in this one. If you're attached to a background session, <code>/stop</code> stops it, and <code>/exit</code> only detaches.</p>
+<div class="box example"><span class="tag">Real-world example: how edits stay separate</span><p>When a session dispatched with <code>--bg</code> or from agent view is about to edit files in a git repository, Claude first moves it into its own worktree under <code>.claude/worktrees/</code>. So three background fixes don't overwrite each other. When it has changed code, Claude is told to preserve the work: it commits, pushes the branch if there's a remote, and may open a draft pull request. It never pushes to <code>main</code> or <code>master</code>, never force-pushes and never merges. If your CLAUDE.md says you handle git yourself, it leaves git to you.</p></div>
+<div class="box warn"><span class="tag">Know the limits</span><ul>
+<li>Background sessions run <strong>on your machine</strong>. They survive closing the terminal and sleep, but stop if the computer shuts down.</li>
+<li>A session you moved to the background with ← or <code>/background</code> keeps editing the folder it was already in. It isn't moved into a worktree.</li>
+<li>Outside a git repository there's no isolation, so don't send parallel sessions to edit the same files.</li>
+</ul></div>
+<p>Don't confuse these with <strong>background tasks</strong> inside one session: pressing <kbd>Ctrl</kbd>+<kbd>B</kbd> while a long Bash command runs sends just that command to the background, and <code>/tasks</code> lists those commands and subagents.</p>
+
+<h3 id="ch69-5"><span class="num">69.5</span>Four ways to work in parallel, compared</h3>
+<div class="tbl"><table>
+<tr><th>Approach</th><th>Where it runs</th><th>Who starts it</th><th>Best for</th></tr>
+<tr><td><b>Subagents</b> (Chapter 81)</td><td>Inside one session, your machine</td><td>Claude, or you by asking</td><td>Splitting one job: "review these five test files in parallel"; results come back into the same conversation</td></tr>
+<tr><td><b>Worktree sessions</b> (<code>-w</code>)</td><td>Separate terminals, your machine</td><td>You</td><td>Two or three tasks you want to drive yourself, each in its own folder</td></tr>
+<tr><td><b>Background sessions</b> (<code>--bg</code>, agent view)</td><td>Your machine, no terminal needed</td><td>You</td><td>Several independent tasks you check on now and then</td></tr>
+<tr><td><b>Cloud sessions</b> (<code>--cloud</code>)</td><td>Anthropic's cloud</td><td>You</td><td>Work that shouldn't depend on your laptop being on</td></tr>
+</table></div>
+<p>Subagents can also get their own worktrees: ask Claude to "use worktrees for your agents", or add <code>isolation: worktree</code> to a custom subagent's settings (Chapter 81).</p>
+
+<h3 id="ch69-6"><span class="num">69.6</span>Cloud sessions and Remote Control</h3>
+<p>These two sound similar but are opposites. In a <a class="gl" href="#g-cloud-session">cloud session</a> the work runs on Anthropic's computers. With <a class="gl" href="#g-remote-control">Remote Control</a>, the work runs on <em>your</em> computer and you just steer it from somewhere else.</p>
+<div class="cols2">
+<div><h4>Cloud sessions</h4><ul>
+<li>Run on Anthropic-managed cloud machines, started from claude.ai/code, the Claude mobile app, the Desktop app, or the terminal.</li>
+<li><code>claude --cloud "task"</code> starts one. It clones your GitHub repository at your current branch, so <strong>push your changes first</strong>.</li>
+<li><code>claude --teleport</code> or <code>/teleport</code> pulls a cloud session down into your terminal. From the terminal this is one-way: you can't push a running local session up to the cloud.</li>
+<li><code>/web-setup</code> connects GitHub using your local <code>gh</code> sign-in.</li>
+</ul></div>
+<div><h4>Remote Control</h4><ul>
+<li>Lets you continue a <strong>local</strong> session from claude.ai/code or the Claude iOS or Android app. Commands still run on your machine.</li>
+<li>Start with <code>claude --remote-control</code> (or <code>--rc</code>), or type <code>/remote-control</code> (<code>/rc</code>) inside a session. <code>claude remote-control</code> runs a server with no local session.</li>
+<li>Needs a Claude subscription (not an API key). On Team and Enterprise, an Owner must turn it on.</li>
+</ul></div>
+</div>
+<div class="box example"><span class="tag">Real-world example</span><p>You start a long regression investigation on your work laptop before a meeting, with Remote Control on. During a break you open the Claude app on your phone, see that the session is asking whether it may run the full suite, and approve it. The tests run on your laptop, with your local environment and test data, not in the cloud.</p></div>
+<p>Plan availability, organisation settings and supported providers affect both features. For example, Remote Control isn't available through Bedrock, Google Cloud's Agent Platform or Microsoft Foundry. Check with your admin if an option is missing.</p>
+
+<h3 id="ch69-7"><span class="num">69.7</span>Repeating work: <code>/loop</code> and <code>/schedule</code></h3>
+<p>Some QA work is just checking: has the deploy finished? Is the nightly run green yet? Claude Code has three ways to repeat a prompt.</p>
+<div class="tbl"><table>
+<tr><th></th><th><code>/loop</code></th><th>Desktop scheduled tasks</th><th>Cloud scheduled tasks (<code>/schedule</code>)</th></tr>
+<tr><td>Runs on</td><td>Your machine, in the open session</td><td>Your machine</td><td>Anthropic's cloud</td></tr>
+<tr><td>Needs your computer on</td><td>Yes</td><td>Yes</td><td>No</td></tr>
+<tr><td>Needs an open session</td><td>Yes</td><td>No</td><td>No</td></tr>
+<tr><td>Sees your local files</td><td>Yes</td><td>Yes</td><td>No (works on a fresh clone)</td></tr>
+<tr><td>Shortest interval</td><td>1 minute</td><td>1 minute when Claude sets it; 1 hour in the forms</td><td>1 hour</td></tr>
+</table></div>
+<div class="code"><span class="cap">Inside a session</span><pre>/loop 5m check whether the staging deploy has finished and tell me when it's done
+/loop check the nightly run and summarise new failures   <span class="c"># no interval: Claude picks the pace</span>
+/schedule                                                  <span class="c"># create, list or run cloud scheduled tasks</span></pre></div>
+<p><code>/loop</code> tasks belong to the session. They come back when you resume the session with <code>--resume</code> or <code>--continue</code>, and they expire after seven days. <code>/schedule</code> (alias <code>/routines</code>) creates cloud scheduled tasks that keep running whether or not your computer is on. Cloud tasks use auto mode for permissions by default and get MCP connectors configured per task.</p>
+
+<h3 id="ch69-8"><span class="num">69.8</span>Safe habits for parallel work</h3>
+<ol>
+<li><strong>One task per worktree.</strong> Never point two sessions at the same folder. Name each worktree after its task.</li>
+<li><strong>Keep tasks independent.</strong> If two fixes touch the same page object, do them in sequence.</li>
+<li><strong>Give each task a clear finish line.</strong> "Make <code>checkout.spec.ts</code> pass three runs in a row without weakening assertions" is better than "fix checkout".</li>
+<li><strong>Review before merge.</strong> Each worktree produces a branch. Read each diff and run the suite yourself (Chapter 71 covers pull requests).</li>
+<li><strong>Merge one at a time.</strong> After the first merge, the other branches may need updating from <code>main</code>.</li>
+<li><strong>Clean up.</strong> Remove finished worktrees and sessions (<code>claude rm</code>) so old copies don't pile up.</li>
+<li><strong>Watch the cost.</strong> Parallel sessions multiply usage. Check <code>/usage</code>.</li>
+</ol>
+
+<div class="lab"><div class="lab-h"><b>Three fixes in parallel</b><span>45 min · any git repository with tests</span></div><ol>
+<li>In your test repository, run <code>claude</code> once and accept the trust prompt. Add <code>.claude/worktrees/</code> to <code>.gitignore</code> and commit it.<span class="expect">a clean <code>git status</code> after the commit.</span></li>
+<li>Pick three small, independent problems (or create them: break three different tests in three different files on purpose, and commit that as your starting point).</li>
+<li>Dispatch them as background sessions:<br><code>claude --bg --name fix-a "make tests/login.spec.ts pass; don't weaken assertions; report the cause"</code><br>Repeat for <code>fix-b</code> and <code>fix-c</code>.<span class="expect">three "backgrounded" lines, each with a short ID.</span></li>
+<li>Run <code>claude agents</code>. Watch the three rows. Peek (Space) at one that needs input and answer it.<span class="expect">rows moving between Working, Needs input and Completed.</span></li>
+<li>Attach to one finished session (Enter) and ask "which branch and worktree are your changes in?"<span class="expect">a branch name and a path under <code>.claude/worktrees/</code>.</span></li>
+<li>Run <code>git worktree list</code> and <code>git branch</code> in your main checkout.<span class="expect">the extra worktrees and their branches listed beside your main checkout.</span></li>
+<li>Review each branch's diff (<code>git diff main...&lt;branch&gt;</code>), merge the ones you're happy with one at a time, and run the full suite.<span class="expect">all three tests passing on <code>main</code>.</span></li>
+<li>Clean up with <code>claude rm &lt;id&gt;</code> for each session.<span class="expect">the sessions disappear from <code>claude agents</code>.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Parallel sessions are free speed."</dt><dd>Each uses your allowance separately, and each result still needs your review. Parallel work saves waiting time, not review time.</dd>
+<dt>"A worktree is a copy of the whole repository."</dt><dd>It's a separate folder and branch, but it shares the one <code>.git</code> history and remote. Commits made there are in the same repository.</dd>
+<dt>"Background sessions run in the cloud."</dt><dd>No. <code>--bg</code> sessions run on your machine. <code>--cloud</code> sessions run in the cloud.</dd>
+<dt>"Remote Control runs my session on Anthropic's servers."</dt><dd>It runs on your computer; your phone or browser is just the remote.</dd>
+<dt>"A new worktree has everything my tests need."</dt><dd>It's a fresh checkout: no installed packages and no git-ignored files. Install dependencies, and use <code>.worktreeinclude</code> for needed config.</dd>
+</dl></div>
+
+<h3 id="ch69-r"><span class="num">69.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Parallel work helps when tasks are independent and you can review every result.</li>
+<li>A git worktree is an extra folder with its own branch, sharing one history. <code>claude -w name</code> creates one under <code>.claude/worktrees/</code> and starts Claude in it.</li>
+<li><code>claude --bg</code> starts a background session on your machine; <code>claude agents</code> shows them all; <code>attach</code>, <code>logs</code>, <code>stop</code>, <code>rm</code> and <code>respawn</code> manage them (research preview).</li>
+<li>Background sessions move into their own worktree before editing, commit their work, and never push to main or merge.</li>
+<li>Cloud sessions run on Anthropic's machines; Remote Control steers a session that runs on yours.</li>
+<li><code>/loop</code> repeats a prompt in an open session; <code>/schedule</code> creates cloud tasks that run without your computer.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What problem do git worktrees solve for parallel Claude sessions?</p><div class="opts"><button>They make each session run faster</button><button data-ok>Each session gets its own folder and branch, so edits don't collide</button><button>They upload the work to the cloud</button></div><p class="why" hidden>Separate folders and branches keep parallel edits apart until you merge them.</p></div>
+<div class="qz"><p class="q">Where does a session started with <code>claude --bg</code> run?</p><div class="opts"><button data-ok>On your own machine, without needing a terminal open</button><button>On Anthropic's cloud servers</button><button>Inside your VS Code window only</button></div><p class="why" hidden>Background sessions are local. Use <code>--cloud</code> for the cloud.</p></div>
+<div class="qz"><p class="q">You want a check to run every morning even when your laptop is closed. Which option fits?</p><div class="opts"><button><code>/loop</code></button><button data-ok><code>/schedule</code> (a cloud scheduled task)</button><button><code>claude --bg</code></button></div><p class="why" hidden><code>/loop</code> and <code>--bg</code> need your machine running; cloud scheduled tasks don't.</p></div>
+<div class="qz"><p class="q">What will a background session that has changed code never do on its own?</p><div class="opts"><button>Commit its work</button><button>Push its branch</button><button data-ok>Push to main or merge</button></div><p class="why" hidden>It commits and may push its own branch or open a draft PR, but never pushes to main, force-pushes or merges.</p></div>
+<div class="qz"><p class="q">With Remote Control on, where do the commands actually run?</p><div class="opts"><button>On your phone</button><button data-ok>On the computer where the session was started</button><button>In a cloud sandbox</button></div><p class="why" hidden>Your phone or browser only steers the session.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Write a one-page "parallel work policy" for your team. Include: which kinds of tasks may run in parallel, the naming rule for worktrees and background sessions, the maximum number of parallel sessions per person, the review and merge steps, and a cleanup routine. Try it for a week with two or three real tasks, then adjust the policy based on what went wrong.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Claude Code can work on several things at once. A git worktree gives each task its own folder and branch, so edits don't clash. <code>claude --bg</code> starts a task in the background on your machine, and <code>claude agents</code> shows all of them so you can step in when one needs you. Cloud sessions run on Anthropic's machines; Remote Control lets you steer your local session from your phone. Keep tasks independent, and review every branch before you merge."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/worktrees" target="_blank" rel="noopener">Run parallel sessions with worktrees</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/agent-view" target="_blank" rel="noopener">Manage multiple agents with agent view</a> (research preview).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/scheduled-tasks" target="_blank" rel="noopener">Run prompts on a schedule</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/claude-code-on-the-web" target="_blank" rel="noopener">Claude Code on the web</a> and <a href="https://code.claude.com/docs/en/remote-control" target="_blank" rel="noopener">Remote Control</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/cli-reference" target="_blank" rel="noopener">CLI reference</a>; and the installed <code>claude --help</code> and <code>claude agents --help</code> output.</li>
+<li>Git documentation, <a href="https://git-scm.com/docs/git-worktree" target="_blank" rel="noopener">git-worktree</a>.</li>
+</ol><p class="verified">Verified 9 November 2026 against Claude Code 2.1.319</p></div>

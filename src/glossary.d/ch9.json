@@ -1,0 +1,54 @@
+{
+ "Foundation model": {
+  "d": "A large model trained on broad data (usually with self-supervised learning) that can be adapted to many different tasks. Most large language models, including Claude, are foundation models.",
+  "see": "ch9"
+ },
+ "Narrow AI": {
+  "d": "AI that is good at one task or a limited range of tasks, such as a spam filter or a chess program. All AI in use today is narrow by most definitions, though LLMs are far broader than older systems.",
+  "see": "ch9"
+ },
+ "Computer vision": {
+  "d": "The field of getting computers to work with images and video: recognising objects, reading text in pictures, comparing screenshots. Today mostly done with deep learning.",
+  "see": "ch9"
+ },
+ "Self-supervised learning": {
+  "d": "Learning where the correct answers come from the data itself, for example by hiding the next word of a sentence and asking the model to predict it. It needs no human labelling, which is how LLMs can learn from trillions of words.",
+  "see": "ch10"
+ },
+ "Label": {
+  "d": "In machine learning, the correct answer attached to a training example, such as 'critical' on a past bug report or 'spam' on an email. Supervised learning needs labels.",
+  "see": "ch10"
+ },
+ "Feature": {
+  "d": "In machine learning, one measurable fact about an example that a model looks at, such as the number of customers a bug affects or the component it is in.",
+  "see": "ch10"
+ },
+ "Clustering": {
+  "d": "An unsupervised learning task that groups similar items together without being told what the groups are, for example grouping thousands of test failures into a few likely causes.",
+  "see": "ch10"
+ },
+ "Reward": {
+  "d": "In reinforcement learning, the number an agent receives after acting that tells it how well it did. The agent learns to collect as much reward as possible, so a badly designed reward gets exploited.",
+  "see": "ch10"
+ },
+ "Bias (neuron)": {
+  "d": "A number added to a neuron's weighted sum before the activation function. It shifts how easily the neuron activates. Like weights, biases are parameters learned in training. Not the same as bias in data.",
+  "see": "ch11"
+ },
+ "ReLU": {
+  "d": "Rectified linear unit, the most common activation function: if the input is negative, output 0, otherwise output the input unchanged. Cheap to compute and makes deep networks easier to train.",
+  "see": "ch11"
+ },
+ "Sigmoid": {
+  "d": "An activation function that squashes any number into the range 0 to 1 (0.5 at zero), so the output can be read like a probability.",
+  "see": "ch11"
+ },
+ "Forward pass": {
+  "d": "Running an input through every layer of a neural network, in order, to produce an output. Inference is forward passes only; an LLM runs one for each token it generates.",
+  "see": "ch11"
+ },
+ "Hidden layer": {
+  "d": "A layer of neurons between a network's input and output. Hidden layers compute intermediate features; a network with several of them is called deep.",
+  "see": "ch11"
+ }
+}

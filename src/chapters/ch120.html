@@ -1,0 +1,207 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How to use Claude in refinement to find ambiguities, missing acceptance criteria and untestable statements before any code is written</li>
+<li>How to build a risk-based test plan with AI, and keep your own judgement in charge</li>
+<li>How to apply the classic test design techniques (equivalence partitioning, boundary values, decision tables, state transitions, pairwise, error guessing) with worked prompts and outputs</li>
+<li>How to generate and review Gherkin scenarios, traceability matrices and coverage gap reports</li>
+<li>A checklist for reviewing AI-generated tests, and the pitfalls that catch most teams</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 44 (prompting fundamentals) and Chapter 118 (the AI-powered QA engineer) help. Chapter 101 shows how to read stories straight from Jira; it isn't required, because you can paste a story instead.</div>
+
+<div class="bigidea"><p>The cheapest bug is the one you prevent by asking a good question before development starts. AI is excellent at that: give Claude a user story and it will list ambiguities, missing rules and risky areas in seconds. It's also a tireless partner for test design. It can apply boundary values, decision tables and pairwise combinations systematically, and never gets bored. What it can't do is know your product, your users or your risk appetite. So the pattern in this chapter is always the same: <strong>Claude drafts, you decide</strong>.</p></div>
+
+<h3 id="ch120-1"><span class="num">120.1</span>Shift left: AI in refinement</h3>
+<p>"Shift left" means finding problems earlier: in requirements rather than in testing, and in testing rather than in production. Refinement (also called grooming or backlog refinement) is where a team discusses a story before building it. Many teams hold a "three amigos" session: business (product owner), development and testing look at the story together.</p>
+<p>A tester's job in that meeting is to ask the awkward questions. Claude can help you prepare a much longer, sharper list of them in a few minutes.</p>
+<div class="code"><span class="cap">Prompt: refinement preparation</span><pre>You are a senior QA engineer preparing for a three-amigos session.
+Here is the user story and its acceptance criteria:
+
+&lt;story&gt;
+As a shopper, I want to apply a discount code at checkout
+so that I pay less.
+AC1: A valid code reduces the order total.
+AC2: An invalid code shows an error.
+AC3: Only one code per order.
+&lt;/story&gt;
+
+1. List every ambiguity as a question for the product owner.
+2. List missing acceptance criteria (rules you would expect but can't see).
+3. Mark any statement that can't be tested as written, and suggest
+   a testable rewording.
+4. List risks: data, money, security, accessibility, integrations.
+Do not invent answers. Where the story is silent, ask.</pre></div>
+<p>A typical answer will include questions like these:</p>
+<div class="tbl"><table>
+<tr><th>Type</th><th>Example from Claude</th><th>Why it matters</th></tr>
+<tr><td>Ambiguity</td><td>Is the discount applied before or after tax? Before or after delivery charges?</td><td>Different answers give different totals: a money bug</td></tr>
+<tr><td>Missing rule</td><td>What happens if the basket changes after the code is applied and drops below the code's minimum spend?</td><td>Classic production defect</td></tr>
+<tr><td>Missing rule</td><td>Are codes case-sensitive? Are spaces trimmed?</td><td>Users paste codes with spaces</td></tr>
+<tr><td>Untestable</td><td>"Reduces the order total": by how much? Rewording: "reduces the subtotal by the code's percentage, rounded to 2 decimal places, half up"</td><td>You can't pass or fail "reduces"</td></tr>
+<tr><td>Risk</td><td>Could a user apply a code, remove items, and keep a discount they're no longer entitled to?</td><td>Revenue loss</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>It's like asking a well-read friend to check a holiday booking before you pay. They don't know your family, but they'll ask "does the hotel price include breakfast?" and "what if the flight is delayed past check-in?" You still decide; you just decide with fewer surprises.</p></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A QA engineer brings Claude's ten questions to refinement. The product owner answers six on the spot, two become new acceptance criteria, and one ("what if the code expires while the shopper is mid-checkout?") becomes a separate story. That's three defects that will never be written, found in fifteen minutes.</p></div>
+
+<h3 id="ch120-2"><span class="num">120.2</span>Where the story comes from</h3>
+<div class="tbl"><table>
+<tr><th>Source</th><th>How</th><th>Best when</th></tr>
+<tr><td>Paste into chat</td><td>Copy the story into claude.ai or Claude Code</td><td>One-off, or Jira isn't connected</td></tr>
+<tr><td>A claude.ai Project</td><td>Upload the PRD, API spec, glossary and test strategy once; every chat in the Project sees them (Chapter 47)</td><td>A feature or release with many stories</td></tr>
+<tr><td>Jira through MCP</td><td>"Read PAY-412 and its linked stories" (Chapter 101)</td><td>Daily work; keeps you in sync with the live ticket</td></tr>
+<tr><td>Files in the repo</td><td><code>@docs/stories/PAY-412.md</code> in Claude Code</td><td>Teams that keep specs next to code</td></tr>
+</table></div>
+<p>Context is everything. A story on its own gives generic tests. A story plus the product glossary, the business rules document and two examples of your team's existing test cases gives tests that look like your team wrote them.</p>
+
+<h3 id="ch120-3"><span class="num">120.3</span>Risk-based test planning</h3>
+<p>You can never test everything, so you test the riskiest things most. Risk is usually scored as <strong>likelihood</strong> (how likely is it to break?) × <strong>impact</strong> (how bad is it if it does?).</p>
+<div class="code"><span class="cap">Prompt: a risk table</span><pre>For the discount-code feature above, build a risk table with columns:
+Area | What could go wrong | Likelihood (1-3) | Impact (1-3) | Score | Test depth
+Use Test depth: High (score 6-9), Medium (3-4), Low (1-2).
+Explain each likelihood and impact score in one short phrase.
+Then propose the order in which to test.</pre></div>
+<div class="tbl"><table>
+<tr><th>Area</th><th>What could go wrong</th><th>L</th><th>I</th><th>Score</th><th>Depth</th></tr>
+<tr><td>Total calculation</td><td>Wrong rounding or tax order</td><td>2</td><td>3</td><td>6</td><td>High</td></tr>
+<tr><td>Code reuse</td><td>Single-use code used twice by two tabs</td><td>2</td><td>3</td><td>6</td><td>High</td></tr>
+<tr><td>Error messages</td><td>Unclear wording</td><td>2</td><td>1</td><td>2</td><td>Low</td></tr>
+<tr><td>Accessibility</td><td>Error not announced to screen readers</td><td>2</td><td>2</td><td>4</td><td>Medium</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Your judgement wins</span><p>Claude's scores are a starting point. It doesn't know that last quarter's biggest incident was a rounding bug, or that this market is regulated. Adjust the scores with what you know, and write down why. That written reasoning is what makes the plan defensible in a review.</p></div>
+
+<h3 id="ch120-4"><span class="num">120.4</span>Classic techniques, applied by AI</h3>
+<p>Test design techniques are systematic ways of choosing a small number of tests that find a large share of bugs. They're tedious to do by hand, which is exactly why AI helps. Name the technique in your prompt; you'll get far better tests than "write test cases".</p>
+
+<h4>Equivalence partitioning and boundary values</h4>
+<p><a class="gl" href="#g-equivalence-partitioning">Equivalence partitioning</a> splits inputs into groups the system should treat the same way. <a class="gl" href="#g-boundary-value-analysis">Boundary value analysis</a> then tests the edges of each group, because that's where off-by-one bugs live.</p>
+<div class="code"><span class="cap">Prompt</span><pre>Rule: a discount code needs a minimum basket of £20.00 and works up to £500.00.
+Apply equivalence partitioning and boundary value analysis.
+Show the partitions first, then a table of test values with the expected result.
+Prices are in pounds with 2 decimal places.</pre></div>
+<div class="tbl"><table>
+<tr><th>Partition</th><th>Test values</th><th>Expected</th></tr>
+<tr><td>Below minimum (&lt; £20.00)</td><td>£0.01, £19.99</td><td>Code rejected, "Minimum spend £20" message</td></tr>
+<tr><td>Valid (£20.00–£500.00)</td><td>£20.00, £20.01, £250.00, £499.99, £500.00</td><td>Code accepted</td></tr>
+<tr><td>Above maximum (&gt; £500.00)</td><td>£500.01</td><td>Code rejected (needs confirming: is this rule real?)</td></tr>
+<tr><td>Invalid input</td><td>£0.00, empty basket</td><td>Code field disabled or rejected</td></tr>
+</table></div>
+<p>Notice the note on £500.01. A good model flags when the rule implies something nobody said. That's a refinement question, not a test case.</p>
+
+<h4>Decision tables</h4>
+<p>When several conditions combine, a <a class="gl" href="#g-decision-table">decision table</a> lists every combination and the expected outcome. Ask Claude to build the full table, then to collapse rows that can't happen.</p>
+<div class="tbl"><table>
+<tr><th>Code valid?</th><th>Basket ≥ minimum?</th><th>Code already used?</th><th>Expected</th></tr>
+<tr><td>Yes</td><td>Yes</td><td>No</td><td>Discount applied</td></tr>
+<tr><td>Yes</td><td>Yes</td><td>Yes</td><td>"Code already used"</td></tr>
+<tr><td>Yes</td><td>No</td><td>–</td><td>"Minimum spend" message</td></tr>
+<tr><td>No</td><td>–</td><td>–</td><td>"Code not recognised"</td></tr>
+</table></div>
+<p>A dash means "doesn't matter here". Ask Claude to justify each dash; sometimes it reveals a rule the order of checks depends on ("which error wins if the code is both expired and below minimum?").</p>
+
+<h4>State transitions</h4>
+<p>Many features move between states: an order is <em>draft → submitted → paid → shipped → refunded</em>. Ask Claude for a state-transition table that includes the <strong>invalid</strong> transitions (refunding a draft, shipping an unpaid order). Invalid transitions are where serious bugs hide, and they're the ones people forget.</p>
+
+<h4>Pairwise (combinatorial) testing</h4>
+<p>Suppose checkout must work on 4 browsers, 3 payment methods, 2 delivery options and 2 account types. Every combination is 4 × 3 × 2 × 2 = 48 tests. <a class="gl" href="#g-pairwise-testing">Pairwise testing</a> covers every <em>pair</em> of values at least once, which catches most interaction bugs in a dozen or so tests.</p>
+<div class="box warn"><span class="tag">Check the maths</span><p>Claude can produce a pairwise set, but it can make mistakes. For anything that matters, ask it to <em>also</em> list every pair and show which test covers it, or generate the set with a dedicated pairwise tool and use Claude to explain and review it. Never trust a combinatorial claim you haven't checked.</p></div>
+
+<h4>Error guessing</h4>
+<p>Error guessing is the experienced tester's instinct: "what usually breaks here?" Claude has read a great deal about how software fails, so it's a good brainstorming partner. Ask: "List 20 ways a discount-code field typically fails in production, ordered by how common they are." You'll get double-submit, whitespace, case sensitivity, Unicode lookalike characters, race conditions with two tabs, back-button resubmits and more. Keep the ones that apply.</p>
+
+<details class="deep"><summary>Why naming the technique works so well</summary><div class="body">
+<p>Language models respond to the vocabulary in your prompt. "Write tests" pulls toward the most common kind of test text the model has seen, which is usually happy-path examples. "Apply boundary value analysis to this rule" pulls toward the far more structured material written by testers: textbooks, ISTQB syllabus examples, test design articles. You are steering which part of the model's knowledge does the work. The same applies to "state transition table including invalid transitions" and "pairwise". Precise words get precise work.</p>
+</div></details>
+
+<h3 id="ch120-5"><span class="num">120.5</span>Gherkin and BDD</h3>
+<p>Behaviour-driven development (BDD) writes expected behaviour as scenarios that business people can read. The format is <a class="gl" href="#g-gherkin">Gherkin</a>: <strong>Given</strong> a starting situation, <strong>When</strong> something happens, <strong>Then</strong> this should be the result.</p>
+<div class="code"><span class="cap">Gherkin drafted by Claude, then edited by the tester</span><pre>Feature: Discount codes at checkout
+
+  Scenario: Valid code at the minimum spend
+    Given my basket subtotal is £20.00
+    When I apply the code "SAVE10"
+    Then the discount line shows -£2.00
+    And the order total is £18.00
+
+  Scenario Outline: Code rejected below the minimum spend
+    Given my basket subtotal is &lt;subtotal&gt;
+    When I apply the code "SAVE10"
+    Then I see the message "Spend £20 or more to use this code"
+
+    Examples:
+      | subtotal |
+      | £0.01    |
+      | £19.99   |</pre></div>
+<p>Ask Claude to review Gherkin as well as write it. Useful review questions:</p>
+<ul>
+<li>Does each scenario test exactly one behaviour?</li>
+<li>Are the steps written in business language, not UI clicks ("I apply the code", not "I click button #apply")?</li>
+<li>Is every <strong>Then</strong> a specific, checkable result?</li>
+<li>Are any scenarios duplicates of each other in disguise?</li>
+</ul>
+
+<h3 id="ch120-6"><span class="num">120.6</span>Traceability and coverage gaps</h3>
+<p>A <a class="gl" href="#g-traceability-matrix">traceability matrix</a> links each requirement to the tests that cover it. It answers two questions every QA lead gets asked: "Is everything tested?" and "What does this change affect?"</p>
+<div class="code"><span class="cap">Prompt: coverage gap analysis</span><pre>Here are the acceptance criteria (AC1-AC7) and our current test cases (TC-01 to TC-23).
+1. Build a traceability matrix: rows = ACs, columns = test IDs, mark covering tests.
+2. List any AC with no test, or with only happy-path tests.
+3. List any test that maps to no AC (possibly obsolete, or a missing AC).
+4. Suggest the minimum new tests to close the gaps.</pre></div>
+<p>Point 3 is often the most valuable. A test with no matching requirement is either testing something that was removed, or something nobody wrote down. Both are worth a conversation.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>Before a release, a QA lead exports 180 test cases from the test management tool as CSV, plus the 40 acceptance criteria for the release. Claude builds the matrix in under a minute and finds 4 criteria with only happy-path coverage and 11 tests mapping to a feature that was cut. The lead spends an hour checking Claude's mapping on a sample of 20 rows (it got 19 right), then closes the gaps. The same analysis by hand would take a day.</p></div>
+
+<h3 id="ch120-7"><span class="num">120.7</span>Reviewing AI-generated tests</h3>
+<p>Treat AI-generated tests like a pull request from a capable new colleague: probably good, definitely needing review. Use this checklist.</p>
+<div class="tbl"><table>
+<tr><th>Check</th><th>Question to ask</th></tr>
+<tr><td>Grounded</td><td>Does every expected result come from the requirements, or did the model assume it? Ask: "For each expected result, quote the requirement it comes from."</td></tr>
+<tr><td>Specific</td><td>Could a different tester run it and get the same pass or fail? "Error is shown" fails this; "'Code not recognised' appears below the field" passes.</td></tr>
+<tr><td>Negative cases</td><td>Are there tests for invalid input, wrong states, permissions and failures, not just the happy path?</td></tr>
+<tr><td>Boundaries</td><td>Are the edges of every range covered?</td></tr>
+<tr><td>Duplicates</td><td>Do two tests check the same thing with different wording?</td></tr>
+<tr><td>Product fit</td><td>Does it use your real screens, terms and data, or generic ones ("click Submit" when your button says "Pay now")?</td></tr>
+<tr><td>Priority</td><td>Do priorities match your risk table, not the model's guess?</td></tr>
+<tr><td>Automatable</td><td>Is it clear which tests should become automation (Chapter 121) and which stay manual or exploratory (Chapter 124)?</td></tr>
+</table></div>
+
+<div class="lab"><div class="lab-h"><b>From story to reviewed test design</b><span>45 min · claude.ai or Claude Code</span></div><ol>
+<li>Pick a real story from your backlog (remove confidential details if your policy requires it), or use the discount-code story in 111.1.</li>
+<li>Run the refinement prompt from 111.1.<span class="expect">10–20 questions, grouped into ambiguities, missing rules, untestable statements and risks.</span></li>
+<li>Answer what you can, and mark the rest "ask product owner". Add your answers to the conversation.</li>
+<li>Ask for a risk table (111.3), then adjust at least two scores yourself and write why.<span class="expect">a table with your edits clearly noted.</span></li>
+<li>Ask Claude to apply boundary value analysis and a decision table to the riskiest rule.<span class="expect">partitions, boundary values and a full decision table with expected results.</span></li>
+<li>Ask: "For each expected result, quote the requirement it comes from, or say ASSUMED."<span class="expect">some results marked ASSUMED. Those are your next refinement questions.</span></li>
+<li>Run the review checklist in 111.7 over the final set and delete or fix at least one test.</li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings and pitfalls</span><dl>
+<dt>Generic tests</dt><dd>"Verify the page loads" and "verify the user can log in" for every story. Fix: give real context (screens, rules, examples of your team's tests) and name the techniques you want.</dd>
+<dt>Hallucinated requirements</dt><dd>The model invents a rule that sounds sensible ("codes expire after 30 days") and writes tests for it. Fix: the "quote the requirement or say ASSUMED" prompt.</dd>
+<dt>Too many tests</dt><dd>AI will happily write 200 tests. More isn't better; maintained, meaningful coverage is. Ask it to merge duplicates and rank by risk.</dd>
+<dt>"The AI did the test design"</dt><dd>It drafted it. You own the risk decisions, the priorities and the sign-off.</dd>
+<dt>Skipping the conversation</dt><dd>The refinement questions are only valuable if someone answers them. Take them to the three-amigos session; don't just file them.</dd>
+</dl></div>
+
+<h3 id="ch120-r"><span class="num">120.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>The biggest win is before development: use Claude to find ambiguities, missing rules and untestable statements for refinement.</li>
+<li>Give rich context (a Project, Jira through MCP, or repo files), not a bare story.</li>
+<li>Name the technique: equivalence partitioning, boundary values, decision tables, state transitions, pairwise, error guessing.</li>
+<li>Use AI for traceability matrices and coverage gap analysis, and spot-check its mapping.</li>
+<li>Review every generated test: grounded, specific, negative cases, boundaries, no duplicates, real product terms.</li>
+<li>Claude drafts; you own risk, priority and sign-off.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What's the most valuable output of AI in refinement?</p><div class="opts"><button>A large number of test cases</button><button data-ok>Questions about ambiguities and missing rules, answered before development</button><button>Automated scripts</button></div><p class="why" hidden>Preventing a defect is cheaper than finding one. Questions answered in refinement remove bugs before they're written.</p></div>
+<div class="qz"><p class="q">A minimum spend is £20.00. Which set best applies boundary value analysis?</p><div class="opts"><button>£5, £50, £100</button><button data-ok>£19.99, £20.00, £20.01</button><button>£20 only</button></div><p class="why" hidden>Test just below, on and just above the boundary.</p></div>
+<div class="qz"><p class="q">How do you catch hallucinated requirements in AI-generated tests?</p><div class="opts"><button>Use a bigger model</button><button data-ok>Ask Claude to quote the requirement behind each expected result, or mark it ASSUMED</button><button>Generate the tests twice</button></div><p class="why" hidden>Grounding each result in a quoted requirement exposes anything the model made up.</p></div>
+<div class="qz"><p class="q">Why use pairwise testing for 4 browsers × 3 payment methods × 2 delivery options × 2 account types?</p><div class="opts"><button>It tests all 48 combinations faster</button><button data-ok>It covers every pair of values with far fewer tests, catching most interaction bugs</button><button>It removes the need for browser testing</button></div><p class="why" hidden>Most interaction bugs involve two factors, so covering every pair gives good value for much less effort.</p></div>
+<div class="qz"><p class="q">A test in your suite maps to no acceptance criterion. What does that suggest?</p><div class="opts"><button>It should be deleted immediately</button><button data-ok>It may test a removed feature, or a rule nobody wrote down; worth a conversation</button><button>The traceability matrix is wrong</button></div><p class="why" hidden>Orphan tests point to either obsolete coverage or missing requirements.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>For your next sprint, use Claude to prepare for refinement on two stories. Track three numbers: questions raised, questions that changed the story, and defects later found in those stories compared with similar stories you prepared the old way. After two sprints, share the comparison with your team. This becomes evidence for the business case in Chapter 126.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Use Claude before development, not just after. Give it the story and context, and ask for ambiguities, missing rules and risks to take to refinement. Then name the technique you want (boundaries, decision tables, state transitions, pairwise) and you'll get proper test design, not generic tests. Always ask it to quote the requirement behind each expected result, and review everything. Claude drafts; we decide."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>ISTQB, <a href="https://www.istqb.org/certifications/certified-tester-foundation-level" target="_blank" rel="noopener">Certified Tester Foundation Level syllabus</a>: the standard definitions of equivalence partitioning, boundary value analysis, decision tables, state transition testing and error guessing.</li>
+<li>Cucumber, <a href="https://cucumber.io/docs/gherkin/reference/" target="_blank" rel="noopener">Gherkin reference</a>.</li>
+<li>Anthropic, <a href="https://docs.claude.com/en/docs/build-with-claude/prompt-engineering/overview" target="_blank" rel="noopener">Prompt engineering overview</a> (role, context, examples and XML tags).</li>
+<li>Chapter 101 of this book for reading stories directly from Jira through MCP.</li>
+</ol><p class="verified">Content type: established testing practice with AI workflows · Last reviewed 9 November 2026</p></div>

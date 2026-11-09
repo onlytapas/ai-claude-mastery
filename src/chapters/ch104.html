@@ -1,0 +1,424 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>When it's worth building your own MCP server, and when it isn't</li>
+<li>How to build a small, useful QA server in Python with the official SDK, line by line</li>
+<li>How to write tool names, descriptions and inputs that Claude uses correctly</li>
+<li>How to report errors so Claude can recover, and how to test your server without Claude</li>
+<li>How to connect it to Claude Code, keep it secure, and share it with your team</li>
+<li>What the same thing looks like in TypeScript</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 97 (what MCP is), Chapter 99 (how MCP works inside) and Chapter 58 (Python and package managers). You need Python 3.11 or newer. No previous programming experience is assumed beyond running commands in a terminal: every line of code is explained.</div>
+
+<div class="bigidea"><p>Sometimes the tool your team needs doesn't have an MCP server: your own test-report format, an internal test-data service, a home-grown release checklist. Building a server for it is smaller than it sounds. With the official Python SDK, each tool is an ordinary Python function with a short description. In this chapter you'll build a server called <strong>qa-results</strong> that lets Claude read JUnit test reports, list failing tests and explain why they failed. The code was tested against the current SDK while this chapter was written.</p></div>
+
+<h3 id="ch104-1"><span class="num">104.1</span>Should you build one?</h3>
+<p>Building a server is the right choice in some situations and overkill in others.</p>
+<div class="tbl"><table>
+<tr><th>Situation</th><th>Best option</th></tr>
+<tr><td>The service already has an official MCP server</td><td>Use it (Chapter 103)</td></tr>
+<tr><td>You only need Claude Code to do it, on your machine, and a terminal command already does the job</td><td>Let Claude run the command, or write a <a class="gl" href="#g-skill">skill</a> that explains how (Chapter 80)</td></tr>
+<tr><td>You want the same ability in claude.ai, Claude Desktop, other AI tools, or for the whole team</td><td><strong>Build an MCP server</strong></td></tr>
+<tr><td>You need strict control over what the AI can do (only these three read-only actions)</td><td><strong>Build an MCP server</strong>: it offers exactly the tools you define, nothing more</td></tr>
+<tr><td>You need to wrap an internal API that needs secret credentials</td><td><strong>Build an MCP server</strong>: the server holds the credentials, and Claude never sees them</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>An MCP server is like a hotel reception desk. Guests (AI assistants) can't wander into the back office. They ask at the desk, and the desk offers a fixed menu of services: book a taxi, store luggage, call a doctor. You decide what's on the menu. That's why a well-designed server is safer than giving the AI direct access to everything.</p></div>
+
+<h3 id="ch104-2"><span class="num">104.2</span>What we'll build</h3>
+<p>Most test frameworks (Playwright, Jest, pytest, JUnit, Cypress and others) can write their results as a <a class="gl" href="#g-junit-xml">JUnit XML</a> file. Our server will read those files and offer Claude:</p>
+<div class="tbl"><table>
+<tr><th>Name</th><th>Kind</th><th>What it does</th></tr>
+<tr><td><code>list_reports</code></td><td>Tool</td><td>Lists the report files in the reports folder</td></tr>
+<tr><td><code>list_failing_tests</code></td><td>Tool</td><td>Lists every failed or errored test in one report, with a short message</td></tr>
+<tr><td><code>get_failure_details</code></td><td>Tool</td><td>Shows the full error and stack trace for one test</td></tr>
+<tr><td><code>reports://summary</code></td><td>Resource</td><td>A pass/fail summary of every report, which you can attach to a conversation</td></tr>
+</table></div>
+<p>Remember from Chapter 99: <strong>tools</strong> are actions the model decides to call; <strong>resources</strong> are data that the application or you attach. Everything here only reads, so the server can never change or delete anything.</p>
+<div class="flow">
+<div><b>You ask</b>"Why did last night's tests fail?"</div>
+<div><b>Claude</b>Calls <code>list_reports</code>, then <code>list_failing_tests</code></div>
+<div class="hl"><b>qa-results server</b>Reads the XML files in one folder only</div>
+<div><b>Claude</b>Calls <code>get_failure_details</code> for each failure</div>
+<div><b>Answer</b>A grouped explanation, with the real error text</div>
+</div>
+
+<h3 id="ch104-3"><span class="num">104.3</span>Set up the project</h3>
+<p>The official Python <a class="gl" href="#g-sdk">SDK</a> is the package called <code>mcp</code> (version 2.3.0 when this was written). It needs Python 3.11 or newer.</p>
+<div class="code"><span class="cap">In a terminal</span><pre>mkdir qa-results &amp;&amp; cd qa-results     <span class="c"># make a project folder and go into it</span>
+python3 -m venv .venv                   <span class="c"># create a private Python environment in .venv</span>
+source .venv/bin/activate               <span class="c"># switch to it (Windows: .venv\Scripts\activate)</span>
+pip install "mcp[cli]"                  <span class="c"># install the SDK plus its "mcp" command-line tool</span>
+mkdir test-results                      <span class="c"># the folder our server will read from</span></pre></div>
+<p>A virtual environment (<code>.venv</code>) keeps this project's packages separate from everything else on your computer (Chapter 58). The <code>[cli]</code> part adds the <code>mcp</code> command, used later for testing. If your team uses the <code>uv</code> tool instead, the equivalent is <code>uv add "mcp[cli]"</code>.</p>
+<p>Now save a sample report as <code>test-results/junit.xml</code>, so there's something to read:</p>
+<div class="code"><span class="cap">test-results/junit.xml</span><pre>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;testsuites&gt;
+  &lt;testsuite name="checkout" tests="3" failures="1" errors="1"&gt;
+    &lt;testcase classname="checkout.spec.ts" name="applies a valid coupon" time="1.2"/&gt;
+    &lt;testcase classname="checkout.spec.ts" name="rejects an expired coupon" time="0.9"&gt;
+      &lt;failure message="expect(received).toHaveText(expected)"&gt;Expected: "Coupon expired"
+Received: "Invalid code"
+    at checkout.spec.ts:42:31&lt;/failure&gt;
+    &lt;/testcase&gt;
+    &lt;testcase classname="checkout.spec.ts" name="shows the order total" time="30.0"&gt;
+      &lt;error message="Timeout 30000ms exceeded"&gt;waiting for getByTestId('order-total')&lt;/error&gt;
+    &lt;/testcase&gt;
+  &lt;/testsuite&gt;
+&lt;/testsuites&gt;</pre></div>
+<p>In JUnit XML, each <code>&lt;testcase&gt;</code> is one test. A <code>&lt;failure&gt;</code> inside it means an assertion failed; an <code>&lt;error&gt;</code> means something crashed or timed out. A test with neither passed.</p>
+
+<h3 id="ch104-4"><span class="num">104.4</span>The server, part by part</h3>
+<p>Create <code>server.py</code>. We'll build it in five parts; together they form one complete, working file of about 90 lines.</p>
+<h4>Part 1: imports and settings</h4>
+<div class="code"><pre><span class="s">"""qa-results: an MCP server that lets Claude read JUnit test reports."""</span>
+import os
+from pathlib import Path
+import xml.etree.ElementTree as ET
+from typing import Annotated
+
+from pydantic import Field
+
+from mcp.server import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
+from mcp.types import ToolAnnotations
+
+PROJECT = Path(os.environ.get("CLAUDE_PROJECT_DIR", "."))  <span class="c"># Claude Code sets this to your project folder</span>
+REPORTS = Path(os.environ.get("REPORTS_DIR", PROJECT / "test-results")).resolve()
+MAX_CHARS = 4000  <span class="c"># keep tool output small: it all goes into Claude's context</span>
+
+mcp = MCPServer(
+    "qa-results",
+    instructions="Read JUnit XML test reports: list failing tests and show why they failed.",
+)</pre></div>
+<ul>
+<li>The first line, in triple quotes, is a description of the file. Python ignores it when running.</li>
+<li><code>import os</code>, <code>Path</code> and <code>ET</code> are built into Python: environment variables, file paths and an XML reader.</li>
+<li><code>Annotated</code> and <code>Field</code> let us attach a description to each tool input (Part 3). <code>pydantic</code> is installed automatically with the SDK.</li>
+<li>The three <code>mcp</code> imports bring in the server class, the error type for tools, and "annotations" (labels such as "this tool only reads").</li>
+<li><code>PROJECT</code>: when Claude Code starts a local server, it sets the environment variable <code>CLAUDE_PROJECT_DIR</code> to your project folder. If it isn't set, we use the current folder (<code>"."</code>).</li>
+<li><code>REPORTS</code> is the one folder our server may read. Someone can override it with a <code>REPORTS_DIR</code> environment variable. <code>.resolve()</code> turns it into a full, exact path, which matters for the safety check in Part 2.</li>
+<li><code>MAX_CHARS</code> caps how much text one tool returns. Everything a tool returns goes into Claude's <a class="gl" href="#g-context-window">context window</a>, so a 5 MB stack trace would be expensive and unhelpful.</li>
+<li><code>MCPServer("qa-results", instructions=…)</code> creates the server. The name appears in Claude Code's <code>/mcp</code> list. The instructions tell Claude what the server is for, which helps it find these tools when it searches.</li>
+</ul>
+<div class="box note"><span class="tag">Older tutorials say FastMCP</span><p>Version 1 of the Python SDK called this class <code>FastMCP</code> (imported from <code>mcp.server.fastmcp</code>). Version 2 renamed it to <code>MCPServer</code>, imported from <code>mcp.server</code>. If you copy code from an older blog post and it fails to import, this is usually why. The SDK has a migration guide.</p></div>
+
+<h4>Part 2: helper functions (not visible to Claude)</h4>
+<div class="code"><pre>ReportName = Annotated[str, Field(description='Report file name from list_reports, e.g. "junit.xml"')]
+
+
+def open_report(report: str) -&gt; ET.Element:
+    <span class="s">"""Parse one report file, refusing anything outside the reports folder."""</span>
+    path = (REPORTS / report).resolve()
+    if not path.is_relative_to(REPORTS):
+        raise ToolError("Report must be inside the reports folder.")
+    if path.suffix != ".xml" or not path.is_file():
+        raise ToolError(f"No report called {report!r}. Use list_reports to see the names.")
+    return ET.parse(path).getroot()
+
+
+def failures(root: ET.Element):
+    <span class="s">"""Yield (testcase, problem) for every failed or errored test."""</span>
+    for case in root.iter("testcase"):
+        problem = case.find("failure")
+        if problem is None:
+            problem = case.find("error")
+        if problem is not None:
+            yield case, problem</pre></div>
+<ul>
+<li><code>ReportName</code> is a reusable description of the "report" input: a piece of text (<code>str</code>) with a helpful explanation. Both tools that take a report name use it.</li>
+<li><code>open_report</code> builds the full path to the file. <code>REPORTS / report</code> joins the folder and the name, and <code>.resolve()</code> works out the real location, expanding things like <code>..</code> ("go up one folder").</li>
+<li><code>is_relative_to(REPORTS)</code> checks that the final location is still inside the reports folder. This is the <a class="gl" href="#g-path-traversal">path traversal</a> defence: without it, a request for <code>../../.ssh/id_rsa</code> could read your private SSH key.</li>
+<li>The second check makes sure it's an existing <code>.xml</code> file. The error message tells Claude how to fix its mistake ("Use list_reports"). Section 97.6 explains why that matters.</li>
+<li><code>ET.parse(path).getroot()</code> reads the XML and returns its top element.</li>
+<li><code>failures</code> walks through every <code>&lt;testcase&gt;</code>. If it contains a <code>&lt;failure&gt;</code> or an <code>&lt;error&gt;</code>, it hands back that test and the problem. <code>yield</code> returns results one at a time, like a conveyor belt.</li>
+</ul>
+
+<h4>Part 3: the tools</h4>
+<div class="code"><pre>@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
+def list_reports() -&gt; list[str]:
+    <span class="s">"""List the JUnit XML report files available to read."""</span>
+    return sorted(p.name for p in REPORTS.glob("*.xml"))
+
+
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
+def list_failing_tests(report: ReportName) -&gt; list[dict]:
+    <span class="s">"""List every failed or errored test in a JUnit XML report."""</span>
+    return [
+        {
+            "test": case.get("name"),
+            "class": case.get("classname"),
+            "kind": problem.tag,
+            "message": (problem.get("message") or "")[:200],
+        }
+        for case, problem in failures(open_report(report))
+    ]
+
+
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
+def get_failure_details(
+    report: ReportName,
+    test: Annotated[str, Field(description="Test name exactly as list_failing_tests shows it")],
+) -&gt; str:
+    <span class="s">"""Show the full error message and stack trace for one failing test."""</span>
+    for case, problem in failures(open_report(report)):
+        if case.get("name") == test:
+            text = f"{problem.get('message', '')}\n\n{problem.text or ''}".strip()
+            return text[:MAX_CHARS]
+    raise ToolError(f"No failing test named {test!r} in {report}.")</pre></div>
+<ul>
+<li><code>@mcp.tool(…)</code> is a <em>decorator</em>: a label on the line above a function that says "offer this function to AI clients as a tool". That single line is the whole registration.</li>
+<li><code>ToolAnnotations(readOnlyHint=True)</code> tells clients the tool changes nothing. Claude Code uses this hint, for example to run read-only calls side by side.</li>
+<li>The <strong>function name</strong> becomes the tool name. The <strong>docstring</strong> (the line in triple quotes) becomes the tool description that Claude reads to decide when to use it.</li>
+<li>The <strong>type hints</strong> (<code>report: ReportName</code>, <code>-&gt; list[str]</code>) become the input and output schema. You don't write any <a class="gl" href="#g-json-schema">JSON Schema</a> by hand: the SDK generates it.</li>
+<li><code>list_reports</code> finds every <code>.xml</code> file in the folder and returns their names, sorted.</li>
+<li><code>list_failing_tests</code> returns one small record per failure. The message is cut to 200 characters so the list stays short; the details come from the next tool. This "summary first, details on request" design keeps Claude's context tidy.</li>
+<li><code>get_failure_details</code> finds the named test and returns its message plus the full text inside the failure element (usually the stack trace), capped at <code>MAX_CHARS</code>. If no test matches, it raises a <code>ToolError</code>.</li>
+</ul>
+
+<h4>Part 4: the resource</h4>
+<div class="code"><pre>@mcp.resource("reports://summary")
+def summary() -&gt; str:
+    <span class="s">"""Pass/fail totals for every report in the folder."""</span>
+    lines = []
+    for name in list_reports():
+        root = open_report(name)
+        total = len(list(root.iter("testcase")))
+        failed = len(list(failures(root)))
+        lines.append(f"{name}: {total} tests, {failed} failing")
+    return "\n".join(lines) or "No reports found."</pre></div>
+<ul>
+<li><code>@mcp.resource("reports://summary")</code> publishes this function's result as a resource with that address (a URI). The <code>reports://</code> part is a name we chose; it doesn't need to be a web address.</li>
+<li>It counts tests and failures in every report and returns one line per file, such as <code>junit.xml: 3 tests, 2 failing</code>.</li>
+</ul>
+
+<h4>Part 5: start the server</h4>
+<div class="code"><pre>if __name__ == "__main__":
+    mcp.run()  <span class="c"># stdio: Claude Code starts this script and talks to it over stdin/stdout</span></pre></div>
+<ul>
+<li>This runs only when the file is started directly (<code>python server.py</code>), not when another file imports it (as our tests will).</li>
+<li><code>mcp.run()</code> starts the server using the <a class="gl" href="#g-stdio">stdio</a> transport by default: messages arrive on standard input and replies go out on standard output (Chapter 99). The SDK can also serve over HTTP, which you'd use for a server shared over a network.</li>
+</ul>
+<div class="warn"><span class="tag">Never print() in a stdio server</span><p>In a stdio server, standard output <em>is</em> the conversation with Claude Code. A stray <code>print("debug")</code> injects garbage into that conversation and can break the connection. Send debugging messages to standard error instead, or use Python's <code>logging</code> module, which writes to standard error by default.</p></div>
+
+<h3 id="ch104-5"><span class="num">104.5</span>Names, descriptions and inputs Claude can use</h3>
+<p>Claude never sees your code. It sees only each tool's name, description and input schema. Here is what the SDK generates for <code>get_failure_details</code>:</p>
+<div class="code"><span class="cap">What Claude receives (simplified)</span><pre>{
+  "name": "get_failure_details",
+  "description": "Show the full error message and stack trace for one failing test.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "report": { "type": "string", "description": "Report file name from list_reports, e.g. \"junit.xml\"" },
+      "test":   { "type": "string", "description": "Test name exactly as list_failing_tests shows it" }
+    },
+    "required": ["report", "test"]
+  },
+  "annotations": { "readOnlyHint": true }
+}</pre></div>
+<p>That's all Claude has to go on, so treat it like documentation for a new colleague:</p>
+<div class="tbl"><table>
+<tr><th>Do</th><th>Avoid</th></tr>
+<tr><td>Verb-first names that say what happens: <code>list_failing_tests</code></td><td>Vague names: <code>process</code>, <code>handle_data</code>, <code>tool1</code></td></tr>
+<tr><td>Descriptions that say what the tool does and when to use it, with the key words first</td><td>Empty or one-word descriptions</td></tr>
+<tr><td>Describe every input, with an example value</td><td>Inputs like <code>s: str</code> with no explanation</td></tr>
+<tr><td>Point to the tool that provides a value ("from list_reports")</td><td>Making Claude guess file names</td></tr>
+<tr><td>A few focused tools</td><td>One giant tool with ten modes, or fifty near-identical tools</td></tr>
+</table></div>
+<p>Claude Code cuts very long descriptions (server instructions and up-front tool descriptions at 4,096 characters), and its tool search reads the start of each description, so put the important words first.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>A team's first version of a similar server had one tool, <code>query(q: str)</code>, described as "Query results". Claude kept passing full English sentences, guessing file names, and asking the user what to do. Splitting it into three clearly named tools with described inputs fixed it the same day: Claude started chaining them correctly without being told.</p></div>
+
+<h3 id="ch104-6"><span class="num">104.6</span>Errors that help Claude recover</h3>
+<p>Things go wrong: Claude asks for a report that doesn't exist, or misspells a test name. How the tool reports that decides what happens next.</p>
+<div class="tbl"><table>
+<tr><th>What the tool does</th><th>What Claude sees</th><th>Use when</th></tr>
+<tr><td><code>raise ToolError("…")</code></td><td>A result marked as an error, with your message. Claude reads it and usually tries again correctly.</td><td>Almost always: bad input, nothing found, not allowed</td></tr>
+<tr><td>Some other exception (a bug)</td><td>Only that the call failed. Your log gets the details.</td><td>Never on purpose; it means your code needs fixing</td></tr>
+<tr><td><code>return "Error: …"</code></td><td>A normal, successful result that happens to say "Error"</td><td>Don't. Clients treat it as success, so the error flag is missing</td></tr>
+</table></div>
+<p>The best error messages say what was wrong <em>and how to fix it</em>: "No report called 'nightly.xml'. Use list_reports to see the names." When we tested this server, a wrong name produced exactly that message with the error flag set, ready for Claude to correct itself.</p>
+
+<h3 id="ch104-7"><span class="num">104.7</span>Test it before Claude does</h3>
+<p>You're a tester: don't make Claude your first test. There are two good ways to check a server on its own.</p>
+<h4>Automated tests with the SDK's client</h4>
+<p>The SDK includes a <code>Client</code> that can connect straight to your server object in memory, with no separate process and no network. That makes ordinary automated tests possible:</p>
+<div class="code"><span class="cap">test_server.py (run with: pip install pytest, then python -m pytest)</span><pre>import pytest
+from mcp import Client
+from server import mcp
+
+
+@pytest.mark.anyio
+async def test_lists_failing_tests():
+    async with Client(mcp) as client:
+        result = await client.call_tool("list_failing_tests", {"report": "junit.xml"})
+        names = [t["test"] for t in result.structured_content["result"]]
+        assert names == ["rejects an expired coupon", "shows the order total"]
+
+
+@pytest.mark.anyio
+async def test_refuses_files_outside_the_folder():
+    async with Client(mcp) as client:
+        result = await client.call_tool("list_failing_tests", {"report": "../secrets.xml"})
+        assert result.is_error</pre></div>
+<ul>
+<li><code>from server import mcp</code> imports your server object (this is why Part 5 checks <code>__name__</code>: importing doesn't start it).</li>
+<li><code>@pytest.mark.anyio</code> lets pytest run <code>async</code> test functions. <code>async</code> and <code>await</code> are Python's way of waiting for things like messages without freezing.</li>
+<li><code>Client(mcp)</code> connects to the server in memory; <code>call_tool</code> calls a tool exactly as Claude would.</li>
+<li>The first test checks the right failures come back. The second is a <em>security</em> test: it proves the path traversal defence works. Both passed against SDK 2.3.0.</li>
+</ul>
+<h4>Clicking around in the MCP Inspector</h4>
+<p>The <a class="gl" href="#g-mcp-inspector">MCP Inspector</a> is the official visual tool for trying a server: it lists the tools, builds a form for each input and shows the raw messages.</p>
+<div class="code"><pre>mcp dev server.py                                    <span class="c"># the SDK's shortcut; needs the uv tool and Node.js</span>
+npx @modelcontextprotocol/inspector python server.py   <span class="c"># or run the Inspector directly (needs a recent Node.js)</span></pre></div>
+<p>Open the address it prints in your browser, choose a tool, fill in the form and run it. Check the descriptions read well, the inputs are clear, and the errors make sense. The Inspector also has a command-line mode (<code>--cli</code>) for scripted checks in CI.</p>
+
+<h3 id="ch104-8"><span class="num">104.8</span>Connect it to Claude Code</h3>
+<p>Claude Code starts a stdio server itself, so you give it the exact command that runs your file. Use the Python inside your virtual environment, so the <code>mcp</code> package is found.</p>
+<div class="code"><span class="cap">From the qa-results folder</span><pre>claude mcp add --transport stdio qa-results \
+  --env REPORTS_DIR="$PWD/test-results" \
+  -- "$PWD/.venv/bin/python" "$PWD/server.py"</pre></div>
+<ul>
+<li><code>qa-results</code> is the server's name in Claude Code; its tools become <code>mcp__qa-results__list_reports</code> and so on.</li>
+<li><code>--env REPORTS_DIR=…</code> sets the reports folder for the server. <code>$PWD</code> is the shell's name for "the folder I'm in", so the paths become complete.</li>
+<li>Options go before the name; the command that starts the server goes after <code>--</code>.</li>
+<li>On Windows the Python path is <code>.venv\Scripts\python.exe</code>.</li>
+</ul>
+<p>Then check it and use it:</p>
+<div class="code"><pre>claude mcp get qa-results     <span class="c"># should report the server as connected</span>
+claude                        <span class="c"># start a session</span></pre></div>
+<div class="code"><span class="cap">Inside the session</span><pre>/mcp                                         <span class="c"># see qa-results and its three tools</span>
+Which tests failed in the latest report, and why? Group them by likely cause.
+Compare with @qa-results:reports://summary   <span class="c"># attach the resource with @</span></pre></div>
+<p>The first time Claude calls each tool, Claude Code asks your permission. To allow this server's tools without prompts, add the rule <code>mcp__qa-results__*</code> to your allow list (Chapter 78).</p>
+
+<h3 id="ch104-9"><span class="num">104.9</span>Security checklist for your own server</h3>
+<div class="tbl"><table>
+<tr><th>Risk</th><th>What could happen</th><th>What our server does</th></tr>
+<tr><td>Path traversal</td><td>A crafted file name reads files outside the folder</td><td>Resolves the path and checks it's inside <code>REPORTS</code>; tested</td></tr>
+<tr><td>Doing too much</td><td>A tool deletes or changes things it shouldn't</td><td>Only read-only tools exist; nothing can write</td></tr>
+<tr><td>Huge outputs</td><td>One call floods Claude's context</td><td>Messages cut to 200 characters; details capped at 4,000</td></tr>
+<tr><td>Leaking secrets</td><td>Tokens or passwords appear in results and go to the model</td><td>Reads only test reports. If you wrap an API, keep its key in the server's environment and never return it</td></tr>
+<tr><td>Untrusted files</td><td>A malicious XML file attacks the parser</td><td>Reports come from your own CI. For files from outside, use a hardened parser such as the <code>defusedxml</code> package</td></tr>
+<tr><td>Prompt injection</td><td>Text inside a report says "ignore your instructions and…"</td><td>Can't be fully prevented by the server; Claude Code's permission prompts and your review are the safeguard (Chapter 105)</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Your server is a shop counter, not an open warehouse. Decide exactly what's sold over the counter (tools), check every order slip (input validation), never hand over the safe combination (secrets), and keep parcels to a size that fits through the hatch (output limits).</p></div>
+
+<h3 id="ch104-10"><span class="num">104.10</span>Share it with your team</h3>
+<p>To give everyone on a project the same server, commit the server code to the repository (for example under <code>tools/qa-results/</code>) and add a project-scope entry to <code>.mcp.json</code> at the repository root:</p>
+<div class="code"><span class="cap">.mcp.json</span><pre>{
+  "mcpServers": {
+    "qa-results": {
+      "command": "${CLAUDE_PROJECT_DIR:-.}/tools/qa-results/.venv/bin/python",
+      "args": ["${CLAUDE_PROJECT_DIR:-.}/tools/qa-results/server.py"],
+      "env": { "REPORTS_DIR": "${CLAUDE_PROJECT_DIR:-.}/test-results" }
+    }
+  }
+}</pre></div>
+<ul>
+<li>An entry with a <code>command</code> and no <code>type</code> is a stdio server.</li>
+<li><code>${CLAUDE_PROJECT_DIR:-.}</code> means "the project folder, or the current folder if that isn't set". Claude Code's documentation says <code>.mcp.json</code> entries need the <code>:-.</code> default here, because the variable is set for the server, not for Claude Code itself.</li>
+<li>Each teammate creates the virtual environment once (<code>python3 -m venv tools/qa-results/.venv</code>, then installs <code>mcp</code> into it). Add <code>.venv</code> to <code>.gitignore</code>.</li>
+<li>The first time someone opens the project, Claude Code asks them to approve the project's servers. That approval step is deliberate: a repository can't silently start programs on your machine.</li>
+</ul>
+<p>You can also run <code>claude mcp add --scope project …</code>, which writes the <code>.mcp.json</code> entry for you. For wider sharing, MCP servers can be published to package registries and the MCP Registry, or bundled into a Claude Code plugin (Chapter 84).</p>
+
+<h3 id="ch104-11"><span class="num">104.11</span>The same idea in TypeScript</h3>
+<p>If your team works in JavaScript or TypeScript, the official TypeScript SDK works the same way. Its current version (v2) is published as <code>@modelcontextprotocol/server</code>; the older v1 package <code>@modelcontextprotocol/sdk</code> appears in many existing tutorials. Input schemas are written with a schema library such as Zod. This version of two tools was tested against <code>@modelcontextprotocol/server</code> 2.4.0:</p>
+<div class="code"><span class="cap">server.ts (install: npm install @modelcontextprotocol/server zod)</span><pre>import { readdir } from 'node:fs/promises';
+import path from 'node:path';
+import { McpServer } from '@modelcontextprotocol/server';
+import * as z from 'zod/v4';
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
+
+const project = process.env.CLAUDE_PROJECT_DIR ?? '.';
+const reports = path.resolve(process.env.REPORTS_DIR ?? path.join(project, 'test-results'));
+
+const server = new McpServer({ name: 'qa-results', version: '1.0.0' });
+
+server.registerTool(
+    'list_reports',
+    {
+        description: 'List the JUnit XML report files available to read.',
+        annotations: { readOnlyHint: true }
+    },
+    async () =&gt; {
+        const names = (await readdir(reports)).filter(n =&gt; n.endsWith('.xml')).sort();
+        return { content: [{ type: 'text', text: names.join('\n') || 'No reports found.' }] };
+    }
+);
+
+server.registerTool(
+    'report_exists',
+    {
+        description: 'Check whether a report file is in the reports folder.',
+        inputSchema: z.object({ report: z.string().describe('Report file name, e.g. "junit.xml"') }),
+        annotations: { readOnlyHint: true }
+    },
+    async ({ report }) =&gt; {
+        const names = await readdir(reports);
+        return { content: [{ type: 'text', text: names.includes(report) ? 'yes' : 'no' }] };
+    }
+);
+
+async function main() {
+    await server.connect(new StdioServerTransport());
+}
+
+main();</pre></div>
+<ul>
+<li><code>registerTool(name, settings, handler)</code> is the TypeScript version of <code>@mcp.tool()</code>: you give the name and description explicitly instead of taking them from a function.</li>
+<li><code>z.object({ report: z.string().describe(…) })</code> defines the input. The SDK converts it to JSON Schema for clients.</li>
+<li>The handler returns a list of <code>content</code> items; here, one piece of text.</li>
+<li><code>server.connect(new StdioServerTransport())</code> starts listening on stdio, like <code>mcp.run()</code> in Python.</li>
+<li>To run TypeScript directly during development you can use <code>npx tsx server.ts</code>; for sharing, compile it to JavaScript first.</li>
+</ul>
+
+<details class="deep"><summary>What actually travels between Claude Code and your server</summary><div class="body">
+<p>When Claude decides to call <code>list_failing_tests</code>, Claude Code writes one line of <a class="gl" href="#g-json">JSON</a> to your server's standard input. It's a JSON-RPC request (Chapter 99): roughly <code>{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"list_failing_tests","arguments":{"report":"junit.xml"}}}</code>. The SDK reads it, checks the arguments against the schema generated from your type hints, calls your Python function, and writes the reply to standard output: a result with <code>content</code> (text for the model) and, because the function returns structured data, <code>structuredContent</code> holding the same list as JSON. If your function raises <code>ToolError</code>, the reply instead has <code>"isError": true</code> and your message. You never write this plumbing; that's the point of the SDK.</p>
+</div></details>
+
+<div class="lab"><div class="lab-h"><b>Build, test and connect qa-results</b><span>90 min · Python 3.11+</span></div><ol>
+<li>Follow 97.3 to create the folder, virtual environment and sample report.<span class="expect"><code>pip</code> finishes installing <code>mcp</code>; <code>test-results/junit.xml</code> exists.</span></li>
+<li>Create <code>server.py</code> from the five parts in 97.4, in order, as one file.<span class="expect">running <code>python server.py</code> shows nothing and waits. That's correct: a stdio server waits silently for a client. Press <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop it.</span></li>
+<li>Create <code>test_server.py</code> from 97.7, install pytest, and run <code>python -m pytest -q</code>.<span class="expect"><code>2 passed</code>. If an import fails, check you activated <code>.venv</code>.</span></li>
+<li>Add a third test of your own: calling <code>get_failure_details</code> with a test name that doesn't exist should return <code>is_error</code> as true.<span class="expect">three passing tests.</span></li>
+<li>Connect it with the <code>claude mcp add</code> command from 97.8, then run <code>claude mcp get qa-results</code>.<span class="expect">a connected server.</span></li>
+<li>In a Claude Code session, ask: "Which tests failed in the latest report, and what's the most likely cause of each?"<span class="expect">Claude calls <code>list_reports</code>, then <code>list_failing_tests</code>, then <code>get_failure_details</code> twice, asking permission the first time. It explains a text mismatch for the coupon test and a timeout for the order total.</span></li>
+<li>Ask: "Read the report ../../.ssh/config".<span class="expect">the tool returns "Report must be inside the reports folder." Your security check, working for real.</span></li>
+<li>Replace the sample with a real JUnit report from one of your own test runs and ask the same questions.<span class="expect">answers about your real failures.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Building an MCP server is a big engineering project."</dt><dd>A useful server can be under 100 lines. The SDK handles the protocol; you write ordinary functions.</dd>
+<dt>"Claude reads my code to understand the tools."</dt><dd>It sees only names, descriptions and input schemas. Write those as carefully as the code.</dd>
+<dt>"Returning an error message as text is fine."</dt><dd>Without the error flag it looks like success. Raise <code>ToolError</code> so the client knows the call failed.</dd>
+<dt>"print() is a harmless way to debug."</dt><dd>In a stdio server it corrupts the conversation with Claude Code. Log to standard error.</dd>
+<dt>"Code from any MCP tutorial will work."</dt><dd>The SDKs changed between versions (FastMCP became MCPServer; the TypeScript package was split). Check which version a tutorial uses.</dd>
+</dl></div>
+
+<h3 id="ch104-r"><span class="num">104.12</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Build your own server when no official one exists and you need the ability in several AI tools, for a team, or with tight control and hidden credentials.</li>
+<li>With the Python SDK (<code>mcp</code>, class <code>MCPServer</code>), a tool is a decorated function: its name, docstring and type hints become what Claude sees.</li>
+<li>Good names, descriptions and described inputs matter more than clever code.</li>
+<li>Raise <code>ToolError</code> with a message that explains how to fix the problem.</li>
+<li>Test with the SDK's in-memory <code>Client</code> and the MCP Inspector before connecting to Claude.</li>
+<li>Connect with <code>claude mcp add --transport stdio name -- command</code>; share via a project <code>.mcp.json</code> using <code>${CLAUDE_PROJECT_DIR:-.}</code>.</li>
+<li>Defend against path traversal, oversized output and leaked secrets; prefer read-only tools.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">In the Python SDK, where does Claude get a tool's description from?</p><div class="opts"><button>From reading the function's code</button><button data-ok>From the function's docstring</button><button>From the file name</button></div><p class="why" hidden>The SDK takes the name from the function, the description from its docstring and the input schema from its type hints.</p></div>
+<div class="qz"><p class="q">A tool can't find the file Claude asked for. What should it do?</p><div class="opts"><button>Return the text "Error: not found"</button><button data-ok>Raise ToolError with a message saying how to find valid names</button><button>Crash with an exception</button></div><p class="why" hidden>ToolError sets the error flag and gives Claude a message it can act on.</p></div>
+<div class="qz"><p class="q">Why does our server check that the resolved path is inside the reports folder?</p><div class="opts"><button>To make it faster</button><button data-ok>To stop file names like ../../secret from reading files elsewhere</button><button>Because the SDK requires it</button></div><p class="why" hidden>That's path traversal, a classic security hole. The second test in 97.7 proves the defence works.</p></div>
+<div class="qz"><p class="q">Why must a stdio MCP server avoid print()?</p><div class="opts"><button>print() is slow</button><button data-ok>Standard output carries the protocol messages, so extra text corrupts them</button><button>Claude can't read printed text</button></div><p class="why" hidden>Log to standard error instead.</p></div>
+<div class="qz"><p class="q">In a shared .mcp.json, how should a stdio server refer to the project folder?</p><div class="opts"><button>Hard-code your own home folder path</button><button data-ok>${CLAUDE_PROJECT_DIR:-.}</button><button>$PWD</button></div><p class="why" hidden>The variable is set for the server, so .mcp.json entries need the :-. default. A hard-coded path won't work on a teammate's computer.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Extend qa-results into something your team would use. Ideas: a <code>compare_reports</code> tool that lists tests that passed yesterday but fail today (newly broken) and the reverse (fixed); a <code>slowest_tests</code> tool using the <code>time</code> attribute; or a prompt (<code>@mcp.prompt()</code>) called <code>triage</code> that asks Claude to group failures and draft bug reports. Write tests for each new tool, including at least one security or bad-input test. Then share it with one colleague through a project <code>.mcp.json</code> and note every step that confused them.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"An MCP server is a menu of tools we choose to offer the AI. With the Python SDK, each tool is a normal function with a clear name, a one-line description and typed inputs; the SDK turns that into what Claude sees. We raise ToolError with helpful messages, block anything outside the folder we allow, keep outputs small, and test it with the SDK's client before Claude ever touches it. Then one command connects it to Claude Code, and a .mcp.json file shares it with the team."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Model Context Protocol, <a href="https://github.com/modelcontextprotocol/python-sdk" target="_blank" rel="noopener">Python SDK</a> and its documentation at <a href="https://py.sdk.modelcontextprotocol.io/" target="_blank" rel="noopener">py.sdk.modelcontextprotocol.io</a> (installation, first steps, handling errors, testing, v2 migration). Package: <a href="https://pypi.org/project/mcp/" target="_blank" rel="noopener">mcp on PyPI</a> (2.3.0 tested).</li>
+<li>Model Context Protocol, <a href="https://github.com/modelcontextprotocol/typescript-sdk" target="_blank" rel="noopener">TypeScript SDK</a>: v2 packages <code>@modelcontextprotocol/server</code> and <code>@modelcontextprotocol/client</code> (server 2.4.0 tested).</li>
+<li>Model Context Protocol, <a href="https://github.com/modelcontextprotocol/inspector" target="_blank" rel="noopener">MCP Inspector</a>.</li>
+<li>Model Context Protocol, <a href="https://modelcontextprotocol.io/specification/latest" target="_blank" rel="noopener">specification</a> (tools, resources, annotations, JSON-RPC).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/mcp" target="_blank" rel="noopener">Connect Claude Code to tools via MCP</a>: local stdio servers, <code>CLAUDE_PROJECT_DIR</code>, <code>.mcp.json</code> variable expansion, tool annotations, description limits and project-server approval.</li>
+<li>Python documentation, <a href="https://docs.python.org/3/library/xml.html#xml-vulnerabilities" target="_blank" rel="noopener">XML vulnerabilities</a> (why to use defusedxml for untrusted XML).</li>
+</ol><p class="verified">Verified 9 November 2026. All Python code was run against mcp 2.3.0 on Python 3.11 (in-memory and stdio); the TypeScript example against @modelcontextprotocol/server 2.4.0.</p></div>

@@ -1,0 +1,34 @@
+{
+ "In-process MCP server": {
+  "d": "An MCP server that runs inside your own program rather than as a separate process. In the Claude Agent SDK you make one with create_sdk_mcp_server to give Claude your own Python or TypeScript functions as tools.",
+  "see": "ch110"
+ },
+ "Agent team": {
+  "d": "In Claude Code (experimental): a lead session plus teammate sessions, each a separate Claude Code instance, that share a task list and message each other directly.",
+  "see": "ch111"
+ },
+ "Handoff": {
+  "d": "The point where work and information pass from one agent to another: the brief sent to a worker, or the report it sends back. Anything left out of a handoff is lost to the other agent.",
+  "see": "ch111"
+ },
+ "Context isolation": {
+  "d": "Keeping each agent's working memory separate, so a worker's file reads and tool results stay in its own context and only its final report reaches the agent that started it.",
+  "see": "ch111"
+ },
+ "Computer use": {
+  "d": "A Claude capability for operating a computer from screenshots: Claude asks for actions such as clicks and key presses, and the developer's program performs them in a sandboxed environment and returns new screenshots.",
+  "see": "ch112"
+ },
+ "Client toolset": {
+  "d": "An Anthropic-defined bundle of tools declared with one entry in an API request (for example the computer or browser toolset). Claude calls its member tools; your application runs every call.",
+  "see": "ch112"
+ },
+ "Batch action": {
+  "d": "Several computer or browser actions that Claude returns in one reply, such as click, type and screenshot. Your program must run them in order, answer each one, and stop at the first failure.",
+  "see": "ch112"
+ },
+ "Browser use tool": {
+  "d": "An Anthropic API toolset that lets Claude navigate, read and act on web pages in a browser your application runs, using both the page structure and screenshots.",
+  "see": "ch112"
+ }
+}

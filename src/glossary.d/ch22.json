@@ -1,0 +1,62 @@
+{
+ "Sycophancy": {
+  "d": "An AI model's tendency to agree with the user or tell them what they seem to want to hear, even when it isn't true. Partly caused by training on human preference ratings.",
+  "see": "ch22"
+ },
+ "Grounding": {
+  "d": "Giving a model the source material (documents, logs, data) and asking it to answer only from that material, so its answer can be checked against the source.",
+  "see": "ch22"
+ },
+ "Chunking": {
+  "d": "Splitting documents into smaller passages (chunks) before embedding them, so that search can find and return just the relevant part.",
+  "see": "ch23"
+ },
+ "Vector database": {
+  "d": "A database built to store embeddings (vectors) with their text and metadata, and to find the stored vectors nearest to a query vector quickly.",
+  "see": "ch23"
+ },
+ "Keyword search": {
+  "d": "Search that matches the exact words in the query, usually scored with a formula such as BM25. Strong for identifiers like ticket numbers; weak on synonyms.",
+  "see": "ch23"
+ },
+ "Semantic search": {
+  "d": "Search by meaning rather than exact words: the query and documents are turned into embeddings and the closest ones are returned.",
+  "see": "ch23"
+ },
+ "Hybrid search": {
+  "d": "Running keyword search and semantic search together and merging their results, for example with reciprocal rank fusion.",
+  "see": "ch23"
+ },
+ "BM25": {
+  "d": "A classic keyword-search scoring formula that rewards rare query words, repeated matches (with diminishing returns) and shorter passages.",
+  "see": "ch23"
+ },
+ "Reranking": {
+  "d": "A second retrieval step in which a slower, more accurate model rescores the candidate passages against the query and keeps only the best ones.",
+  "see": "ch23"
+ },
+ "Data contamination": {
+  "d": "When benchmark questions or their answers were in a model's training data, so a high score may reflect memory rather than ability.",
+  "see": "ch24"
+ },
+ "Benchmark saturation": {
+  "d": "The point at which top models score near the maximum on a benchmark, so it can no longer tell them apart.",
+  "see": "ch24"
+ },
+ "Leaderboard": {
+  "d": "A public ranking of AI models by their scores on one or more benchmarks or by human-preference votes.",
+  "see": "ch24"
+ },
+ "Elo rating": {
+  "d": "A rating system from chess, used by some AI leaderboards: models gain more points for beating strong opponents than weak ones in head-to-head comparisons.",
+  "see": "ch24"
+ },
+ "pass@k": {
+  "d": "A scoring rule that counts a task as solved if any of k attempts succeeds. pass@1 counts only the first attempt and is closest to real use.",
+  "see": "ch24"
+ },
+ "Confidence interval": {
+  "d": "A range of values that a true score plausibly lies in, given the size of the test. Overlapping intervals mean a difference may be noise.",
+  "see": "ch24"
+ }
+}

@@ -1,0 +1,774 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What "multimodal" means, and the difference between understanding and generating images, audio and video</li>
+<li>How a language model can "see": vision encoders and image patches, in plain terms</li>
+<li>What Claude accepts today (images, PDFs, charts, screenshots), its limits and what it costs in tokens</li>
+<li>How audio, speech and video fit in, and where Claude does and doesn't handle them</li>
+<li>Where vision is reliable and where it isn't: counting, small text, positions, rotated images</li>
+<li>How to use screenshots safely and effectively in QA work, including privacy</li>
+<li>Optionally, how to build three small Python tools: screenshots to bug data, meeting audio to action items, and screen recordings to a user journey</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch14">Chapter 14</a> (tokens), <a href="#ch15">Chapter 15</a> (embeddings) and <a href="#ch20">Chapter 20</a> (context windows). <a href="#ch16">Chapter 16</a> helps for "under the hood".</div>
+
+<div class="bigidea"><p>A <a class="gl" href="#g-multimodal">multimodal</a> model works with more than one kind of input or output: text, images, audio or video. The trick is to turn each kind into tokens the same Transformer can read. Images are cut into small square patches, and each patch becomes a token-like vector. Claude can read images and PDFs, including screenshots, charts and scanned pages, but it cannot create images, and it has known weak spots such as exact counting and tiny text. For testers, screenshots are a powerful input, as long as you check the output and remove anything private first.</p></div>
+
+<h3 id="ch21-1"><span class="num">21.1</span>What "multimodal" means</h3>
+<p>A <em>modality</em> is a kind of data: text, images, audio, video. Early language models were text in, text out. Multimodal models accept or produce other kinds too. It helps to separate two directions, because they are very different skills and often different models.</p>
+<div class="tbl"><table>
+<tr><th>Direction</th><th>What it does</th><th>Examples</th></tr>
+<tr><td><b>Understanding</b> (input)</td><td>Takes an image, document, sound or video and answers questions about it in text</td><td>"What error is shown in this screenshot?" · "Summarise this scanned contract" · speech-to-text</td></tr>
+<tr><td><b>Generation</b> (output)</td><td>Creates a new image, sound or video from a description</td><td>Image generators, text-to-speech voices, video generators</td></tr>
+</table></div>
+<div class="box note"><span class="tag">Verified 9 Nov 2026 · what Claude does</span><p>Anthropic's vision documentation says Claude "is an image understanding model only. It can interpret and analyze images, but it cannot generate, produce, edit, manipulate, or create images." Claude <em>can</em> write code that draws things, such as an SVG diagram, a chart in an Artifact (<a href="#ch48">Chapter 48</a>) or a Matplotlib script, and it can create Word, Excel, PowerPoint and PDF files in the apps (<a href="#ch46">Chapter 46</a>). That is text output that a program turns into a picture, not image generation.</p></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Being able to read a map and being able to draw one are different skills. A good navigator can study a map and tell you the fastest route without being able to draw a map themselves. Claude is the navigator: excellent at reading images, not a painter. Image generators are the painters.</p></div>
+
+<h3 id="ch21-2"><span class="num">21.2</span>How a model "sees"</h3>
+<p>A Transformer (<a href="#ch16">Chapter 16</a>) reads a sequence of vectors. For text, those come from tokens. For images, the image is turned into a sequence of vectors too. The usual approach has three steps.</p>
+<div class="flow">
+<div><b>1. Cut into patches</b>The image is split into a grid of small squares</div>
+<div class="hl"><b>2. Vision encoder</b>A neural network turns each patch into a vector that captures what's in it and its context</div>
+<div><b>3. Project</b>The vectors are mapped into the same "space" as the text tokens</div>
+<div><b>4. One sequence</b>Image vectors and text tokens are read together by the language model</div>
+</div>
+<p>The <a class="gl" href="#g-vision-encoder">vision encoder</a> is usually a Vision Transformer: the same attention idea applied to patches instead of words (Dosovitskiy et al., 2020). Many encoders are pre-trained on huge collections of images paired with captions, learning to put a picture and its description close together in embedding space, the idea behind OpenAI's CLIP (2021). That's why a model can connect "red error banner" in your question with red pixels at the top of a screenshot.</p>
+<div class="box note"><span class="tag">What Anthropic publishes about Claude</span><p>Anthropic's documentation says Claude "processes images in patches instead of pixels. Each patch is a 28×28-pixel block of the image, referred to as a <a class="gl" href="#g-visual-token">visual token</a>." Anthropic does not publish the full internal design of Claude's vision system, so the flow above describes the common approach in the field, not a confirmed description of Claude.</p></div>
+<details class="deep"><summary>Under the hood: why patches, and why image size matters</summary><div class="body">
+<p>Treating each pixel as a token would be hopeless: a 1920×1080 screenshot has over two million pixels, and attention cost grows with the square of sequence length. Grouping pixels into 28×28 patches cuts that to about 2,700 visual tokens. Each patch is flattened into a list of numbers (28 × 28 × 3 colour channels), multiplied by learned weights to make a vector, and given a position so the model knows where it came from, much like positional encoding for text.</p>
+<p>The consequence for you is that <strong>the patch grid sets the level of detail</strong>. Text that's only a few pixels high falls inside one patch with lots of other detail and becomes hard to read. And if an image is larger than the model's limit, it is scaled down before patching, which shrinks small text further. Cropping to the area that matters often helps more than sending a bigger image.</p>
+</div></details>
+
+<h3 id="ch21-3"><span class="num">21.3</span>Images, PDFs and charts in Claude</h3>
+<div class="tbl"><table>
+<tr><th>Fact (Verified 9 Nov 2026)</th><th>Value, from Anthropic's vision and PDF docs</th></tr>
+<tr><td>Image formats</td><td>JPEG, PNG, GIF, WebP. For animated GIFs only the first frame is used.</td></tr>
+<tr><td>Images per request</td><td>Up to 20 per message on claude.ai; up to 600 per API request (100 on models with a 200K window)</td></tr>
+<tr><td>Size per image</td><td>10 MB on claude.ai and the Claude API (base64-encoded on the API); 5 MB on Amazon Bedrock. Maximum 8000×8000 px</td></tr>
+<tr><td>Token cost</td><td><code>⌈width / 28⌉ × ⌈height / 28⌉</code> visual tokens, after any downscaling</td></tr>
+<tr><td>Resolution limit</td><td>Claude 4.7 and later: long edge up to 2,576 px and 4,784 visual tokens. Older models: 1,568 px and 1,568 tokens. Larger images are scaled down automatically</td></tr>
+<tr><td>Metadata</td><td>Claude doesn't receive image metadata (such as EXIF data)</td></tr>
+<tr><td>PDFs</td><td>Each page is converted to an image <em>and</em> its text is extracted; both are given to Claude. Up to 600 pages per request (100 below a 1M window). Roughly 1,500–3,000 text tokens per page plus the image cost. No password-protected PDFs</td></tr>
+<tr><td>Other files</td><td>On the API, .xlsx and .docx aren't accepted directly in document blocks: convert them to text or PDF. The apps handle spreadsheets with code execution (<a href="#ch46">Chapter 46</a>)</td></tr>
+</table></div>
+<p>Because PDF pages are read both as text and as images, Claude can answer questions about charts, tables and diagrams in a PDF, not just its words. Anthropic notes that PDF reading is subject to the same limitations as other vision tasks.</p>
+<div class="box example"><span class="tag">Real-world example: charts</span><p>A test manager uploads a screenshot of last sprint's defect-trend chart from Jira and asks: "Which component had the biggest rise in open defects, and roughly by how much?" Claude reads the legend, the lines and the axis labels and gives an answer like "Payments rose most, from about 12 to about 30." The word "about" matters: reading values off a chart is estimation. If the exact numbers matter, export the data as CSV and give Claude that instead.</p></div>
+
+<h3 id="ch21-4"><span class="num">21.4</span>Screenshots for QA</h3>
+<p>Screenshots are where vision pays off most for testers. A picture captures layout, state and error text in one go.</p>
+<div class="tbl"><table>
+<tr><th>Task</th><th>What to ask</th><th>What to watch</th></tr>
+<tr><td>Bug report draft</td><td>"Write a bug report from this screenshot: summary, observed, likely cause, questions."</td><td>Check quoted error text against the real screen</td></tr>
+<tr><td>Before/after comparison</td><td>Send both images: "List every visible difference between image 1 and image 2."</td><td>Claude may miss 1-pixel shifts. Use a pixel-diff tool for <a class="gl" href="#g-visual-regression">visual regression</a> and Claude to explain diffs</td></tr>
+<tr><td>Accessibility first pass</td><td>"Point out likely accessibility problems: contrast, missing labels, tiny tap targets."</td><td>A hint list, not an audit. Confirm with axe-core and real assistive tech (<a href="#ch122">Chapter 122</a>)</td></tr>
+<tr><td>Test ideas from a design</td><td>"Here is the new checkout mock-up. Suggest test cases, including edge cases."</td><td>Good for coverage ideas; check against the actual requirements</td></tr>
+<tr><td>Reading an error dialog</td><td>Paste the dialog: "What does this error mean and what should I check?"</td><td>For long stack traces, copy the text instead: text is cheaper and exact</td></tr>
+</table></div>
+<p>In Claude Code you can paste a screenshot from the clipboard with <code>Ctrl+V</code> (also <code>Cmd+V</code> in iTerm2, <code>Alt+V</code> on Windows/WSL). It appears as an <code>[Image #1]</code> chip in your prompt (verified 9 Nov 2026). Claude Code can also read image files in your project when you give it the path, which is handy for screenshots that Playwright saves on failure (<a href="#ch102">Chapter 102</a>).</p>
+<div class="box example"><span class="tag">Real-world example: Playwright failure screenshots</span><p>A nightly Playwright run fails 6 tests and saves a screenshot for each in <code>test-results/</code>. A tester asks Claude Code: "For each failing test, read its error message and its screenshot in test-results, then group the failures by likely cause." Claude finds that four screenshots show the same cookie banner covering the button the tests try to click: one root cause, not four bugs.</p></div>
+
+<h3 id="ch21-5"><span class="num">21.5</span>Limits: where vision goes wrong</h3>
+<p>Anthropic's documentation lists these limitations. Treat them as test conditions.</p>
+<div class="tbl"><table>
+<tr><th>Limitation (Anthropic's wording, summarised)</th><th>What it means in practice</th></tr>
+<tr><td><b>Counting</b>: approximate, especially "with large numbers of small objects"</td><td>"How many rows are in this table screenshot?" may be off by a few. Ask for the data as text, or have code count</td></tr>
+<tr><td><b>Accuracy</b>: may hallucinate or make mistakes with "low-quality, rotated, or very small images under 200 pixels"</td><td>Blurry phone photos of a monitor, sideways scans and thumbnails give unreliable answers</td></tr>
+<tr><td><b>Spatial reasoning</b>: coordinates and positions are approximate</td><td>"Is the button exactly aligned with the field?" Use a pixel-level tool</td></tr>
+<tr><td><b>Small text</b>: important text should be legible and not too small; downscaling can make it less legible</td><td>Crop to the region; don't send a 4K full-screen capture to read a tooltip</td></tr>
+<tr><td><b>People</b>: Claude won't identify people in images</td><td>It can describe what's shown, not who someone is</td></tr>
+<tr><td><b>AI-generated images</b>: can't tell reliably whether an image is AI-made</td><td>Don't use it as a fake-detector</td></tr>
+<tr><td><b>Medical scans</b>: not designed for complex diagnostic scans such as CTs or MRIs</td><td>Not a substitute for professional diagnosis</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Vision can hallucinate too</span><p>When text in an image is unclear, a model may "read" something plausible that isn't there, such as an error code with one digit wrong. This is the same <a class="gl" href="#g-hallucination">hallucination</a> problem as in text (<a href="#ch22">Chapter 22</a>). Two defences: ask Claude to say when it can't read something, and copy exact error text yourself when it matters.</p></div>
+
+<h3 id="ch21-6"><span class="num">21.6</span>Audio, speech and video</h3>
+<h4>Audio and speech</h4>
+<p>Speech handling usually has three parts: <a class="gl" href="#g-speech-to-text">speech-to-text</a> (turning spoken words into text), a language model working on that text, and text-to-speech (reading the reply aloud). Some newer systems process audio more directly, but the pipeline idea is the easiest way to understand them. OpenAI's Whisper (2022) is a well-known open speech-to-text model, trained on 680,000 hours of audio according to its paper.</p>
+<div class="box note"><span class="tag">Verified 9 Nov 2026 · Claude and voice</span><p>The Claude apps have a voice mode, in beta, on all plans. Claude Code has voice dictation that you turn on with <code>/voice</code> (it needs a claude.ai account), then hold or tap the space bar to speak. The Messages API documentation we checked for this chapter describes text, image and PDF input; we found no audio input there. If you need Claude to work with a recording, such as a support call, transcribe it first and send the text.</p></div>
+<h4>Video</h4>
+<p>Video is a sequence of images plus, often, sound. Models that "watch" video typically sample frames, for example one or two per second, and treat each as an image, which gets expensive fast. Claude does not accept video files. To ask Claude about a screen recording of a bug, extract a few key frames (for example with the free tool <code>ffmpeg</code>) and send them as images in order, with a sentence describing what happens between them.</p>
+<h4>Generation elsewhere in the industry</h4>
+<p>Other companies offer generation models, for example Google's Imagen and Nano Banana for images and Veo for video, and xAI's Grok Imagine for images and video (<a href="#ch28">Chapter 28</a>, <a href="#ch30">Chapter 30</a>). Most modern image generators are based on <a class="gl" href="#g-diffusion-model">diffusion models</a>, which start from random noise and remove it step by step, guided by your text, until a picture appears. For testers, generated images can be useful test data (for example, sample product photos for an upload test), but check your organisation's policy first.</p>
+<details class="deep"><summary>Under the hood: diffusion in one paragraph</summary><div class="body">
+<p>During training, a diffusion model sees real images with increasing amounts of random noise added, and learns to predict the noise so it can remove it. To generate, you start with pure noise and repeatedly ask the model "what noise should I remove to move towards an image matching this caption?". After many small steps, an image emerges. The caption guides each step through a text encoder, often trained the CLIP way. The 2020 paper by Ho, Jain and Abbeel ("Denoising Diffusion Probabilistic Models") made the approach practical. This is a completely different process from how Claude reads images, which is why understanding and generating are separate skills.</p>
+</div></details>
+
+<h3 id="ch21-7"><span class="num">21.7</span>Cost and privacy of screenshots</h3>
+<h4>Cost</h4>
+<p>Images are tokens, so they cost money and context space. Using Anthropic's formula, a full-HD 1920×1080 screenshot is about 2,691 visual tokens on Claude 4.7 and later. Anthropic's own worked example: on Opus 5.5 at $4 per million input tokens, a 4K screenshot costs about $19 per thousand images. In a long Claude Code session, twenty screenshots can add 50,000 tokens to the window (<a href="#ch20">Chapter 20</a>). Crop, and send only what's needed.</p>
+<h4>Privacy</h4>
+<p>Screenshots capture more than you notice: customer names in a table, email addresses, account numbers, internal URLs, tokens in a browser's address bar, other open tabs, a chat notification in the corner.</p>
+<div class="flow">
+<div><b>Capture</b>Only the window or region you need</div>
+<div class="hl"><b>Inspect</b>Look at every corner before sending</div>
+<div><b>Redact</b>Blur or block personal data and secrets, or use test data</div>
+<div><b>Check policy</b>Is this tool approved for this data?</div>
+<div><b>Send</b>Ask a precise question</div>
+</div>
+<div class="box warn"><span class="tag">Data handling</span><p>Anthropic's vision FAQ says Anthropic "does not use uploaded images to train models" and points to its privacy policy and API data-retention pages for details. How long data is kept, and settings for consumer accounts, depend on your plan and your organisation's agreement: see <a href="#ch42">Chapter 42</a> and <a href="#ch50">Chapter 50</a>. Whatever the policy, the safest screenshot is one taken in a test environment with synthetic data (<a href="#ch13">Chapter 13</a>).</p></div>
+<div class="box opinion"><span class="tag">Opinion · common practice in QA teams</span><p>Many QA leads set a simple rule: "no production screenshots in AI tools, ever; staging with test data only." It is stricter than some vendor policies require, but easy to follow and audit. Teams that need production evidence typically redact first and record what was shared. Decide your team's rule before someone pastes a customer record.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Screenshot to bug report, and what it costs</b><span>25 min · Python 3, Claude Code or claude.ai (API optional)</span></div><ol>
+<li>Take a screenshot of an error in a test or demo application, cropped to the relevant region. No customer data. (No app to hand? Use any public website's 404 page.) Save it as <code>bug.png</code>.<span class="expect">a PNG file of a few hundred KB or less.</span></li>
+<li>Save the first script below as <code>image_tokens.py</code> and run <code>python3 image_tokens.py</code>, then <code>python3 image_tokens.py WIDTH HEIGHT</code> with your screenshot's size.<span class="expect">the table shown below the script, then a single row for your image. The first table matches Anthropic's published examples.</span></li>
+<li>In Claude Code, paste the screenshot with <code>Ctrl+V</code> (or give the path: "Read bug.png"), or upload it in claude.ai. Ask: "Write a bug report draft: Summary, What is visible, Likely problem, Questions to confirm. Quote any error text exactly. If text is unclear, say so."<span class="expect">a structured draft quoting the error text.</span></li>
+<li>Compare every quoted string with the real screen, character by character.<span class="expect">usually exact for clear text; any mismatch is a vision hallucination worth noting.</span></li>
+<li>Stress test: shrink the image to about 150 px wide (any image editor) and ask the same question.<span class="expect">vaguer answers, guesses or a note that text is unreadable: Anthropic's "very small images" limitation in action.</span></li>
+<li>Optional, API: save the second script as <code>describe_screenshot.py</code>, set <code>ANTHROPIC_API_KEY</code> in your terminal, and run <code>python3 describe_screenshot.py bug.png</code>.<span class="expect">a bug-report draft followed by a line like <code>[input tokens: 1,8xx, output tokens: 4xx]</code>; input tokens are roughly your visual-token estimate plus the prompt.</span></li>
+</ol></div>
+<div class="code"><span class="cap">image_tokens.py (Python 3, standard library only)</span><pre>"""Estimate how many visual tokens Claude will use for a screenshot.
+
+Rule from Anthropic's vision docs: an image costs
+ceil(width / 28) * ceil(height / 28) visual tokens, and images over the
+model's long-edge or token limit are scaled down (keeping the aspect ratio)
+before processing. This script searches for that scaled size, so treat the
+result as an estimate and check real usage in the API response.
+"""
+import math
+import sys
+
+TIERS = {
+    "high": (2576, 4784),      # Claude 4.7 and later models
+    "standard": (1568, 1568),  # all other models
+}
+
+
+def tokens(w, h):
+    return math.ceil(w / 28) * math.ceil(h / 28)
+
+
+def fit(w, h, tier):
+    max_edge, max_tokens = TIERS[tier]
+    if max(w, h) &lt;= max_edge and tokens(w, h) &lt;= max_tokens:
+        return w, h
+    best = (1, 1)
+    lo, hi = 1, min(w, max_edge if w &gt;= h else w)
+    while lo &lt;= hi:
+        nw = (lo + hi) // 2
+        nh = max(1, round(h * nw / w))
+        if max(nw, nh) &lt;= max_edge and tokens(nw, nh) &lt;= max_tokens:
+            best = (nw, nh)
+            lo = nw + 1
+        else:
+            hi = nw - 1
+    return best
+
+
+def main():
+    sizes = [(200, 200), (1000, 1000), (1920, 1080), (2000, 1500), (3840, 2160)]
+    if len(sys.argv) == 3:
+        sizes = [(int(sys.argv[1]), int(sys.argv[2]))]
+    price_opus = 4.00  # USD per million input tokens, Opus 5.5 (verified 9 Nov 2026)
+    print(f"{'image':&gt;11} | {'high-res tier':&gt;22} | {'standard tier':&gt;22}")
+    for w, h in sizes:
+        row = []
+        for tier in ("high", "standard"):
+            nw, nh = fit(w, h, tier)
+            row.append(f"{nw}x{nh} = {tokens(nw, nh):,} tok")
+        print(f"{w:&gt;5}x{h:&lt;5} | {row[0]:&gt;22} | {row[1]:&gt;22}")
+    w, h = sizes[-1]
+    t = tokens(*fit(w, h, "high"))
+    print(f"\n1,000 screenshots of {w}x{h} on Opus 5.5 cost about "
+          f"${t * 1000 * price_opus / 1_000_000:.2f} in input tokens.")
+
+
+if __name__ == "__main__":
+    main()</pre></div>
+<div class="code"><span class="cap">Expected output of python3 image_tokens.py</span><pre>      image |          high-res tier |          standard tier
+  200x200   |       200x200 = 64 tok |       200x200 = 64 tok
+ 1000x1000  |  1000x1000 = 1,296 tok |  1000x1000 = 1,296 tok
+ 1920x1080  |  1920x1080 = 2,691 tok |   1456x819 = 1,560 tok
+ 2000x1500  |  2000x1500 = 3,888 tok |   1270x952 = 1,564 tok
+ 3840x2160  |  2576x1449 = 4,784 tok |   1456x819 = 1,560 tok
+
+1,000 screenshots of 3840x2160 on Opus 5.5 cost about $19.14 in input tokens.</pre></div>
+<p>These match Anthropic's published table, except that Anthropic's exact resize rule gives 1269 px rather than 1270 px for the 2000×1500 standard-tier case: the script is an estimate.</p>
+<div class="code"><span class="cap">describe_screenshot.py (optional; Python 3, standard library only)</span><pre>"""Send a screenshot to Claude and get a structured bug-report draft."""
+import base64
+import json
+import os
+import sys
+import urllib.error
+import urllib.request
+
+TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+         ".gif": "image/gif", ".webp": "image/webp"}
+PROMPT = (
+    "You are helping a software tester. Look at this screenshot and write a "
+    "bug-report draft with these headings: Summary, What is visible, "
+    "Likely problem, Questions to confirm. Quote any error text exactly. "
+    "If text is too small or unclear to read, say so instead of guessing."
+)
+
+
+def main():
+    if len(sys.argv) != 2:
+        sys.exit("Usage: python3 describe_screenshot.py path/to/screenshot.png")
+    path = sys.argv[1]
+    ext = os.path.splitext(path)[1].lower()
+    if ext not in TYPES:
+        sys.exit(f"Unsupported file type {ext}. Use PNG, JPEG, GIF or WebP.")
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    if not key:
+        sys.exit("Set ANTHROPIC_API_KEY first (see Chapter 98).")
+    with open(path, "rb") as f:
+        data = base64.standard_b64encode(f.read()).decode("ascii")
+    body = {
+        "model": "claude-sonnet-5-5",
+        "max_tokens": 4000,
+        "output_config": {"effort": "low"},
+        "messages": [{
+            "role": "user",
+            "content": [
+                {"type": "image",
+                 "source": {"type": "base64", "media_type": TYPES[ext], "data": data}},
+                {"type": "text", "text": PROMPT},
+            ],
+        }],
+    }
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=json.dumps(body).encode("utf-8"),
+        headers={"x-api-key": key, "anthropic-version": "2026-10-21",
+                 "content-type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=300) as resp:
+            reply = json.load(resp)
+    except urllib.error.HTTPError as err:
+        sys.exit(f"HTTP {err.code}: {err.read().decode('utf-8')}")
+    for block in reply.get("content", []):
+        if block.get("type") == "text":
+            print(block["text"])
+    print(f"\n[input tokens: {reply['usage']['input_tokens']}, "
+          f"output tokens: {reply['usage']['output_tokens']}]")
+
+
+if __name__ == "__main__":
+    main()</pre></div>
+<div class="box note"><span class="tag">Troubleshooting</span><p><b>Ctrl+V pastes nothing in Claude Code</b>: copy the image again (not the file) or give the file path instead. <b>"Unsupported file type"</b>: convert to PNG or JPEG. <b>HTTP 400 about image size</b>: the file is over 10 MB or 8000 px; resize it. <b>HTTP 401</b>: check the API key. <b>The draft invents error text</b>: crop tighter, make the text bigger, and keep the "say so instead of guessing" instruction. <b>No API access</b>: steps 1–5 need only Claude Code or claude.ai.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Claude can make images if I ask nicely."</dt><dd>Claude understands images but doesn't generate them. It can write code (SVG, charts, diagrams) that draws them.</dd>
+<dt>"A bigger, sharper screenshot is always better."</dt><dd>Images over the limit are scaled down, and big images cost more tokens. Crop to what matters.</dd>
+<dt>"If Claude read the number from the chart, it's exact."</dt><dd>Chart reading is estimation, and counting is approximate. Use the underlying data for exact values.</dd>
+<dt>"Claude can watch my screen recording."</dt><dd>Not as video. Extract key frames and send them as images, or describe the steps.</dd>
+<dt>"Vision answers can't be hallucinated; it's looking right at it."</dt><dd>Unclear text, small images and rotated scans can produce confident misreadings. Verify quoted text.</dd>
+<dt>"It's only a screenshot, so privacy doesn't apply."</dt><dd>Screenshots often contain personal data and secrets. Redact, or use test data.</dd>
+</dl></div>
+
+<h3 id="ch21-8"><span class="num">21.8</span>Optional lab: build with images, audio and video</h3>
+<p>This section is <strong>optional</strong>. It is for readers who want to <em>build</em> small multimodal tools, not just use them in a chat window. You will write three short Python programs that each finish in under an hour: one turns screenshots into bug data, one turns a meeting recording into action items, and one reads a screen recording as a series of frames. Skip it if you don't write code; nothing later in the book depends on it.</p>
+<div class="box note"><span class="tag">Optional · what you need</span><p>Python 3.9 or later. A Claude API key in the <code>ANTHROPIC_API_KEY</code> environment variable for the live runs (<a href="#ch86">Chapter 86</a> shows how to get one). <strong>No key? Every script has a <code>--dry-run</code> mode</strong>: it does all the local work (reading files, encoding images, transcribing audio, building the request) and then uses a fake reply written into the script instead of calling Claude. Fake replies are clearly labelled in the output.</p></div>
+<div class="tbl"><table>
+<tr><th>Exercise</th><th>Input</th><th>Runs on your computer</th><th>Claude's job</th><th>Output</th></tr>
+<tr><td>1. Screenshot to bug data</td><td>PNG or JPEG screenshots</td><td>Encode each image</td><td>Read the screen; fill in page, element, problem, severity guess</td><td><code>bugs.json</code></td></tr>
+<tr><td>2. Meeting to action items</td><td>An audio recording</td><td><a class="gl" href="#g-speech-to-text">Speech-to-text</a> with faster-whisper</td><td>Structure the transcript text</td><td><code>action_items.json</code></td></tr>
+<tr><td>3. Recording to user journey</td><td>A screen recording (MP4)</td><td>Extract frames with ffmpeg</td><td>Describe the journey; flag possible <a class="gl" href="#g-visual-regression">visual regressions</a></td><td><code>journey.json</code></td></tr>
+</table></div>
+<div class="box warn"><span class="tag">What was tested for this book, and what wasn't</span><p>On 9 November 2026 every script below was run offline with <code>--dry-run</code> on macOS with Python 3.11, and the expected outputs shown are copied from those runs. The local parts were run for real: faster-whisper 1.2.1 transcribed a generated test recording, and the ffmpeg command (ffmpeg 9.0) extracted frames from a generated test video. <strong>The live Claude API calls were not run</strong>, because no API key was available. A request sent with a deliberately invalid key reached the API and got the expected HTTP 401, which confirms the address and headers but not Claude's replies. The request format follows Anthropic's vision documentation and the API version used in <a href="#ch86">Chapter 86</a> (<code>2026-10-21</code>, no <code>temperature</code>). Treat the "live run" descriptions as what to expect, not recorded output.</p></div>
+
+<h4>Setup: one shared helper</h4>
+<p>Make a new folder, for example <code>mm-lab</code>, and save the file below in it as <code>claude_lab.py</code>. All three exercises import it. It uses only Python's standard library, so there is nothing to install for exercises 1 and 3. It sends each image as a <a class="gl" href="#g-base64">base64</a> image block, the format in Anthropic's vision documentation: <code>{"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": …}}</code>. Anthropic's docs say Claude works best when images come before the text that asks about them, so the scripts put the question last.</p>
+<div class="code"><span class="cap">claude_lab.py (shared helper; Python 3, standard library only)</span><pre>"""Shared helpers for the Chapter 21 lab: image blocks, one API call, JSON parsing.
+
+Standard library only. Pass dry_run=True to skip the network: the request is
+built and summarised, and a fake reply (clearly labelled) is returned instead.
+"""
+import base64
+import json
+import math
+import os
+import struct
+import sys
+import urllib.error
+import urllib.request
+
+API_URL = "https://api.anthropic.com/v1/messages"
+API_VERSION = "2026-10-21"          # no temperature: version 2026-10-21 rejects it
+MODEL = "claude-sonnet-5-5"
+TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+         ".gif": "image/gif", ".webp": "image/webp"}
+MAX_BYTES = 10 * 1024 * 1024        # API limit per image (base64-encoded)
+
+
+def png_size(path):
+    """Return (width, height) of a PNG from its header, or None for other files."""
+    with open(path, "rb") as f:
+        head = f.read(24)
+    if head[:8] != b"\x89PNG\r\n\x1a\n":
+        return None
+    return struct.unpack("&gt;II", head[16:24])
+
+
+def visual_tokens(path):
+    """Rough estimate using Anthropic's rule (before any downscaling)."""
+    size = png_size(path)
+    if not size:
+        return None
+    return math.ceil(size[0] / 28) * math.ceil(size[1] / 28)
+
+
+def image_block(path):
+    """Turn an image file into a Messages API image content block."""
+    ext = os.path.splitext(path)[1].lower()
+    if ext not in TYPES:
+        sys.exit(f"{path}: unsupported type {ext}. Use PNG, JPEG, GIF or WebP.")
+    with open(path, "rb") as f:
+        data = base64.standard_b64encode(f.read()).decode("ascii")
+    if len(data) &gt; MAX_BYTES:
+        sys.exit(f"{path}: over 10 MB once encoded. Crop or resize it.")
+    return {"type": "image",
+            "source": {"type": "base64", "media_type": TYPES[ext], "data": data}}
+
+
+def summarise(body):
+    """Print what would be sent, without the image bytes."""
+    print(f"[dry run] model={body['model']} max_tokens={body['max_tokens']}")
+    for block in body["messages"][0]["content"]:
+        if block["type"] == "image":
+            kb = len(block["source"]["data"]) / 1024
+            print(f"[dry run]   image block, {block['source']['media_type']}, "
+                  f"{kb:,.0f} KB base64")
+        else:
+            first_line = block["text"].splitlines()[0][:70]
+            print(f"[dry run]   text block: {first_line!r}")
+
+
+def ask_claude(content, max_tokens=2000, dry_run=False, fake_reply=""):
+    """Send one user message (a list of content blocks) and return Claude's text."""
+    body = {
+        "model": MODEL,
+        "max_tokens": max_tokens,
+        "output_config": {"effort": "low"},
+        "messages": [{"role": "user", "content": content}],
+    }
+    if dry_run:
+        summarise(body)
+        print("[dry run] no API call made; using a FAKE reply written into the script")
+        return fake_reply
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    if not key:
+        sys.exit("Set ANTHROPIC_API_KEY first, or add --dry-run to test offline.")
+    req = urllib.request.Request(
+        API_URL,
+        data=json.dumps(body).encode("utf-8"),
+        headers={"Authorization": f"Bearer {key}",
+                 "anthropic-version": API_VERSION,
+                 "content-type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=300) as resp:
+            reply = json.load(resp)
+    except urllib.error.HTTPError as err:
+        sys.exit(f"HTTP {err.code}: {err.read().decode('utf-8')}")
+    except urllib.error.URLError as err:
+        sys.exit(f"Network error: {err.reason}")
+    if reply.get("stop_reason") == "max_tokens":
+        print("Warning: reply was cut off (max_tokens). Raise max_tokens.",
+              file=sys.stderr)
+    usage = reply.get("usage", {})
+    print(f"[input tokens: {usage.get('input_tokens')}, "
+          f"output tokens: {usage.get('output_tokens')}]", file=sys.stderr)
+    return "".join(b["text"] for b in reply.get("content", [])
+                   if b.get("type") == "text")
+
+
+def parse_json(text):
+    """Parse JSON from a reply, tolerating a ```json fence around it."""
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1].rsplit("```", 1)[0]
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as err:
+        sys.exit(f"Reply was not valid JSON ({err}). Reply was:\n{text}")</pre></div>
+<div class="box note"><span class="tag">Why ask for JSON?</span><p>Asking for "ONLY a JSON object with these keys" gives you data a program can check, sort and send on to Jira or a spreadsheet. The scripts still check the reply, because a model can occasionally leave out a key or add a sentence. For stricter guarantees, the API also offers <a class="gl" href="#g-structured-output">structured output</a> with a JSON schema (<a href="#ch43">Chapter 43</a>); the plain prompt keeps this lab short.</p></div>
+
+<h4>Exercise 1: screenshots to structured bug details</h4>
+<div class="lab"><div class="lab-h"><b>Screenshot to bug JSON</b><span>30 min · Python 3 · API key optional</span></div><ol>
+<li>Collect two or three screenshots of problems in a test or demo app (staging, test data only, cropped to the area that matters; see 21.7). Save them in <code>mm-lab</code> as <code>shot1.png</code>, <code>shot2.png</code> and so on.<span class="expect">PNG or JPEG files under 10 MB each.</span></li>
+<li>Save <code>bug_extract.py</code> (below) next to <code>claude_lab.py</code>. Run <code>python3 bug_extract.py shot1.png --dry-run</code>.<span class="expect">the dry-run output below: a visual-token estimate, the blocks that would be sent, then a table built from the fake reply, and a new <code>bugs.json</code>.</span></li>
+<li>Live: run <code>python3 bug_extract.py shot1.png shot2.png</code> with your API key set.<span class="expect">one row per screenshot with Claude's page, element, problem and severity guess, plus a token-usage line per call. A <code>CHECK:</code> note appears if a key is missing or the severity isn't one of the four allowed values.</span></li>
+<li>Open <code>bugs.json</code> and compare every quoted error message with the real screen.<span class="expect">clear text is usually quoted exactly; anything listed under <code>unreadable</code> needs a person to read it.</span></li>
+</ol></div>
+<div class="code"><span class="cap">bug_extract.py</span><pre>"""Exercise 1: turn application screenshots into structured bug details (JSON).
+
+Usage:  python3 bug_extract.py shot1.png [shot2.png ...] [--dry-run]
+Writes bugs.json and prints a short table.
+"""
+import json
+import sys
+
+from claude_lab import ask_claude, image_block, parse_json, visual_tokens
+
+PROMPT = """You are helping a software tester triage a bug from a screenshot.
+Reply with ONLY a JSON object, no other text, with exactly these keys:
+  "page": the page or screen name as shown (or "unknown"),
+  "element": the UI element that looks wrong,
+  "problem": one sentence describing what is wrong, quoting visible error text exactly,
+  "severity_guess": one of "blocker", "major", "minor", "cosmetic",
+  "unreadable": a list of any text too small or unclear to read (empty list if none).
+If the screenshot shows no visible problem, set "problem" to "none visible"."""
+
+KEYS = ["page", "element", "problem", "severity_guess", "unreadable"]
+SEVERITIES = {"blocker", "major", "minor", "cosmetic"}
+
+FAKE = json.dumps({
+    "page": "Checkout - Payment",
+    "element": "Pay now button",
+    "problem": "Error banner says 'Payment service unavailable (code 503)'.",
+    "severity_guess": "major",
+    "unreadable": [],
+})
+
+
+def check(bug):
+    """Return a list of problems with Claude's JSON, so bad replies are visible."""
+    issues = [f"missing key {k!r}" for k in KEYS if k not in bug]
+    if bug.get("severity_guess") not in SEVERITIES:
+        issues.append(f"unexpected severity {bug.get('severity_guess')!r}")
+    return issues
+
+
+def main():
+    dry_run = "--dry-run" in sys.argv
+    paths = [a for a in sys.argv[1:] if a != "--dry-run"]
+    if not paths:
+        sys.exit("Usage: python3 bug_extract.py shot1.png [shot2.png ...] [--dry-run]")
+    results = []
+    for path in paths:
+        print(f"\n== {path} (about {visual_tokens(path) or '?'} visual tokens)")
+        content = [image_block(path), {"type": "text", "text": PROMPT}]
+        bug = parse_json(ask_claude(content, max_tokens=1500,
+                                    dry_run=dry_run, fake_reply=FAKE))
+        bug["file"] = path
+        bug["checks"] = check(bug)
+        results.append(bug)
+    with open("bugs.json", "w", encoding="utf-8") as f:
+        json.dump(results, f, indent=2)
+    print(f"\n{'file':&lt;18} {'severity':&lt;9} problem")
+    for bug in results:
+        flag = "  CHECK: " + "; ".join(bug["checks"]) if bug["checks"] else ""
+        print(f"{bug['file'][:18]:&lt;18} {str(bug.get('severity_guess')):&lt;9} "
+              f"{bug.get('problem', '')[:60]}{flag}")
+    print("\nSaved bugs.json. Severity is a guess: a person decides the real one.")
+
+
+if __name__ == "__main__":
+    main()</pre></div>
+<div class="code"><span class="cap">Expected output of python3 bug_extract.py shot1.png --dry-run (for a 1280×720 screenshot)</span><pre>== shot1.png (about 1196 visual tokens)
+[dry run] model=claude-sonnet-5-5 max_tokens=1500
+[dry run]   image block, image/png, 65 KB base64
+[dry run]   text block: 'You are helping a software tester triage a bug from a screenshot.'
+[dry run] no API call made; using a FAKE reply written into the script
+
+file               severity  problem
+shot1.png          major     Error banner says 'Payment service unavailable (code 503)'.
+
+Saved bugs.json. Severity is a guess: a person decides the real one.</pre></div>
+<p>The "major" and the payment error come from the fake reply, whatever your screenshot shows. In a live run, the severity is still only a guess: Claude can't know your users, your release date or your team's severity rules. Treat it as a sorting hint for triage, and let a person set the real severity.</p>
+<div class="box note"><span class="tag">Troubleshooting: exercise 1</span><p><b>"Set ANTHROPIC_API_KEY first"</b>: export the key in the same terminal, or add <code>--dry-run</code>. <b>"Reply was not valid JSON"</b>: the reply is printed; usually there was extra text. Run again, or raise <code>max_tokens</code> if a "cut off" warning appeared. <b>HTTP 400 about the image</b>: the file is over 10 MB or 8000 px; crop it. <b>HTTP 401</b>: the key is wrong or revoked. <b>"Network error: … CERTIFICATE_VERIFY_FAILED"</b> on macOS: Python from python.org needs its certificates installed; run "Install Certificates.command" in your Python folder in Applications. <b>The visual-token estimate shows "?"</b>: the estimate reads PNG headers only; JPEGs still work.</p></div>
+
+<h4>Exercise 2: a meeting recording to action items</h4>
+<p>Claude's API accepts text, images and PDFs, but <strong>not audio</strong>: there is no audio content block in the Messages API reference (checked 9 November 2026, consistent with 21.6). So this exercise is a two-stage pipeline. First, a free speech-to-text model turns the recording into text <em>on your own computer</em>. Then Claude turns the text into decisions and action items.</p>
+<p>For stage one we use <strong>faster-whisper</strong>, an open-source (MIT licence) re-implementation of OpenAI's Whisper model that runs well on an ordinary laptop CPU. Its README says it needs Python 3.9 or later and does not need FFmpeg installed, because it decodes audio with a bundled library. OpenAI's original <code>openai-whisper</code> package is the alternative (<code>pip install -U openai-whisper</code>), but it needs ffmpeg installed separately.</p>
+<div class="box warn"><span class="tag">Consent and privacy</span><p>Only record meetings when everyone present has agreed, and follow your company's rules on recording. A transcript holds names, opinions and sometimes customer details. The transcription step stays on your machine; the Claude step sends the text to Anthropic, so the same policy questions as screenshots apply (21.7). For practice, use a recording made for the purpose.</p></div>
+<div class="lab"><div class="lab-h"><b>Meeting audio to action items</b><span>40 min · Python 3.9+ · about 150 MB download once · API key optional</span></div><ol>
+<li>In <code>mm-lab</code>, create a virtual environment and install faster-whisper: <code>python3 -m venv .venv</code>, then <code>source .venv/bin/activate</code> (Windows: <code>.venv\Scripts\activate</code>), then <code>pip install faster-whisper</code>.<span class="expect">pip finishes with "Successfully installed … faster-whisper-1.2.1" (or a later version).</span></li>
+<li>Get a short recording (30 seconds to 5 minutes) of a pretend stand-up: record yourself on your phone, or on a Mac generate one with the built-in <code>say</code> command: <code>say -o meeting.aiff "Okay, quick release meeting. We agreed to move release four point two to Thursday. Priya, can you re-run the payment regression suite by Wednesday? Yes, I will do that. Tom will update the release notes. Who signs off the release? We still need to decide."</code><span class="expect">an audio file such as <code>meeting.m4a</code>, <code>.mp3</code>, <code>.wav</code> or <code>.aiff</code>.</span></li>
+<li>Save <code>transcribe.py</code> and run <code>python3 transcribe.py meeting.aiff</code> (use your file name).<span class="expect">the first run downloads the "base" model (about 150 MB) from Hugging Face; then timestamped lines like the output below, and a <code>transcript.txt</code>.</span></li>
+<li>Save <code>action_items.py</code> and run <code>python3 action_items.py transcript.txt --dry-run</code>.<span class="expect">the dry-run output below, built from the fake reply.</span></li>
+<li>Live: run <code>python3 action_items.py transcript.txt</code> with your key set.<span class="expect">Claude's decisions, action items with owners and due dates, and open questions. Any action item whose quote isn't found word for word in the transcript is marked "quote NOT found: check".</span></li>
+</ol></div>
+<div class="code"><span class="cap">transcribe.py (needs: pip install faster-whisper)</span><pre>"""Exercise 2, step A: transcribe a meeting recording locally with faster-whisper.
+
+Setup:  pip install faster-whisper   (Python 3.9+; no separate ffmpeg needed)
+Usage:  python3 transcribe.py meeting.m4a [model]     model defaults to "base"
+Writes transcript.txt. The audio never leaves your computer; the first run
+downloads the model files once from Hugging Face.
+"""
+import sys
+
+from faster_whisper import WhisperModel
+
+
+def main():
+    if len(sys.argv) not in (2, 3):
+        sys.exit("Usage: python3 transcribe.py meeting.m4a [tiny|base|small|medium]")
+    audio = sys.argv[1]
+    size = sys.argv[2] if len(sys.argv) == 3 else "base"
+    model = WhisperModel(size, device="cpu", compute_type="int8")
+    segments, info = model.transcribe(audio, beam_size=5)
+    print(f"Detected language {info.language} "
+          f"(probability {info.language_probability:.2f})")
+    lines = []
+    for seg in segments:            # transcription happens as you loop
+        line = f"[{seg.start:6.1f}s] {seg.text.strip()}"
+        print(line)
+        lines.append(line)
+    with open("transcript.txt", "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    print(f"\nSaved transcript.txt ({len(lines)} segments).")
+
+
+if __name__ == "__main__":
+    main()</pre></div>
+<div class="code"><span class="cap">Expected output of python3 transcribe.py meeting.aiff (the "say" recording above; real run)</span><pre>Detected language en (probability 0.99)
+[   0.0s] Okay, quick release meeting.
+[   1.9s] We agreed to move release 4.2 to Thursday.
+[   4.6s] Priya, can you rerun the payment regression suite
+[   7.0s] by Wednesday?
+[   8.0s] Yes, I will do that.
+[   9.5s] Tom will update the release notes.
+[  11.4s] Who signs off the release?
+[  13.0s] We still need to decide.
+
+Saved transcript.txt (8 segments).</pre></div>
+<p>Notice the small differences from the script that was spoken: "four point two" became "4.2" and "re-run" became "rerun". That is normal for speech-to-text, and it's why the next script asks Claude to list garbled places and to copy quotes exactly, then checks each quote against the transcript.</p>
+<div class="code"><span class="cap">action_items.py</span><pre>"""Exercise 2, step B: have Claude turn a meeting transcript into action items.
+
+Usage:  python3 action_items.py transcript.txt [--dry-run]
+Claude's API takes text, images and PDFs, not audio, so we send the transcript.
+"""
+import json
+import sys
+
+from claude_lab import ask_claude, parse_json
+
+PROMPT = """Below is an automatic transcript of a software team meeting. It may
+contain recognition errors. Reply with ONLY a JSON object with these keys:
+  "decisions": list of decisions made,
+  "action_items": list of objects with "owner", "task", "due" ("unknown" if not said)
+                  and "quote" (words copied exactly from the transcript, no timestamp),
+  "open_questions": list of questions nobody answered,
+  "unclear": list of places where the transcript seems garbled.
+Only include action items someone actually agreed to. Do not invent owners or dates.
+
+&lt;transcript&gt;
+{transcript}
+&lt;/transcript&gt;"""
+
+FAKE = json.dumps({
+    "decisions": ["Release 4.2 moves to Thursday."],
+    "action_items": [{"owner": "Priya", "task": "Re-run the payment regression suite",
+                      "due": "Wednesday",
+                      "quote": "Priya, can you rerun the payment regression suite"}],
+    "open_questions": ["Who signs off the release?"],
+    "unclear": [],
+})
+
+
+def main():
+    dry_run = "--dry-run" in sys.argv
+    args = [a for a in sys.argv[1:] if a != "--dry-run"]
+    if len(args) != 1:
+        sys.exit("Usage: python3 action_items.py transcript.txt [--dry-run]")
+    with open(args[0], encoding="utf-8") as f:
+        transcript = f.read()
+    print(f"Transcript: {len(transcript.split())} words")
+    content = [{"type": "text", "text": PROMPT.format(transcript=transcript)}]
+    notes = parse_json(ask_claude(content, max_tokens=3000,
+                                  dry_run=dry_run, fake_reply=FAKE))
+    print("\nDecisions:")
+    for d in notes.get("decisions", []):
+        print(f"  - {d}")
+    print("Action items:")
+    for item in notes.get("action_items", []):
+        found = "" if item.get("quote", "") in transcript else "  (quote NOT found: check)"
+        print(f"  - {item.get('owner')}: {item.get('task')} (due {item.get('due')}){found}")
+    print("Open questions:")
+    for q in notes.get("open_questions", []):
+        print(f"  - {q}")
+    with open("action_items.json", "w", encoding="utf-8") as f:
+        json.dump(notes, f, indent=2)
+    print("\nSaved action_items.json")
+
+
+if __name__ == "__main__":
+    main()</pre></div>
+<div class="code"><span class="cap">Expected output of python3 action_items.py transcript.txt --dry-run</span><pre>Transcript: 59 words
+[dry run] model=claude-sonnet-5-5 max_tokens=3000
+[dry run]   text block: 'Below is an automatic transcript of a software team meeting. It may'
+[dry run] no API call made; using a FAKE reply written into the script
+
+Decisions:
+  - Release 4.2 moves to Thursday.
+Action items:
+  - Priya: Re-run the payment regression suite (due Wednesday)
+Open questions:
+  - Who signs off the release?
+
+Saved action_items.json</pre></div>
+<p>With your own recording, the dry run shows the same fake items and the quote check will say "quote NOT found: check", because the fake quote isn't in your transcript. That is the check working.</p>
+<div class="box note"><span class="tag">Troubleshooting: exercise 2</span><p><b>"No module named faster_whisper"</b>: activate the virtual environment first, then install. <b>The model download fails</b>: the first run needs internet access to Hugging Face; behind a company proxy, ask IT or download on another network once (the model is then cached). A warning about "unauthenticated requests to the HF Hub" is harmless. <b>Poor transcription</b>: try a bigger model, <code>python3 transcribe.py meeting.m4a small</code> (slower, more accurate), and record closer to the microphone. <b>Wrong language detected</b>: short or noisy clips confuse detection; record a longer, clearer sample. <b>Very long meetings</b>: transcripts of an hour are fine for Claude's context window, but check the token count in the output and split the meeting if you hit <code>max_tokens</code>.</p></div>
+
+<h4>Exercise 3: a screen recording to a user journey</h4>
+<p>Claude doesn't accept video (21.6), so you turn the recording into still frames first. <a class="gl" href="#g-frame-sampling">Frame sampling</a> means keeping one frame every so often instead of all 30 or 60 per second. The free command-line tool <strong>ffmpeg</strong> does it with its <code>fps</code> filter. Install it with <code>brew install ffmpeg</code> (macOS), <code>sudo apt update &amp;&amp; sudo apt install ffmpeg</code> (Ubuntu/Debian) or <code>choco install ffmpeg</code> / <code>scoop install ffmpeg</code> (Windows), the commands listed in the Whisper README.</p>
+<div class="code"><span class="cap">Terminal: one frame every 2 seconds, 1280 px wide</span><pre>mkdir -p frames
+ffmpeg -i recording.mp4 -vf "fps=1/2,scale=1280:-2" frames/frame_%03d.png
+<span class="c"># fps=1/2       keep one frame every 2 seconds (use fps=1 for every second)</span>
+<span class="c"># scale=1280:-2 resize to 1280 px wide; -2 keeps the aspect ratio with an even height</span>
+<span class="c"># frame_%03d    names the files frame_001.png, frame_002.png, ...</span></pre></div>
+<p>The width matters for cost: a 1280×720 frame is about 1,196 visual tokens, against 2,691 for full HD (21.7), and text in most web apps is still readable at that size. A 12-second recording at <code>fps=1/2</code> gives 6 frames.</p>
+<div class="lab"><div class="lab-h"><b>Screen recording to journey and regressions</b><span>40 min · Python 3 · ffmpeg · API key optional</span></div><ol>
+<li>Record 20–60 seconds of a short journey in a test app: log in, open a page, add an item, open the basket. Use your operating system's screen recorder or Playwright's video option (<a href="#ch102">Chapter 102</a>). Save it as <code>recording.mp4</code>. A <code>.mov</code> or <code>.webm</code> file works too: put its name in the ffmpeg command.<span class="expect">a video file of a few MB.</span></li>
+<li>Run the ffmpeg command above.<span class="expect">a <code>frames</code> folder with roughly one PNG per 2 seconds of video.</span></li>
+<li>Look through the frames yourself and delete any that show private data.<span class="expect">only frames you are happy to share.</span></li>
+<li>Save <code>journey.py</code> and run <code>python3 journey.py frames --dry-run</code>.<span class="expect">the frame list, a total visual-token estimate and the fake journey shown below.</span></li>
+<li>Live: run <code>python3 journey.py frames</code>. Then, to look for a regression, add a screenshot of one screen from the last good release: <code>python3 journey.py frames --baseline good_basket.png</code>.<span class="expect">a numbered journey ("1. Opens the login page …") and a list of possible visual issues, each with a frame number and a confidence. With a baseline, differences between it and the matching frame appear as issues.</span></li>
+</ol></div>
+<div class="code"><span class="cap">journey.py</span><pre>"""Exercise 3: describe a user journey from ordered frames and flag visual regressions.
+
+Usage:  python3 journey.py frames/ [--baseline good.png] [--max 8] [--dry-run]
+Frames are sent in filename order (frame_001.png, frame_002.png, ...).
+"""
+import argparse
+import glob
+import json
+import os
+import sys
+
+from claude_lab import TYPES, ask_claude, image_block, parse_json, visual_tokens
+
+PROMPT = """The images labelled Frame 1..{n} are screenshots taken in order from
+a screen recording of one user journey in a web app.{baseline_note}
+Reply with ONLY a JSON object with these keys:
+  "journey": list of objects with "frame" (number) and "step" (what the user is doing),
+  "visual_issues": list of objects with "frame", "element", "issue" and
+                   "confidence" ("high", "medium" or "low"): overlapping or cut-off
+                   text, misaligned or missing elements, broken images, wrong colours,
+                   layout that changes unexpectedly between frames,
+  "summary": one sentence.
+Report only what you can see. If unsure, use confidence "low"."""
+
+BASELINE_NOTE = """
+The image labelled Baseline is the same screen from the last good release.
+Compare the matching frame with it and report differences as visual issues."""
+
+FAKE = json.dumps({
+    "journey": [{"frame": 1, "step": "Opens the login page"},
+                {"frame": 2, "step": "Signs in and lands on the dashboard"},
+                {"frame": 3, "step": "Opens the basket"}],
+    "visual_issues": [{"frame": 3, "element": "Checkout button",
+                       "issue": "Button overlaps the order total text",
+                       "confidence": "medium"}],
+    "summary": "Login to basket works, but the basket layout looks broken.",
+})
+
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument("frames_dir")
+    p.add_argument("--baseline", help="screenshot of the same screen from a good release")
+    p.add_argument("--max", type=int, default=8, help="most frames to send (cost control)")
+    p.add_argument("--dry-run", action="store_true")
+    a = p.parse_args()
+    frames = sorted(f for f in glob.glob(os.path.join(a.frames_dir, "*"))
+                    if os.path.splitext(f)[1].lower() in TYPES)
+    if not frames:
+        sys.exit(f"No PNG/JPEG/GIF/WebP images in {a.frames_dir}")
+    if len(frames) &gt; a.max:            # keep an even spread across the recording
+        step = len(frames) / a.max
+        frames = [frames[int(i * step)] for i in range(a.max)]
+    content, total = [], 0
+    if a.baseline:
+        content += [{"type": "text", "text": "Baseline:"}, image_block(a.baseline)]
+        total += visual_tokens(a.baseline) or 0
+    for i, path in enumerate(frames, 1):
+        content += [{"type": "text", "text": f"Frame {i}:"}, image_block(path)]
+        total += visual_tokens(path) or 0
+        print(f"Frame {i}: {path}")
+    print(f"About {total:,} visual tokens for {len(frames)} frames")
+    note = BASELINE_NOTE if a.baseline else ""
+    content.append({"type": "text",
+                    "text": PROMPT.format(n=len(frames), baseline_note=note)})
+    result = parse_json(ask_claude(content, max_tokens=3000,
+                                   dry_run=a.dry_run, fake_reply=FAKE))
+    print("\nJourney:")
+    for s in result.get("journey", []):
+        print(f"  {s.get('frame')}. {s.get('step')}")
+    print("Possible visual issues (confirm with a pixel diff or by eye):")
+    for v in result.get("visual_issues", []) or [{"issue": "none reported"}]:
+        print(f"  frame {v.get('frame', '-')} [{v.get('confidence', '-')}] "
+              f"{v.get('element', '')}: {v.get('issue')}")
+    print(f"Summary: {result.get('summary')}")
+    with open("journey.json", "w", encoding="utf-8") as f:
+        json.dump(result, f, indent=2)
+    print("\nSaved journey.json")
+
+
+if __name__ == "__main__":
+    main()</pre></div>
+<div class="code"><span class="cap">Expected output of python3 journey.py frames --dry-run (six 1280×720 frames)</span><pre>Frame 1: frames/frame_001.png
+Frame 2: frames/frame_002.png
+Frame 3: frames/frame_003.png
+Frame 4: frames/frame_004.png
+Frame 5: frames/frame_005.png
+Frame 6: frames/frame_006.png
+About 7,176 visual tokens for 6 frames
+[dry run] model=claude-sonnet-5-5 max_tokens=3000
+[dry run]   text block: 'Frame 1:'
+[dry run]   image block, image/png, 65 KB base64
+[dry run]   text block: 'Frame 2:'
+[dry run]   image block, image/png, 66 KB base64
+[dry run]   text block: 'Frame 3:'
+[dry run]   image block, image/png, 66 KB base64
+[dry run]   text block: 'Frame 4:'
+[dry run]   image block, image/png, 67 KB base64
+[dry run]   text block: 'Frame 5:'
+[dry run]   image block, image/png, 63 KB base64
+[dry run]   text block: 'Frame 6:'
+[dry run]   image block, image/png, 64 KB base64
+[dry run]   text block: 'The images labelled Frame 1..6 are screenshots taken in order from'
+[dry run] no API call made; using a FAKE reply written into the script
+
+Journey:
+  1. Opens the login page
+  2. Signs in and lands on the dashboard
+  3. Opens the basket
+Possible visual issues (confirm with a pixel diff or by eye):
+  frame 3 [medium] Checkout button: Button overlaps the order total text
+Summary: Login to basket works, but the basket layout looks broken.
+
+Saved journey.json</pre></div>
+<p>The script labels each image "Frame 1:", "Frame 2:" and so on, as Anthropic's vision guide suggests for multiple images, so Claude's answer can point to a frame. It sends at most 8 frames by default, spread evenly across the recording; raise <code>--max</code> if the journey has more steps (and pays more tokens).</p>
+<div class="box warn"><span class="tag">A hint list, not a regression gate</span><p>Claude can point at a button that suddenly overlaps the total or a missing logo, and explain it in words. It can also miss a 2-pixel shift or a slightly different shade (21.4 and 21.5). Use this as a fast first look at a recording, then confirm anything important by eye or with a pixel-comparison tool such as Playwright's screenshot assertions (<a href="#ch122">Chapter 122</a>). Frames between samples are never seen: a flash of broken layout that lasts one second can fall between two frames.</p></div>
+<div class="box note"><span class="tag">Troubleshooting: exercise 3</span><p><b>"ffmpeg: command not found"</b>: install it (above) and open a new terminal. <b>No frames, or "No such file"</b>: check the video's name and that the <code>frames</code> folder exists. <b>Too many frames</b>: use <code>fps=1/5</code> for one every 5 seconds, or rely on <code>--max</code>. <b>Steps described in the wrong order</b>: make sure file names sort correctly (<code>%03d</code> gives 001, 002…). <b>HTTP 413 or a size error</b>: too much data in one request; send fewer or smaller frames. <b>Claude reports issues that aren't there</b>: low-confidence items are often guesses; check the frame before filing anything.</p></div>
+<div class="box mistakes"><span class="tag">Common misunderstandings in this lab</span><dl>
+<dt>"I can send the meeting recording straight to Claude."</dt><dd>Not through the API: it takes text, images and PDFs. Transcribe first, then send the text.</dd>
+<dt>"The dry run proves the prompt works."</dt><dd>It proves your files, encoding and request building work. Only a live run shows what Claude actually answers.</dd>
+<dt>"Claude's severity guess can go straight into Jira."</dt><dd>It's a starting point for triage. A person who knows the product decides.</dd>
+</dl></div>
+
+<h3 id="ch21-r"><span class="num">21.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Multimodal means more than one kind of data. Understanding (reading images, audio) and generation (making them) are different skills, often different models.</li>
+<li>Models "see" by cutting images into patches and turning each into a vector the language model reads alongside text. For Claude, a patch is 28×28 pixels.</li>
+<li>Claude reads JPEG, PNG, GIF and WebP images and PDFs (text plus page images); it does not generate images, and it does not accept video.</li>
+<li>Known limits: approximate counting and positions, trouble with tiny, blurry or rotated images, no identification of people.</li>
+<li>Screenshots are excellent for bug drafts, comparisons and test ideas, but verify quoted text and use proper tools for pixel-level checks.</li>
+<li>Images cost tokens (about 2,700 for a full-HD screenshot on current models) and can carry private data. Crop and redact.</li>
+<li>To build with audio or video, convert first: transcribe audio locally (for example with faster-whisper) and send the text; sample video into frames with ffmpeg and send them as labelled images.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">A colleague asks Claude to "create a logo image for our test dashboard". What should they expect?</p><div class="opts"><button>A PNG logo generated by Claude</button><button data-ok>Claude can't generate images, but it can write code such as an SVG that draws one</button><button>An error, because Claude has no visual abilities</button></div><p class="why" hidden>Anthropic states Claude is an image understanding model only; it can still produce drawing code.</p></div>
+<div class="qz"><p class="q">About how many visual tokens does a 1920×1080 screenshot use on Claude 4.7 and later models?</p><div class="opts"><button>About 270</button><button data-ok>About 2,700</button><button>About 2 million</button></div><p class="why" hidden>⌈1920/28⌉ × ⌈1080/28⌉ = 69 × 39 = 2,691 visual tokens.</p></div>
+<div class="qz"><p class="q">You need the exact number of rows in a 400-row results table. Best approach?</p><div class="opts"><button>Screenshot it and ask Claude to count</button><button data-ok>Export the table as text or CSV and have code count it</button><button>Send a higher-resolution screenshot</button></div><p class="why" hidden>Counting many small objects is a documented weak spot; text and code give an exact answer.</p></div>
+<div class="qz"><p class="q">How does Claude process a PDF?</p><div class="opts"><button>Text only; images in the PDF are ignored</button><button>As a single image of the first page</button><button data-ok>Each page as an image plus its extracted text</button></div><p class="why" hidden>That's why Claude can answer questions about charts and tables inside PDFs.</p></div>
+<div class="qz"><p class="q">You have a screen recording of a checkout bug. How do you get Claude's help?</p><div class="opts"><button>Upload the MP4 directly</button><button data-ok>Extract key frames as images and describe what happens between them</button><button>Convert it to a GIF so all frames are read</button></div><p class="why" hidden>Claude doesn't take video, and for animated GIFs only the first frame is used.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Write a one-page "Screenshots and AI" guideline for your team. Include: (1) which tasks screenshots are good for (with two real examples from your product), (2) the limits from 21.5 that matter most for your app, (3) a redaction checklist specific to your screens (which fields hold personal data or secrets), (4) a cropping rule and the token cost of your typical screenshot size from <code>image_tokens.py</code>, and (5) when to send text instead of an image. Test it by having a colleague follow it for one real bug.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Multimodal just means the AI handles more than text. Claude can read images and PDFs: it cuts a picture into tiny squares, turns each into numbers, and reads them alongside your words. So it's great at turning a screenshot of an error into a bug report, comparing before-and-after screens or reading a chart. But it can't draw pictures, it doesn't take video, and it's shaky at exact counting and tiny text, so copy exact error text yourself. Every image costs tokens, and screenshots leak private data easily, so crop and redact before you paste."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/vision" target="_blank" rel="noopener">Vision</a> (formats, limits, 28×28 patches, resolution tiers, token table, limitations, FAQ on generation, metadata and training).</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/pdf-support" target="_blank" rel="noopener">PDF support</a> (pages as text plus images, limits, cost per page, other file formats).</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Pricing</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/interactive-mode" target="_blank" rel="noopener">Claude Code interactive mode</a> (image paste) and <a href="https://code.claude.com/docs/en/commands" target="_blank" rel="noopener">commands</a> (<code>/voice</code>).</li>
+<li>Anthropic Help Center, <a href="https://support.claude.com/en/articles/11101966" target="_blank" rel="noopener">Voice mode</a>.</li>
+<li>A. Dosovitskiy et al., <a href="https://arxiv.org/abs/2010.11929" target="_blank" rel="noopener">An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale</a> (2020).</li>
+<li>A. Radford et al., <a href="https://arxiv.org/abs/2103.00020" target="_blank" rel="noopener">Learning Transferable Visual Models From Natural Language Supervision</a> (CLIP, 2021).</li>
+<li>A. Radford et al., <a href="https://arxiv.org/abs/2212.04356" target="_blank" rel="noopener">Robust Speech Recognition via Large-Scale Weak Supervision</a> (Whisper, 2022).</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/api/messages" target="_blank" rel="noopener">Messages API reference</a> (content block types: text, image, document and others; no audio block) and <a href="https://platform.claude.com/docs/en/api/versioning" target="_blank" rel="noopener">Versions</a> (2026-10-21).</li>
+<li>SYSTRAN, <a href="https://github.com/SYSTRAN/faster-whisper" target="_blank" rel="noopener">faster-whisper</a> (install, Python 3.9+, no separate FFmpeg, usage) and its <a href="https://pypi.org/project/faster-whisper/" target="_blank" rel="noopener">PyPI page</a> (version 1.2.1, MIT licence).</li>
+<li>OpenAI, <a href="https://github.com/openai/whisper" target="_blank" rel="noopener">Whisper repository</a> (openai-whisper install, ffmpeg install commands, model names, MIT licence).</li>
+<li>FFmpeg, <a href="https://ffmpeg.org/ffmpeg-filters.html" target="_blank" rel="noopener">Filters documentation</a> (<code>fps</code> and <code>scale</code>) and <a href="https://ffmpeg.org/ffmpeg.html" target="_blank" rel="noopener">ffmpeg documentation</a> (extracting images from a video).</li>
+<li>J. Ho, A. Jain and P. Abbeel, <a href="https://arxiv.org/abs/2006.11239" target="_blank" rel="noopener">Denoising Diffusion Probabilistic Models</a> (2020).</li>
+</ol><p class="verified">Verified 9 November 2026 against Anthropic's vision, PDF support and pricing documentation, the Claude Code docs and Help Center. The internal design of Claude's vision system is not public; 21.2 describes the common approach in the field. The 21.8 lab was tested offline (dry runs, local transcription and frame extraction); its live API calls were not run.</p></div>

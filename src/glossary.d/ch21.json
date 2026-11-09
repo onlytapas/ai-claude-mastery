@@ -1,0 +1,10 @@
+{
+ "Base64": {
+  "d": "A way of writing any file, such as an image, as plain text letters and digits so it can travel inside a JSON request. It makes the data about a third bigger.",
+  "see": "ch21"
+ },
+ "Frame sampling": {
+  "d": "Keeping only some still frames from a video, for example one every two seconds, so an image-reading model can look at a recording without processing every frame.",
+  "see": "ch21"
+ }
+}

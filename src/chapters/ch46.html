@@ -1,0 +1,181 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>Which kinds of files you can give Claude in a chat, and the size and page limits that apply</li>
+<li>How Claude actually "reads" a PDF, an image, a Word file and a spreadsheet, and why that changes the answers you get</li>
+<li>How to get reliable analysis of CSV and Excel data, including how to check Claude's numbers</li>
+<li>How Claude creates real Word, Excel, PowerPoint and PDF files, and the setting that turns this on</li>
+<li>How to use screenshots well in bug reports and test reviews</li>
+<li>What to think about before uploading anything: privacy, plan differences and company policy</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> You should be able to start a chat and pick a model (<a href="#ch43">Chapter 43</a>) and write a clear prompt (<a href="#ch44">Chapter 44</a>). It helps to know what a <a class="gl" href="#g-context-window">context window</a> is (<a href="#ch20">Chapter 20</a>). For the lab you need a claude.ai account (the Free plan works) and a text editor.</div>
+
+<div class="bigidea"><p>You can hand Claude documents, images and data files instead of pasting text. Claude reads them in different ways: a PDF can be read for both words and pictures, a Word file is mostly read as text, an image is "seen" by the model, and a spreadsheet is usually opened by Claude writing and running small programs in a private sandbox. The same sandbox lets Claude hand back real files: a Word report, an Excel workbook, a slide deck or a PDF. Knowing which path your file takes tells you how far to trust the answer and how to check it. And because everything you upload leaves your computer, the first question is always: am I allowed to share this?</p></div>
+
+<h3 id="ch46-1"><span class="num">46.1</span>Why files instead of copy and paste</h3>
+<p>You could paste the text of a test plan into the message box. Uploading the file is usually better for three reasons. First, it keeps structure: tables, headings and page numbers survive, so Claude can say "on page 4, table 2". Second, some content can't be pasted at all, like a screenshot or a chart in a PDF. Third, with spreadsheets Claude can run real calculations over every row rather than estimating from what it sees.</p>
+<p>The everyday flow is simple: in a chat, use the attach control (a paperclip or "+" button next to the message box at the time of writing), drag a file into the window, or paste an image from your clipboard. Then ask your question about it. The exact buttons move between app versions, so treat any UI location in this chapter as liable to change.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Pasting text is like reading a document aloud to a colleague over the phone. Uploading the file is like handing them the printed copy: they can see the tables, flip to page 12 and point at the chart. Handing over a spreadsheet with code execution turned on is like giving them the actual file on a laptop with Excel open, so they can sort and filter rather than eyeball.</p></div>
+
+<h3 id="ch46-2"><span class="num">46.2</span>What you can upload, and the limits</h3>
+<p>Anthropic's help centre lists the supported types and limits below. These numbers change from time to time, so check the linked article before you rely on an edge case.</p>
+<div class="tbl"><table>
+<tr><th>Category</th><th>File types (per the help centre)</th><th>How Claude reads it</th></tr>
+<tr><td><b>Documents</b></td><td>PDF, DOCX, TXT, RTF, ODT, HTML, EPUB, JSON</td><td>PDFs: text and visuals (up to a page limit). Other documents: text is extracted; pictures embedded inside them are not read.</td></tr>
+<tr><td><b>Data</b></td><td>CSV, XLSX</td><td>XLSX needs the "code execution and file creation" capability turned on. With it on, Claude can open data files with code.</td></tr>
+<tr><td><b>Images</b></td><td>JPEG, PNG, GIF, WebP</td><td>Seen directly by the model's vision ability.</td></tr>
+</table></div>
+<div class="tbl"><table>
+<tr><th>Limit</th><th>In a chat</th><th>In a project's knowledge (<a href="#ch47">Chapter 47</a>)</th></tr>
+<tr><td>Files</td><td>Up to 20 per chat</td><td>No fixed count, but the total must fit the context window (paid plans can go further with retrieval)</td></tr>
+<tr><td>Size per file</td><td>The upload article lists 500 MB per file; the file-creation article lists 30 MB per file for uploads and downloads in the sandbox</td><td>30 MB per file</td></tr>
+<tr><td>Images</td><td>Up to 8000 × 8000 pixels; 1000 × 1000 or larger recommended</td><td>Text extraction only, except multimodal PDFs</td></tr>
+<tr><td>PDF pages</td><td colspan="2">Up to 100 pages: text and visuals (charts, images) analysed. 101 to 1000 pages: text only. Over 1000 pages: rejected with "Uploaded file is too large".</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Two help articles, two numbers</span><p>On 9 November 2026 the upload article said 500 MB per file in a chat, while the file-creation article said 30 MB for uploads and downloads. They may describe different paths (reading a file into the conversation versus putting it in the sandbox), or one may be out of date. In practice, keep files small and split anything big. If an upload fails, the limit you hit is the one that applies to you today.</p></div>
+<p>A size limit is not the only limit. Everything Claude reads goes into its context window, which is measured in <a class="gl" href="#g-token">tokens</a>. A 900-page PDF read as text can fill most of the window, leaving less room for your conversation, and it also uses your plan's usage allowance faster. The pricing page says it plainly: how fast you reach a limit "depends on the model you use, how long your chats are, and how large your files are".</p>
+<details class="deep"><summary>Under the hood: three ways a file reaches the model</summary><div class="body">
+<p><b>Text extraction.</b> For DOCX, TXT, HTML and similar, the app pulls out the words and gives them to the model as text. Layout, colours and embedded pictures are lost. A test plan in Word reads fine; a Word document that is mostly screenshots reads as nearly empty.</p>
+<p><b>Visual reading.</b> For images, and for PDF pages within the visual limit, the page is turned into image input as well. A vision component converts the picture into <a class="gl" href="#g-visual-token">visual tokens</a> that the language model attends to alongside your words (<a href="#ch21">Chapter 21</a> covers <a class="gl" href="#g-multimodal">multimodal</a> models). This is why Claude can describe a chart in a PDF report.</p>
+<p><b>Code in a sandbox.</b> With code execution on, the file is placed in a private computing environment. Claude writes Python (or JavaScript), runs it, reads the output and continues. The file itself may never be loaded into the context window in full: Claude reads the parts it needs through code. That is how it can handle a spreadsheet with tens of thousands of rows that would never fit as plain text.</p>
+</div></details>
+
+<h3 id="ch46-3"><span class="num">46.3</span>PDFs and documents: specs, test plans and reports</h3>
+<p>For QA work, documents are the daily bread: requirement specs, test plans, release notes, vendor test reports, audit evidence. Good prompts point Claude at a specific job and ask it to show where it found things.</p>
+<div class="code"><span class="cap">Prompt: review a requirements PDF</span><pre>The attached PDF is the requirements spec for the new checkout flow.
+1. List every requirement that has no clear acceptance criterion.
+2. List requirements that contradict each other.
+3. For each item, quote the sentence and give the page number.
+Do not invent requirements that are not in the document.
+If something is ambiguous, say so rather than guessing.</pre></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A tester receives a 60-page vendor specification two days before sprint planning. She uploads it and asks for untestable requirements with page references. Claude flags "the page should load quickly" (no number) and two sections that disagree on the password length. She checks each quote against the PDF, then raises three questions in the Jira story before planning instead of during testing.</p></div>
+<div class="box note"><span class="tag">Quote and check</span><p>Asking for quotes and page numbers is the single best habit with documents. It turns a vague summary into claims you can verify in seconds, and it makes <a class="gl" href="#g-hallucination">hallucination</a> easy to spot: if the quoted sentence isn't on that page, you know not to trust that item.</p></div>
+<p>Remember the 100-page line. A 300-page PDF is read as text only, so a question about a diagram on page 210 may get a confident but wrong answer. Split long PDFs or extract the pages you care about.</p>
+
+<h3 id="ch46-4"><span class="num">46.4</span>Images and screenshots for bugs</h3>
+<p>Screenshots are where Claude's vision becomes useful for testers. You can paste a screenshot straight into the chat and ask Claude to:</p>
+<ul>
+<li>write a clear bug report from a screenshot plus your notes (title, steps, expected, actual);</li>
+<li>compare two screenshots (before and after a release) and list visible differences;</li>
+<li>read an error dialog or a stack trace captured as an image;</li>
+<li>spot obvious layout or accessibility problems, such as low-contrast text or truncated labels;</li>
+<li>turn a whiteboard photo of a test strategy into a tidy list.</li>
+</ul>
+<div class="code"><span class="cap">Prompt: bug report from a screenshot</span><pre>Screenshot attached: the order confirmation page on staging, Safari 18, iPhone viewport.
+What I did: added 2 items, applied code SAVE10, paid with the test Visa card.
+Write a Jira bug report with: Title, Environment, Steps to reproduce,
+Expected result, Actual result, Severity suggestion with reason.
+Only describe what is visible in the screenshot or stated by me.</pre></div>
+<div class="flow"><div><b>Capture</b>Screenshot with the problem visible</div><div><b>Redact</b>Blur names, emails, tokens</div><div class="hl"><b>Describe</b>Add steps and environment in words</div><div><b>Ask</b>Request a structured report</div><div><b>Verify</b>Check every line against reality</div></div>
+<div class="box warn"><span class="tag">Vision has limits</span><p>Claude can misread tiny text, mis-count items in a dense table and miss off-by-one-pixel layout shifts. It cannot measure exact colours or pixel positions from a picture reliably. For true visual regression, use a tool built for it (<a href="#ch123">Chapter 123</a>), and use Claude to explain and write up what the tool finds.</p></div>
+<p>A screenshot only shows what was on screen. Claude doesn't know the steps you took, the test data or the build number unless you tell it. The "Describe" step in the flow above is the one people skip, and it's the one that makes the report useful.</p>
+
+<h3 id="ch46-5"><span class="num">46.5</span>Spreadsheets and CSV analysis</h3>
+<p>A <a class="gl" href="#g-csv">CSV</a> file is a plain-text table: one row per line, columns separated by commas. Test tools export results this way all the time. Excel files (XLSX) hold the same kind of table plus formatting, formulas and several sheets.</p>
+<p>With the <a class="gl" href="#g-code-execution">code execution</a> capability on, Claude doesn't guess at your data. It loads the file in the sandbox with Python, runs calculations and reports results, often with a chart. You can usually expand the steps to see the code it ran. Without code execution, Claude can still read a small CSV as text, but its sums and averages are then the model's mental arithmetic, which is much less reliable on large tables.</p>
+<div class="cols2"><div><h4>Good questions for data</h4><p>"What is the pass rate per suite, excluding skipped tests?" "Which tests changed status between runs?" "Plot the ten slowest tests." "Group failures by error message and count them." "Which columns have missing values?"</p></div><div><h4>Questions to handle with care</h4><p>"Why did these tests fail?" (the data may not say). "Is the release ready?" (a judgement for people). "Predict next week's failure rate" (a small dataset can't support it). Ask Claude to separate what the data shows from what it is guessing.</p></div></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A QA lead exports a month of nightly CI results to CSV and asks for tests that alternated between pass and fail with no code change. Claude computes the list in Python, plots a timeline, and labels these as <a class="gl" href="#g-flaky-test">flaky</a> candidates rather than proven flaky tests. The lead takes the top five to the team's stabilisation backlog.</p></div>
+<details class="deep"><summary>Under the hood: how to check Claude's numbers</summary><div class="body">
+<p>Treat Claude's analysis like a junior colleague's spreadsheet: probably right, worth a spot check. Three cheap checks catch most problems:</p>
+<ol>
+<li><b>Row count.</b> Ask "How many rows did you load, and how many columns?" If it doesn't match the file, something went wrong at load time (often a bad header row or a different delimiter).</li>
+<li><b>One known number.</b> Work out one figure yourself with a filter in Excel, and compare.</li>
+<li><b>Definitions.</b> Ask how a metric was computed. "Pass rate" with and without skipped tests can differ a lot, as the lab shows.</li>
+</ol>
+<p>Ask Claude to show the code it ran. Even if you can't write Python, you can usually read a line like <code>df[df.status != "skip"]</code> and see that skipped rows were excluded.</p>
+</div></details>
+
+<h3 id="ch46-6"><span class="num">46.6</span>Creating files: Word, Excel, PowerPoint and PDF</h3>
+<p>Claude can also hand files back. According to the help centre, it can create and edit Excel (.xlsx), PowerPoint (.pptx), Word (.docx) and PDF files, and can also produce things like Python scripts, PNG charts, and plain text files such as .csv, .md and .html. The feature launched on 9 September 2025 and is available on all plans, including Free, on the web, desktop and mobile apps.</p>
+<p>It works through the same sandbox: Claude writes code that builds the file, runs it, and gives you a download. Anthropic's ready-made <a class="gl" href="#g-skill">Skills</a> for docx, xlsx, pptx and pdf hold the know-how for producing well-formed files (<a href="#ch80">Chapter 80</a> explains Skills in depth). You don't need to call them by name; asking for "a Word document" or "an Excel workbook with a summary sheet" is enough.</p>
+<div class="tbl"><table>
+<tr><th>Where</th><th>Setting (at the time of writing)</th><th>Who controls it</th></tr>
+<tr><td>Web and desktop, individual plans (Free, Pro, Max, Ultra)</td><td>Settings &gt; Capabilities &gt; "Code execution and file creation" (shown as "Create and edit files" in the updated layout)</td><td>You</td></tr>
+<tr><td>Mobile</td><td>Your name or initials &gt; Settings &gt; Capabilities, same toggle</td><td>You</td></tr>
+<tr><td>Team and Enterprise</td><td>Organization settings &gt; Capabilities</td><td>Owners turn it on or off for the organisation and set network access</td></tr>
+</table></div>
+<p>The sandbox also has a network setting, "Allow network egress". When it is off, Claude can only use packages already installed and can't reach the internet. Other options allow package registries only, package registries plus named domains, or all domains. The help centre says Team defaults to package managers only, new Enterprise organisations start with it off, and owners control it. Creating files also uses more of your usage allowance than an ordinary chat.</p>
+<div class="code"><span class="cap">Prompt: a release test summary as Word and Excel</span><pre>Using the attached test-run CSV, create two files:
+1. release-summary.docx: one page. Heading "Release 4.2 test summary",
+   a short paragraph, a table of pass rate per suite (excluding skipped),
+   and a bullet list of failing tests.
+2. release-metrics.xlsx: sheet "Raw" with the original data,
+   sheet "Summary" with the per-suite table using Excel formulas
+   (COUNTIFS), not pasted values, so I can update it.</pre></div>
+<div class="box note"><span class="tag">Ask for formulas, not just values</span><p>If you want to keep using a spreadsheet, ask Claude to use real Excel formulas. Pasted numbers look the same but go stale the moment the raw data changes. Open the file and click a cell to confirm.</p></div>
+<div class="box warn"><span class="tag">Security warning from Anthropic</span><p>The help centre warns that instructions hidden in a file or web page could trick Claude into running untrusted code in the sandbox, or into sending data from your conversation to a third party. This is <a class="gl" href="#g-prompt-injection">prompt injection</a> (<a href="#ch131">Chapter 131</a>). Keep network access as narrow as you can, watch what Claude does with files from outside your organisation, and stop it if it starts reaching for data you didn't expect.</p></div>
+<p>Files Claude creates are often also shown as <a class="gl" href="#g-artifact">artifacts</a> beside the chat. <a href="#ch48">Chapter 48</a> covers artifacts, including documents and slides you can export to Word, PowerPoint and PDF.</p>
+
+<h3 id="ch46-7"><span class="num">46.7</span>Privacy: what happens to what you upload</h3>
+<p>Uploading a file sends its contents to Anthropic's servers so the model can read it. Before you drag anything in, ask three questions.</p>
+<ol>
+<li><b>Am I allowed to?</b> Your company's AI policy decides which data may go into which tool. Many companies allow a Team or Enterprise workspace and forbid personal accounts for work data.</li>
+<li><b>Which account am I on?</b> Anthropic's data-usage documentation says consumer accounts (Free, Pro, Max and Ultra) have a setting that decides whether chats may be used to train future models, with a 5-year retention period if you allow it and 30 days if you don't. Commercial accounts (Team, Enterprise, API) are not used for training by default and have a standard 30-day retention period, with options such as custom retention on Enterprise. Check your current settings at the privacy controls page, and see <a href="#ch42">Chapter 42</a> for organisation options and <a href="#ch132">Chapter 132</a> for privacy in depth.</li>
+<li><b>Do I need the real data?</b> Usually not. Replace names, emails, card numbers and tokens with fake values first. This is <a class="gl" href="#g-data-masking">data masking</a>, and for test work it rarely changes the answer.</li>
+</ol>
+<div class="box warn"><span class="tag">Screenshots leak</span><p>Screenshots are the easiest way to leak data by accident: a customer's address in a form, an access token in a browser's address bar, a colleague's chat message in a notification. Crop and blur before you paste. The same applies to log files, which often contain session IDs and email addresses.</p></div>
+<div class="box note"><span class="tag">Incognito is not a privacy shield for your company</span><p>Incognito chats (<a href="#ch50">Chapter 50</a>) are not saved to your chat history or memory. They still send the file to Anthropic to be processed. They don't make a file you weren't allowed to share acceptable to share.</p></div>
+<div class="box opinion"><span class="tag">Opinion · common guidance from security teams</span><p>Many security teams recommend a simple rule for testers: "synthetic data by default, masked data when needed, real customer data never in a chat tool unless your data-protection officer has approved that exact use." It is stricter than the tools require, and that is the point.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Analyse a test-run CSV and get a report back</b><span>25 min · claude.ai (any plan)</span></div><ol>
+<li>In claude.ai, open Settings &gt; Capabilities and make sure "Code execution and file creation" (or "Create and edit files") is on. On Team or Enterprise, if you can't see it, an owner controls it: ask them, or do steps 2 to 5 with your own Free account using only this fake data.<span class="expect">the toggle is on, or you know who controls it.</span></li>
+<li>Create a file called <code>runs.csv</code> in a text editor and paste exactly this (illustrative data):
+<div class="code"><span class="cap">runs.csv</span><pre>test_id,suite,status,duration_s,browser,run_date
+T001,login,pass,4.2,chrome,2026-11-02
+T002,login,pass,3.9,firefox,2026-11-02
+T003,login,fail,12.5,webkit,2026-11-02
+T004,checkout,pass,8.1,chrome,2026-11-02
+T005,checkout,fail,15.0,chrome,2026-11-02
+T006,checkout,pass,7.7,firefox,2026-11-02
+T007,checkout,skip,0,webkit,2026-11-02
+T008,search,pass,2.3,chrome,2026-11-02
+T009,search,pass,2.6,firefox,2026-11-02
+T010,search,pass,2.4,webkit,2026-11-02
+T001,login,pass,4.0,chrome,2026-11-03
+T002,login,pass,4.1,firefox,2026-11-03
+T003,login,pass,5.2,webkit,2026-11-03
+T004,checkout,pass,8.4,chrome,2026-11-03
+T005,checkout,fail,15.0,chrome,2026-11-03
+T006,checkout,pass,7.9,firefox,2026-11-03
+T007,checkout,skip,0,webkit,2026-11-03
+T008,search,pass,2.2,chrome,2026-11-03
+T009,search,fail,9.8,firefox,2026-11-03
+T010,search,pass,2.5,webkit,2026-11-03</pre></div><span class="expect">a 21-line file: one header plus 20 rows.</span></li>
+<li>Start a new chat, attach <code>runs.csv</code>, and ask: "How many rows and columns did you load? Then give the overall pass rate twice: once including skipped tests and once excluding them. Show the code you ran."<span class="expect">20 rows and 6 columns; 14 passes, 4 failures, 2 skips; 70% including skips (14 of 20) and about 77.8% excluding them (14 of 18). You can expand the step to see Python code.</span></li>
+<li>Ask: "Which tests changed status between the two runs, and which test failed both times? What might the 15.0-second duration suggest? Separate facts from guesses."<span class="expect">T003 and T009 changed status (flaky candidates); T005 failed both times with an identical 15.0 s, which Claude should mark as a guess, such as a timeout. T007 was skipped both times.</span></li>
+<li>Ask: "Create release-summary.docx with a per-suite pass-rate table (excluding skips) and a list of failing tests, and release-metrics.xlsx with Raw and Summary sheets using COUNTIFS formulas."<span class="expect">two downloadable files. Per suite, excluding skips: login 5 of 6, checkout 4 of 6, search 5 of 6. In Excel, clicking a Summary cell shows a formula, not a typed number.</span></li>
+<li>Check one figure yourself: in Excel or a text editor, count the checkout rows with status "pass".<span class="expect">4, matching Claude's table.</span></li>
+</ol>
+<p><b>Troubleshooting.</b> <i>No download appears:</i> code execution is off or blocked by your organisation; check step 1. <i>Different totals:</i> ask how many rows were loaded; a stray blank line or a pasted header twice is the usual cause. <i>Claude "estimates" instead of calculating:</i> say "use code to calculate this". <i>Usage limit reached:</i> file work uses more allowance; wait for the reset or try a smaller file.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"If Claude accepted the file, it read all of it, including the pictures."</dt><dd>Only PDFs up to 100 pages and images get visual reading. Word files and long PDFs are read as text, so embedded screenshots and charts may be invisible to Claude.</dd>
+<dt>"Claude's spreadsheet totals are always exact."</dt><dd>With code execution they are calculated by real code and are usually right, but the definition (for example, whether skips count) and the loading step can still be wrong. Without code execution, they are mental arithmetic. Spot-check one number.</dd>
+<dt>"Incognito means I can upload confidential files."</dt><dd>Incognito affects history and memory, not whether the data leaves your machine. Company policy and your account type decide what you may upload.</dd>
+<dt>"File creation needs a paid plan."</dt><dd>The help centre lists it on all plans, including Free. It does need the capability turned on, and on Team and Enterprise an owner decides.</dd>
+</dl></div>
+
+<h3 id="ch46-r"><span class="num">46.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Claude accepts documents (PDF, DOCX, TXT and more), data (CSV, XLSX) and images (JPEG, PNG, GIF, WebP), up to 20 files per chat. Check the help centre for current size limits, which differ between articles.</li>
+<li>PDFs up to 100 pages are read for text and visuals; 101 to 1000 pages for text only. Other documents are text-only.</li>
+<li>With code execution on, Claude analyses spreadsheets by running real code in a sandbox; ask it to show the code and check one number yourself.</li>
+<li>Claude creates Word, Excel, PowerPoint and PDF files through the same sandbox, controlled by the "Code execution and file creation" capability, which owners control on Team and Enterprise.</li>
+<li>Screenshots make good bug reports when you add steps and environment in words, and redact anything sensitive.</li>
+<li>Before uploading: is it allowed, which account am I on, and can I use masked or synthetic data instead?</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">You upload a 350-page PDF and ask about a chart on page 220. What should you expect?</p><div class="opts"><button>Claude reads the chart exactly like a short PDF</button><button data-ok>Claude reads only the text of PDFs over 100 pages, so it may not see the chart; extract that page instead</button><button>The upload is rejected because it is over 100 pages</button></div><p class="why" hidden>Between 101 and 1000 pages, only text is processed. Uploads are rejected only above 1000 pages.</p></div>
+<div class="qz"><p class="q">Why is it better to have code execution on when analysing a large CSV?</p><div class="opts"><button>It makes Claude's writing style more formal</button><button>It stops the file being sent to Anthropic</button><button data-ok>Claude calculates with real code over every row instead of estimating in its head</button></div><p class="why" hidden>The sandbox runs Python on the actual data. It doesn't change where the data goes.</p></div>
+<div class="qz"><p class="q">A Word test plan full of embedded screenshots gets a thin summary from Claude. The most likely reason is:</p><div class="opts"><button data-ok>Text is extracted from Word files and embedded images are not read</button><button>Word files are not supported</button><button>The model is too small to read Word</button></div><p class="why" hidden>Export it to PDF (under 100 pages) or attach the key screenshots as images.</p></div>
+<div class="qz"><p class="q">On a Team plan, you can't find the setting to create files. Who can change that?</p><div class="opts"><button>Anthropic support only</button><button data-ok>An organisation owner, in Organization settings &gt; Capabilities</button><button>Any member, by turning on incognito</button></div><p class="why" hidden>On Team and Enterprise, owners turn capabilities on or off for the organisation.</p></div>
+<div class="qz"><p class="q">Which habit best protects against invented details when summarising a long spec?</p><div class="opts"><button>Asking Claude to be confident</button><button>Uploading the file twice</button><button data-ok>Asking for a quote and a page number for every finding, then spot-checking them</button></div><p class="why" hidden>Quotes with locations turn claims into something you can verify in seconds.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Take a real (or masked) export from your team's test tool: a CSV of last week's runs, or a test-plan PDF. Write a short "file-handling card" for your team: which file types you use, which account people should use for them, what must be masked first, and three prompts that worked well (one summary, one analysis with numbers you verified, one file creation). Share it in your team channel and ask one colleague to try a prompt and report back.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"You can give Claude files instead of pasting text. PDFs up to 100 pages are read for words and pictures, Word files only for words, and screenshots are 'seen' directly. For spreadsheets, turn on code execution: Claude then runs real code over the data, and can even hand you back an Excel or Word file. Always ask it to show its working and check one number. And before uploading anything, ask whether you're allowed to, which account you're on, and whether fake data would do."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Claude Help Center, "What kinds of documents can I upload to Claude.ai?" <a href="https://support.claude.com/en/articles/8241126-what-kinds-of-documents-can-i-upload-to-claude-ai" target="_blank" rel="noopener">support.claude.com/en/articles/8241126</a></li>
+<li>Claude Help Center, "Create and edit files with Claude". <a href="https://support.claude.com/en/articles/12111783-create-and-edit-files-with-claude" target="_blank" rel="noopener">support.claude.com/en/articles/12111783</a></li>
+<li>Claude Help Center, "What are Skills?" <a href="https://support.claude.com/en/articles/12512176-what-are-skills" target="_blank" rel="noopener">support.claude.com/en/articles/12512176</a></li>
+<li>Claude pricing and plan features. <a href="https://claude.com/pricing" target="_blank" rel="noopener">claude.com/pricing</a></li>
+<li>Claude Code docs, "Data usage" (training settings and retention by account type). <a href="https://code.claude.com/docs/en/data-usage" target="_blank" rel="noopener">code.claude.com/docs/en/data-usage</a></li>
+<li>Claude Help Center, "Use incognito chats". <a href="https://support.claude.com/en/articles/12260368-use-incognito-chats" target="_blank" rel="noopener">support.claude.com/en/articles/12260368</a></li>
+</ol><p class="verified">Verified 9 November 2026 against the Claude Help Center, claude.com/pricing and the Claude Code data-usage page. UI locations and limits change; the two help articles disagreed on per-file size at the time of checking.</p></div>

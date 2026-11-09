@@ -1,0 +1,50 @@
+{
+ "Baseline": {
+  "d": "A measurement of how things are before you change anything, such as how long test design takes today. Without a baseline you can't show that AI made a difference.",
+  "see": "ch126"
+ },
+ "ROI": {
+  "d": "Return on investment: how much value you get back compared with what you spend. ROI = (benefit − cost) ÷ cost, usually shown as a percentage.",
+  "see": "ch126"
+ },
+ "Escaped defect": {
+  "d": "A bug that got past testing and was found later, usually by customers or in production.",
+  "see": "ch126"
+ },
+ "Flaky test": {
+  "d": "An automated test that sometimes passes and sometimes fails without any change to the code, usually because of timing, test data or environment problems.",
+  "see": "ch122"
+ },
+ "Cycle time": {
+  "d": "How long a piece of work takes from start to finish, for example from a story being ready for testing to it being signed off.",
+  "see": "ch126"
+ },
+ "MTTR": {
+  "d": "Mean time to repair (or resolve): the average time from noticing a failure to fixing it. In QA it often means how long a failing test or build takes to diagnose and fix.",
+  "see": "ch126"
+ },
+ "Goodhart's law": {
+  "d": "The observation that when a measure becomes a target, it stops being a good measure, because people start optimising the number instead of the real goal.",
+  "see": "ch126"
+ },
+ "Vanity metric": {
+  "d": "A number that looks impressive but doesn't show real value, such as 'number of AI prompts sent' or 'test cases generated'.",
+  "see": "ch126"
+ },
+ "Leading indicator": {
+  "d": "An early measurement that suggests where results are heading, such as requirement questions raised before development. A lagging indicator, such as escaped defects, shows results only after the fact.",
+  "see": "ch126"
+ },
+ "Pilot": {
+  "d": "A small, time-boxed trial of a new way of working with a few people and clear success criteria, run before rolling it out widely.",
+  "see": "ch128"
+ },
+ "AI champion": {
+  "d": "A team member who learns a new tool early, helps colleagues, collects good practices and feeds problems back to the people running the rollout.",
+  "see": "ch128"
+ },
+ "Maturity model": {
+  "d": "A set of levels describing how far an organisation has progressed with a practice, with checklists for what each level looks like.",
+  "see": "ch128"
+ }
+}

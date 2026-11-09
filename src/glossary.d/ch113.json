@@ -1,0 +1,58 @@
+{
+ "Approval fatigue": {
+  "d": "When people see so many routine approval prompts that they start approving without reading, so the important prompt gets waved through too.",
+  "see": "ch113"
+ },
+ "Audit log": {
+  "d": "A permanent, time-stamped record of who or what did each action, with what permissions and who approved it, used to reconstruct what happened.",
+  "see": "ch113"
+ },
+ "Trajectory evaluation": {
+  "d": "Judging an agent by the path it took (tools called, order, approvals, forbidden actions, steps) as well as by its final result.",
+  "see": "ch113"
+ },
+ "Shadow mode": {
+  "d": "A rollout stage where an agent runs on real inputs but only records what it would have done, so people can compare without real consequences.",
+  "see": "ch113"
+ },
+ "Canary release": {
+  "d": "Releasing a change, or more autonomy for an agent, to a small group first and watching closely before rolling it out to everyone.",
+  "see": "ch113"
+ },
+ "Kill switch": {
+  "d": "A control outside the AI that stops an agent or a capability immediately, works without the agent's cooperation and fails closed.",
+  "see": "ch113"
+ },
+ "Software development lifecycle": {
+  "d": "The stages every change passes through from idea to running software: plan, design, code, review, test, release and operate. Often shortened to SDLC.",
+  "see": "ch114"
+ },
+ "DORA metrics": {
+  "d": "Software delivery measures from the DORA research programme: change lead time, deployment frequency, failed deployment recovery time, change fail rate and deployment rework rate.",
+  "see": "ch114"
+ },
+ "Minimal reproduction": {
+  "d": "The smallest set of steps, data or code that still makes a bug happen, which makes it far easier to investigate.",
+  "see": "ch115"
+ },
+ "Correlation ID": {
+  "d": "An identifier attached to one request and written into every log line in every service it passes through, so you can follow that request end to end.",
+  "see": "ch115"
+ },
+ "Git bisect": {
+  "d": "A git command that finds the commit that introduced a bug by repeatedly testing the commit halfway between a known good and a known bad one.",
+  "see": "ch115"
+ },
+ "Root-cause analysis": {
+  "d": "Investigating why a problem really happened, beyond the visible symptom, so that fixes prevent the whole class of problem. Often shortened to RCA.",
+  "see": "ch115"
+ },
+ "Five whys": {
+  "d": "A root-cause technique of repeatedly asking why something happened until you reach a cause in the process that can be changed.",
+  "see": "ch115"
+ },
+ "Blameless postmortem": {
+  "d": "An incident write-up that focuses on what in the system allowed a failure, not on who to blame, so people share details honestly.",
+  "see": "ch115"
+ }
+}

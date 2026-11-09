@@ -1,0 +1,26 @@
+{
+ "Plugin": {
+  "d": "In Claude Code, an installable package that bundles skills, subagents, hooks, MCP servers and other extensions, so a whole team can get the same setup in one step.",
+  "see": "ch127"
+ },
+ "Plugin marketplace": {
+  "d": "A catalogue of Claude Code plugins, usually a Git repository with a .claude-plugin/marketplace.json file. Teams add a marketplace once, then install plugins from it by name.",
+  "see": "ch127"
+ },
+ "Print mode": {
+  "d": "Running Claude Code non-interactively with claude -p: it answers one prompt and exits, which makes it usable in scripts and CI pipelines. Also called headless mode.",
+  "see": "ch127"
+ },
+ "Continuous integration": {
+  "d": "Automatically building and testing software every time code changes (or on a schedule), using services such as GitHub Actions. Usually shortened to CI.",
+  "see": "ch127"
+ },
+ "Flaky test": {
+  "d": "A test that sometimes passes and sometimes fails without any change to the code, usually because of timing, shared state or an unreliable environment.",
+  "see": "ch122"
+ },
+ "Regression testing": {
+  "d": "Re-running tests after a change to check that things that used to work still work.",
+  "see": "ch129"
+ }
+}

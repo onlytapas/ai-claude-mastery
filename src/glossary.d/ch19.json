@@ -1,0 +1,46 @@
+{
+ "Adaptive thinking": {
+  "d": "How current Claude models reason: for each request the model decides whether to think before answering and how much. You steer it with an effort level rather than a fixed thinking budget.",
+  "see": "ch19"
+ },
+ "Chain of thought": {
+  "d": "Step-by-step reasoning a model writes out before its final answer. The written steps give it more computation and somewhere to keep intermediate results.",
+  "see": "ch19"
+ },
+ "Test-time compute": {
+  "d": "Extra computation spent while a model answers (mainly thinking tokens), as opposed to computation spent training it. Also called inference-time compute.",
+  "see": "ch19"
+ },
+ "Context rot": {
+  "d": "Anthropic's name for the drop in accuracy and recall as the amount of text in a model's context window grows. The reason to curate context rather than fill it.",
+  "see": "ch20"
+ },
+ "Lost in the middle": {
+  "d": "The finding (Liu et al., 2023) that language models use information at the start and end of a long input more reliably than information in the middle.",
+  "see": "ch20"
+ },
+ "Auto memory": {
+  "d": "Notes Claude Code writes for itself about a project, stored on your machine and loaded into the context at the start of each session. On by default; managed with /memory.",
+  "see": "ch20"
+ },
+ "Prompt caching": {
+  "d": "An API feature that stores the processed beginning of a prompt for a short time so repeated requests reuse it more cheaply and quickly. Cached tokens still count toward the context window.",
+  "see": "ch20"
+ },
+ "Vision encoder": {
+  "d": "The part of a multimodal model that turns an image (cut into small patches) into vectors the language model can read alongside text.",
+  "see": "ch21"
+ },
+ "Visual token": {
+  "d": "Anthropic's term for one 28x28-pixel patch of an image as Claude processes it. An image costs roughly (width/28) x (height/28) visual tokens.",
+  "see": "ch21"
+ },
+ "Speech-to-text": {
+  "d": "Turning spoken audio into written text, also called transcription or automatic speech recognition. Often the first step before a language model works on speech.",
+  "see": "ch21"
+ },
+ "Diffusion model": {
+  "d": "The kind of model behind most image and video generators: it starts from random noise and removes it step by step, guided by a text description, until an image appears.",
+  "see": "ch21"
+ }
+}

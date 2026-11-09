@@ -1,0 +1,247 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>More than 70 concrete ways to use Claude across the whole testing lifecycle</li>
+<li>Which Claude feature fits each idea: a Project, an Artifact, Claude Code, a skill, a subagent, a hook, an MCP server, headless mode or the API</li>
+<li>How to pick the right first ideas with an impact × effort matrix</li>
+<li>The ten quick wins most QA teams can start this week</li>
+<li>How to run a brainstorming workshop with your own team, and turn the results into a plan</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 118 (the AI-powered QA engineer). You don't need to have read every chapter linked here. The catalogue is a map, and each idea points to where it's taught in detail.</div>
+
+<div class="bigidea"><p>Once you know what Claude can do, the next question is <em>"what should my team actually use it for?"</em> This chapter is the answer in the form of a catalogue: over seventy ideas, organised by testing stage, each with the Claude feature to use, a rough rating of the effort it saves and the coverage it adds, and how hard it is to start. Use it three ways: browse it for inspiration, filter it for your current problem, and bring it to a team workshop to choose your first experiments. The goal isn't to do all of them. It's to find the five that make the biggest difference for <em>your</em> team.</p></div>
+
+<h3 id="ch119-1"><span class="num">119.1</span>Where AI helps across the testing lifecycle</h3>
+<p>AI can help at every stage of testing, not just automation. In fact the biggest gains often come early, when finding a gap in a requirement prevents a bug from ever being written. That's the idea behind <a class="gl" href="#g-shift-left-testing">shift-left testing</a>, and AI makes it far cheaper.</p>
+<div class="flow">
+<div><b>Refine</b>Find gaps in stories before development</div>
+<div><b>Plan</b>Risks, strategy, estimates</div>
+<div><b>Design</b>Test cases, data, techniques</div>
+<div class="hl"><b>Build</b>Automation, API tests, tooling</div>
+<div><b>Run</b>Exploratory, non-functional, CI</div>
+<div><b>Learn</b>Triage, reporting, knowledge</div>
+</div>
+<p>Each stage has a "Claude-shaped" opportunity. In early stages it's mostly reading and reasoning (claude.ai Projects, or Claude reading Jira through <a class="gl" href="#g-mcp">MCP</a>). In middle stages it's producing and running code (Claude Code, Playwright). In later stages it's summarising and spotting patterns (headless runs in CI, Artifacts for reports).</p>
+
+<h3 id="ch119-2"><span class="num">119.2</span>How to read the catalogue</h3>
+<div class="tbl"><table>
+<tr><th>Column</th><th>Meaning</th></tr>
+<tr><td><b>Idea</b></td><td>What you'd do, in one line</td></tr>
+<tr><td><b>Claude feature</b></td><td>The surface or feature that fits best. "Project" and "Artifact" are in the Claude apps; "Claude Code" runs in your terminal or IDE; "MCP" means connecting a tool such as Jira, Playwright, GitHub or a database; "-p" means Claude Code's headless print mode in scripts or CI; "API" means calling Claude from your own code</td></tr>
+<tr><td><b>Effort saved</b></td><td>Rough guidance on how much manual work it can remove: Low, Med or High</td></tr>
+<tr><td><b>Coverage gained</b></td><td>Rough guidance on how much more you could test, or test earlier: Low, Med or High</td></tr>
+<tr><td><b>Start</b></td><td>How hard it is to try: Easy (a prompt or a Project), Medium (Claude Code or one MCP connection), Hard (code, CI or team setup)</td></tr>
+<tr><td><b>Learn</b></td><td>The chapter that teaches it</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">About the ratings</span><p>The Low/Med/High ratings are the author's rough guidance for a typical web-product QA team, not measured data. Your results depend on your product, your existing process and how well you set up context. Chapter 126 shows how to measure the real effect in your own team. Also note that some features depend on your plan and your administrator's settings (for example connectors, MCP servers and scheduled tasks).</p></div>
+
+<h3 id="ch119-3"><span class="num">119.3</span>The idea catalogue</h3>
+<p>Type in the box to filter by any word: a stage ("test data"), a feature ("MCP", "skill", "-p"), a tool ("Playwright", "Jira") or a rating ("High").</p>
+<input class="filter" id="ideasFilter" type="search" data-filter="#ideas" data-empty="#ideasEmpty" placeholder="Filter ideas, e.g. Jira, test data, skill, High" aria-label="Filter the idea catalogue">
+<div class="tbl"><table id="ideas">
+<tr><th>#</th><th>Idea</th><th>Claude feature</th><th>Effort saved</th><th>Coverage gained</th><th>Start</th><th>Learn</th></tr>
+<tr class="group"><td colspan="7" style="background:var(--paper);font-weight:700;color:var(--ochre)">1 · Requirements and refinement</td></tr>
+<tr><td>1</td><td>Ambiguity hunt: list unclear, missing or contradictory points in a user story before refinement</td><td>Project, or Jira via MCP</td><td>Med</td><td>High</td><td>Easy</td><td><a href="#ch120">111</a></td></tr>
+<tr><td>2</td><td>Draft acceptance criteria in Given/When/Then form for the product owner to confirm</td><td>Project</td><td>High</td><td>Med</td><td>Easy</td><td><a href="#ch120">111</a></td></tr>
+<tr><td>3</td><td>Testability review of a spec or design: what can't be observed, measured or controlled?</td><td>Project with the spec PDF</td><td>Med</td><td>High</td><td>Easy</td><td><a href="#ch46">45</a></td></tr>
+<tr><td>4</td><td>Traceability map: which stories have tests, which don't</td><td>Claude Code + Jira MCP, Artifact</td><td>Med</td><td>Med</td><td>Medium</td><td><a href="#ch101">94</a></td></tr>
+<tr><td>5</td><td>Impact questions for refinement: "what else does this change touch?"</td><td>Claude Code reading the codebase</td><td>Med</td><td>Med</td><td>Medium</td><td><a href="#ch65">62</a></td></tr>
+<tr class="group"><td colspan="7" style="background:var(--paper);font-weight:700;color:var(--ochre)">2 · Test planning and risk</td></tr>
+<tr><td>6</td><td>Risk-based test plan draft for a feature or release</td><td>Project</td><td>High</td><td>Med</td><td>Easy</td><td><a href="#ch120">111</a></td></tr>
+<tr><td>7</td><td>Release risk summary from the list of changed files</td><td>Claude Code with git</td><td>Med</td><td>High</td><td>Medium</td><td><a href="#ch71">68</a></td></tr>
+<tr><td>8</td><td>Test strategy document from your company template</td><td>Project or skill</td><td>High</td><td>Low</td><td>Easy</td><td><a href="#ch80">77</a></td></tr>
+<tr><td>9</td><td>Pre-mortem: "it's three months after release and this failed badly. Why?"</td><td>Chat</td><td>Low</td><td>High</td><td>Easy</td><td><a href="#ch45">44</a></td></tr>
+<tr><td>10</td><td>Sanity-check a test estimate against the scope and risks</td><td>Chat</td><td>Low</td><td>Low</td><td>Easy</td><td><a href="#ch44">43</a></td></tr>
+<tr class="group"><td colspan="7" style="background:var(--paper);font-weight:700;color:var(--ochre)">3 · Test design</td></tr>
+<tr><td>11</td><td>Boundary values and equivalence partitions for every input field</td><td>Chat or Project</td><td>High</td><td>High</td><td>Easy</td><td><a href="#ch120">111</a></td></tr>
+<tr><td>12</td><td>Pairwise combinations for settings, browsers, roles or payment types</td><td>Claude Code (small script)</td><td>High</td><td>High</td><td>Medium</td><td><a href="#ch120">111</a></td></tr>
+<tr><td>13</td><td>State-transition model as a diagram, plus tests for every transition</td><td>Artifact</td><td>Med</td><td>High</td><td>Medium</td><td><a href="#ch48">47</a></td></tr>
+<tr><td>14</td><td>Negative, abuse and "unhappy path" cases</td><td>Chat</td><td>Med</td><td>High</td><td>Easy</td><td><a href="#ch120">111</a></td></tr>
+<tr><td>15</td><td>Convert manual test cases to Gherkin (BDD) scenarios</td><td>Chat or skill</td><td>High</td><td>Low</td><td>Easy</td><td><a href="#ch80">77</a></td></tr>
+<tr><td>16</td><td>Clean up a regression suite: find duplicates, outdated and overlapping cases</td><td>Claude Code on a test-case export</td><td>High</td><td>Med</td><td>Medium</td><td><a href="#ch120">111</a></td></tr>
+<tr><td>17</td><td>Coverage gap analysis: compare a story's criteria with existing tests</td><td>Claude Code + Jira MCP</td><td>Med</td><td>High</td><td>Medium</td><td><a href="#ch101">94</a></td></tr>
+<tr class="group"><td colspan="7" style="background:var(--paper);font-weight:700;color:var(--ochre)">4 · Test data</td></tr>
+<tr><td>18</td><td>Synthetic customers, orders or accounts, including edge cases</td><td>Claude Code (generator script)</td><td>High</td><td>High</td><td>Easy</td><td><a href="#ch122">113</a></td></tr>
+<tr><td>19</td><td>Reusable data-generator scripts that run in CI</td><td>Claude Code</td><td>High</td><td>Med</td><td>Medium</td><td><a href="#ch122">113</a></td></tr>
+<tr><td>20</td><td>Masking script to anonymise data copied from production (with approval)</td><td>Claude Code</td><td>Med</td><td>Low</td><td>Medium</td><td><a href="#ch122">113</a></td></tr>
+<tr><td>21</td><td>Check database state after a UI action, with a read-only user</td><td>Database MCP</td><td>Med</td><td>Med</td><td>Medium</td><td><a href="#ch103">96</a></td></tr>
+<tr><td>22</td><td>Locale, time-zone, currency and Unicode edge-case data sets</td><td>Chat</td><td>Med</td><td>High</td><td>Easy</td><td><a href="#ch122">113</a></td></tr>
+<tr class="group"><td colspan="7" style="background:var(--paper);font-weight:700;color:var(--ochre)">5 · Automation creation and maintenance</td></tr>
+<tr><td>23</td><td>Turn a manual test case into a Playwright test that follows your conventions</td><td>Claude Code + Playwright MCP</td><td>High</td><td>Med</td><td>Medium</td><td><a href="#ch121">112</a></td></tr>
+<tr><td>24</td><td>Scaffolding (page objects, fixtures, helpers) defined once in CLAUDE.md</td><td>Claude Code</td><td>High</td><td>Low</td><td>Medium</td><td><a href="#ch77">74</a></td></tr>
+<tr><td>25</td><td>Repair broken locators after a UI change</td><td>Claude Code</td><td>High</td><td>Low</td><td>Medium</td><td><a href="#ch121">112</a></td></tr>
+<tr><td>26</td><td>Investigate a <a class="gl" href="#g-flaky-test">flaky test</a> from CI logs and history</td><td>Claude Code</td><td>High</td><td>Med</td><td>Medium</td><td><a href="#ch122">113</a></td></tr>
+<tr><td>27</td><td>A "test-reviewer" helper that checks new tests for weak assertions and hard waits</td><td>Subagent</td><td>Med</td><td>Med</td><td>Medium</td><td><a href="#ch81">78</a></td></tr>
+<tr><td>28</td><td>Run the linter or a fast test subset automatically after every edit</td><td>Hook</td><td>Low</td><td>Low</td><td>Medium</td><td><a href="#ch82">79</a></td></tr>
+<tr><td>29</td><td>Migrate an old suite to a new framework, one area at a time</td><td>Claude Code</td><td>High</td><td>Low</td><td>Hard</td><td><a href="#ch121">112</a></td></tr>
+<tr><td>30</td><td>Turn an exploratory browser session into a repeatable test</td><td>Playwright MCP + Claude Code</td><td>High</td><td>Med</td><td>Medium</td><td><a href="#ch102">95</a></td></tr>
+<tr class="group"><td colspan="7" style="background:var(--paper);font-weight:700;color:var(--ochre)">6 · API testing</td></tr>
+<tr><td>31</td><td>Generate API tests from an OpenAPI specification</td><td>Claude Code</td><td>High</td><td>High</td><td>Medium</td><td><a href="#ch85">82</a></td></tr>
+<tr><td>32</td><td>Negative, authentication and rate-limit cases for every endpoint</td><td>Chat or Claude Code</td><td>Med</td><td>High</td><td>Easy</td><td><a href="#ch85">82</a></td></tr>
+<tr><td>33</td><td>Contract checks: does service B still accept what service A sends?</td><td>Claude Code</td><td>Med</td><td>High</td><td>Hard</td><td><a href="#ch121">112</a></td></tr>
+<tr><td>34</td><td>Convert an API-tool collection into version-controlled code tests</td><td>Claude Code</td><td>High</td><td>Low</td><td>Medium</td><td><a href="#ch85">82</a></td></tr>
+<tr><td>35</td><td>Explain an unfamiliar API response or error in plain words</td><td>Chat</td><td>Med</td><td>Low</td><td>Easy</td><td><a href="#ch85">82</a></td></tr>
+<tr class="group"><td colspan="7" style="background:var(--paper);font-weight:700;color:var(--ochre)">7 · Exploratory testing</td></tr>
+<tr><td>36</td><td>Exploratory charters generated from the risk list</td><td>Chat or Project</td><td>Med</td><td>High</td><td>Easy</td><td><a href="#ch124">115</a></td></tr>
+<tr><td>37</td><td>AI-driven exploration of a page or flow, reporting anything odd</td><td>Playwright MCP</td><td>Med</td><td>High</td><td>Medium</td><td><a href="#ch124">115</a></td></tr>
+<tr><td>38</td><td>Turn rough session notes into bug reports and follow-up test ideas</td><td>Skill</td><td>High</td><td>Med</td><td>Easy</td><td><a href="#ch80">77</a></td></tr>
+<tr><td>39</td><td>Persona tours: first-time user, power user, keyboard-only user, slow network</td><td>Chat + Playwright MCP</td><td>Med</td><td>High</td><td>Medium</td><td><a href="#ch124">115</a></td></tr>
+<tr class="group"><td colspan="7" style="background:var(--paper);font-weight:700;color:var(--ochre)">8 · Non-functional: accessibility, performance, security, visual</td></tr>
+<tr><td>40</td><td>Accessibility check of key pages using the accessibility tree</td><td>Playwright MCP + Claude Code</td><td>Med</td><td>High</td><td>Medium</td><td><a href="#ch123">114</a></td></tr>
+<tr><td>41</td><td>Draft performance test scripts for your load-testing tool</td><td>Claude Code</td><td>High</td><td>Med</td><td>Medium</td><td><a href="#ch123">114</a></td></tr>
+<tr><td>42</td><td>Interpret performance results: where did response times jump, and why?</td><td>Chat with the results file</td><td>Med</td><td>Med</td><td>Easy</td><td><a href="#ch46">45</a></td></tr>
+<tr><td>43</td><td>Security pass on a branch before release</td><td>Claude Code <code>/security-review</code></td><td>Med</td><td>High</td><td>Easy</td><td><a href="#ch74">71</a></td></tr>
+<tr><td>44</td><td>Triage visual differences from screenshots: real bug or harmless change?</td><td>Claude reading images</td><td>Med</td><td>Med</td><td>Medium</td><td><a href="#ch123">114</a></td></tr>
+<tr><td>45</td><td>Localisation checks: truncated text, untranslated strings, wrong formats</td><td>Chat with screenshots</td><td>Med</td><td>Med</td><td>Easy</td><td><a href="#ch46">45</a></td></tr>
+<tr class="group"><td colspan="7" style="background:var(--paper);font-weight:700;color:var(--ochre)">9 · Defect management and triage</td></tr>
+<tr><td>46</td><td>Consistent bug reports in your team's template from notes and screenshots</td><td>Skill</td><td>High</td><td>Low</td><td>Easy</td><td><a href="#ch80">77</a></td></tr>
+<tr><td>47</td><td>Find likely duplicates before filing a new bug</td><td>Jira MCP</td><td>Med</td><td>Low</td><td>Medium</td><td><a href="#ch101">94</a></td></tr>
+<tr><td>48</td><td>Suggest severity and priority with a stated reason, for a human to confirm</td><td>Skill</td><td>Low</td><td>Low</td><td>Easy</td><td><a href="#ch80">77</a></td></tr>
+<tr><td>49</td><td>Root-cause hints from logs and stack traces</td><td>Claude Code</td><td>High</td><td>Med</td><td>Medium</td><td><a href="#ch115">107</a></td></tr>
+<tr><td>50</td><td>Turn each fixed bug into an automated regression test</td><td>Claude Code</td><td>Med</td><td>High</td><td>Medium</td><td><a href="#ch121">112</a></td></tr>
+<tr class="group"><td colspan="7" style="background:var(--paper);font-weight:700;color:var(--ochre)">10 · Regression and CI</td></tr>
+<tr><td>51</td><td>Smart <a class="gl" href="#g-regression-testing">regression</a> selection: which suites does this change put at risk?</td><td>Claude Code with git</td><td>High</td><td>Med</td><td>Medium</td><td><a href="#ch71">68</a></td></tr>
+<tr><td>52</td><td>Failure summary posted after every CI run</td><td>Claude Code <code>-p</code> in CI</td><td>High</td><td>Low</td><td>Medium</td><td><a href="#ch75">72</a></td></tr>
+<tr><td>53</td><td>Review a pull request for bugs and testability before you test it</td><td>Claude Code <code>/code-review</code></td><td>Med</td><td>Med</td><td>Easy</td><td><a href="#ch74">71</a></td></tr>
+<tr><td>54</td><td>Morning triage of last night's failures, prepared before stand-up</td><td><code>/schedule</code> (cloud scheduled tasks) or CI</td><td>High</td><td>Low</td><td>Medium</td><td><a href="#ch74">71</a></td></tr>
+<tr><td>55</td><td>Release test checklist built from the pull requests merged since the last release</td><td>GitHub MCP</td><td>Med</td><td>Med</td><td>Medium</td><td><a href="#ch103">96</a></td></tr>
+<tr class="group"><td colspan="7" style="background:var(--paper);font-weight:700;color:var(--ochre)">11 · Reporting and metrics</td></tr>
+<tr><td>56</td><td>Test summary report from raw results</td><td>Chat or Artifact</td><td>High</td><td>Low</td><td>Easy</td><td><a href="#ch48">47</a></td></tr>
+<tr><td>57</td><td>Interactive quality dashboard your stakeholders can open</td><td>Artifact</td><td>Med</td><td>Low</td><td>Easy</td><td><a href="#ch48">47</a></td></tr>
+<tr><td>58</td><td>Release-readiness summary written for non-technical stakeholders</td><td>Project</td><td>Med</td><td>Low</td><td>Easy</td><td><a href="#ch47">46</a></td></tr>
+<tr><td>59</td><td>Defect trend analysis from a spreadsheet export</td><td>Chat with the spreadsheet</td><td>Med</td><td>Med</td><td>Easy</td><td><a href="#ch46">45</a></td></tr>
+<tr class="group"><td colspan="7" style="background:var(--paper);font-weight:700;color:var(--ochre)">12 · Knowledge and onboarding</td></tr>
+<tr><td>60</td><td>A product Q&amp;A Project new testers can ask anything</td><td>Project</td><td>Med</td><td>Low</td><td>Easy</td><td><a href="#ch47">46</a></td></tr>
+<tr><td>61</td><td>Explain an unfamiliar feature's code before you test it</td><td>Claude Code</td><td>Med</td><td>Med</td><td>Easy</td><td><a href="#ch65">62</a></td></tr>
+<tr><td>62</td><td>Keep the test plan pages in Confluence up to date</td><td>Atlassian MCP</td><td>Med</td><td>Low</td><td>Medium</td><td><a href="#ch101">94</a></td></tr>
+<tr><td>63</td><td>A shared library of prompts, skills and subagents for the whole team</td><td>Skills, plugin</td><td>Med</td><td>Low</td><td>Medium</td><td><a href="#ch84">81</a></td></tr>
+<tr class="group"><td colspan="7" style="background:var(--paper);font-weight:700;color:var(--ochre)">13 · Testing AI features</td></tr>
+<tr><td>64</td><td>An eval set for a chatbot or AI feature: normal, edge and adversarial cases</td><td>Chat, then API</td><td>Med</td><td>High</td><td>Medium</td><td><a href="#ch125">116</a></td></tr>
+<tr><td>65</td><td><a class="gl" href="#g-prompt-injection">Prompt injection</a> test cases for anything that reads user content</td><td>Chat</td><td>Med</td><td>High</td><td>Medium</td><td><a href="#ch131">122</a></td></tr>
+<tr><td>66</td><td>Consistency testing: same input many times, measure how often answers differ</td><td>API script</td><td>High</td><td>High</td><td>Hard</td><td><a href="#ch125">116</a></td></tr>
+<tr><td>67</td><td>Automated grading with a model-graded rubric, spot-checked by people</td><td>API</td><td>High</td><td>Med</td><td>Hard</td><td><a href="#ch125">116</a></td></tr>
+<tr class="group"><td colspan="7" style="background:var(--paper);font-weight:700;color:var(--ochre)">14 · Team productivity and building new things</td></tr>
+<tr><td>68</td><td>A custom MCP server for an in-house tool (test management, environments)</td><td>MCP SDK</td><td>Med</td><td>Med</td><td>Hard</td><td><a href="#ch104">97</a></td></tr>
+<tr><td>69</td><td>A small internal QA tool, such as a test-data web form or an environment status page</td><td>Claude Code</td><td>High</td><td>Med</td><td>Medium</td><td><a href="#ch127">118</a></td></tr>
+<tr><td>70</td><td>Test process documentation (how we test, definitions of done) drafted and kept current</td><td>Project</td><td>Med</td><td>Low</td><td>Easy</td><td><a href="#ch47">46</a></td></tr>
+<tr><td>71</td><td>Meeting and stand-up notes turned into action items and follow-up tickets</td><td>Chat or Jira MCP</td><td>Low</td><td>Low</td><td>Easy</td><td><a href="#ch101">94</a></td></tr>
+<tr><td>72</td><td>A "value log" recording time saved and extra coverage for each experiment</td><td>Artifact</td><td>Low</td><td>Low</td><td>Easy</td><td><a href="#ch126">117</a></td></tr>
+</table></div>
+<p id="ideasEmpty" hidden>No idea matches that filter. Try a shorter word.</p>
+
+<h3 id="ch119-4"><span class="num">119.4</span>Start here: ten quick wins</h3>
+<p>These are easy to start, need no special setup beyond Claude itself, and tend to show results in the first week. They're a good first round for any team.</p>
+<div class="tbl"><table>
+<tr><th></th><th>Quick win</th><th>Why it works</th></tr>
+<tr><td>1</td><td><b>Ambiguity hunt</b> on next sprint's stories (#1)</td><td>Bugs prevented before code is written are the cheapest bugs of all</td></tr>
+<tr><td>2</td><td><b>Boundaries and partitions</b> for every input (#11)</td><td>Systematic technique the AI applies tirelessly; easy to review</td></tr>
+<tr><td>3</td><td><b>Negative and unhappy paths</b> (#14)</td><td>The cases people skip under time pressure</td></tr>
+<tr><td>4</td><td><b>Risk-based test plan draft</b> (#6)</td><td>Hours of document writing reduced to review</td></tr>
+<tr><td>5</td><td><b>Synthetic test data</b> with edge cases (#18)</td><td>Removes a constant blocker; no real personal data needed</td></tr>
+<tr><td>6</td><td><b>Bug-report skill</b> in your template (#46)</td><td>Every report consistent, whoever writes it</td></tr>
+<tr><td>7</td><td><b>Exploratory charters</b> from risks (#36)</td><td>Gives exploratory sessions focus and makes them reportable</td></tr>
+<tr><td>8</td><td><b>PR review before testing</b> with <code>/code-review</code> (#53)</td><td>Finds obvious bugs before a test cycle starts</td></tr>
+<tr><td>9</td><td><b>Test summary reports</b> from raw results (#56)</td><td>Turns an hour of formatting into minutes of checking</td></tr>
+<tr><td>10</td><td><b>Product Q&amp;A Project</b> for the team (#60)</td><td>Faster onboarding; fewer interruptions for senior testers</td></tr>
+</table></div>
+
+<h3 id="ch119-5"><span class="num">119.5</span>Example prompts for five ideas</h3>
+<div class="code"><span class="cap">#1 Ambiguity hunt (claude.ai Project holding the product docs)</span><pre>Here is user story CHK-412 and its acceptance criteria:
+&lt;story&gt; …paste… &lt;/story&gt;
+Act as a senior tester in refinement. List:
+1. Ambiguous or untestable statements, quoting each one.
+2. Missing scenarios (errors, limits, permissions, concurrency).
+3. Contradictions with the product docs in this Project.
+Phrase each as a question I can ask the product owner. Don't write test cases yet.</pre></div>
+<div class="code"><span class="cap">#11 Boundaries and partitions</span><pre>The "age" field accepts whole numbers from 18 to 65; "postcode" must match
+the UK format. For each field, list the equivalence partitions and boundary
+values, then give test cases in a table: ID, input, partition, expected result.
+Mark anything where the requirement doesn't tell you the expected result.</pre></div>
+<div class="code"><span class="cap">#18 Synthetic test data (Claude Code, in the test repository)</span><pre>Write a script in scripts/ that generates 200 fake customers as CSV for our
+test environment. Include: names with accents and apostrophes, very long
+addresses, empty optional fields, customers in three time zones, and 5 with
+duplicate emails in different cases. No real people or real email domains.
+Run it once and show me the first 10 rows.</pre></div>
+<div class="code"><span class="cap">#51 Smart regression selection (Claude Code)</span><pre>Compare this branch with main. List the changed files, explain in plain words
+what behaviour each change could affect, and map them to our test suites in
+tests/. Recommend which suites to run before merge and which can wait for the
+nightly run. Explain your reasoning; don't run anything yet.</pre></div>
+<div class="code"><span class="cap">#64 An eval set for an AI feature</span><pre>We're testing a support chatbot that answers questions from our help centre.
+Draft 15 eval cases: 5 normal questions, 5 edge cases (vague, misspelt,
+two questions in one), 5 adversarial (asks for other customers' data, tries
+to override instructions). For each give: input, what a good answer must do,
+what would count as a failure.</pre></div>
+
+<h3 id="ch119-6"><span class="num">119.6</span>Choosing: the impact × effort matrix</h3>
+<p>Seventy ideas are too many to try at once. A simple <a class="gl" href="#g-impact-effort-matrix">impact-effort matrix</a> helps a team agree on where to start. Score each candidate idea for <em>impact</em> (effort saved plus coverage gained, for your team) and <em>effort</em> (setup, learning, approvals), then place it in one of four boxes.</p>
+<div class="cols2">
+<div><h4>High impact, low effort · Do first</h4><p>Your quick wins. Start two or three of these this sprint.</p></div>
+<div><h4>High impact, high effort · Plan</h4><p>Worth it, but needs time: CI integration, MCP connections, a custom server. Plan them as small projects with an owner.</p></div>
+<div><h4>Low impact, low effort · Fill in</h4><p>Nice to have. Do them when someone has a spare hour, or as practice.</p></div>
+<div><h4>Low impact, high effort · Skip for now</h4><p>Revisit later. Your product or setup may change their value.</p></div>
+</div>
+<details class="deep"><summary>Scoring ideas more carefully</summary><div class="body">
+<p>For a more careful choice, score each idea from 1 to 5 on four questions and multiply impact by confidence, then divide by effort:</p>
+<div class="tbl"><table>
+<tr><th>Question</th><th>Score 1</th><th>Score 5</th></tr>
+<tr><td>Impact: how much time or risk does it address?</td><td>Minutes a month</td><td>Days a sprint, or a major risk</td></tr>
+<tr><td>Reach: how many people or releases benefit?</td><td>One person, once</td><td>Whole team, every release</td></tr>
+<tr><td>Confidence: how sure are we it'll work here?</td><td>A guess</td><td>We've seen it work</td></tr>
+<tr><td>Effort: how much work to set up and maintain?</td><td>An hour</td><td>Weeks, plus approvals</td></tr>
+</table></div>
+<p>Score = (Impact × Reach × Confidence) ÷ Effort. The numbers aren't precise; their value is in making the team discuss the same questions. Confidence also tells you what to test first: a quick, cheap experiment that raises confidence is often the best next step.</p>
+</div></details>
+
+<h3 id="ch119-7"><span class="num">119.7</span>Running a brainstorm workshop with your team</h3>
+<p>The ideas that stick are the ones the team chooses. A 90-minute workshop is enough to get from "AI could help us" to three agreed experiments with owners.</p>
+<div class="tbl"><table>
+<tr><th>Minutes</th><th>Step</th><th>What happens</th></tr>
+<tr><td>0–10</td><td>Frame</td><td>State the goal: "Pick three experiments that save effort or add coverage, to try for two weeks." Remind everyone of the company AI policy.</td></tr>
+<tr><td>10–25</td><td>Pain points</td><td>Each person writes their three most time-consuming or frustrating QA tasks on sticky notes (physical or digital). Group similar ones.</td></tr>
+<tr><td>25–45</td><td>Match ideas</td><td>For the top pain points, look up matching ideas in this catalogue (filter by stage). Add your own ideas too.</td></tr>
+<tr><td>45–65</td><td>Prioritise</td><td>Place candidates on the impact × effort matrix together. Discuss disagreements; they usually reveal hidden effort or hidden value.</td></tr>
+<tr><td>65–80</td><td>Design experiments</td><td>For the top three: owner, what you'll try, how you'll measure it (time before vs after, cases found), and what "success" means.</td></tr>
+<tr><td>80–90</td><td>Commit</td><td>Agree a date to share results. Record everything in a shared page or an Artifact.</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example (illustrative)</span><p>A five-person web QA team runs this workshop. Their top pain points are "writing regression test cases", "preparing test data for each environment" and "chasing unclear requirements". They choose three experiments: an ambiguity hunt on every story before refinement (#1), a synthetic data generator (#18) and a bug-report skill (#46). Two weeks later they compare time spent with the previous sprint and decide to keep two, rework one, and try the next three ideas from their matrix. This example is illustrative, not a measured case study; Chapter 129 shows more before-and-after scenarios.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Build your team's shortlist</b><span>45 min</span></div><ol>
+<li>Write down your five most time-consuming QA tasks from the last month.<span class="expect">a short list grounded in your real work, not in what sounds impressive.</span></li>
+<li>Filter the catalogue above for each task's stage and note two or three matching ideas per task.<span class="expect">roughly 10–15 candidate ideas.</span></li>
+<li>Paste your tasks and candidates into Claude: "I'm a QA engineer. Help me score these ideas on impact and effort for my team, and ask me questions where you need more information about our setup."<span class="expect">questions about your tools, plan and constraints, then a scored list. Correct anything it assumed wrongly.</span></li>
+<li>Place them on an impact × effort matrix. Ask Claude to draw it as an Artifact if you're in the Claude app.<span class="expect">a visual matrix you can share with your lead.</span></li>
+<li>Pick one "do first" idea and try it today. Record the time it took and what it produced.<span class="expect">your first entry in a value log (Chapter 126).</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"We should start with the most impressive idea."</dt><dd>Start with quick wins. Early, visible successes build trust and skills for the bigger projects.</dd>
+<dt>"AI is mainly for test automation."</dt><dd>Some of the largest gains are in requirements, test design, data and reporting, before and after automation.</dd>
+<dt>"The ratings tell us what we'll save."</dt><dd>They're rough guidance. Measure your own before-and-after times (Chapter 126).</dd>
+<dt>"Every idea needs MCP or coding."</dt><dd>About a third of the catalogue works with a chat or a Project alone. Start there if your setup is limited.</dd>
+<dt>"Once chosen, an idea is done."</dt><dd>Treat each one as an experiment: try it, measure it, then keep, adjust or drop it.</dd>
+</dl></div>
+
+<h3 id="ch119-r"><span class="num">119.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>AI helps at every testing stage; some of the biggest gains come early, in requirements and test design.</li>
+<li>Each idea maps to a specific Claude feature: chat and Projects for reasoning, Claude Code for code and data, MCP for real tools, headless mode and scheduling for CI, the API for your own tools.</li>
+<li>Start with quick wins (high impact, low effort), then plan the bigger projects.</li>
+<li>Use the impact × effort matrix and a 90-minute workshop to choose experiments together.</li>
+<li>Treat every idea as an experiment and measure it; the ratings here are only rough guidance.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Which Claude feature best fits "review every pull request for bugs before testing starts"?</p><div class="opts"><button>A claude.ai Artifact</button><button data-ok><code>/code-review</code> in Claude Code</button><button>The Playwright MCP server</button></div><p class="why" hidden>It reviews the current changes or a given PR for correctness bugs.</p></div>
+<div class="qz"><p class="q">Where does the impact × effort matrix tell you to start?</p><div class="opts"><button>High impact, high effort</button><button data-ok>High impact, low effort</button><button>Low impact, low effort</button></div><p class="why" hidden>Quick wins first; plan the high-effort ideas as projects.</p></div>
+<div class="qz"><p class="q">Your team has no MCP access yet. Which idea can you still start today?</p><div class="opts"><button>Find duplicate bugs in Jira automatically</button><button data-ok>Boundary values and partitions for every input field</button><button>AI-driven browser exploration</button></div><p class="why" hidden>It only needs a chat or a Project. The other two need MCP connections.</p></div>
+<div class="qz"><p class="q">What do the Low/Med/High ratings in the catalogue represent?</p><div class="opts"><button>Measured results from industry studies</button><button data-ok>Rough guidance; you should measure your own results</button><button>Anthropic's official benchmarks</button></div><p class="why" hidden>Chapter 126 shows how to measure real before-and-after values.</p></div>
+<div class="qz"><p class="q">Why do early-stage ideas such as the ambiguity hunt often give the biggest return?</p><div class="opts"><button>They use the most powerful model</button><button data-ok>Finding a gap before code is written prevents the bug, which is cheaper than finding it later</button><button>They don't need any review</button></div><p class="why" hidden>That's shift-left testing: problems are cheapest to fix at the start.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Run the 90-minute workshop from 110.7 with at least two colleagues (or, if you're on your own, with Claude playing the other roles). Produce: the pain-point list, the impact × effort matrix, and three experiments, each with an owner, a measure and a review date. Share it with your lead. In two weeks, record the results; you'll use them in Chapter 126 to build a value case.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"There are dozens of ways Claude can help QA, at every stage from requirements to reporting, not just automation. Each one fits a specific feature: a Project for reasoning over documents, Claude Code for scripts and data, MCP for Jira and Playwright, headless mode for CI. Start with quick wins like the ambiguity hunt, boundary values and synthetic data, pick the next ones with an impact-effort matrix, and measure every experiment."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/overview" target="_blank" rel="noopener">Claude Code documentation</a>, including commands (<code>/code-review</code>, <code>/security-review</code>, <code>/schedule</code>), headless mode, skills, subagents, hooks and MCP. Feature names checked against Claude Code 2.1.319.</li>
+<li>Anthropic, <a href="https://support.claude.com" target="_blank" rel="noopener">Claude Help Center</a>, for Projects, Artifacts and connectors in the Claude apps.</li>
+<li>Model Context Protocol, <a href="https://modelcontextprotocol.io" target="_blank" rel="noopener">modelcontextprotocol.io</a>.</li>
+<li>ISTQB, <a href="https://www.istqb.org/" target="_blank" rel="noopener">Certified Tester Foundation Level syllabus</a>, for test design techniques (equivalence partitioning, boundary value analysis, state transition testing, pairwise testing).</li>
+<li>Chapters 74, 80, 81, 82, 101, 102, 103, 120–127 of this book for each idea in depth.</li>
+</ol><p class="verified">Claude feature names verified 9 November 2026 · Ratings are illustrative guidance, not measured data</p></div>

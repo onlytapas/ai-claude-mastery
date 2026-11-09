@@ -1,0 +1,34 @@
+{
+ "TPU": {
+  "d": "Tensor Processing Unit: a chip Google designs specifically for the maths inside neural networks. Google trains and serves Gemini on TPUs and rents them to other companies, including Anthropic, through Google Cloud.",
+  "see": "ch28"
+ },
+ "Mixture of Experts": {
+  "d": "A model design (often shortened to MoE) where the network contains many smaller 'expert' parts and a router sends each token to only a few of them. Announcements then quote two sizes: total parameters (all experts) and active parameters (the ones used per token).",
+  "see": "ch28"
+ },
+ "Frontier model": {
+  "d": "One of the most capable AI models available at a given time, usually from a large lab such as Anthropic, OpenAI or Google DeepMind. The label is relative and changes as new models appear.",
+  "see": "ch28"
+ },
+ "CUDA": {
+  "d": "NVIDIA's software platform (first released 2006–07) that lets programmers use NVIDIA GPUs for general computing. Most deep-learning software is built on it, which is a big reason NVIDIA dominates AI hardware.",
+  "see": "ch29"
+ },
+ "Hyperscaler": {
+  "d": "A company that runs cloud computing at enormous scale, such as Amazon Web Services, Microsoft Azure and Google Cloud. Hyperscalers are the biggest buyers of AI chips and a main route by which companies reach AI models.",
+  "see": "ch29"
+ },
+ "Model licence": {
+  "d": "The legal terms that say what you may do with a downloadable model: use it commercially, change it, redistribute it. Some are standard open-source licences (Apache 2.0, MIT); others are custom, with conditions you must read.",
+  "see": "ch29"
+ },
+ "Sovereign AI": {
+  "d": "AI that a country or organisation can run and control within its own borders or infrastructure, rather than depending on a foreign provider's service. Often given as a reason to choose open-weight or locally hosted models.",
+  "see": "ch30"
+ },
+ "Entity List": {
+  "d": "A US government list of foreign companies and organisations that face export restrictions, so US technology cannot be supplied to them without a licence. Some AI companies are on it, which can affect whether your employer may use their services.",
+  "see": "ch30"
+ }
+}

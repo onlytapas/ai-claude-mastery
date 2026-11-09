@@ -1,0 +1,461 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>Why the most valuable QA engineers move from <em>using</em> AI to <em>building tools</em> with it</li>
+<li>How to build seven practical QA tools with Claude Code doing most of the typing: a skills pack, a reviewer subagent, a checking hook, a results server, a nightly CI summary, a dashboard and a team plugin</li>
+<li>How to test each tool before anyone relies on it</li>
+<li>How to share tools with your team so everyone gets the same behaviour</li>
+<li>How to choose the right mechanism for a job, and how to look after tools once people depend on them</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapters 80 (skills), 78 (subagents), 79 (hooks), 81 (plugins and team setup) and 97 (building an MCP server). You need Claude Code, Git, Node.js with a Playwright project, Python 3, and the small command-line JSON tool <code>jq</code>. Chapter 119's ideas list is a good source of "what should I build?"</div>
+
+<div class="bigidea"><p>Using AI saves you time on one task. <strong>Building a tool</strong> with AI saves time on every future task, for every person on your team. Claude Code can write most of the code for you, so a QA engineer who isn't a full-time developer can now build real, useful tools: shared commands that write bug reports the team's way, a reviewer that checks every new test, an automatic check that runs whenever a test changes, a nightly failure summary, a dashboard, and a single package that gives the whole team all of it. This chapter builds all seven, with complete working files, and shows how to test and share each one.</p></div>
+
+<h3 id="ch127-1"><span class="num">127.1</span>From tool user to toolmaker</h3>
+<p>Most people use AI one conversation at a time. They type a good prompt, get a good result, and next week they type it again. Everyone on the team writes their own slightly different version, and the quality depends on who wrote it.</p>
+<p>A toolmaker notices the repetition and captures it once. The prompt becomes a <a class="gl" href="#g-skill">skill</a> anyone can call. The review checklist becomes a <a class="gl" href="#g-subagent">subagent</a>. The "don't forget to run the test" reminder becomes a <a class="gl" href="#g-hook">hook</a> that never forgets. That's how one person's good habit becomes the whole team's standard.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A carpenter who cuts the same shape fifty times doesn't measure fifty times. They build a <em>jig</em>: a simple guide that makes every cut identical, so even an apprentice gets it right. The tools in this chapter are jigs for QA work. They make good practice the easy, default path.</p></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A test lead notices that bug reports from five testers come in five different formats, and developers keep asking for the build number. Writing one <code>/bug-report</code> skill takes half an hour with Claude Code's help. From then on, every report has the same sections, and the skill asks for the build number instead of guessing it.</p></div>
+
+<h3 id="ch127-2"><span class="num">127.2</span>The toolkit we'll build</h3>
+<div class="tbl"><table>
+<tr><th>#</th><th>Tool</th><th>Problem it solves</th><th>Mechanism</th></tr>
+<tr><td>1</td><td>Team skills pack: <code>/bug-report</code>, <code>/test-plan</code>, <code>/risk-review</code></td><td>Everyone prompts differently; quality varies</td><td>Skills</td></tr>
+<tr><td>2</td><td>Test reviewer</td><td>Weak or flaky tests slip through review</td><td>Subagent</td></tr>
+<tr><td>3</td><td>Test-file checker</td><td>Claude (or a person) edits a test and forgets to run it</td><td>Hook</td></tr>
+<tr><td>4</td><td>Test-results server</td><td>Claude can't easily query test reports</td><td>MCP server (Chapter 104)</td></tr>
+<tr><td>5</td><td>Nightly failure summary</td><td>Someone spends the morning reading red CI logs</td><td>Headless Claude Code in CI</td></tr>
+<tr><td>6</td><td>Test dashboard</td><td>Nobody can see the state of testing at a glance</td><td>A small script Claude writes, or an Artifact</td></tr>
+<tr><td>7</td><td>Team plugin</td><td>Sharing all of the above is fiddly</td><td>Plugin</td></tr>
+</table></div>
+<div class="flow">
+<div><b>Capture</b>Turn a repeated prompt or checklist into a file</div>
+<div><b>Test</b>Try it on real examples, including awkward ones</div>
+<div><b>Share</b>Commit it to the repo, or package it as a plugin</div>
+<div class="hl"><b>Own</b>Keep it working as the team and tools change</div>
+</div>
+<p>You don't have to write any of these files by hand. A good way to work is to ask Claude Code to create each one from the description in this chapter, then compare its version with the one shown here. The files below are complete and were checked against Claude Code 2.1.319.</p>
+
+<h3 id="ch127-3"><span class="num">127.3</span>Tool 1: a team skills pack</h3>
+<p>A skill is a folder containing a <code>SKILL.md</code> file: a short block of settings (the "frontmatter", between <code>---</code> lines) followed by plain instructions. Put project skills in <code>.claude/skills/&lt;name&gt;/SKILL.md</code> and commit them; everyone who clones the repository gets them. You run a skill by typing <code>/name</code>, and Claude can also load it on its own when your request matches its <code>description</code>.</p>
+<div class="code"><span class="cap">.claude/skills/bug-report/SKILL.md</span><pre>---
+name: bug-report
+description: Write a bug report in the team's Jira format. Use when the user describes a defect, a failing test or broken behaviour, or asks for a bug report.
+argument-hint: "[short description of the problem]"
+---
+
+Write a bug report for: $ARGUMENTS
+
+Use exactly these sections:
+1. **Title**: [Area] what is wrong, in under 12 words
+2. **Environment**: build, browser, OS, test account
+3. **Steps to reproduce**: numbered, one action per step
+4. **Expected result** and **Actual result**
+5. **Severity** (S1–S4) with a one-line reason
+6. **Evidence**: screenshots, log lines or test output provided
+
+Ask for any missing environment details before finishing. Never guess a build number.</pre></div>
+<ul>
+<li><code>description</code> is what Claude reads to decide when the skill applies, so it says both <em>what</em> it does and <em>when</em> to use it, in the words people actually type.</li>
+<li><code>argument-hint</code> is the grey hint shown after <code>/bug-report</code> in the menu.</li>
+<li><code>$ARGUMENTS</code> is replaced by whatever you type after the command.</li>
+</ul>
+<div class="code"><span class="cap">.claude/skills/test-plan/SKILL.md</span><pre>---
+name: test-plan
+description: Draft a test plan for a feature or user story, with risks, scope and test cases. Use when the user asks for a test plan or test cases for a story.
+argument-hint: "[story key or feature name]"
+---
+
+Create a test plan for $ARGUMENTS.
+
+1. List ambiguous or missing acceptance criteria as questions first.
+2. Rank the main risks (likelihood and impact).
+3. Write test cases as a table: ID, Title, Preconditions, Steps, Expected, Priority (P1–P3).
+   Cover positive, negative, boundary, accessibility and error-handling cases.
+4. Mark which cases should be automated, and why.</pre></div>
+<p>The third skill uses a powerful feature: a line written as <code>!`command`</code> runs that shell command <em>before</em> Claude sees the skill, and pastes its output in. So the skill arrives already knowing what changed.</p>
+<div class="code"><span class="cap">.claude/skills/risk-review/SKILL.md</span><pre>---
+name: risk-review
+description: Review the current branch's changes for test risk and suggest what to test. Use before testing a pull request or deciding regression scope.
+disable-model-invocation: true
+---
+
+## Changed files on this branch
+!`git diff --stat origin/main...HEAD`
+
+Using the changes above:
+1. Group the changed files by product area.
+2. For each area, say what could break and how likely it is.
+3. List the existing test suites that cover these areas, and the gaps.
+4. Recommend a regression scope: must-run, should-run and safe-to-skip.</pre></div>
+<ul>
+<li><code>disable-model-invocation: true</code> means only a person can run it. Use this for skills that you want to run deliberately, not whenever Claude thinks they fit.</li>
+<li>If your main branch isn't called <code>main</code>, change <code>origin/main</code> to match.</li>
+</ul>
+<h4>How to test it</h4>
+<ol>
+<li>Start a new session and type <code>/</code>. The three skills should be in the list. <code>/skills</code> also lists them.</li>
+<li>Run <code>/bug-report checkout total ignores coupon</code> and check every section is present and it asks for the build.</li>
+<li>Describe a bug in plain words <em>without</em> the command. Claude should pick the skill up from its description. If it doesn't, improve the description.</li>
+<li>Try an awkward case: a vague one-line complaint, a bug with no steps. Good skills ask questions; bad ones invent details.</li>
+</ol>
+<h4>How to share it</h4>
+<p>Commit the <code>.claude/skills/</code> folder. Personal variations go in <code>~/.claude/skills/</code> instead, which only you see.</p>
+
+<h3 id="ch127-4"><span class="num">127.4</span>Tool 2: a test-reviewer subagent</h3>
+<p>A subagent is a helper Claude can hand a job to. It starts with a fresh, empty context, follows its own instructions, can be limited to certain tools, and reports back only its result. That makes it ideal for an independent review: it isn't influenced by the conversation that produced the code.</p>
+<div class="code"><span class="cap">.claude/agents/test-reviewer.md</span><pre>---
+name: test-reviewer
+description: Reviews test code for flakiness, weak assertions and missing cases. Use after tests are written or changed.
+tools: Read, Glob, Grep
+model: sonnet
+---
+
+You are a strict QA reviewer. For each test file you are given, report:
+- hard-coded waits or timing assumptions (for example waitForTimeout)
+- assertions that can never fail, or that check too little
+- missing negative, boundary and error cases
+- shared state or order dependence between tests
+- selectors that are likely to break (CSS classes instead of test ids or roles)
+
+Return a table with columns: file, line, issue, suggested fix. Do not edit files.</pre></div>
+<ul>
+<li>Only <code>name</code> and <code>description</code> are required. The text below the frontmatter becomes the subagent's own instructions.</li>
+<li><code>tools: Read, Glob, Grep</code> makes it read-only: it can look but can't change anything. A reviewer shouldn't edit what it reviews.</li>
+<li><code>model: sonnet</code> picks the model; you can also use <code>opus</code>, <code>haiku</code>, <code>fable</code> or <code>inherit</code> (use the session's model).</li>
+</ul>
+<p>Use it by asking: <em>"Use the test-reviewer subagent on tests/checkout.spec.ts."</em> In current versions, <code>/agents</code> only prints a reminder; you create and edit subagents by writing these files (or asking Claude to). Files are picked up within seconds.</p>
+<h4>How to test it</h4>
+<p>Write a deliberately bad test: a <code>waitForTimeout(3000)</code>, an assertion like <code>expect(true).toBe(true)</code>, and a CSS-class selector. A good reviewer flags all three. If it misses one, tighten its instructions. This is "testing the tester", and it's a habit worth keeping.</p>
+
+<h3 id="ch127-5"><span class="num">127.5</span>Tool 3: a hook that checks every test edit</h3>
+<p>Skills and subagents are instructions Claude <em>chooses</em> to follow. A hook is different: Claude Code itself runs it at a set moment, every time. Use a hook for anything that must never be skipped.</p>
+<p>This hook runs after Claude edits or writes a file. If the file is a Playwright spec, it lints it and runs just that test. If either fails, Claude is told immediately and can fix it.</p>
+<div class="code"><span class="cap">.claude/hooks/check-test-file.sh</span><pre>#!/bin/bash
+<span class="c"># Runs after Claude edits or writes a file.</span>
+<span class="c"># If the file is a Playwright spec, lint it and run just that spec.</span>
+input=$(cat)
+file=$(echo "$input" | jq -r '.tool_input.file_path // empty')
+
+case "$file" in
+  *.spec.ts|*.spec.js) ;;      <span class="c"># carry on for test files</span>
+  *) exit 0 ;;                 <span class="c"># ignore every other file</span>
+esac
+
+cd "$CLAUDE_PROJECT_DIR" || exit 0
+
+if ! out=$(npx eslint "$file" 2>&1); then
+  echo "ESLint found problems in $file:" >&2
+  echo "$out" >&2
+  exit 2
+fi
+
+if ! out=$(npx playwright test "$file" --reporter=line 2>&1); then
+  echo "The test in $file failed:" >&2
+  echo "$out" | tail -n 40 >&2
+  exit 2
+fi
+exit 0</pre></div>
+<div class="tbl"><table>
+<tr><th>Line</th><th>What it does</th></tr>
+<tr><td><code>input=$(cat)</code></td><td>Claude Code sends details of the action as <a class="gl" href="#g-json">JSON</a> on the script's input. This reads all of it.</td></tr>
+<tr><td><code>jq -r '.tool_input.file_path // empty'</code></td><td>Pulls out the path of the file that was edited (or nothing, if there isn't one).</td></tr>
+<tr><td><code>case … esac</code></td><td>Only continues for files ending <code>.spec.ts</code> or <code>.spec.js</code>.</td></tr>
+<tr><td><code>$CLAUDE_PROJECT_DIR</code></td><td>The project's root folder, provided by Claude Code.</td></tr>
+<tr><td><code>exit 2</code> with a message on <code>&gt;&amp;2</code></td><td>Exit code 2 plus text on the error stream. After an edit, this shows the message to Claude so it can react. Exit 0 means "all fine".</td></tr>
+</table></div>
+<p>Make it executable with <code>chmod +x .claude/hooks/check-test-file.sh</code>, then register it in <code>.claude/settings.json</code>:</p>
+<div class="code"><span class="cap">.claude/settings.json (the hooks section)</span><pre>{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/check-test-file.sh", "timeout": 300 }
+        ]
+      }
+    ]
+  }
+}</pre></div>
+<ul>
+<li><code>PostToolUse</code> means "after a tool has run". <code>"matcher": "Edit|Write"</code> limits it to file edits and new files.</li>
+<li><code>timeout</code> is in seconds. Running a browser test takes a while, so we allow up to five minutes.</li>
+<li>You can view the hooks Claude Code has loaded with <code>/hooks</code>.</li>
+</ul>
+<h4>How to test it, without Claude</h4>
+<p>Because a hook is just a script reading JSON, you can test it yourself by sending it fake input:</p>
+<div class="code"><span class="cap">Terminal</span><pre>echo '{"tool_input":{"file_path":"src/app.ts"}}' | CLAUDE_PROJECT_DIR="$PWD" .claude/hooks/check-test-file.sh; echo "exit=$?"
+<span class="c"># exit=0: not a test file, so it does nothing</span>
+
+echo '{"tool_input":{"file_path":"tests/checkout.spec.ts"}}' | CLAUDE_PROJECT_DIR="$PWD" .claude/hooks/check-test-file.sh; echo "exit=$?"
+<span class="c"># exit=0 if the spec passes; exit=2 and an error message if it fails</span></pre></div>
+<div class="box warn"><span class="tag">Careful</span><p>A hook runs real commands, automatically, with your permissions. Read any hook before adding it, especially one from someone else, and keep hooks fast: a slow hook after every edit makes everyone's sessions slow.</p></div>
+
+<h3 id="ch127-6"><span class="num">127.6</span>Tool 4: a test-results MCP server</h3>
+<p>Chapter 104 builds this tool step by step: a small Python <a class="gl" href="#g-mcp-server">MCP server</a> called <code>qa-results</code> that reads <a class="gl" href="#g-junit-xml">JUnit XML</a> reports and gives Claude tools to list failing tests and read their errors. Follow that chapter to build and test it. Here's how it fits into the toolkit.</p>
+<p>Commit the server under <code>tools/qa-results/</code> and share it through <code>.mcp.json</code> at the repository root, as Chapter 104 shows. Teammates are asked to approve project servers the first time, which is a safety feature, not a fault.</p>
+<p>The real value comes from combining tools. With the server connected, the <code>/bug-report</code> skill can be invoked as <em>"/bug-report the expired-coupon failure from last night"</em>, and Claude can fetch the actual failure message from the server instead of you pasting it in.</p>
+<div class="flow">
+<div><b>Skill</b>/bug-report sets the format</div>
+<div><b>MCP server</b>qa-results supplies the real failure details</div>
+<div><b>Claude</b>Writes the report, asks for anything missing</div>
+<div class="hl"><b>You</b>Review and file it</div>
+</div>
+
+<h3 id="ch127-7"><span class="num">127.7</span>Tool 5: a nightly failure summary in CI</h3>
+<p>Claude Code can run without a person watching, using <strong>print mode</strong> (<code>claude -p</code>). It answers once and exits, which is perfect for scripts and CI pipelines. This GitHub Actions workflow runs the test suite every night and, if anything fails, asks Claude to summarise the failures into the job's summary page.</p>
+<div class="code"><span class="cap">.github/workflows/nightly.yml</span><pre>name: Nightly tests with AI summary
+on:
+  schedule:
+    - cron: "0 2 * * *"          <span class="c"># every day at 02:00 UTC</span>
+  workflow_dispatch:              <span class="c"># also allow manual runs</span>
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npx playwright install --with-deps
+
+      - name: Run tests
+        id: tests
+        continue-on-error: true
+        run: npx playwright test --reporter=junit
+        env:
+          PLAYWRIGHT_JUNIT_OUTPUT_NAME: test-results/results.xml
+
+      - name: Summarise failures with Claude
+        if: steps.tests.outcome == 'failure'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash
+          ~/.local/bin/claude -p "Read test-results/results.xml. Group the failures by likely root cause. For each group give the tests, the error, whether it looks like a product bug, a test bug or flakiness, and a suggested next step. Use Markdown." \
+            --bare \
+            --allowedTools "Read,Grep,Glob" \
+            --permission-prompts none \
+            --max-budget-usd 1 \
+            --output-format json | jq -r '.result' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail the job if tests failed
+        if: steps.tests.outcome == 'failure'
+        run: exit 1</pre></div>
+<div class="tbl"><table>
+<tr><th>Part</th><th>Why it's there</th></tr>
+<tr><td><code>continue-on-error: true</code> and <code>id: tests</code></td><td>Lets the workflow carry on to the summary step after a test failure, while remembering the result</td></tr>
+<tr><td><code>curl … install.sh | bash</code></td><td>The official native installer; it puts <code>claude</code> in <code>~/.local/bin</code></td></tr>
+<tr><td><code>-p "…"</code></td><td>Print mode: one prompt, one answer, then exit</td></tr>
+<tr><td><code>--bare</code></td><td>Skips loading hooks, skills, plugins, MCP servers and CLAUDE.md, so CI runs are predictable. It signs in only with <code>ANTHROPIC_API_KEY</code>.</td></tr>
+<tr><td><code>--allowedTools "Read,Grep,Glob"</code></td><td>Read-only: the summary job can look at files but not change anything</td></tr>
+<tr><td><code>--permission-prompts none</code></td><td>Nobody is there to answer questions, so anything that would ask permission is denied automatically</td></tr>
+<tr><td><code>--max-budget-usd 1</code></td><td>A spending cap for this run, in US dollars</td></tr>
+<tr><td><code>--output-format json</code> then <code>jq -r '.result'</code></td><td>Gets a structured answer and pulls out just the text</td></tr>
+<tr><td><code>$GITHUB_STEP_SUMMARY</code></td><td>A file GitHub shows on the run's summary page</td></tr>
+<tr><td>Final step <code>exit 1</code></td><td>Keeps the job red when tests failed, so nobody mistakes a summary for a pass</td></tr>
+</table></div>
+<p>Store the key as a repository secret named <code>ANTHROPIC_API_KEY</code> (Chapter 98 explains keys and secrets). Never write it into the file. Anthropic also publishes an official GitHub Action, <code>anthropics/claude-code-action@v1</code>, which is the better choice when you want people to mention <code>@claude</code> in pull requests (Chapter 71).</p>
+<h4>How to test it</h4>
+<p>Trigger it manually with "Run workflow" (that's what <code>workflow_dispatch</code> allows) after deliberately breaking one test on a branch. Check the summary page shows a sensible grouping and that the job still ends red.</p>
+
+<h3 id="ch127-8"><span class="num">127.8</span>Tool 6: a test dashboard</h3>
+<p>Managers and developers want to see the state of testing without opening reports. Two simple routes:</p>
+<div class="cols2">
+<div><h4>Route A: a script that builds a page</h4><p>Claude Code writes a small script that turns JUnit reports into a one-page HTML dashboard. It runs anywhere, including at the end of the CI job above, and needs no server.</p></div>
+<div><h4>Route B: a Claude Artifact</h4><p>Paste or upload a summary in the Claude app and ask for an interactive dashboard Artifact (Chapter 48). Quick to create and easy to share, but you refresh it by hand.</p></div>
+</div>
+<p>Here's Route A. It uses only Python's standard library, so there's nothing to install.</p>
+<div class="code"><span class="cap">tools/make_dashboard.py</span><pre>#!/usr/bin/env python3
+"""Turn JUnit XML test reports into a one-page HTML dashboard.
+
+Usage: python3 tools/make_dashboard.py [reports-folder] [output-file]
+"""
+import glob
+import html
+import sys
+import xml.etree.ElementTree as ET
+from datetime import datetime
+
+folder = sys.argv[1] if len(sys.argv) > 1 else "test-results"
+output = sys.argv[2] if len(sys.argv) > 2 else "dashboard.html"
+
+suites, failures = [], []
+for path in sorted(glob.glob(f"{folder}/**/*.xml", recursive=True)):
+    root = ET.parse(path).getroot()
+    found = [root] if root.tag == "testsuite" else root.findall("testsuite")
+    for s in found:
+        total = int(s.get("tests", 0))
+        failed = int(s.get("failures", 0)) + int(s.get("errors", 0))
+        skipped = int(s.get("skipped", 0))
+        suites.append((s.get("name", path), total, total - failed - skipped, failed, skipped))
+        for case in s.findall("testcase"):
+            problem = case.find("failure")
+            if problem is None:
+                problem = case.find("error")
+            if problem is not None:
+                message = (problem.get("message") or "").strip()[:200]
+                failures.append((case.get("classname", ""), case.get("name", ""), message))
+
+total = sum(s[1] for s in suites)
+passed = sum(s[2] for s in suites)
+failed = sum(s[3] for s in suites)
+rate = f"{passed / total * 100:.1f}%" if total else "n/a"
+
+def cells(values):
+    return "".join(f"&lt;td&gt;{html.escape(str(v))}&lt;/td&gt;" for v in values)
+
+suite_rows = "".join(f"&lt;tr&gt;{cells(s)}&lt;/tr&gt;" for s in suites)
+failure_rows = "".join(f"&lt;tr&gt;{cells(f)}&lt;/tr&gt;" for f in failures) or "&lt;tr&gt;&lt;td colspan='3'&gt;No failures&lt;/td&gt;&lt;/tr&gt;"
+
+page = f"""&lt;!doctype html&gt;&lt;html&gt;&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Test dashboard&lt;/title&gt;
+&lt;style&gt;body{{font-family:system-ui,sans-serif;margin:2rem;color:#1d2a22}}
+table{{border-collapse:collapse;margin:1rem 0}}td,th{{border:1px solid #ccc;padding:.4rem .7rem;text-align:left}}
+.big{{font-size:2rem;font-weight:700}}&lt;/style&gt;&lt;/head&gt;&lt;body&gt;
+&lt;h1&gt;Test dashboard&lt;/h1&gt;&lt;p&gt;Generated {datetime.now():%Y-%m-%d %H:%M} from {html.escape(folder)}&lt;/p&gt;
+&lt;p class="big"&gt;{passed} of {total} passed ({rate}) · {failed} failed&lt;/p&gt;
+&lt;h2&gt;Suites&lt;/h2&gt;&lt;table&gt;&lt;tr&gt;&lt;th&gt;Suite&lt;/th&gt;&lt;th&gt;Tests&lt;/th&gt;&lt;th&gt;Passed&lt;/th&gt;&lt;th&gt;Failed&lt;/th&gt;&lt;th&gt;Skipped&lt;/th&gt;&lt;/tr&gt;{suite_rows}&lt;/table&gt;
+&lt;h2&gt;Failures&lt;/h2&gt;&lt;table&gt;&lt;tr&gt;&lt;th&gt;File&lt;/th&gt;&lt;th&gt;Test&lt;/th&gt;&lt;th&gt;Message&lt;/th&gt;&lt;/tr&gt;{failure_rows}&lt;/table&gt;
+&lt;/body&gt;&lt;/html&gt;"""
+
+with open(output, "w", encoding="utf-8") as f:
+    f.write(page)
+print(f"Wrote {output}: {passed}/{total} passed, {failed} failed")</pre></div>
+<ul>
+<li>It finds every <code>.xml</code> report under the folder, reads each test suite's totals, and collects each failing test's message.</li>
+<li><code>html.escape</code> makes sure an error message containing <code>&lt;</code> or quotes can't break the page.</li>
+<li>Run it with <code>python3 tools/make_dashboard.py test-results dashboard.html</code>. It prints a one-line summary such as <code>Wrote dashboard.html: 3/5 passed, 1 failed</code>.</li>
+</ul>
+<p>To publish it automatically, add a CI step that runs the script and uploads <code>dashboard.html</code> as a build artifact, or ask Claude Code to extend it with trends over time once you have several nights of reports.</p>
+<details class="deep"><summary>Why ask Claude to write the script instead of asking it for the dashboard each time?</summary><div class="body">
+<p>Asking Claude to read reports and describe them every day costs tokens, varies slightly each time, and depends on a person remembering to ask. A script Claude wrote once runs in a fraction of a second, gives exactly the same kind of output every time, costs nothing to run, and can be reviewed like any other code. A good rule: <strong>use AI to build deterministic tools for repeatable jobs; use AI directly for judgement</strong>, like grouping failures by likely cause in the CI summary.</p>
+</div></details>
+
+<h3 id="ch127-9"><span class="num">127.9</span>Tool 7: package it all as a team plugin</h3>
+<p>Committing files to one repository shares them with that repository's users. A <a class="gl" href="#g-plugin">plugin</a> shares them across <em>every</em> repository, installed in one step. It's a folder with a manifest and the same kinds of files you've already written.</p>
+<div class="code"><span class="cap">Plugin folder layout</span><pre>qa-toolkit/
+├── .claude-plugin/
+│   └── plugin.json            <span class="c"># the manifest (only this file goes in .claude-plugin/)</span>
+├── README.md                  <span class="c"># what it does and how to use it</span>
+├── skills/
+│   ├── bug-report/SKILL.md
+│   ├── test-plan/SKILL.md
+│   └── risk-review/SKILL.md
+├── agents/
+│   └── test-reviewer.md
+├── hooks/
+│   └── hooks.json             <span class="c"># same shape as the "hooks" part of settings.json</span>
+└── scripts/
+    └── check-test-file.sh</pre></div>
+<div class="code"><span class="cap">qa-toolkit/.claude-plugin/plugin.json</span><pre>{
+  "name": "qa-toolkit",
+  "description": "Our QA team's skills, test reviewer, test-file hook and results server",
+  "version": "1.0.0",
+  "author": { "name": "QA Team" },
+  "license": "MIT"
+}</pre></div>
+<div class="code"><span class="cap">qa-toolkit/hooks/hooks.json</span><pre>{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/check-test-file.sh\"",
+            "timeout": 300
+          }
+        ]
+      }
+    ]
+  }
+}</pre></div>
+<ul>
+<li><code>${CLAUDE_PLUGIN_ROOT}</code> means "wherever this plugin is installed". Wrap it in quotes so a folder name with a space can't break the command; Claude Code's validator warns if you forget.</li>
+<li>Inside a plugin, skills are called with the plugin's name in front: <code>/qa-toolkit:bug-report</code>.</li>
+<li>Plugin subagents ignore some settings (such as their own hooks and MCP servers), so keep the reviewer simple.</li>
+<li>An MCP server can be included with a <code>.mcp.json</code> file in the plugin folder.</li>
+</ul>
+<h4>How to test it</h4>
+<div class="code"><span class="cap">Terminal</span><pre>claude plugin validate ./qa-toolkit       <span class="c"># checks the manifest, hooks and layout</span>
+claude --plugin-dir ./qa-toolkit          <span class="c"># loads it for this session only</span></pre></div>
+<p>The validator prints <code>✔ Validation passed</code> when the plugin is correct, plus advice. Some advice (an icon, an install line in the README) only matters if you publish to Anthropic's public plugin directory; an internal team plugin doesn't need it. With <code>--plugin-dir</code>, type <code>/qa-toolkit:bug-report</code> to try it without installing anything.</p>
+<h4>How to share it</h4>
+<p>Put the plugin in a Git repository that also contains a marketplace file, <code>.claude-plugin/marketplace.json</code>, listing your plugins (Chapter 84 shows the format). Then teammates run:</p>
+<div class="code"><span class="cap">Terminal</span><pre>claude plugin marketplace add your-org/qa-plugins
+claude plugin install qa-toolkit@qa-plugins --scope project</pre></div>
+<p>The part after <code>@</code> is the marketplace's name from its <code>marketplace.json</code>. <code>--scope project</code> records the plugin in the project's shared settings so everyone on that project gets it; <code>user</code> scope would install it just for you. Inside a session, <code>/plugin</code> lets people browse and manage plugins, and <code>/reload-plugins</code> loads new ones without restarting.</p>
+
+<h3 id="ch127-10"><span class="num">127.10</span>Choosing the right mechanism</h3>
+<div class="tbl"><table>
+<tr><th>If you need…</th><th>Use</th><th>Because</th></tr>
+<tr><td>A repeatable way of doing a task (format, steps, checklist)</td><td>Skill</td><td>Instructions loaded only when needed; anyone can call it</td></tr>
+<tr><td>An independent second opinion, or a big search that shouldn't clutter the conversation</td><td>Subagent</td><td>Fresh context, limited tools, returns only a summary</td></tr>
+<tr><td>Something that must happen every single time</td><td>Hook</td><td>Run by Claude Code itself; can't be forgotten</td></tr>
+<tr><td>Claude to reach live data or an outside system</td><td>MCP server</td><td>A standard connection with defined tools</td></tr>
+<tr><td>Work done with nobody watching</td><td><code>claude -p</code> in CI, or the GitHub Action</td><td>Scriptable, cappable, auditable</td></tr>
+<tr><td>The same output every time from the same input</td><td>A script Claude writes</td><td>Fast, free to run, predictable</td></tr>
+<tr><td>All of the above for many repositories</td><td>Plugin</td><td>One install gives everyone the same setup</td></tr>
+<tr><td>Project facts Claude should always know</td><td>CLAUDE.md (Chapter 77)</td><td>Loaded at the start of every session</td></tr>
+</table></div>
+
+<h3 id="ch127-11"><span class="num">127.11</span>Owning and maintaining your tools</h3>
+<p>The moment other people rely on a tool, it becomes a small product. Treat it that way:</p>
+<ul>
+<li><strong>Give every tool an owner</strong> and write their name in the README.</li>
+<li><strong>Keep tools in version control</strong> and change them through pull requests, so changes are reviewed.</li>
+<li><strong>Bump the version</strong> in <code>plugin.json</code> when you change behaviour, and note what changed.</li>
+<li><strong>Keep test examples</strong>: a few bug descriptions for the skills, a bad test file for the reviewer, a sample report for the dashboard. Re-run them after changes. Chapter 125 shows how to turn these into proper evals.</li>
+<li><strong>Re-check after Claude Code updates.</strong> Features change; the version this book was checked against is 2.1.319.</li>
+<li><strong>Ask for feedback.</strong> A skill nobody uses is a sign the description, the output or the problem is wrong.</li>
+<li><strong>Retire tools</strong> that are no longer needed. Fewer, better tools beat a cluttered menu.</li>
+</ul>
+
+<div class="lab"><div class="lab-h"><b>Build and ship the toolkit</b><span>About 90 minutes · a Playwright project</span></div><ol>
+<li>In your project, ask Claude Code: "Create the three skills in .claude/skills/ described in Chapter 127: bug-report, test-plan and risk-review." Compare its files with section 118.3.<span class="expect">three <code>SKILL.md</code> files, and all three skills listed when you type <code>/</code> in a new session.</span></li>
+<li>Run <code>/bug-report</code> with a one-line description and no build number.<span class="expect">a report with all six sections that asks you for the build rather than inventing one.</span></li>
+<li>Create the test-reviewer subagent and run it on a test file containing a <code>waitForTimeout</code> and an always-true assertion.<span class="expect">a table that flags both problems and suggests fixes, with no edits made.</span></li>
+<li>Add the hook script and settings. Test it by piping fake JSON into it, as in 118.5.<span class="expect"><code>exit=0</code> for a non-test file; for a spec, <code>exit=0</code> if it passes or <code>exit=2</code> and an error message if it fails.</span></li>
+<li>Ask Claude to change a spec so one assertion fails.<span class="expect">after the edit, Claude receives the hook's failure message and responds to it.</span></li>
+<li>Run the dashboard script on your <code>test-results</code> folder and open the HTML file.<span class="expect">totals, a suites table and a failures table that match your report.</span></li>
+<li>Move the skills, subagent and hook into a <code>qa-toolkit/</code> plugin folder and run <code>claude plugin validate ./qa-toolkit</code>.<span class="expect"><code>✔ Validation passed</code>, possibly with advice about an icon or README install line.</span></li>
+<li>Start <code>claude --plugin-dir ./qa-toolkit</code> and run <code>/qa-toolkit:test-plan</code> on a real story.<span class="expect">the plugin's version of the skill runs, without anything installed.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"I need to be a developer to build tools."</dt><dd>Claude Code writes most of the code. You bring what matters most: knowing which problems are worth solving and what "good" looks like.</dd>
+<dt>"A skill will always be followed exactly."</dt><dd>Skills are instructions, followed very reliably but not guaranteed. If something must always happen, use a hook or a script.</dd>
+<dt>"Hooks are a good place for slow, heavy checks."</dt><dd>Hooks run often. Keep them fast and focused; put full-suite runs in CI.</dd>
+<dt>"Once it works, it's done."</dt><dd>Tools need owners, versions and re-testing, especially as Claude Code and your test stack change.</dd>
+<dt>"The CI summary replaces looking at failures."</dt><dd>It's a head start. A person still decides whether each failure is a product bug, a test bug or noise.</dd>
+</dl></div>
+
+<h3 id="ch127-r"><span class="num">127.12</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Building tools turns one person's good practice into the team's default, and saves time on every future task.</li>
+<li>Skills capture how to do a task; subagents give independent reviews; hooks enforce what must always happen; MCP servers connect live data; <code>claude -p</code> works unattended; scripts give identical results every time; plugins share everything.</li>
+<li>Test every tool with real and awkward examples before others depend on it, including "testing the tester".</li>
+<li>Share project tools by committing <code>.claude/</code> files; share across projects with a plugin and a marketplace.</li>
+<li>Owned, versioned, reviewed and regularly re-tested tools stay useful; unowned tools quietly rot.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Every edited Playwright spec must be linted and run, with no exceptions. Which mechanism fits best?</p><div class="opts"><button>A skill</button><button data-ok>A hook</button><button>A line in CLAUDE.md</button></div><p class="why" hidden>Hooks are run by Claude Code itself every time; skills and CLAUDE.md are instructions the model follows.</p></div>
+<div class="qz"><p class="q">Why does the test-reviewer subagent have only <code>Read, Glob, Grep</code> tools?</p><div class="opts"><button>Those are the only tools subagents can use</button><button data-ok>A reviewer should look, not change what it reviews</button><button>It makes the subagent cheaper</button></div><p class="why" hidden>Limiting tools keeps the review independent and safe.</p></div>
+<div class="qz"><p class="q">In the CI workflow, what does <code>--permission-prompts none</code> do?</p><div class="opts"><button>Allows every action without asking</button><button data-ok>Automatically denies anything that would need a person to approve it</button><button>Turns off the test run</button></div><p class="why" hidden>Nobody is watching in CI, so anything that would prompt is refused.</p></div>
+<div class="qz"><p class="q">Inside a plugin named <code>qa-toolkit</code>, how is the <code>bug-report</code> skill called?</p><div class="opts"><button>/bug-report</button><button data-ok>/qa-toolkit:bug-report</button><button>/plugin bug-report</button></div><p class="why" hidden>Plugin skills are prefixed with the plugin's name.</p></div>
+<div class="qz"><p class="q">You need the same dashboard numbers every day from the same reports. What's the best approach?</p><div class="opts"><button>Ask Claude to read the reports and describe them each morning</button><button data-ok>Have Claude write a script once, then run the script</button><button>Ask a subagent to count the tests</button></div><p class="why" hidden>Use AI to build deterministic tools for repeatable jobs; use AI directly for judgement.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick the three most repeated tasks in your team's week (Chapter 119's catalogue may help). Build one tool for each, choosing the mechanism with the table in 118.10. For each, write a half-page README covering the problem, how to use it, how you tested it and who owns it. Package them as a plugin, have two teammates install it, and collect their feedback after one week.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Don't just use AI; build tools with it. Turn repeated prompts into skills, reviews into subagents, must-do checks into hooks, live data into MCP servers, unattended jobs into <code>claude -p</code> in CI, and repeatable reports into scripts. Then bundle them as a plugin so the whole team gets them in one install. Test each tool, give it an owner, and keep it up to date."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/skills" target="_blank" rel="noopener">Claude Code: Skills</a> (SKILL.md format, frontmatter, <code>$ARGUMENTS</code>, <code>!`command`</code> dynamic context).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/sub-agents" target="_blank" rel="noopener">Claude Code: Subagents</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/hooks" target="_blank" rel="noopener">Claude Code: Hooks reference</a> and <a href="https://code.claude.com/docs/en/hooks-guide" target="_blank" rel="noopener">hooks guide</a> (events, matchers, exit codes, JSON input).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/headless" target="_blank" rel="noopener">Claude Code: headless (print) mode</a> and the local <code>claude --help</code> output for <code>--bare</code>, <code>--permission-prompts</code> and <code>--max-budget-usd</code> (Claude Code 2.1.319).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/plugins/create" target="_blank" rel="noopener">Claude Code: Create plugins</a>, <a href="https://code.claude.com/docs/en/plugins/marketplace-reference" target="_blank" rel="noopener">marketplace reference</a>; the plugin in 118.9 was checked with <code>claude plugin validate</code>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/github-actions" target="_blank" rel="noopener">Claude Code GitHub Actions</a> (<code>anthropics/claude-code-action</code>).</li>
+<li>Playwright, <a href="https://playwright.dev/docs/test-reporters" target="_blank" rel="noopener">Test reporters</a> (JUnit reporter and <code>PLAYWRIGHT_JUNIT_OUTPUT_NAME</code>).</li>
+<li>GitHub Docs, <a href="https://docs.github.com/en/actions" target="_blank" rel="noopener">GitHub Actions</a> (scheduled workflows, job summaries, secrets).</li>
+</ol><p class="verified">Verified 9 November 2026 against Claude Code 2.1.319. The hook script and dashboard script were run against sample data before publication.</p></div>

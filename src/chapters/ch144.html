@@ -1,0 +1,182 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What interviewers for AI-aware QA and engineering roles are trying to find out, and how that maps to understanding, using and building</li>
+<li>The STAR method, and this book's STAR-AI extension for describing work you did with AI honestly</li>
+<li>A searchable bank of interview questions by topic, with short model answers and links to the chapters behind them</li>
+<li>How to run a realistic mock interview with Claude, and how to score yourself afterwards</li>
+<li>How to build a small portfolio that proves what you can do, without leaking anything confidential</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> this chapter is optional and draws on the whole book. It's most useful after <a href="#ch118">Chapter 118</a> (the AI-powered QA engineer), <a href="#ch125">Chapter 125</a> (evals) and the capstone in <a href="#ch143">Chapter 143</a>, which makes an excellent portfolio piece. You'll need access to Claude (any plan) for the mock-interview lab.</div>
+
+<div class="bigidea"><p>Interviewers can't see inside your head, so they look for evidence: clear explanations, sensible judgement and real examples. For AI-related roles, three questions sit under almost everything they ask: do you understand how these systems behave, can you use them productively, and can you keep them honest? Prepare by practising short, structured answers to likely questions, by telling stories about real work that say plainly what the AI did and what you did, and by bringing a small portfolio you can show. Practise out loud, with a mock interviewer, until the answers sound like you.</p></div>
+
+<h3 id="ch144-1"><span class="num">144.1</span>What interviewers are looking for</h3>
+<p>Job titles vary a lot: QA engineer, SDET (software development engineer in test), test automation engineer, quality lead, AI evaluation engineer. Whatever the title, AI-related questions usually probe one of three levels. They're the same three skills this book separates throughout.</p>
+<div class="tbl"><table>
+<tr><th>Level</th><th>What they want to see</th><th>Typical question</th><th>Where you learned it</th></tr>
+<tr><td><b>Understand</b></td><td>You can explain how a model works and why it fails, in plain words</td><td>"Why do language models make things up?"</td><td>Chapters 14–24</td></tr>
+<tr><td><b>Use</b></td><td>You get real work done with AI tools, and you check the output</td><td>"How have you used AI in your testing?"</td><td>Chapters 43–51, 63–84, 118–124</td></tr>
+<tr><td><b>Build</b></td><td>You can design, test and run AI-powered systems safely</td><td>"How would you test a chatbot before release?"</td><td>Chapters 85–113, 125, 143</td></tr>
+</table></div>
+<p>On top of that, every interview checks the same human things as before: can you communicate, do you think about risk, do you take ownership, and are you honest about what you don't know.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>An interview is like a driving test. The examiner doesn't need you to explain the engine in detail, but they need to see that you know what the mirrors are for, that you check them without being reminded, and that you stay calm when something unexpected happens. "I'd check the output against the source before sending it" is the AI equivalent of checking your mirrors.</p></div>
+<div class="box opinion"><span class="tag">Opinion · this book</span><p>The candidates who stand out in AI conversations are rarely the ones who know the most product names. They're the ones who can say, with a concrete example, where AI helped, where it was wrong, and how they caught it. Product details change every few months; judgement doesn't.</p></div>
+
+<h3 id="ch144-2"><span class="num">144.2</span>STAR and STAR-AI</h3>
+<p>Behavioural questions start with "Tell me about a time when…". The widely used <a class="gl" href="#g-star-method">STAR method</a> gives your answer a shape so it doesn't wander:</p>
+<div class="flow">
+<div><b>Situation</b>Where and when, in one or two sentences</div>
+<div><b>Task</b>What you were responsible for</div>
+<div class="hl"><b>Action</b>What <em>you</em> did, step by step</div>
+<div><b>Result</b>What happened, with numbers if you have real ones</div>
+</div>
+<p>When the story involves AI, interviewers have two extra questions they may not say out loud: <em>what exactly did the AI do, versus you?</em> and <em>how did you know its output was right?</em> This book suggests an extension we call <strong>STAR-AI</strong>. It's our own teaching device, not an industry standard, so don't name it in the interview; just use the shape.</p>
+<div class="tbl"><table>
+<tr><th>Part</th><th>Question it answers</th><th>Example phrase</th></tr>
+<tr><td>Situation, Task</td><td>As usual</td><td>"We had two days to regression-test a checkout redesign."</td></tr>
+<tr><td>Action, split in two</td><td>What did the AI do? What did you do?</td><td>"I had Claude draft 40 scenarios from the stories; I removed 9 that tested things the story didn't say and added 6 boundary cases it missed."</td></tr>
+<tr><td>Result</td><td>As usual, with honest figures</td><td>"We finished on time and found two S2 bugs before release."</td></tr>
+<tr><td><b>Assurance</b></td><td>How did you verify it?</td><td>"Every generated case was reviewed against the acceptance criteria, and the automated ones had to fail against a broken build first."</td></tr>
+<tr><td><b>Improvement</b></td><td>What would you change?</td><td>"I'd turn those review notes into a checklist in the prompt, and measure it with a small eval."</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Honest numbers only</span><p>Never invent a figure like "saved 60% of testing time" because it sounds good. Interviewers ask follow-ups ("how did you measure that?"), and a made-up number collapses fast. If you didn't measure, say "roughly a day of work, by my estimate" and explain how you'd measure next time (<a href="#ch126">Chapter 126</a>).</p></div>
+
+<h3 id="ch144-3"><span class="num">144.3</span>The question bank</h3>
+<p>Thirty common questions with short model answers. Treat these as skeletons, not scripts: an answer in your own words, with your own example, beats a memorised one every time. Type in the box to filter by any word, such as "RAG", "flaky" or "agent".</p>
+<input class="filter" data-filter="#ch143Bank" data-empty="#ch143Empty" type="search" placeholder="Filter questions…" aria-label="Filter interview questions">
+<div class="tbl"><table id="ch143Bank">
+<tr><th>Question</th><th>Model answer (short)</th><th>Read</th></tr>
+<tr class="group"><td colspan="3">AI fundamentals</td></tr>
+<tr><td>What is a large language model, in plain words?</td><td>A program trained on huge amounts of text to predict the next piece of text (a token). Doing that well forces it to learn grammar, facts and patterns of reasoning, which is why it can answer questions and write code. It doesn't look things up unless you give it tools or documents.</td><td><a href="#ch17">17</a></td></tr>
+<tr><td>Why do models hallucinate?</td><td>They generate the most plausible continuation, and plausible isn't the same as true. Gaps in training data, questions outside what they know, and pressure to give an answer all make it worse. Mitigations: give them the source material (RAG), ask for citations, allow "I don't know", and verify.</td><td><a href="#ch22">22</a></td></tr>
+<tr><td>What is a context window?</td><td>The amount of text the model can consider at once, measured in tokens: your instructions, the conversation, documents and its own reply. Beyond it, earlier content must be dropped or summarised. Bigger isn't automatically better; relevant, well-ordered context matters more.</td><td><a href="#ch20">20</a></td></tr>
+<tr><td>What's the difference between training a model and prompting it?</td><td>Training changes the model's weights using large datasets and lots of compute. Prompting changes only the input for one request. Most teams get what they need from prompting, retrieval and tools, and fine-tune rarely.</td><td><a href="#ch136">135</a></td></tr>
+<tr><td>What are embeddings?</td><td>Lists of numbers that represent meaning, so texts about similar things end up close together. They power semantic search in RAG systems.</td><td><a href="#ch15">15</a></td></tr>
+<tr class="group"><td colspan="3">Prompting and context</td></tr>
+<tr><td>What makes a good prompt?</td><td>Clear task, relevant context, the format you want, examples where helpful, and constraints such as "say if you're unsure". Treat it like briefing a capable new colleague who knows nothing about your project.</td><td><a href="#ch44">44</a></td></tr>
+<tr><td>What is structured output and why does QA care?</td><td>Making the model's answer match a JSON Schema, so code can rely on the fields. For QA tools, it means generated test cases always have the same columns and allowed values, so they can be validated and exported.</td><td><a href="#ch89">89</a>, <a href="#ch94">94</a></td></tr>
+<tr><td>What is prompt injection?</td><td>Instructions hidden in data the model reads (a web page, a Jira comment, an email) that try to override yours. Defences are layered: separate instructions from data, least-privilege tools, approval for risky actions, and testing with injection cases. No single defence is complete.</td><td><a href="#ch131">130</a></td></tr>
+<tr class="group"><td colspan="3">RAG and data</td></tr>
+<tr><td>Explain RAG to a product manager.</td><td>Before answering, the system searches our own documents for the relevant passages and gives them to the model, which answers from them and cites them. It's like an open-book exam: more accurate and checkable than answering from memory.</td><td><a href="#ch23">23</a></td></tr>
+<tr><td>How would you test a RAG system?</td><td>Separately test retrieval (did it find the right passages? recall and precision on labelled questions) and generation (is the answer faithful to the passages, with valid citations?). Include questions with no answer in the documents, and check access control so people can't retrieve documents they shouldn't see.</td><td><a href="#ch92">92</a>, <a href="#ch125">124</a></td></tr>
+<tr><td>What data would you not put into an AI tool?</td><td>Anything the company's policy and the tool's contract don't allow: customer personal data, secrets, credentials, confidential code where not approved. Use anonymised or synthetic test data. Know whether your plan's data may be used for training.</td><td><a href="#ch132">131</a></td></tr>
+<tr class="group"><td colspan="3">Agents, MCP and tools</td></tr>
+<tr><td>What is an agent?</td><td>A model in a loop: it decides on an action, uses a tool, looks at the result and decides again, until the task is done. Workflows follow a fixed path; agents choose their path, which is more flexible and harder to test.</td><td><a href="#ch107">106</a></td></tr>
+<tr><td>What is MCP?</td><td>The Model Context Protocol: an open standard for connecting AI applications to tools and data, such as Jira, GitHub or a browser. Build a server once and any MCP-capable app can use it.</td><td><a href="#ch97">96</a></td></tr>
+<tr><td>Would you let an agent file bugs automatically?</td><td>Not without a person approving each one at first. Filing is visible to others and creates work. I'd have it draft bugs with evidence, gate the filing step, log decisions, and only relax that once data shows the drafts are reliably good.</td><td><a href="#ch109">108</a>, <a href="#ch143">142</a></td></tr>
+<tr><td>How do you keep an AI tool's permissions safe?</td><td>Least privilege: give it only the tools and scopes the task needs, read-only where possible, separate credentials for writing, secrets in environment variables or a vault, and approval for consequential actions.</td><td><a href="#ch134">133</a></td></tr>
+<tr class="group"><td colspan="3">Claude Code and AI-assisted automation</td></tr>
+<tr><td>How have you used AI to write automated tests?</td><td>(Use your own story.) Plan first, give it project conventions in a CLAUDE.md, ask for role-based locators and web-first assertions, run the tests, make each one fail on purpose to prove it can, then review the diff like any colleague's code.</td><td><a href="#ch121">120</a></td></tr>
+<tr><td>How do you know an AI-written test is any good?</td><td>It must fail when the behaviour breaks (mutate or break the app and see), assert on user-visible outcomes, avoid fixed waits, and test what the requirement says, not what the code happens to do.</td><td><a href="#ch121">120</a></td></tr>
+<tr><td>How do you deal with flaky tests?</td><td>Identify them (fails then passes on retry), quarantine fast so they don't hide real failures, then find the cause: timing, shared test data, environment, order dependence. AI helps by reading traces and logs; the fix still needs a person's judgement.</td><td><a href="#ch122">121</a></td></tr>
+<tr><td>What is CLAUDE.md?</td><td>A Markdown file Claude Code reads at the start of a session: project commands, conventions and rules. It's how you make the AI follow your team's standards without repeating them in every prompt.</td><td><a href="#ch77">77</a></td></tr>
+<tr class="group"><td colspan="3">Testing AI applications</td></tr>
+<tr><td>How would you test a chatbot before release?</td><td>Define quality dimensions (correctness, faithfulness, safety, tone, refusal behaviour), build an eval set of realistic and adversarial questions with expected outcomes, grade with code where possible and an AI judge or humans where not, run it many times because outputs vary, and gate releases on pass rates.</td><td><a href="#ch125">124</a></td></tr>
+<tr><td>What is an eval?</td><td>A repeatable test for an AI feature: a set of inputs, a way of grading outputs, and a score you track over time. It's the AI equivalent of a regression suite.</td><td><a href="#ch125">124</a></td></tr>
+<tr><td>What is LLM-as-judge, and its risks?</td><td>Using a model to grade another model's output against a rubric. It scales, but judges can be biased (towards longer answers, or their own style), so you calibrate them against human ratings and keep humans on a sample.</td><td><a href="#ch125">124</a></td></tr>
+<tr><td>A model update changed answers. What do you do?</td><td>Run the regression eval on old and new model, compare pass rates per category, read a sample of differences, and decide with the product owner. Pin model versions in production so changes are deliberate.</td><td><a href="#ch95">95</a></td></tr>
+<tr class="group"><td colspan="3">Security, governance and judgement</td></tr>
+<tr><td>What's on the OWASP Top 10 for LLM applications?</td><td>A list of the main security risks for LLM apps, such as prompt injection, sensitive information disclosure and excessive agency. Name two or three you've thought about and how you'd test for them; don't recite the list.</td><td><a href="#ch130">129</a></td></tr>
+<tr><td>Your manager wants AI to "replace manual testing". Response?</td><td>Agree on the goal (faster, better coverage), then be specific: AI speeds up test design, automation and triage, but exploratory testing, risk judgement and sign-off still need people. Propose a measured pilot with clear metrics.</td><td><a href="#ch128">127</a></td></tr>
+<tr><td>When would you not use AI?</td><td>When a simple deterministic script does the job, when data can't leave the environment, when errors are very costly and can't be checked, or when nobody will review the output.</td><td><a href="#ch118">117</a></td></tr>
+<tr class="group"><td colspan="3">Behavioural (answer with STAR-AI)</td></tr>
+<tr><td>Tell me about a time AI gave you a wrong answer.</td><td>Pick a real case. Say how you noticed (a test, a source check, a colleague), what the impact would have been, and what you changed in your process afterwards.</td><td><a href="#ch22">22</a></td></tr>
+<tr><td>Tell me about introducing a new tool to your team.</td><td>Show you started small, measured, handled concerns (privacy, jobs, quality), trained people and adjusted based on feedback.</td><td><a href="#ch145">144</a></td></tr>
+<tr><td>Describe a project you're proud of.</td><td>Your capstone works well: the problem, the design choices (what the model does vs code vs a person), the eval results, and what you'd do next.</td><td><a href="#ch143">142</a></td></tr>
+</table></div>
+<p id="ch143Empty" hidden>No questions match. Try a shorter word.</p>
+
+<h3 id="ch144-4"><span class="num">144.4</span>Three longer answers, worked through</h3>
+<p>Some questions are really small design exercises. Interviewers want to hear your structure as much as your conclusion. Think out loud, state assumptions, and ask one clarifying question.</p>
+<h4>"Design a tool that generates test cases from Jira stories."</h4>
+<div class="flow">
+<div><b>Clarify</b>Who uses it? Which Jira? What happens to the output?</div>
+<div><b>Inputs</b>Story via Jira MCP or API, plus team standards via RAG</div>
+<div class="hl"><b>Generate</b>Structured output: schema with IDs, type, priority, steps, criterion</div>
+<div><b>Check</b>Validator: coverage per criterion, duplicates, vague wording flagged</div>
+<div><b>Review</b>Tester edits; nothing written back to Jira without approval</div>
+<div><b>Measure</b>Eval set of stories with expected coverage; track over model changes</div>
+</div>
+<p>Mention risks: prompt injection from story text, confidential data, over-trust. Mention a fallback: if the model is down, testers work as before. That's essentially Chapter 94 and stages 1–3 of Chapter 143.</p>
+<h4>"How would you know if our AI support bot is getting worse?"</h4>
+<p>Offline: a fixed regression eval run on every prompt, model or document change. Online: sample real conversations (with privacy controls) for human review, track signals such as escalation rate, thumbs-down rate and repeated questions, and alert on sudden shifts. Tie each release to a version of prompt, model and index, so a regression can be traced and rolled back (<a href="#ch95">Chapter 95</a>).</p>
+<h4>"An AI agent in CI marked a failing test as flaky and retried it until it passed. What went wrong?"</h4>
+<p>The agent was allowed to decide something it shouldn't: it hid a possible product bug. Fixes: record every retry, treat "passed on retry" as a separate flaky status that a person reviews, never let an agent change a test's verdict, and add a trace so you can see its reasoning (<a href="#ch109">Chapter 109</a>, <a href="#ch113">Chapter 113</a>).</p>
+<details class="deep"><summary>Using AI during the interview itself</summary><div class="body"><p>Policies differ widely. Some companies expect you to use AI tools in a take-home task or a live coding exercise; others forbid it. Ask at the start: "Am I allowed to use an AI assistant for this?" If yes, use it the way you would at work and narrate your checking: "I'll ask it for a first draft, then I'll read the locators and run it." If no, don't. Being caught using an assistant secretly ends interviews; being open about how you'd use one at work is a strength.</p></div></details>
+
+<h3 id="ch144-5"><span class="num">144.5</span>Mock interviews with Claude</h3>
+<p>Practising out loud is the single most useful thing you can do. A colleague is best; Claude is a good, always-available second. The prompt below makes Claude behave like an interviewer: one question at a time, follow-ups, and honest feedback at the end.</p>
+<div class="code"><span class="cap">Prompt</span><pre>You are interviewing me for this role: [paste the job title and the key lines of the job ad].
+Run a 30-minute mock interview.
+
+Rules:
+- Ask ONE question at a time and wait for my answer.
+- Mix: 3 AI fundamentals, 3 practical QA-with-AI questions, 1 small design question,
+  2 behavioural questions.
+- After each answer, ask at most one follow-up if my answer was vague, had no example,
+  or claimed a number without saying how it was measured.
+- Do not give feedback until I type "END".
+
+When I type END, score each answer from 1 to 4 on: accuracy, structure (STAR where relevant),
+use of a concrete example, and honesty about what the AI did versus what I did.
+Then give me my three biggest improvements, each with a better version of one sentence I said.
+Be direct. Do not flatter me.</pre></div>
+<div class="box note"><span class="tag">Why "do not flatter me"?</span><p>Models tend to be agreeable, a behaviour called <a class="gl" href="#g-sycophancy">sycophancy</a>. Asking explicitly for direct criticism, and for scores against named criteria, gives you more useful feedback. Still treat its scores as one opinion, not a verdict.</p></div>
+<div class="lab"><div class="lab-h"><b>Lab: one full mock interview</b><span>45 min · claude.ai or the Claude app</span></div><ol>
+<li>Find a real job ad for a role you'd like (or use your current job description). Paste its key lines into the prompt above and send it.<span class="expect">Claude introduces the interview and asks exactly one question, then waits.</span></li>
+<li>Answer every question by voice if your app supports dictation, or by typing quickly without editing. Don't look anything up.<span class="expect">a follow-up appears when your answer lacked an example or an unmeasured number slipped in.</span></li>
+<li>Type <code>END</code>.<span class="expect">a score table (four criteria per answer) and three improvements with rewritten sentences.</span></li>
+<li>Pick your weakest answer. Rewrite it using STAR-AI, then say it aloud twice, timing yourself.<span class="expect">a version that takes 90 seconds to 2 minutes and includes what the AI did, what you did, and how you checked.</span></li>
+<li>Check any factual claim Claude made in its feedback against the chapter linked in the question bank.<span class="expect">most will be right; note any that aren't. Spotting them is part of the skill being tested.</span></li>
+</ol></div>
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Knowing the latest model names and prices impresses interviewers."</dt><dd>It dates fast and proves little. Showing how you'd choose and evaluate a model (Chapter 36) is far stronger.</dd>
+<dt>"I should hide that AI helped with my work."</dt><dd>Be open and precise. Most teams want people who use AI well; what worries them is people who can't tell when it's wrong.</dd>
+<dt>"Long answers show depth."</dt><dd>Two minutes is plenty for most answers. Stop, and let them ask follow-ups.</dd>
+<dt>"If I don't know, I should guess confidently."</dt><dd>"I don't know, but here's how I'd find out" is a good answer, especially in a field where confident wrong answers are the main risk.</dd>
+</dl></div>
+
+<h3 id="ch144-6"><span class="num">144.6</span>Your portfolio</h3>
+<p>A <a class="gl" href="#g-portfolio">portfolio</a> is a small collection of work you can show. One or two well-presented projects beat ten half-finished ones.</p>
+<div class="tbl"><table>
+<tr><th>Item</th><th>What it proves</th><th>Source in this book</th></tr>
+<tr><td>The AI QA assistant capstone, with README, evidence report and eval output</td><td>You can build an AI system end to end and keep it honest</td><td><a href="#ch143">Chapter 143</a></td></tr>
+<tr><td>A Playwright suite written with Claude Code, with a CLAUDE.md and CI</td><td>You use AI for automation and still follow good practice</td><td><a href="#ch121">Chapter 121</a></td></tr>
+<tr><td>A small eval harness for a prompt or a RAG assistant</td><td>You can measure AI quality, not just demo it</td><td><a href="#ch125">Chapter 125</a>, <a href="#ch93">Chapter 93</a></td></tr>
+<tr><td>A custom MCP server or Claude Code skill for a QA task</td><td>You can extend tools for your team</td><td><a href="#ch104">Chapter 104</a>, <a href="#ch80">Chapter 80</a></td></tr>
+<tr><td>A one-page write-up or short talk on lessons learned</td><td>You communicate clearly</td><td><a href="#ch145">Chapter 145</a></td></tr>
+</table></div>
+<p>A good project README answers, in this order: what problem it solves, a screenshot or sample output, how to run it in under five minutes (ideally with an offline mode), the design decisions and trade-offs, how it was evaluated, and known limitations. "Known limitations" is the section interviewers read most carefully, because it shows judgement.</p>
+<div class="box warn"><span class="tag">Never publish company material</span><p>Don't put your employer's code, stories, documents, logs, screenshots or test data in a public portfolio, even "anonymised" by hand. Rebuild the idea with demo data, such as the checkout app in Chapter 143. If you want to mention work projects, describe them in words and check what your contract allows.</p></div>
+<h4>Questions to ask them</h4>
+<ul>
+<li>"Which AI tools does the team use today, and what are the rules about data?"</li>
+<li>"How do you check the quality of AI-generated tests or code before it's merged?"</li>
+<li>"If you have AI features in the product, how are they evaluated before release?"</li>
+<li>"What would success look like for this role in the first three months?"</li>
+</ul>
+<p>Their answers tell you a lot about how mature their AI use is, and good questions are themselves a signal of the judgement they're hiring for.</p>
+
+<h3 id="ch144-r"><span class="num">144.7</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Interviewers test understanding, use and building, plus judgement and honesty.</li>
+<li>Use STAR for stories; when AI was involved, separate what it did from what you did, and say how you verified it.</li>
+<li>Use real numbers or none; explain how you would measure.</li>
+<li>Practise out loud with mock interviews, and ask the mock interviewer not to flatter you.</li>
+<li>One or two well-documented portfolio projects, with an honest "limitations" section, beat many demos; never publish company material.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">In a STAR-AI answer, what does the extra "Assurance" part describe?</p><div class="opts"><button>Which model you used</button><button data-ok>How you checked that the AI's output was correct</button><button>How much time you saved</button></div><p class="why" hidden>Interviewers want to know how you caught mistakes, for example by reviewing against acceptance criteria or making tests fail on purpose.</p></div>
+<div class="qz"><p class="q">You didn't measure the time AI saved on a project. What's the best way to talk about it?</p><div class="opts"><button>Quote a typical industry figure</button><button>Avoid mentioning the benefit at all</button><button data-ok>Give your honest estimate, say it's an estimate, and explain how you'd measure next time</button></div><p class="why" hidden>Honest estimates labelled as such survive follow-up questions; invented figures don't.</p></div>
+<div class="qz"><p class="q">Asked "Would you let an agent file bugs automatically?", which answer shows the best judgement?</p><div class="opts"><button>Yes, it saves the most time</button><button data-ok>Let it draft bugs with evidence, require approval to file, log decisions, and relax the gate only with data</button><button>No, agents should never touch bug trackers</button></div><p class="why" hidden>It recognises the value, the risk of a visible, hard-to-undo action, and a measured path to more autonomy.</p></div>
+<div class="qz"><p class="q">Why add "Do not flatter me" to a mock-interview prompt?</p><div class="opts"><button>It makes the model faster</button><button data-ok>Models tend to be agreeable, so explicit instructions and criteria give more useful criticism</button><button>It's required by the Claude apps</button></div><p class="why" hidden>Sycophancy is a known tendency. Asking for direct feedback against named criteria counteracts it, though the feedback is still one opinion.</p></div>
+<div class="qz"><p class="q">What should a portfolio project for a QA-with-AI role avoid?</p><div class="opts"><button>An offline demo mode</button><button>A "known limitations" section</button><button data-ok>Your employer's stories, logs or screenshots</button></div><p class="why" hidden>Company material doesn't belong in a public portfolio. Rebuild the idea with demo data instead.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Write three STAR-AI stories from your own work: one where AI helped, one where it was wrong and you caught it, and one about introducing a change to your team. Keep each under 250 words. Run two mock interviews a week apart, and record your scores from the end of each to see if you're improving. Finish by writing a README for your Chapter 143 capstone with the six sections in 143.6.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"When you talk about AI work in an interview, split the action in two: what the AI did and what you did. Then add one sentence on how you checked it, like 'I made every generated test fail against a broken build first.' Use real numbers or say it's an estimate. And practise out loud. Even Claude can play the interviewer if you tell it to ask one question at a time and not to flatter you."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/overview" target="_blank" rel="noopener">Prompt engineering overview</a> (for writing mock-interview and practice prompts)</li>
+<li>OWASP, <a href="https://genai.owasp.org/llm-top-10/" target="_blank" rel="noopener">Top 10 for LLM Applications</a></li>
+<li>Anthropic, <a href="https://www.anthropic.com/engineering/building-effective-agents" target="_blank" rel="noopener">Building effective agents</a> (agents versus workflows)</li>
+<li>This book: Chapters 22, 24, 92, 109, 118, 121, 125 and 143 for the topics behind the question bank</li>
+</ol>
+<p class="verified">Content type: established practice and this book's guidance (STAR-AI is this book's own extension of the STAR method) · Last reviewed 9 November 2026</p></div>

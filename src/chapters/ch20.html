@@ -1,0 +1,186 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What a context window is, and exactly what fills it in a chat, in Claude Code and on the API</li>
+<li>How big current Claude context windows are, and why bigger isn't automatically better</li>
+<li>What "context rot" and "lost in the middle" mean for your results</li>
+<li>How compaction, clearing and summaries keep long sessions working</li>
+<li>How "memory" features really work: Claude apps memory, CLAUDE.md and auto memory all put text back into the window</li>
+<li>Practical habits for keeping context clean in everyday QA work</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch14">Chapter 14</a> (tokens). <a href="#ch19">Chapter 19</a> helps for the part about thinking tokens.</div>
+
+<div class="bigidea"><p>A language model has no memory of its own between requests. Everything it "knows" about your conversation is the text sent to it each time, and that text has to fit in its <a class="gl" href="#g-context-window">context window</a>, measured in tokens. Current Claude models can hold 1 million tokens, which is a lot, but quality drops as the window fills, a problem Anthropic calls <a class="gl" href="#g-context-rot">context rot</a>. Every "memory" feature, from Claude's app memory to <a class="gl" href="#g-claude-md">CLAUDE.md</a>, works by putting the right text back into the window. Good results come from curating what goes in, not from filling it up.</p></div>
+
+<h3 id="ch20-1"><span class="num">20.1</span>The model forgets everything, every time</h3>
+<p>This surprises most people: when you send your tenth message in a chat, the model does not "remember" the first nine. The app sends the <strong>whole conversation so far</strong> to the model again, together with your new message. The model reads it all from the start, writes a reply, and then forgets it. Next time, the app sends everything again, now including that reply.</p>
+<div class="flow">
+<div><b>Turn 1 sent</b>instructions + message 1</div>
+<div><b>Turn 2 sent</b>instructions + message 1 + reply 1 + message 2</div>
+<div><b>Turn 3 sent</b>instructions + messages 1–2 + replies 1–2 + message 3</div>
+<div class="hl"><b>…until</b>the total reaches the context window limit</div>
+</div>
+<p>Anthropic's documentation describes the context window as "all the text a language model can reference when generating a response, including the response itself", and as the model's "working memory". It is completely separate from what the model learned in training (<a href="#ch17">Chapter 17</a>).</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Imagine a brilliant contractor with no long-term memory who visits each morning. Before they start, you hand them a folder: the brief, yesterday's notes, the latest emails. They read the whole folder, do excellent work, and leave. Tomorrow they remember nothing, so the folder is everything. The context window is the size of that folder. A bigger folder holds more, but a folder stuffed with irrelevant paper makes it harder to find what matters.</p></div>
+
+<h3 id="ch20-2"><span class="num">20.2</span>What fills the window</h3>
+<p>Your visible messages are only part of it. Anthropic's documentation says that everything in the request counts: the system prompt, every message (including tool results, images and documents), tool definitions, and the output Claude generates, including its thinking.</p>
+<div class="tbl"><table>
+<tr><th>Item</th><th>What it is</th><th>QA example</th></tr>
+<tr><td><b>System prompt</b></td><td>Hidden instructions from the app or developer (<a class="gl" href="#g-system-prompt">system prompt</a>)</td><td>"You are a test-automation assistant for the Payments team…"</td></tr>
+<tr><td><b>Tool definitions</b></td><td>Descriptions of every tool the model may call, including MCP servers</td><td>Jira, Playwright and GitHub MCP tools: each adds its descriptions</td></tr>
+<tr><td><b>Memory and project files</b></td><td>CLAUDE.md, auto memory, project knowledge, saved memories</td><td>Your team's CLAUDE.md with test conventions</td></tr>
+<tr><td><b>Conversation history</b></td><td>All earlier messages and replies</td><td>The last hour of debugging back-and-forth</td></tr>
+<tr><td><b>Tool results</b></td><td>Output from tools: file contents, command output, web pages</td><td>A 3,000-line test log Claude read; the output of <code>npx playwright test</code></td></tr>
+<tr><td><b>Images and documents</b></td><td>Screenshots, PDFs (<a href="#ch21">Chapter 21</a>)</td><td>Ten screenshots of a broken checkout page</td></tr>
+<tr><td><b>Thinking</b></td><td>The model's reasoning (<a href="#ch19">Chapter 19</a>)</td><td>On current Claude models, earlier thinking blocks are kept in the history by default</td></tr>
+<tr><td><b>The new reply</b></td><td>What the model is writing right now</td><td>The test plan you asked for</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A tester connects five MCP servers to Claude Code, opens a session and asks one short question. <code>/context</code> shows a large share of the window already used before they've typed much: tool definitions, the system prompt and memory files. Turning off MCP servers they don't need for this task frees that space. <a href="#ch99">Chapter 99</a> covers MCP token costs in detail.</p></div>
+
+<h3 id="ch20-3"><span class="num">20.3</span>How big is the window?</h3>
+<div class="box note"><span class="tag">Verified 9 Nov 2026</span><p>Claude Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 5.5 all have a <strong>1,000,000-token</strong> context window and can generate up to <strong>128,000 tokens</strong> in one reply. Several older models still on sale (Opus 4.5, Haiku 4.5) have 200,000 tokens. Anthropic says 1M is the default on models that have it, with no beta header and standard pricing, except Haiku 5.5, where prompts over 100,000 tokens cost more ($0.50/$2.50 per million instead of $0.10/$0.50).</p></div>
+<p>To make a million tokens concrete, using the rough guide from <a href="#ch14">Chapter 14</a> (about ¾ of a word per English token, and somewhat fewer words on newer Claude tokenizers):</p>
+<div class="tbl"><table>
+<tr><th>Content</th><th>Very rough size (illustrative)</th></tr>
+<tr><td>A detailed Jira story with acceptance criteria</td><td>1,000–3,000 tokens</td></tr>
+<tr><td>A 50-page requirements PDF</td><td>Anthropic estimates 1,500–3,000 tokens per page of text, plus image cost: very roughly 100,000–200,000 tokens</td></tr>
+<tr><td>A mid-sized test suite's source code</td><td>Hundreds of thousands of tokens, possibly more than fits</td></tr>
+<tr><td>A full day's CI logs</td><td>Often far more than 1M tokens. Search them instead.</td></tr>
+</table></div>
+<p>Windows have grown fast. Anthropic's Claude 2.1 (November 2023) introduced a 200,000-token window; the current generation has five times that. But size is only half the story.</p>
+
+<h3 id="ch20-4"><span class="num">20.4</span>Context rot: why more isn't automatically better</h3>
+<p>Anthropic's documentation is direct about this: "more context isn't automatically better. As token count grows, accuracy and recall degrade, a phenomenon known as <em>context rot</em>. This makes curating what's in context just as important as how much space is available."</p>
+<p>Several effects combine:</p>
+<ul>
+<li><strong>Dilution.</strong> Attention (<a href="#ch16">Chapter 16</a>) has to spread across more tokens. One key sentence among 500,000 tokens of logs competes with everything else.</li>
+<li><strong>Distraction.</strong> Old, wrong or irrelevant material can pull answers off course. An abandoned approach from an hour ago is still in the window, and the model may keep using it.</li>
+<li><strong>Position effects.</strong> Researchers have found that models use information at the start and end of a long input more reliably than information in the middle.</li>
+</ul>
+<details class="deep"><summary>Under the hood: "lost in the middle"</summary><div class="body">
+<p>In 2023, Nelson Liu and colleagues at Stanford published "Lost in the Middle: How Language Models Use Long Contexts", which gave the <a class="gl" href="#g-lost-in-the-middle">lost in the middle</a> effect its name. They gave models a question plus many documents, only one of which held the answer, and moved that document around. Accuracy was highest when the answer was near the beginning or the end, and dropped noticeably when it was in the middle: a U-shaped curve. The models they tested were 2023 models, and newer ones handle long inputs much better, but the general lesson has held: position and clutter matter.</p>
+<p>A popular test for this is the "needle in a haystack": hide one fact in a long text and ask for it. Modern models usually pass simple versions. Harder versions, which need several hidden facts combined or reasoning about them, still show drops as length grows. That is why the lab in 20.8 hides three facts, not one.</p>
+<p>Anthropic's prompting guidance also suggests putting long documents <em>before</em> your question, and its vision guide says the same about images. Your instructions then sit at the end, close to where the model starts writing.</p>
+</div></details>
+<div class="box warn"><span class="tag">What happens when it's full</span><p>On the API, Anthropic documents two cases. If the input alone exceeds the window, the request fails with a "prompt is too long" error. If the input fits but the reply runs into the limit while being written, generation stops with the stop reason <code>model_context_window_exceeded</code>. Chat apps handle this for you: Anthropic notes that interfaces such as claude.ai "can also manage the context window on a rolling 'first in, first out' basis", and Claude Code compacts automatically (20.5). Either way, older detail is lost, so don't rely on something said long ago.</p></div>
+
+<h3 id="ch20-5"><span class="num">20.5</span>Compaction and clearing</h3>
+<p>When a session grows long, there are three ways to make room. All three throw something away, so it pays to know which you're using.</p>
+<div class="tbl"><table>
+<tr><th>Technique</th><th>What it does</th><th>Where (Verified 9 Nov 2026)</th></tr>
+<tr><td><b><a class="gl" href="#g-compaction">Compaction</a></b></td><td>Replaces older turns with a summary written by Claude, so the session can continue</td><td>Claude Code: automatic when the context gets full, or on demand with <code>/compact [instructions]</code>; the threshold can be set with <code>/autocompact</code>. API: server-side compaction, currently in beta</td></tr>
+<tr><td><b>Clearing</b></td><td>Starts a fresh conversation with empty context</td><td>Claude Code: <code>/clear</code> (the old conversation stays resumable). Apps: start a new chat</td></tr>
+<tr><td><b>Context editing</b></td><td>Removes specific old material, such as stale tool results or old thinking blocks, by rule</td><td>API: context editing (beta)</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Compaction is like a colleague handing over a ticket with a summary comment: "Tried A and B, both failed; root cause is likely the cache; next step is C." You lose the detail of every attempt but keep what matters. If the summary misses something important, it's gone, which is why <code>/compact</code> lets you say what to keep: <code>/compact keep the failing test names and the exact error messages</code>.</p></div>
+<div class="box example"><span class="tag">Real-world example: choosing between them</span><p>You've spent 90 minutes in Claude Code fixing a flaky Playwright test and it's now fixed. Next you want to write API tests for a different service. Use <code>/clear</code>: nothing from the flaky-test hunt helps, and it would only distract. If instead you're halfway through the same investigation and the session is getting slow, use <code>/compact</code> with instructions about what to preserve.</p></div>
+
+<h3 id="ch20-6"><span class="num">20.6</span>"Memory" is text put back into the window</h3>
+<p>If the model forgets everything, how do Claude's memory features work? They all do the same basic thing: <strong>store notes outside the model and insert the relevant ones into the context window at the start of a conversation or when needed</strong>. This is a form of <a class="gl" href="#g-context-engineering">context engineering</a>. Nothing about the model itself changes.</p>
+<div class="tbl"><table>
+<tr><th>Feature</th><th>Where the notes live</th><th>How they get into the window (Verified 9 Nov 2026)</th></tr>
+<tr><td><b>Claude apps memory</b></td><td>Anthropic's servers, tied to your account</td><td>On by default on consumer plans; reached Free users in March 2026. Claude can draw on earlier chats; chat search needs a paid plan. Incognito chats aren't saved to history or memory. <a href="#ch50">Chapter 50</a> covers settings.</td></tr>
+<tr><td><b>Projects</b></td><td>Project knowledge and instructions</td><td>Included in chats inside that project (<a href="#ch47">Chapter 47</a>)</td></tr>
+<tr><td><b>CLAUDE.md</b></td><td>Plain Markdown files you write: project (<code>./CLAUDE.md</code>), user (<code>~/.claude/CLAUDE.md</code>), personal (<code>CLAUDE.local.md</code>) and organisation-managed</td><td>Claude Code loads the ones for your working directory and its parents at launch; ones in subfolders load when Claude works there. <code>/init</code> creates a starter file; <code>/memory</code> opens them</td></tr>
+<tr><td><b><a class="gl" href="#g-auto-memory">Auto memory</a></b></td><td>Notes Claude writes for itself in <code>~/.claude/projects/&lt;project&gt;/memory/</code> on your machine</td><td>The first 200 lines or 25 KB of its index, <code>MEMORY.md</code>, load each session; topic files are read when needed. On by default; toggle with <code>/memory</code></td></tr>
+</table></div>
+<p>Two consequences follow. First, <strong>memory costs context</strong>: a 5,000-line CLAUDE.md is read at the start of every session and competes with your actual task. Keep memory files short and specific; <a href="#ch77">Chapter 77</a> shows how. Second, <strong>memory is only as good as what's written</strong>: if a saved note is wrong or outdated, Claude will confidently use it. Review memory like you'd review test data.</p>
+<details class="deep"><summary>Under the hood: memory versus training</summary><div class="body">
+<p>It's natural to assume that when Claude "remembers" your preference, it has learned it. It hasn't. The model's weights, the billions of numbers set in training (<a href="#ch11">Chapter 11</a>), don't change when you chat. Changing them is <a class="gl" href="#g-fine-tuning">fine-tuning</a>, a separate and much heavier process (<a href="#ch18">Chapter 18</a>).</p>
+<p>Memory systems are retrieval: they decide which stored text is relevant and add it to the prompt. That's the same idea as RAG (<a href="#ch23">Chapter 23</a>), applied to your own notes. It also explains why memory can be inspected, edited and deleted, and why turning memory off immediately changes behaviour: the notes simply aren't sent any more.</p>
+<p>On the API, nothing is remembered unless your code sends it. If you build an application, your code owns the conversation history, and you decide what to keep, summarise or drop. Anthropic also offers a memory tool for agents that store notes in files your application controls; <a href="#ch88">Chapter 88</a> covers designing this.</p>
+</div></details>
+
+<h3 id="ch20-7"><span class="num">20.7</span>Prompt caching, briefly</h3>
+<p>Because the whole conversation is sent again every turn, the same long beginning (system prompt, tools, documents) is processed over and over. <a class="gl" href="#g-prompt-caching">Prompt caching</a> lets the API store that processed beginning for a short time and reuse it. Anthropic's default cache lifetime is 5 minutes, with a 1-hour option. Cached reads are much cheaper: for example $0.20 instead of $4 per million input tokens on Opus 5.5 (verified 9 Nov 2026).</p>
+<p>One point people often miss: <strong>cached tokens still take up the context window</strong>. Anthropic puts it plainly: caching "changes what you pay for those tokens, not whether they count." Caching fixes cost, not context rot. <a href="#ch90">Chapter 90</a> covers caching properly.</p>
+
+<h3 id="ch20-8"><span class="num">20.8</span>Context hygiene: habits that work</h3>
+<div class="tbl"><table>
+<tr><th>Habit</th><th>Why</th></tr>
+<tr><td>One task per session; <code>/clear</code> or a new chat between unrelated tasks</td><td>Stops old material from distracting the new task</td></tr>
+<tr><td>Point to files and let Claude search, rather than pasting everything</td><td>Claude Code can <code>grep</code> a log for the error instead of reading 3,000 lines</td></tr>
+<tr><td>Put long documents first and your question last</td><td>Anthropic's recommended order for long inputs</td></tr>
+<tr><td>Check <code>/context</code> when results get worse</td><td>Shows what's using the space: tools, memory, messages</td></tr>
+<tr><td>Use <code>/compact</code> with instructions on what to keep</td><td>A focused summary beats an automatic one at a random moment</td></tr>
+<tr><td>Keep CLAUDE.md short and current</td><td>It is loaded every session and costs context every time</td></tr>
+<tr><td>Disconnect MCP servers you don't need for this task</td><td>Tool definitions take space before you type anything</td></tr>
+<tr><td>Restate key facts in a long session</td><td>"Reminder: the target is the staging environment, not production"</td></tr>
+<tr><td>Never paste secrets or personal data</td><td>Everything in the window is sent to the model, and may end up in memory</td></tr>
+</table></div>
+<div class="box opinion"><span class="tag">Opinion · Anthropic's engineering team</span><p>In its article "Effective context engineering for AI agents", Anthropic's engineering team argues that context should be treated as a finite resource with diminishing returns, and that the goal is the smallest set of high-signal tokens that gets the job done. Not every practitioner agrees on how aggressively to trim; some prefer giving models more material and letting them search it. Both views agree that what's in the window matters more than its size.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Haystack, context and memory</b><span>25 min · Python 3 + Claude Code (or claude.ai for steps 1–4)</span></div><ol>
+<li>Make a new folder, save the script below as <code>make_haystack.py</code>, and run <code>python3 make_haystack.py</code>.<span class="expect"><code>Wrote haystack.log with 4003 lines (about 146 KB).</code> The file hides three NOTE lines: near the start (line 201), the middle (line 2002) and the end (line 3803).</span></li>
+<li>Open Claude Code in that folder with <code>claude</code>. Run <code>/context</code> and note the "messages" figure.<span class="expect">a coloured grid; messages near zero; the system prompt, tools and any memory files already using some space.</span></li>
+<li>Ask: "Read haystack.log in full and list every NOTE line, with its line number. Do not use grep or any search command." Then run <code>/context</code> again.<span class="expect">probably all three notes; messages usage jumps by tens of thousands of tokens. (If you use claude.ai instead, upload the file and ask the same question.)</span></li>
+<li>Run <code>/clear</code>, then ask: "Find every NOTE line in haystack.log." Run <code>/context</code>.<span class="expect">Claude uses a search command, gets all three in seconds, and uses a tiny fraction of the context. This is the main lesson: search, don't stuff.</span></li>
+<li>Run <code>/compact keep only the three NOTE facts</code> after step 3 (repeat it if you cleared), then ask "What was the code freeze date?"<span class="expect">"14 March", answered from the summary.</span></li>
+<li>Ask: "Remember that our staging environment resets every Friday at 18:00." Then run <code>/memory</code>.<span class="expect">Claude saves it to auto memory; <code>/memory</code> lists your memory files and the auto-memory folder.</span></li>
+<li>Exit, start a new session with <code>claude</code>, and ask "When does staging reset?"<span class="expect">"Friday at 18:00", because the note was put back into the new session's context.</span></li>
+</ol></div>
+<div class="code"><span class="cap">make_haystack.py (Python 3, standard library only)</span><pre>"""Write a long, boring test log with three facts hidden in it."""
+import random
+
+random.seed(7)  # same file every time
+SUITES = ["checkout", "login", "search", "profile", "payments", "cart"]
+FACTS = {
+    0.05: "NOTE: staging environment resets every Friday at 18:00",
+    0.50: "NOTE: release 4.2 code freeze moved to 14 March",
+    0.95: "NOTE: flaky test cart_spec:88 owned by team Falcon",
+}
+TOTAL = 4000
+
+lines = []
+for i in range(TOTAL):
+    for position, fact in FACTS.items():
+        if i == int(TOTAL * position):
+            lines.append(f"[{i:05d}] {fact}")
+    suite = random.choice(SUITES)
+    ms = random.randint(40, 900)
+    lines.append(f"[{i:05d}] PASS {suite}_spec:{random.randint(1, 200)} ({ms} ms)")
+
+with open("haystack.log", "w", encoding="utf-8") as f:
+    f.write("\n".join(lines) + "\n")
+print(f"Wrote haystack.log with {len(lines)} lines "
+      f"(about {sum(len(l) for l in lines) // 1000} KB).")</pre></div>
+<div class="box note"><span class="tag">Troubleshooting</span><p><b>Claude used grep in step 3 anyway</b>: that's sensible behaviour; repeat the instruction or accept it and compare with step 4. <b>Step 7 doesn't recall the fact</b>: check <code>/memory</code> shows auto memory on, or that you're in the same folder (auto memory is per project). If your organisation turned it off, add the line to <code>CLAUDE.md</code> via <code>/memory</code> instead. <b>No Claude Code access</b>: do steps 1, 3 and 4 in claude.ai by uploading the file, and use a Project's instructions for steps 6–7.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Claude remembers our earlier conversation because it learned from it."</dt><dd>The model never changes. Apps resend the history and memory features insert saved notes.</dd>
+<dt>"With 1M tokens I can paste everything."</dt><dd>You can, but quality degrades as context grows (context rot), and you pay for every token. Curate.</dd>
+<dt>"Compaction is lossless."</dt><dd>It's a summary. Detail is dropped. Tell <code>/compact</code> what to keep.</dd>
+<dt>"Prompt caching gives me more room."</dt><dd>Cached tokens still count toward the window. Caching lowers cost and speeds up processing.</dd>
+<dt>"A longer CLAUDE.md makes Claude smarter about our project."</dt><dd>Only if it's relevant. It is loaded every session and competes with the task. Short and specific wins.</dd>
+<dt>"Incognito means nothing is sent to the model."</dt><dd>The conversation is still sent to the model to be answered; incognito chats just aren't saved to history or memory.</dd>
+</dl></div>
+
+<h3 id="ch20-r"><span class="num">20.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>The model is stateless: every turn, the whole relevant conversation is sent again and must fit in the context window.</li>
+<li>The window holds system prompt, tools, memory files, history, tool results, images, thinking and the new reply.</li>
+<li>Current Claude models: 1M-token window, 128K-token maximum reply (verified 9 Nov 2026).</li>
+<li>Context rot: accuracy and recall degrade as context grows, and the middle of long inputs is used less reliably.</li>
+<li>Compaction summarises, clearing starts fresh, context editing removes by rule. All drop something.</li>
+<li>Memory features (apps memory, Projects, CLAUDE.md, auto memory) are text inserted into the window, not learning.</li>
+<li>Caching saves money but not space. Search rather than stuff; one task per session.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">On your 20th message in a chat, what does the model receive?</p><div class="opts"><button>Only the 20th message; it remembers the rest</button><button data-ok>The conversation history (possibly trimmed or summarised) plus the new message</button><button>A compressed copy of its own weights</button></div><p class="why" hidden>The model is stateless. The app resends the history each turn.</p></div>
+<div class="qz"><p class="q">Which of these does NOT count toward the context window?</p><div class="opts"><button>Tool definitions from connected MCP servers</button><button>The model's thinking for the current reply</button><button data-ok>The data the model was trained on</button></div><p class="why" hidden>Training data shaped the weights; it isn't in the window. Tools and thinking both use window space.</p></div>
+<div class="qz"><p class="q">What does Anthropic mean by "context rot"?</p><div class="opts"><button>Saved memories expiring after 30 days</button><button data-ok>Accuracy and recall degrading as the token count grows</button><button>The cache lifetime running out</button></div><p class="why" hidden>Anthropic's context-window docs define it this way, which is why curating context matters.</p></div>
+<div class="qz"><p class="q">You finished one bug investigation in Claude Code and are starting an unrelated task. Best move?</p><div class="opts"><button data-ok>/clear</button><button>/compact</button><button>Keep going; 1M tokens is plenty</button></div><p class="why" hidden>Nothing from the old task helps the new one; clearing removes distraction. Compact when continuing the same task.</p></div>
+<div class="qz"><p class="q">How does a CLAUDE.md file influence Claude Code?</p><div class="opts"><button>It fine-tunes the model for your project</button><button data-ok>Its text is loaded into the context at the start of the session</button><button>It is only read when you type /memory</button></div><p class="why" hidden>CLAUDE.md files for the working directory and its parents load at launch; it's context, not training.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Audit one real Claude Code project of your team. (1) Run <code>/context</code> at the start of a session and record how much space the system prompt, tools and memory files take. (2) Read the project's CLAUDE.md and mark every line as "needed every session", "needed sometimes" or "outdated". (3) Propose a shorter CLAUDE.md, moving "sometimes" material into separate files that are loaded only when needed (<a href="#ch77">Chapter 77</a> shows imports and rules files). (4) List which MCP servers could be disconnected for everyday work. Share the before/after numbers.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Claude doesn't remember our conversation. Every time we send a message, the whole conversation gets sent again, and it has to fit in a fixed space called the context window. Claude's window is huge, a million tokens, but the fuller it gets, the worse it gets at finding the important bit. So we keep it clean: one task per session, let Claude search logs instead of pasting them, and clear or compact when it gets long. Memory features like CLAUDE.md just paste our notes back in at the start, so keep them short and correct."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/context-windows" target="_blank" rel="noopener">Context windows</a> (definition, context rot, what counts, sizes, overflow behaviour, caching note).</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/compaction" target="_blank" rel="noopener">Compaction overview</a> and <a href="https://platform.claude.com/docs/en/build-with-claude/context-editing" target="_blank" rel="noopener">Context editing</a>.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/models/overview" target="_blank" rel="noopener">Models overview</a> and <a href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Pricing</a>.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/prompt-caching" target="_blank" rel="noopener">Prompt caching</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/memory" target="_blank" rel="noopener">Claude Code memory</a> (CLAUDE.md locations, auto memory) and <a href="https://code.claude.com/docs/en/commands" target="_blank" rel="noopener">commands</a> (<code>/context</code>, <code>/compact</code>, <code>/autocompact</code>, <code>/clear</code>, <code>/memory</code>).</li>
+<li>Anthropic Help Center, <a href="https://support.claude.com/en/articles/11817273-use-claude-s-chat-search-and-memory-to-build-on-previous-context" target="_blank" rel="noopener">Use Claude's chat search and memory</a> and <a href="https://support.claude.com/en/articles/12260368-use-incognito-chats" target="_blank" rel="noopener">Use incognito chats</a>.</li>
+<li>Anthropic Engineering, <a href="https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents" target="_blank" rel="noopener">Effective context engineering for AI agents</a>.</li>
+<li>Anthropic, <a href="https://www.anthropic.com/news/claude-2-1" target="_blank" rel="noopener">Introducing Claude 2.1</a> (200K context, November 2023).</li>
+<li>N. F. Liu et al., <a href="https://arxiv.org/abs/2307.03172" target="_blank" rel="noopener">Lost in the Middle: How Language Models Use Long Contexts</a> (2023).</li>
+</ol><p class="verified">Verified 9 November 2026 against Anthropic's context-window, compaction, models, pricing and Claude Code memory documentation. Token sizes in 20.3 are illustrative estimates.</p></div>

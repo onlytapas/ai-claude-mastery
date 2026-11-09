@@ -1,0 +1,307 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What a plugin is, and when packaging your setup as one is worth it</li>
+<li>The plugin folder structure and the <code>plugin.json</code> manifest</li>
+<li>How marketplaces work, and how a team shares plugins through one</li>
+<li>The <code>claude plugin</code> subcommands, including <code>validate</code>, <code>install</code>, <code>enable</code>, <code>details</code> and <code>eval</code></li>
+<li>Output styles and the status line, the two "look and feel" settings</li>
+<li>How to build a QA team starter kit, and a decision table for CLAUDE.md, skills, subagents, hooks, MCP, plugins and settings</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> this chapter ties Part X together, so it helps to have read <a href="#ch77">Chapter 77</a> (CLAUDE.md), <a href="#ch78">Chapter 78</a> (settings), <a href="#ch80">Chapter 80</a> (skills), <a href="#ch81">Chapter 81</a> (subagents), <a href="#ch82">Chapter 82</a> (hooks) and <a href="#ch83">Chapter 83</a> (MCP). The lab needs only Claude Code and a terminal.</div>
+
+<div class="bigidea"><p>Skills, subagents, hooks and MCP servers all work on their own. A <a class="gl" href="#g-plugin">plugin</a> is simply a folder that packages several of them, with a small manifest file giving the package a name and version, so a whole team can install the same setup in one step and receive updates. Plugins are listed in <a class="gl" href="#g-plugin-marketplace">marketplaces</a>: catalogues, usually git repositories, that you add once. The <code>claude plugin</code> command validates, installs, enables, inspects and even evaluates them. The harder skill is choosing the right building block in the first place, so the chapter ends with a decision table you can keep beside you.</p></div>
+
+<h3 id="ch84-1"><span class="num">84.1</span>What a plugin is, and when you need one</h3>
+<p>Imagine your QA team has built up a good setup: a bug-report skill, a read-only test reviewer subagent, a hook that protects application code, and a Playwright MCP server. Today each person copies those files by hand, and copies drift. A plugin turns the set into one installable, versioned unit.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A new starter can be told "install Chrome, then these six extensions, then change these settings", or they can be handed the company laptop image that has it all. A plugin is the laptop image for Claude Code: same contents as doing it by hand, but packaged, named, versioned and easy to update.</p></div>
+<p>The official guidance is practical. Keep things standalone (in <code>.claude/</code> or <code>~/.claude/</code>) while they serve one project or only you. Make a plugin when you want to share the setup with teammates, use it in several repositories, or publish versioned releases. A good trigger, from Anthropic's "build your setup over time" table: <em>a second repository needs the same setup</em>.</p>
+<div class="box warn"><span class="tag">An enabled plugin is always on</span><p>Every skill and agent a plugin adds that Claude can invoke on its own puts its name and description into Claude's context on <em>every</em> turn, even when unused, and its MCP servers and hooks run in every session where it's enabled. Whatever a plugin runs, it runs as you. Install few plugins, from sources you trust, and disable ones you don't use.</p></div>
+
+<h3 id="ch84-2"><span class="num">84.2</span>The plugin folder</h3>
+<p>Each kind of component goes in a fixed place under the plugin's root folder. Add only what you use.</p>
+<div class="tbl"><table>
+<tr><th>Path in the plugin</th><th>Contents</th><th>Covered in</th></tr>
+<tr><td><code>.claude-plugin/plugin.json</code></td><td>The manifest. <strong>Only this file</strong> goes in <code>.claude-plugin/</code></td><td>84.3</td></tr>
+<tr><td><code>skills/&lt;name&gt;/SKILL.md</code></td><td>Skills, run as <code>/plugin-name:skill-name</code></td><td><a href="#ch80">Chapter 80</a></td></tr>
+<tr><td><code>commands/</code></td><td>Flat Markdown commands, the older form of skills</td><td><a href="#ch80">Chapter 80</a></td></tr>
+<tr><td><code>agents/</code></td><td>Subagent files, named <code>plugin-name:agent-name</code></td><td><a href="#ch81">Chapter 81</a></td></tr>
+<tr><td><code>hooks/hooks.json</code></td><td><code>{"hooks": {…}}</code>, same shape as settings</td><td><a href="#ch82">Chapter 82</a></td></tr>
+<tr><td><code>.mcp.json</code></td><td>MCP server definitions</td><td><a href="#ch83">Chapter 83</a></td></tr>
+<tr><td><code>output-styles/</code>, <code>.lsp.json</code> and others</td><td>Output styles, language servers, monitors, themes</td><td>84.7</td></tr>
+</table></div>
+<div class="code"><span class="cap">The starter kit built in this chapter</span><pre>qa-kit/
+├── .claude-plugin/
+│   └── plugin.json
+├── README.md
+├── skills/
+│   └── bug-report/
+│       └── SKILL.md
+├── agents/
+│   └── qa-reviewer.md
+├── hooks/
+│   └── hooks.json
+└── scripts/
+    └── protect_src.py</pre></div>
+<div class="box note"><span class="tag">Namespacing</span><p>Plugin skills and agents get the plugin's name as a prefix, so two plugins can each have a <code>review</code> skill without clashing: <code>/qa-kit:bug-report</code>, <code>qa-kit:qa-reviewer</code>. Plugin subagents ignore the <code>hooks</code>, <code>mcpServers</code> and <code>permissionMode</code> fields for security; ship hooks in <code>hooks/hooks.json</code> and servers in <code>.mcp.json</code> instead.</p></div>
+
+<h3 id="ch84-3"><span class="num">84.3</span>The manifest: <code>plugin.json</code></h3>
+<p>The <a class="gl" href="#g-plugin-manifest">manifest</a> names and describes the plugin. Only <code>name</code> is required; without a manifest, a plugin loaded with <code>--plugin-dir</code> is named after its folder.</p>
+<div class="code"><span class="cap">qa-kit/.claude-plugin/plugin.json</span><pre>{
+  "name": "qa-kit",
+  "description": "Shared QA setup: bug-report skill, test reviewer subagent and a protect-src hook",
+  "version": "0.1.0",
+  "author": { "name": "QA Team" },
+  "license": "MIT"
+}</pre></div>
+<div class="tbl"><table>
+<tr><th>Field</th><th>What it's for</th></tr>
+<tr><td><code>name</code></td><td>Required. Identifies the plugin and becomes the prefix on its skills and agents. No spaces</td></tr>
+<tr><td><code>description</code></td><td>What users see in <code>/plugin</code></td></tr>
+<tr><td><code>version</code></td><td>Optional. When set, users stay on that version until you change it</td></tr>
+<tr><td><code>author</code></td><td>An object; <code>name</code> required inside it, <code>email</code> and <code>url</code> optional</td></tr>
+<tr><td>Others</td><td><code>displayName</code>, <code>homepage</code>, <code>repository</code>, <code>license</code>, <code>keywords</code>, <code>defaultEnabled</code>, <code>dependencies</code>, custom component paths (<code>skills</code>, <code>commands</code>, <code>agents</code>, <code>hooks</code>, <code>mcpServers</code>, <code>lspServers</code>, <code>outputStyles</code>) and <code>userConfig</code> for options users fill in</td></tr>
+</table></div>
+<p>Inside hooks and MCP definitions, refer to bundled files with <code>${CLAUDE_PLUGIN_ROOT}</code>, because you don't know where the plugin will be installed:</p>
+<div class="code"><span class="cap">qa-kit/hooks/hooks.json</span><pre>{
+  "description": "Block edits under src/ while the kit is enabled",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/protect_src.py"]
+          }
+        ]
+      }
+    ]
+  }
+}</pre></div>
+
+<h3 id="ch84-4"><span class="num">84.4</span>Marketplaces</h3>
+<p>A marketplace is a catalogue, not a shop: a git repository or folder containing <code>.claude-plugin/marketplace.json</code>, which lists plugins and where to fetch each one. You add a marketplace once, then install plugins from it by <code>name@marketplace</code>.</p>
+<div class="code"><span class="cap">qa-tools/.claude-plugin/marketplace.json</span><pre>{
+  "name": "qa-tools",
+  "description": "Claude Code plugins maintained by the QA team",
+  "owner": { "name": "QA Team" },
+  "plugins": [
+    {
+      "name": "qa-kit",
+      "source": "./plugins/qa-kit",
+      "description": "Bug-report skill, test reviewer subagent and protect-src hook"
+    }
+  ]
+}</pre></div>
+<p>Required: <code>name</code>, <code>owner</code> (with a <code>name</code>), and <code>plugins</code>, each entry with <code>name</code> and <code>source</code>. Sources can be a relative path (as above), <code>github</code>, <code>url</code>, <code>git-subdir</code>, <code>npm</code>, <code>archive</code> or <code>command</code>. A top-level <code>description</code> is optional, but <code>claude plugin validate</code> warns when it's missing.</p>
+<ul>
+<li><strong>The official marketplace</strong> (<code>claude-plugins-official</code>) is added automatically the first time you start an interactive terminal session, unless your organisation blocks it. Browse it in the <b>Discover</b> tab of <code>/plugin</code>.</li>
+<li><strong>Three tiers:</strong> official names, community names (such as <code>claude-community</code>) and everything else, "third-party", which includes your own team's marketplace. Claude Code accepts official and community names only from <code>github.com/anthropics/</code> repositories.</li>
+<li>A <em>plugin marketplace</em> is not the same thing as Claude Marketplace, the website at claude.com/marketplace.</li>
+</ul>
+<h4>Sharing with a team through project settings</h4>
+<p>To make the team marketplace and plugin appear for everyone who opens the repository, commit both keys to <code>.claude/settings.json</code>:</p>
+<div class="code"><span class="cap">.claude/settings.json (illustrative organisation and repository names)</span><pre>{
+  "extraKnownMarketplaces": {
+    "qa-tools": {
+      "source": { "source": "github", "repo": "your-org/qa-tools" }
+    }
+  },
+  "enabledPlugins": {
+    "qa-kit@qa-tools": true
+  }
+}</pre></div>
+<p>Two details trip teams up. First, Claude Code honours a repository's <code>extraKnownMarketplaces</code> only after you accept the workspace trust dialog. Second, enabling a plugin in project settings doesn't install it for everyone: each person still installs it on their own machine. To opt out of a project-enabled plugin personally, set it to <code>false</code> in <code>.claude/settings.local.json</code> (user settings can't override project settings).</p>
+
+<h3 id="ch84-5"><span class="num">84.5</span>The <code>claude plugin</code> commands</h3>
+<p>Run these in your shell, outside a session (<code>claude plugins</code> is an alias). Inside a session, <code>/plugin</code> opens a panel with Discover, Installed and Marketplaces tabs, and <code>/reload-plugins</code> applies changes without restarting.</p>
+<input class="filter" data-filter="#ch84-cmds" data-empty="#ch84-cmds-empty" type="search" placeholder="Filter commands…" aria-label="Filter plugin commands">
+<div class="tbl"><table id="ch84-cmds">
+<tr><th>Command</th><th>What it does</th></tr>
+<tr class="group"><td colspan="2">Build and check</td></tr>
+<tr><td><code>claude plugin validate &lt;path&gt;</code></td><td>Checks a plugin or marketplace manifest, or the skills, agents and commands in a folder. <code>--strict</code> fails on warnings (use in CI); <code>--json</code> for scripts. Exit 0 passed, 1 failed, 2 validator error</td></tr>
+<tr><td><code>claude plugin init|new &lt;name&gt;</code></td><td>Scaffolds a plugin at <code>~/.claude/skills/&lt;name&gt;/</code>, which loads next session as <code>&lt;name&gt;@skills-dir</code>. <code>--with skills hooks</code> adds starter files</td></tr>
+<tr><td><code>claude --plugin-dir ./qa-kit</code></td><td>Loads a plugin from a folder (or <code>.zip</code>) for one session, without installing it</td></tr>
+<tr><td><code>claude plugin details &lt;name&gt;</code></td><td>Shows the component inventory and projected token cost. The plugin must be loaded (installed, or via <code>--plugin-dir</code> in the same command)</td></tr>
+<tr><td><code>claude plugin eval [target]</code></td><td>Runs the plugin's eval cases and scores them, by default also without the plugin for comparison (v2.1.269+). <code>claude plugin eval init</code> helps you write the cases</td></tr>
+<tr><td><code>claude plugin tag [path]</code></td><td>Creates a <code>{name}--v{version}</code> git tag, checking <code>plugin.json</code> and the marketplace entry agree</td></tr>
+<tr class="group"><td colspan="2">Install and manage</td></tr>
+<tr><td><code>claude plugin install|i &lt;plugin&gt;</code></td><td>Installs from your marketplaces; <code>--scope user|project|local</code> (default <code>user</code>)</td></tr>
+<tr><td><code>claude plugin enable &lt;plugin&gt;</code> / <code>disable</code></td><td>Turns an installed plugin on or off without uninstalling</td></tr>
+<tr><td><code>claude plugin uninstall|remove &lt;plugin&gt;</code></td><td>Removes it</td></tr>
+<tr><td><code>claude plugin update &lt;plugin&gt;</code></td><td>Updates to the latest version (restart required)</td></tr>
+<tr><td><code>claude plugin list</code></td><td>Lists installed plugins</td></tr>
+<tr><td><code>claude plugin configure &lt;plugin&gt;</code></td><td>Shows or sets a plugin's user options</td></tr>
+<tr><td><code>claude plugin prune|autoremove</code></td><td>Removes auto-installed dependencies no longer needed</td></tr>
+<tr class="group"><td colspan="2">Marketplaces</td></tr>
+<tr><td><code>claude plugin marketplace add &lt;source&gt;</code></td><td>Adds a marketplace from <code>owner/repo</code>, a git URL, a hosted <code>marketplace.json</code> or a local path; <code>--scope</code> picks the settings file</td></tr>
+<tr><td><code>claude plugin marketplace list</code> / <code>update</code> / <code>remove</code></td><td>Lists, refreshes or removes marketplaces</td></tr>
+</table></div>
+<p id="ch84-cmds-empty" hidden>No commands match.</p>
+<p>Install scopes mirror settings files: <strong>user</strong> (you, every project, <code>~/.claude/settings.json</code>), <strong>project</strong> (everyone in the repo, <code>.claude/settings.json</code>) and <strong>local</strong> (you, this repo, <code>.claude/settings.local.json</code>).</p>
+<div class="code"><span class="cap">Terminal: a typical team flow (marketplace name from the example above)</span><pre>claude plugin marketplace add your-org/qa-tools --scope project
+claude plugin install qa-kit@qa-tools --scope project
+claude plugin disable qa-kit@qa-tools     <span class="c"># turn it off for a while</span>
+claude plugin enable qa-kit@qa-tools</pre></div>
+<details class="deep"><summary>Plugin evals in a nutshell</summary><div class="body"><p><code>claude plugin eval</code> treats your plugin like any AI feature that needs testing (<a href="#ch125">Chapter 125</a>). Each case is a prompt plus graders, stored under <code>evals/</code> as <code>case.yaml</code>, or <code>prompt.md</code> with <code>graders/*.md</code>. Claude Code runs each case several times (3 by default) in an isolated session with only your plugin loaded, and usually again without it, so the report shows whether the plugin actually helps. <code>--threshold</code> sets the pass mark, <code>--max-cost-usd</code> caps spend, and the exit code (0 pass, 1 fail, 2 partial run) lets CI gate a release. The help text is explicit that evals run on your machine as you: only evaluate plugins you trust, and a passing suite is not a security review.</p></div></details>
+
+<h3 id="ch84-6"><span class="num">84.6</span>Validating and inspecting: what you really see</h3>
+<p>These outputs come from running the commands on the <code>qa-kit</code> plugin with Claude Code 2.1.319 (paths shortened).</p>
+<div class="code"><span class="cap">claude plugin validate ./qa-kit</span><pre>Validating plugin manifest: …/qa-kit/.claude-plugin/plugin.json
+
+Plugin directory checks for …/qa-kit. …
+
+⚠ Found 1 plugin directory warning:
+
+  ❯ .claude-plugin/plugin.json icon: No icon (ICON_MISSING). …
+
+These plugin directory checks do not change the result below.
+
+✔ Validation passed</pre></div>
+<p>The "plugin directory checks" are extra advice for submitting to Anthropic's public directory (README, licence, icon); they don't change the verdict unless you add <code>--profile directory</code>. A real error looks like this, from a manifest missing its <code>name</code>:</p>
+<div class="code"><span class="cap">A failing manifest</span><pre>✘ Found 1 error:
+
+  ❯ name: Invalid input: expected string, received undefined
+…
+✘ Validation failed</pre></div>
+<div class="code"><span class="cap">claude --plugin-dir ./qa-kit plugin details qa-kit</span><pre>qa-kit 0.1.0
+  Description: Shared QA setup: bug-report skill, test reviewer subagent and a protect-src hook
+  Source: qa-kit@inline
+
+Component inventory
+  Skills (1)  bug-report
+  Agents (1)  qa-reviewer
+  Hooks (1)  PreToolUse  (harness-only — no model context cost)
+  MCP servers (0)
+  LSP servers (0)
+
+Projected token cost
+  Always-on:   ~119 tok   added to every session</pre></div>
+<p>Note where the flag goes: <code>--plugin-dir</code> belongs to <code>claude</code>, before <code>plugin details</code>. The token figure is the always-on cost described in 84.1; the hook costs no context because Claude Code runs it, not the model.</p>
+
+<h3 id="ch84-7"><span class="num">84.7</span>Output styles and the status line</h3>
+<h4>Output styles</h4>
+<p>An <a class="gl" href="#g-output-style">output style</a> sets Claude's role, tone and response format for a whole session. Besides Default there are four built-ins:</p>
+<div class="tbl"><table>
+<tr><th>Style</th><th>What changes</th></tr>
+<tr><td><b>Proactive</b></td><td>Starts work straight away and makes reasonable assumptions instead of asking about routine decisions (permission prompts are unchanged)</td></tr>
+<tr><td><b>Concise</b></td><td>Leads with the result; no preamble, narration or recap</td></tr>
+<tr><td><b>Explanatory</b></td><td>Adds short "Insight" blocks explaining the choices behind the code</td></tr>
+<tr><td><b>Learning</b></td><td>Explains, and leaves small pieces of code for you to write</td></tr>
+</table></div>
+<p>Switch with <code>/output-style concise</code> (the command ignores case) or <code>/config</code> &gt; Output style; both save to <code>.claude/settings.local.json</code>. In a settings file, write <code>"outputStyle": "Explanatory"</code>: there the value <em>is</em> case-sensitive, and a wrong case silently gives you Default. A custom style is a Markdown file in <code>~/.claude/output-styles/</code> or <code>.claude/output-styles/</code>:</p>
+<div class="code"><span class="cap">.claude/output-styles/qa-reporter.md</span><pre>---
+name: QA reporter
+description: Answers in the team's defect-report format
+keep-coding-instructions: true
+---
+When you report a problem, use the headings Summary, Steps to reproduce,
+Expected, Actual and Severity. Keep each section to three lines or fewer.</pre></div>
+<p><code>keep-coding-instructions: true</code> keeps Claude Code's built-in software engineering instructions; leave it out only if Claude won't be coding. Styles are instructions, not guarantees, and they don't change how normal subagents respond (forks excepted).</p>
+<h4>The status line</h4>
+<p>The <a class="gl" href="#g-status-line">status line</a> is a line under the prompt that you control. The fastest route is <code>/statusline</code> followed by a description ("show the model, folder and context used"); Claude writes the script and updates settings. By hand, a script receives session JSON on stdin and prints one line:</p>
+<div class="code"><span class="cap">~/.claude/statusline.sh (from the docs; needs jq)</span><pre>#!/bin/bash
+input=$(cat)
+MODEL=$(echo "$input" | jq -r '.model.display_name')
+DIR=$(echo "$input" | jq -r '.workspace.current_dir')
+PCT=$(echo "$input" | jq -r '.context_window.used_percentage // 0' | cut -d. -f1)
+echo "[$MODEL] ${DIR##*/} | ${PCT}% context"</pre></div>
+<div class="code"><span class="cap">~/.claude/settings.json</span><pre>{ "statusLine": { "type": "command", "command": "~/.claude/statusline.sh", "padding": 2 } }</pre></div>
+<p>Make it executable with <code>chmod +x ~/.claude/statusline.sh</code>. Like hooks, the status line command runs outside the sandbox, so review any script a colleague shares.</p>
+
+<h3 id="ch84-8"><span class="num">84.8</span>A QA team starter kit</h3>
+<p>Here's a sensible split for a QA team, following each tool's strengths. Everything except personal preferences is committed to the test repository or shipped in the plugin.</p>
+<div class="tbl"><table>
+<tr><th>Piece</th><th>Where</th><th>Why there</th></tr>
+<tr><td>Test conventions, commands, folder map</td><td><code>CLAUDE.md</code> in the repo</td><td>Facts Claude should always know (<a href="#ch77">Chapter 77</a>)</td></tr>
+<tr><td>Allow <code>npx playwright test *</code>, deny <code>Read(./.env)</code> and <code>Bash(git push *)</code></td><td><code>.claude/settings.json</code></td><td>Enforced permissions (<a href="#ch78">Chapter 78</a>)</td></tr>
+<tr><td><code>/qa-kit:bug-report</code> skill</td><td>Plugin</td><td>Same report format in every repo</td></tr>
+<tr><td><code>qa-kit:qa-reviewer</code> subagent</td><td>Plugin</td><td>Read-only review, isolated context</td></tr>
+<tr><td>Protect-<code>src/</code> hook</td><td>Plugin <code>hooks/hooks.json</code></td><td>Must happen every time</td></tr>
+<tr><td>Playwright MCP server</td><td><code>.mcp.json</code> in the repo or plugin</td><td>A real browser (<a href="#ch102">Chapter 102</a>)</td></tr>
+<tr><td>Marketplace + enabled plugin</td><td><code>.claude/settings.json</code></td><td>The repo declares the marketplace and the plugin it expects</td></tr>
+<tr><td>Output style, status line, model</td><td>Each person's own settings</td><td>Personal taste, not team policy</td></tr>
+</table></div>
+
+<div class="lab"><div class="lab-h"><b>Package and validate a QA starter kit</b><span>40 min · Claude Code, terminal; no network needed</span></div><ol>
+<li>Create the folders: <code>mkdir -p qa-kit/.claude-plugin qa-kit/skills/bug-report qa-kit/agents qa-kit/hooks qa-kit/scripts</code>.<span class="expect">an empty plugin skeleton.</span></li>
+<li>Save the manifest from 84.3 as <code>qa-kit/.claude-plugin/plugin.json</code> and the hooks file from 84.3 as <code>qa-kit/hooks/hooks.json</code>. Copy <code>protect_src.py</code> from <a href="#ch82">Chapter 82</a> into <code>qa-kit/scripts/</code>, and <code>qa-reviewer.md</code> from <a href="#ch81">Chapter 81</a> into <code>qa-kit/agents/</code>.<span class="expect">four files in place.</span></li>
+<li>Create <code>qa-kit/skills/bug-report/SKILL.md</code>:<div class="code"><pre>---
+name: bug-report
+description: Turn rough notes about a defect into a Jira-ready bug report with steps, expected and actual results. Use when the user describes a bug.
+---
+
+Write a bug report from the notes in $ARGUMENTS with these headings:
+Summary, Environment, Steps to reproduce, Expected result, Actual result, Severity, Attachments needed.
+Ask for any missing environment details instead of guessing.</pre></div><span class="expect">the plugin's one skill.</span></li>
+<li>Add a <code>qa-kit/README.md</code> of a few sentences saying what the kit does and how to install it, then run <code>claude plugin validate ./qa-kit</code>.<span class="expect"><code>Validating plugin manifest: …</code>, possibly an icon warning under "plugin directory checks", and finally <code>✔ Validation passed</code>.</span></li>
+<li>Break it: remove the <code>"name"</code> line from <code>plugin.json</code> and validate again, then put it back.<span class="expect"><code>name: Invalid input: expected string, received undefined</code> and <code>✘ Validation failed</code> (exit code 1); after the fix it passes.</span></li>
+<li>Inspect it: <code>claude --plugin-dir ./qa-kit plugin details qa-kit</code>.<span class="expect">an inventory of 1 skill, 1 agent, 1 PreToolUse hook and a small always-on token estimate.</span></li>
+<li>Try it: in a practice git repo containing a <code>src/</code> folder, start <code>claude --plugin-dir /path/to/qa-kit</code> and run <code>/qa-kit:bug-report login button does nothing on Safari 17, staging, user tester01</code>.<span class="expect">a structured bug report with the seven headings, and a question about anything missing.</span></li>
+<li>Ask Claude to add a comment to a file under <code>src/</code>.<span class="expect">the edit is blocked by the plugin's hook with the <code>Blocked: … is application code</code> message.</span></li>
+<li>Wrap it in a marketplace: <code>mkdir -p qa-tools/.claude-plugin qa-tools/plugins &amp;&amp; cp -R qa-kit qa-tools/plugins/</code>, save the <code>marketplace.json</code> from 84.4, and run <code>claude plugin validate ./qa-tools</code>.<span class="expect"><code>Validating marketplace manifest: …</code> and <code>✔ Validation passed</code>. (Remove the top-level <code>description</code> to see the "No marketplace description provided" warning.)</span></li>
+<li>Optional, on your own machine only: <code>claude plugin marketplace add ./qa-tools --scope local</code>, then <code>claude plugin install qa-kit@qa-tools --scope local</code>, then <code>/reload-plugins</code> in a running session.<span class="expect"><code>Successfully installed plugin: qa-kit@qa-tools (scope: local)</code>. Undo afterwards with <code>claude plugin uninstall qa-kit@qa-tools --scope local</code> and <code>claude plugin marketplace remove qa-tools</code>.</span></li>
+</ol></div>
+<p><b>Troubleshooting.</b> Skills missing after loading: you put <code>skills/</code> inside <code>.claude-plugin/</code>; only <code>plugin.json</code> belongs there. Hook script not found: use <code>${CLAUDE_PLUGIN_ROOT}</code>, not a relative path. <code>unknown option '--plugin-dir'</code>: put the flag before <code>plugin details</code>. Plugin enabled in project settings but "not installed": each person must install it. Changes not showing in a running session: run <code>/reload-plugins</code>.</p>
+
+<h3 id="ch84-9"><span class="num">84.9</span>Choosing the right tool</h3>
+<p>Part X has given you eight ways to shape Claude Code. They overlap just enough to confuse. Ask one question first: <strong>does this need to be guaranteed, or is it guidance?</strong> Guarantees belong in settings (permissions) or hooks. Guidance belongs in CLAUDE.md, skills, output styles or subagent prompts.</p>
+<input class="filter" data-filter="#ch84-choose" data-empty="#ch84-choose-empty" type="search" placeholder="Filter by need, e.g. 'every time' or 'Jira'…" aria-label="Filter decision table">
+<div class="tbl"><table id="ch84-choose">
+<tr><th>You want…</th><th>Use</th><th>Because</th><th>QA example</th></tr>
+<tr><td>Claude to always know project facts and conventions</td><td><b>CLAUDE.md</b></td><td>Loaded every session; plain text</td><td>"Tests live in tests/e2e; use data-qa locators"</td></tr>
+<tr><td>A repeatable procedure, on demand or when relevant</td><td><b>Skill</b></td><td>Loads only when invoked or matched; runs in your conversation</td><td><code>/bug-report</code>, a release-readiness checklist</td></tr>
+<tr><td>A specialist that works separately and returns a summary</td><td><b>Subagent</b></td><td>Own context, tools and model</td><td>Log analyst; read-only test reviewer</td></tr>
+<tr><td>Something to happen every time, without exception</td><td><b>Hook</b></td><td>Run by Claude Code, not the model; can block</td><td>Validate fixtures after edits; block edits to src/</td></tr>
+<tr><td>Access to an outside system or tool</td><td><b>MCP server</b></td><td>Adds new tools Claude can call</td><td>Jira tickets, Playwright browser, test database</td></tr>
+<tr><td>To allow, ask about or forbid actions</td><td><b>Settings: permissions</b></td><td>Enforced by Claude Code; deny always wins</td><td>Deny reading .env; allow npx playwright test</td></tr>
+<tr><td>Other behaviour: model, environment variables, sandbox</td><td><b>Settings</b></td><td>Configuration, not instructions</td><td>Sandbox on; default model for the repo</td></tr>
+<tr><td>A different voice or format for every reply</td><td><b>Output style</b></td><td>Whole-session instructions</td><td>Concise answers; defect-report format</td></tr>
+<tr><td>The same setup in many repos or for many people</td><td><b>Plugin</b></td><td>Packages the above, versioned, via a marketplace</td><td>The qa-kit starter kit</td></tr>
+</table></div>
+<p id="ch84-choose-empty" hidden>No rows match.</p>
+<div class="flow">
+<div><b>Must it never be skipped?</b>Yes → permission rule or hook</div>
+<div><b>Is it about an outside system?</b>Yes → MCP server</div>
+<div><b>Is it noisy or needs isolation?</b>Yes → subagent</div>
+<div><b>Is it a procedure?</b>Yes → skill. Otherwise a fact → CLAUDE.md</div>
+<div class="hl"><b>Needed in many places?</b>Package it as a plugin</div>
+</div>
+<div class="box example"><span class="tag">Real-world example: one rule, three wrong homes</span><p>"Never commit secrets in test data." As a CLAUDE.md line it's a reminder Claude may forget. As a skill it only applies when invoked. As a subagent it's a reviewer you must remember to call. The right home is a permission deny rule for reading <code>.env</code> files plus a <code>PreToolUse</code> hook that scans new fixture files for key patterns, packaged in the team plugin so every repository gets it.</p></div>
+<div class="box opinion"><span class="tag">Opinion · Anthropic's documentation</span><p>Anthropic's "build your setup over time" advice is to add features in response to real triggers rather than up front: a convention Claude gets wrong twice goes in CLAUDE.md; the same prompt typed repeatedly becomes a skill; a side task that floods the conversation becomes a subagent; something that must happen every time becomes a hook; a second repository needing the same setup becomes a plugin. This textbook agrees: a small setup you understand beats a large one nobody can debug.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"A plugin can do things the parts can't."</dt><dd>A plugin packages skills, subagents, hooks, MCP servers and styles. Its value is distribution and versioning, not new powers.</dd>
+<dt>"Enabling a plugin in .claude/settings.json installs it for the team."</dt><dd>It declares it. Each person still installs it, and the marketplace entry only registers after the trust dialog.</dd>
+<dt>"A plugin that isn't being used costs nothing."</dt><dd>Descriptions of its model-invocable skills and agents sit in context every turn, and its hooks and MCP servers run every session. Check with <code>claude plugin details</code>.</dd>
+<dt>"Validation passing means a plugin is safe."</dt><dd>It means the files are well-formed. A plugin runs as you; review what it does, especially hooks and MCP servers.</dd>
+<dt>"An output style forces Claude's behaviour."</dt><dd>It's an instruction, like CLAUDE.md. Use a hook for anything that must happen.</dd>
+</dl></div>
+
+<h3 id="ch84-r"><span class="num">84.10</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>A plugin is a folder that packages skills, agents, hooks, MCP servers and more, with <code>.claude-plugin/plugin.json</code> (only <code>name</code> required) as its manifest.</li>
+<li>Marketplaces are catalogues listed in <code>.claude-plugin/marketplace.json</code>; install with <code>plugin@marketplace</code> at user, project or local scope.</li>
+<li>Key commands: <code>validate</code> (with <code>--strict</code> in CI), <code>install</code>, <code>enable</code>/<code>disable</code>, <code>details</code> (inventory and token cost), <code>eval</code> (scored test cases); test locally with <code>--plugin-dir</code>.</li>
+<li>Output styles change voice and format; the status line is a script that prints one line from session JSON. Both are personal settings.</li>
+<li>Choose by asking: must it be guaranteed (permissions, hooks), is it an outside system (MCP), is it noisy (subagent), is it a procedure (skill), or a fact (CLAUDE.md)? Package for reuse as a plugin.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Which file must go inside a plugin's <code>.claude-plugin/</code> folder?</p><div class="opts"><button>All skills and agents</button><button data-ok>Only plugin.json (or marketplace.json for a marketplace)</button><button>hooks.json and .mcp.json</button></div><p class="why" hidden>Components saved inside .claude-plugin/ don't load. They go at the plugin root, in skills/, agents/, hooks/ and so on.</p></div>
+<div class="qz"><p class="q">You want CI to fail if a plugin has unrecognised fields or missing metadata. Which command fits?</p><div class="opts"><button>claude plugin details ./qa-kit</button><button data-ok>claude plugin validate ./qa-kit --strict</button><button>claude plugin install ./qa-kit</button></div><p class="why" hidden><code>--strict</code> treats warnings as errors and exits 1, which a pipeline can act on.</p></div>
+<div class="qz"><p class="q">Your team must never let Claude edit generated API clients under <code>src/gen/</code>. Which is the right primary tool?</p><div class="opts"><button>A line in CLAUDE.md</button><button>An output style</button><button data-ok>A permission deny rule and/or a PreToolUse hook</button></div><p class="why" hidden>"Never" needs enforcement. CLAUDE.md and output styles are instructions the model may not follow.</p></div>
+<div class="qz"><p class="q">What does <code>claude plugin details</code> show that's useful before rolling a plugin out?</p><div class="opts"><button data-ok>Its components and the projected always-on token cost per session</button><button>Its eval scores</button><button>Who installed it</button></div><p class="why" hidden>The inventory and token estimate tell you what the plugin adds to every session.</p></div>
+<div class="qz"><p class="q">In <code>.claude/settings.json</code>, you set <code>"outputStyle": "concise"</code>. What happens?</p><div class="opts"><button>Claude uses the Concise style</button><button data-ok>You get the Default style, because the value is case-sensitive</button><button>Claude Code refuses to start</button></div><p class="why" hidden>The settings value must be <code>Concise</code>. Only the <code>/output-style</code> command ignores case.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Audit your team's Claude Code setup using the decision table in 84.9. List every rule, prompt and helper people currently share by copy and paste, and write next to each the tool it belongs in and why. Move at least one "must never" rule from CLAUDE.md into a permission rule or hook. Then package the shareable pieces as a plugin, validate it with <code>--strict</code>, check its cost with <code>claude plugin details</code>, and write a one-page README covering what it contains, what it runs on people's machines, and how to disable it.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"A plugin is a package for our Claude Code setup: skills, subagents, hooks and MCP servers in one folder with a plugin.json that names it. We publish it in a marketplace, which is just a git repo with a catalogue file, and everyone installs it with one command. Before adding anything, ask: must it always happen? Then it's a permission or a hook. Is it an outside system? MCP. Is it noisy? A subagent. Is it a procedure? A skill. Is it a fact? CLAUDE.md. And remember an enabled plugin runs as you and costs context every session, so keep it small and review it."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/plugins" target="_blank" rel="noopener">Plugins overview</a> and <a href="https://code.claude.com/docs/en/plugins/create" target="_blank" rel="noopener">Create a plugin</a>: what a plugin is, layout, first plugin, scopes, marketplace tiers.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/plugins/manifest-reference" target="_blank" rel="noopener">Plugin manifest reference</a> and <a href="https://code.claude.com/docs/en/plugins/marketplace-reference" target="_blank" rel="noopener">Marketplace reference</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/plugins/cli-reference" target="_blank" rel="noopener">Plugin commands reference</a>: init, install, enable, details, eval, validate, marketplace commands, <code>/plugin</code>, <code>/reload-plugins</code>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/settings-reference" target="_blank" rel="noopener">Settings reference</a>: <code>enabledPlugins</code>, <code>extraKnownMarketplaces</code>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/output-styles" target="_blank" rel="noopener">Output styles</a>, <a href="https://code.claude.com/docs/en/statusline" target="_blank" rel="noopener">Status line</a> and <a href="https://code.claude.com/docs/en/features-overview" target="_blank" rel="noopener">Extend Claude Code</a> (feature comparison and "build your setup over time").</li>
+<li>Claude Code 2.1.319 local help (<code>claude plugin --help</code>, <code>claude plugin validate --help</code>); validate and details output captured from a scratch plugin and marketplace.</li>
+</ol><p class="verified">Verified 9 November 2026 against the Claude Code documentation and Claude Code 2.1.319.</p></div>

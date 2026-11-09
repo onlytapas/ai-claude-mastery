@@ -1,0 +1,180 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>The difference between proprietary models, open-weight models and truly open-source AI</li>
+<li>How to read the key parts of a model licence, with real examples (Apache 2.0, MIT, Llama's custom licence)</li>
+<li>What it takes to run a model on your own hardware, and a quick way to estimate the memory you need</li>
+<li>How privacy, control, cost and capability differ between the two approaches</li>
+<li>The main arguments in the safety debate about releasing weights, clearly labelled as opinions</li>
+<li>How to decide which approach fits a given company or project</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch31">Chapter 31</a> (why there are so many models). Knowing what weights and parameters are helps (<a href="#ch11">Chapter 11</a>). The industry chapters (<a href="#ch26">Chapter 26</a> to <a href="#ch30">Chapter 30</a>) give background on the companies named here.</div>
+
+<div class="bigidea"><p>A trained model is, at heart, a very large file of numbers called weights. A proprietary model keeps that file private: you can only use it through the company's app or API. An open-weight model lets you download the file and run it yourself, under the terms of a licence. "Open weights" is not the same as "open source": true open-source AI also shares the code and enough information about the training data to rebuild it. Neither approach is simply better. Proprietary models usually lead on capability and are easier to start with; open-weight models give control, privacy and independence, at the cost of running them yourself.</p></div>
+
+<h3 id="ch32-1"><span class="num">32.1</span>Three words that get mixed up</h3>
+<p>When people argue about "open" AI they often mean different things. Start with what a model actually is: a program (the architecture and code that runs it) plus a huge set of learned numbers, the <a class="gl" href="#g-weight">weights</a>. The weights are where the knowledge lives. Whoever holds them can run the model.</p>
+<div class="tbl"><table>
+<tr><th>Term</th><th>What you get</th><th>Examples (Nov 2026)</th></tr>
+<tr><td><a class="gl" href="#g-proprietary-model">Proprietary</a> (closed)</td><td>Access through an app or API only. The weights never leave the company (or its cloud partners).</td><td>Claude, GPT-6 Astra, Gemini 4 Argon, Grok 4.7, Muse Spark</td></tr>
+<tr><td><a class="gl" href="#g-open-weight-model">Open weights</a></td><td>A downloadable weights file and usually inference code, under a licence. Training data and full training code are usually <em>not</em> shared.</td><td>DeepSeek-V4, Mistral Large 4, many Qwen3.8 models, Gemma, gpt-oss, Muse Glimmer, Nemotron</td></tr>
+<tr><td><a class="gl" href="#g-open-source-ai">Open-source AI</a></td><td>Weights, the complete code to train and run, and detailed information about the training data, all under terms that allow use, study, change and sharing.</td><td>Few frontier-scale models meet the strict definition</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a famous restaurant dish. <strong>Proprietary</strong> is eating at the restaurant: you get the meal, but never see the kitchen. <strong>Open weights</strong> is buying the dish frozen: you can heat it at home, serve it to guests, maybe add your own sauce, but you don't know the recipe or where the ingredients came from. <strong>Open source</strong> is getting the full recipe, the ingredient list with suppliers, and the cooking method, so a skilled cook could make it from scratch and change it.</p></div>
+
+<h3 id="ch32-2"><span class="num">32.2</span>Open weights is not open source</h3>
+<p>In software, "open source" has had a precise meaning for decades, maintained by the Open Source Initiative (OSI). For AI, OSI published the <strong>Open Source AI Definition 1.0</strong> on 28 October 2024. It says an open-source AI system must grant four freedoms:</p>
+<div class="cols2">
+<div><h4>Use and study</h4><p><b>Use</b> the system for any purpose without asking permission. <b>Study</b> how it works and inspect its components.</p></div>
+<div><h4>Modify and share</h4><p><b>Modify</b> it for any purpose, including changing its output. <b>Share</b> it, changed or not, for any purpose.</p></div>
+</div>
+<p>To make those freedoms real, the definition requires three things to be available:</p>
+<div class="flow">
+<div><b>Data information</b>Enough detail about the training data (sources, selection, processing) that a skilled person could build a substantially equivalent system</div>
+<div><b>Code</b>The complete code to process data, train, validate and run the model, under OSI-approved licences</div>
+<div class="hl"><b>Parameters</b>The weights (and things like key training checkpoints) under OSI-approved terms</div>
+</div>
+<p>Most "open" models today publish only the last box. That is valuable, but it's open <em>weights</em>. You can run and adapt them; you can't fully inspect or reproduce how they were made.</p>
+<div class="box note"><span class="tag">A live debate</span><p>The definition was contested from the start. Some critics argued that "data information" is too weak and that only fully released training data counts; others argued it is too demanding for models trained on data that can't legally be redistributed. OSI itself describes 1.0 as a starting point. When a vendor calls its model "open source", check which of the three boxes it actually provides.</p></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A test manager reads that a vendor's assistant is "built on open-source AI" and assumes the company could audit its training data for licensing problems. In fact the base model is open-weight only: the weights are downloadable, but there is no information about what data it learned from. The audit question has to go to the model's maker, and the answer may be "not disclosed". Knowing the difference stops a wrong assumption reaching a risk register.</p></div>
+
+<h3 id="ch32-3"><span class="num">32.3</span>Reading a model licence</h3>
+<p>Downloading weights doesn't mean you can do anything with them. The <strong>licence</strong> sets the rules. Three broad kinds are common:</p>
+<div class="tbl"><table>
+<tr><th>Licence type</th><th>What it generally allows</th><th>Examples</th></tr>
+<tr><td><a class="gl" href="#g-permissive-licence">Permissive</a> (Apache 2.0, MIT)</td><td>Commercial use, modification and redistribution with few conditions (mainly keeping copyright and licence notices)</td><td>DeepSeek R1, V3.1, V3.2 and V4 (MIT); gpt-oss-120b and gpt-oss-20b (Apache 2.0); Qwen3.8-27B and Muse Glimmer (Apache 2.0); Cohere Command A+ (Apache 2.0)</td></tr>
+<tr><td>Custom "community" licence</td><td>Commercial use allowed, but with extra conditions written by the vendor</td><td>Llama 3.1 Community License; Mistral Ecosystem Open-Weight License (Large 4)</td></tr>
+<tr><td>Custom with commercial strings</td><td>Use allowed, with revenue-sharing or size thresholds</td><td>Moonshot's Kimi K3 (reported revenue-share licence)</td></tr>
+</table></div>
+<p>Custom licences need careful reading. The Llama 3.1 Community License is a good example of the kinds of clauses to look for:</p>
+<ul>
+<li><strong>A size threshold.</strong> If your products had "greater than 700 million monthly active users" in the month before the release date, "you must request a license from Meta", which Meta may grant at its discretion.</li>
+<li><strong>An <a class="gl" href="#g-acceptable-use-policy">acceptable use policy</a>.</strong> Your use must "adhere to the Acceptable Use Policy", a separate document listing forbidden uses.</li>
+<li><strong>Attribution.</strong> If you distribute the model or a product containing it, you must "prominently display 'Built with Llama'". If you use its outputs to build another distributed model, that model's name must begin with "Llama".</li>
+</ul>
+<div class="box warn"><span class="tag">Not legal advice</span><p>This chapter teaches you what to look for, not how to interpret a licence for your company. Before using an open-weight model in a product, involve your legal or procurement team. Licences also change between versions: the terms for one release may not match the next.</p></div>
+<details class="deep"><summary>Why companies release weights at all</summary><div class="body">
+<p>Releasing weights gives away something that cost a lot to make. Companies do it for several business reasons (described here as observed strategies, not endorsements):</p>
+<ul>
+<li><strong>Ecosystem.</strong> Developers who build on your models, tools and formats become your community. Alibaba's Qwen strategy pairs many open-weight models with proprietary "Max" cloud models.</li>
+<li><strong>Selling something else.</strong> NVIDIA releases open Nemotron models while selling the GPUs they run on. Mistral pairs open weights with paid enterprise and sovereign deployments.</li>
+<li><strong>Talent and reputation.</strong> Strong open releases attract researchers and attention. DeepSeek-R1 (January 2025) showed a research-first lab could compete at the frontier with open weights.</li>
+<li><strong>Strategy can change.</strong> Meta built its reputation on open Llama weights (2023–2025), then in April 2026 launched Muse Spark as a proprietary model while releasing a smaller open-weight Muse Glimmer in August 2026. Meta said it "hope[s] to open-source future versions". Don't assume a vendor's openness is permanent.</li>
+</ul>
+</div></details>
+
+<h3 id="ch32-4"><span class="num">32.4</span>Running a model yourself</h3>
+<p>The practical benefit of open weights is that you can <a class="gl" href="#g-self-hosting">self-host</a>: run the model on your own laptop, server or cloud account. Tools such as Ollama and llama.cpp make this approachable; <a href="#ch137">Chapter 137</a> walks through it step by step. Here we cover what it takes.</p>
+<p>The main constraint is memory. The weights must fit in the memory of your GPU (or, more slowly, your computer's main memory). A rough rule: each parameter takes 2 bytes at 16-bit precision. So one billion parameters needs about 2 GB just to hold the weights. <a class="gl" href="#g-quantisation">Quantisation</a> stores each number with fewer bits (8-bit or 4-bit), shrinking the file by two or four times, usually with a small loss of quality.</p>
+<div class="code"><span class="cap">mem.py · rough memory needed for the weights alone</span><pre><span class="c"># mem.py - rough memory needed just to hold a model's weights</span>
+<span class="c"># Rule of thumb only: real use needs extra room for the context (KV cache) and the runtime.</span>
+BYTES_PER_PARAM = {"16-bit": 2.0, "8-bit": 1.0, "4-bit": 0.5}
+
+models = {                       <span class="c"># parameters, in billions (total, not active)</span>
+    "small 8B model":     8,
+    "Qwen3.8-27B":        27,
+    "Muse Glimmer 30B":   30,
+    "~1T MoE model":      1000,
+}
+
+print(f"{'model':&lt;20}" + "".join(f"{p:&gt;10}" for p in BYTES_PER_PARAM))
+for name, billions in models.items():
+    row = ""
+    for precision, size in BYTES_PER_PARAM.items():
+        gb = billions * size          <span class="c"># 1 billion params x 1 byte = about 1 GB</span>
+        row += f"{gb:&gt;8.0f}GB"
+    print(f"{name:&lt;20}{row}")</pre></div>
+<div class="code"><span class="cap">Expected output</span><pre>model                   16-bit     8-bit     4-bit
+small 8B model            16GB       8GB       4GB
+Qwen3.8-27B               54GB      27GB      14GB
+Muse Glimmer 30B          60GB      30GB      15GB
+~1T MoE model           2000GB    1000GB     500GB</pre></div>
+<p>The lesson: models of a few billion to a few tens of billions of parameters can run on a well-equipped workstation once quantised. The largest open-weight models (DeepSeek-V4-Pro is reported at 1.6 trillion total parameters; Mistral Large 4 at about 1 trillion) need data-centre hardware, even though their <a class="gl" href="#g-active-parameters">active parameters</a> per token are far fewer, because all the experts still have to sit in memory.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Quantisation is like saving a photo as a smaller JPEG. A 4-bit model is a heavily compressed photo: perfectly recognisable, much smaller, but with some fine detail lost. For a quick look it's fine; for printing a poster you might want the full file.</p></div>
+<div class="box note"><span class="tag">The hidden costs</span><p>Self-hosting moves work onto you: buying or renting GPUs, keeping the serving software patched, monitoring, scaling for peak load, applying your own safety filters, and swapping in new versions. For a small team, an API is usually cheaper until volumes are large or a hard requirement (like no data leaving the building) forces the issue.</p></div>
+
+<h3 id="ch32-5"><span class="num">32.5</span>Privacy, control and capability</h3>
+<p>Here is the trade-off side by side:</p>
+<div class="tbl"><table>
+<tr><th></th><th>Proprietary via API</th><th>Open weights, self-hosted</th></tr>
+<tr><td>Where your data goes</td><td>To the vendor (or a cloud partner such as Amazon Bedrock, Google Cloud or Microsoft Foundry); governed by contract and data-handling terms</td><td>Nowhere outside your infrastructure, if you run it yourself</td></tr>
+<tr><td>Capability</td><td>Usually the frontier for the hardest reasoning, coding and agentic tasks</td><td>Strong and closing the gap in many areas; the very largest open models need heavy hardware</td></tr>
+<tr><td>Getting started</td><td>Minutes: an API key and a few lines of code</td><td>Hours to weeks: hardware, serving software, tuning</td></tr>
+<tr><td>Cost shape</td><td>Pay per token; no fixed infrastructure</td><td>Fixed hardware and staff cost; cheap per extra token at high volume</td></tr>
+<tr><td>Version control</td><td>Vendor retires models on its schedule (see <a href="#ch31">Chapter 31</a>)</td><td>You can keep the exact same weights for as long as you like</td></tr>
+<tr><td>Customisation</td><td>Prompting, tools, retrieval; fine-tuning only where the vendor offers it</td><td>Full <a class="gl" href="#g-fine-tuning">fine-tuning</a> and modification, within the licence</td></tr>
+<tr><td>Safety and support</td><td>Vendor provides safeguards, monitoring and support</td><td>You are responsible for safeguards and support</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A bank's QA team wants AI help analysing production logs that contain customer data. Policy forbids sending that data outside the bank's network. Option one: an open-weight model self-hosted inside the bank, after masking. Option two: a proprietary model through the bank's existing cloud provider, if the security team approves that provider's data terms. A third team in the same bank, generating test ideas from public product documentation, has no such constraint and simply uses Claude through the company plan. Same company, different answers per use case.</p></div>
+<details class="deep"><summary>"Open weights" doesn't mean "transparent"</summary><div class="body">
+<p>Having the weights lets you run, measure and fine-tune a model, and researchers can probe its internals in ways an API doesn't allow. But billions of numbers are not readable like source code. You still can't easily tell what data a model saw, whether it memorised copyrighted text, or what behaviours its training encouraged. Interpretability research (<a href="#ch38">Chapter 38</a>) is trying to change that, for open and closed models alike.</p>
+<p>Conversely, closed vendors often publish detailed system cards about testing and safety (<a href="#ch33">Chapter 33</a>), which can tell you more about known risks than a bare weights download does. Transparency is about documentation and evidence, not only about file access.</p>
+</div></details>
+
+<h3 id="ch32-6"><span class="num">32.6</span>The safety debate</h3>
+<p>Whether powerful model weights should be released openly is one of the most argued questions in AI. Both sides include serious researchers and companies. The positions below are summaries of commonly made arguments, not settled facts.</p>
+<div class="box opinion"><span class="tag">Opinion · advocates of open release</span><p>Supporters argue that open weights let independent researchers study and stress-test models, spread benefits beyond a handful of large companies, reduce dependence on any one vendor, support privacy (data never leaves your machine) and let countries and smaller firms build their own systems. They often add that many risks come from how models are used, not whether weights are public, and that openness has historically made software more secure through scrutiny.</p></div>
+<div class="box opinion"><span class="tag">Opinion · advocates of caution</span><p>Critics argue that once weights are released they can't be recalled, and that anyone can strip out safety training through fine-tuning. For the most capable models, they worry this could give real help with cyberattacks or biological and chemical harm. Many in this camp support open release for smaller models but want testing and thresholds before releasing frontier-level weights. Anthropic, for example, keeps its models closed and makes Claude Mythos (the same underlying model as Fable, with some safeguards lifted) available only to organisations verified through programmes such as its Cyber Verification Program.</p></div>
+<p>Notice that the camps overlap: several labs (OpenAI with gpt-oss, Google with Gemma, Meta with Muse Glimmer) keep frontier models closed while releasing smaller open-weight ones. The debate is mostly about <em>where the line should be</em>, not whether any open release is acceptable.</p>
+
+<h3 id="ch32-7"><span class="num">32.7</span>When each fits a company</h3>
+<input class="filter" data-filter="#ch32fit" data-empty="#ch32fitEmpty" type="search" placeholder="Filter situations…" aria-label="Filter situations">
+<div class="tbl"><table id="ch32fit">
+<tr><th>Situation</th><th>Leaning</th><th>Why</th></tr>
+<tr class="group"><td colspan="3">Usually proprietary via API or app</td></tr>
+<tr><td>Small team, getting started</td><td>Proprietary</td><td>Fastest route to value; no hardware or MLOps skills needed</td></tr>
+<tr><td>Hardest reasoning, long agentic coding</td><td>Proprietary</td><td>Frontier capability usually lives here first</td></tr>
+<tr><td>Spiky or unpredictable volume</td><td>Proprietary</td><td>Pay per token instead of buying for the peak</td></tr>
+<tr><td>Already on AWS, Google Cloud or Azure</td><td>Proprietary via your cloud</td><td>Claude and others are available inside the cloud you already have contracts with</td></tr>
+<tr class="group"><td colspan="3">Often open weights</td></tr>
+<tr><td>Data must never leave your network (air-gapped, on-prem)</td><td>Open weights</td><td>Only self-hosting guarantees this</td></tr>
+<tr><td>Very high, steady volume of simple tasks</td><td>Open weights (or a small proprietary tier)</td><td>Fixed hardware cost can beat per-token pricing at scale; compare carefully</td></tr>
+<tr><td>Need to fine-tune deeply or modify the model</td><td>Open weights</td><td>Full access to the weights</td></tr>
+<tr><td>Must reproduce exact results for years (regulated audit)</td><td>Open weights</td><td>You control the version; no vendor retirement</td></tr>
+<tr><td>Offline use: field devices, laptops without network</td><td>Open weights</td><td>Runs locally</td></tr>
+</table></div>
+<p id="ch32fitEmpty" hidden>No situations match.</p>
+<p>Many organisations end up hybrid: proprietary models for most knowledge work and coding, an open-weight model for one sensitive or high-volume pipeline. <a href="#ch35">Chapter 35</a> works through detailed scenarios, and <a href="#ch117">Chapter 117</a> covers enterprise vendor selection.</p>
+
+<div class="lab"><div class="lab-h"><b>Read a real model page and licence</b><span>30 min · web browser + Python 3 (no account needed)</span></div><ol>
+<li>Open <a href="https://huggingface.co/voyageai/voyage-4-nano" target="_blank" rel="noopener">huggingface.co/voyageai/voyage-4-nano</a> (an open-weight embedding model) and <a href="https://huggingface.co/meta-models/Muse-Glimmer-30B" target="_blank" rel="noopener">huggingface.co/meta-models/Muse-Glimmer-30B</a>. If a link has moved, search Hugging Face for the model name.<span class="expect">a model page with a description ("model card"), a "Files" tab and a licence label near the top.</span></li>
+<li>For each model, write down: the licence name; the parameter count; what files are provided (weights, code, tokenizer); whether any training-data information is given.<span class="expect">both list Apache 2.0. You'll likely find weights and usage code but limited training-data detail: open weights, not full open-source AI by the OSI definition.</span></li>
+<li>Now open the <a href="https://dev.meta.ai/llama/llama3_1/license" target="_blank" rel="noopener">Llama 3.1 Community License</a> and find three clauses: the monthly-active-users threshold, the acceptable use policy requirement, and the attribution requirement.<span class="expect">the 700 million MAU clause, section 1(b)(iv) on the AUP, and section 1(b)(i) on "Built with Llama".</span></li>
+<li>Save <code>mem.py</code> from section 32.4 and run <code>python3 mem.py</code>. Add a line for one model you found, using its parameter count.<span class="expect">the table shown in 32.4 plus your new row.</span></li>
+<li>Check your own machine's memory (macOS: Apple menu, About This Mac; Windows: Settings, System, About). Which rows could fit at 4-bit, leaving roughly a third spare for the context and the runtime?<span class="expect">a short note such as "16 GB laptop: an 8B model at 4-bit, maybe 8-bit; not the 27B model".</span></li>
+</ol></div>
+<p><b>Troubleshooting.</b> Hugging Face asks you to log in or "accept conditions": some models are gated; reading the model card usually doesn't need an account, but downloading may. A licence label says "other": that means a custom licence; click through to read it. <code>python3</code> not found on Windows: use <code>py mem.py</code>.</p>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Open weights means open source."</dt><dd>Open-source AI (OSI definition) also needs the full code and enough training-data information to rebuild the model. Most open-weight releases provide only weights and inference code.</dd>
+<dt>"If I can download it, I can use it however I like."</dt><dd>The licence decides. Some are permissive (Apache 2.0, MIT); others add usage policies, attribution or size thresholds.</dd>
+<dt>"Self-hosting is free."</dt><dd>The weights may be free; GPUs, electricity, engineering time, monitoring and safety work are not.</dd>
+<dt>"Proprietary means my data is used for training."</dt><dd>It depends on the product and plan. Commercial API and enterprise terms often differ from consumer apps. Check the terms (<a href="#ch132">Chapter 132</a>).</dd>
+<dt>"Open models are always behind."</dt><dd>The top closed models usually lead on the hardest tasks, but strong open-weight models are competitive for many everyday jobs. Test on your own task.</dd>
+</dl></div>
+
+<h3 id="ch32-r"><span class="num">32.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Proprietary models are used through an app or API; open-weight models can be downloaded and run under a licence.</li>
+<li>OSI's Open Source AI Definition 1.0 (28 Oct 2024) requires data information, complete code and parameters, granting freedoms to use, study, modify and share.</li>
+<li>Licences range from permissive (Apache 2.0, MIT) to custom terms with usage policies, attribution and thresholds, as in Llama 3.1's 700-million-user clause.</li>
+<li>Self-hosting is limited mainly by memory; quantisation shrinks models at some cost in quality.</li>
+<li>Open weights give control, privacy and version stability; proprietary APIs give frontier capability, speed to start and vendor support.</li>
+<li>The safety debate is mainly about where to draw the line for releasing the most capable weights; present it as debate, not fact.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">A vendor releases a model's weights under Apache 2.0 but publishes nothing about its training data or training code. How is it best described?</p><div class="opts"><button>Proprietary</button><button data-ok>Open weights, but not open-source AI under the OSI definition</button><button>Fully open-source AI</button></div><p class="why" hidden>The OSI definition also requires training code and data information. Weights alone make it open-weight.</p></div>
+<div class="qz"><p class="q">Which of these is a typical clause in a custom model licence like Llama 3.1's?</p><div class="opts"><button>A ban on all commercial use</button><button data-ok>Extra conditions such as an acceptable use policy and an attribution requirement</button><button>A requirement to publish your training data</button></div><p class="why" hidden>Llama 3.1 allows commercial use but adds an acceptable use policy, "Built with Llama" attribution and a 700-million-MAU threshold.</p></div>
+<div class="qz"><p class="q">Roughly how much memory do the weights of a 30-billion-parameter model need at 4-bit precision?</p><div class="opts"><button>About 4 GB</button><button data-ok>About 15 GB</button><button>About 60 GB</button></div><p class="why" hidden>4-bit is half a byte per parameter: 30 billion × 0.5 bytes ≈ 15 GB, before the extra room for the context and runtime. 60 GB would be 16-bit.</p></div>
+<div class="qz"><p class="q">Policy says customer data must never leave the company network. Which approach does that most directly point to?</p><div class="opts"><button>Any proprietary chat app</button><button>Whichever model scores highest on benchmarks</button><button data-ok>A self-hosted open-weight model inside the network</button></div><p class="why" hidden>Only self-hosting keeps data entirely on your infrastructure. A cloud-hosted proprietary model may still be acceptable if security approves, but that's a different requirement.</p></div>
+<div class="qz"><p class="q">How should a textbook present the arguments about releasing powerful model weights?</p><div class="opts"><button>As settled: open release is always safer</button><button>As settled: open release is always dangerous</button><button data-ok>As an ongoing debate, attributing each position to those who hold it</button></div><p class="why" hidden>Serious researchers disagree, and many labs take a middle path of closed frontier models plus smaller open ones.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick one real AI use your team has or wants (for example, analysing logs, generating test data, summarising bug reports). Write a one-page recommendation: proprietary, open-weight or hybrid. Cover where the data goes, required capability, expected volume, who would run and patch it, licence conditions (if open-weight), and how you'd keep results stable over time. End with the open questions you'd take to security and legal.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"A model is basically a giant file of numbers called weights. Proprietary models, like Claude, keep that file private and you use them through an app or API. Open-weight models let you download the file and run it yourself, but the licence still sets rules, and you usually don't get the training data or training code, so it's not truly open source. Proprietary is quicker to start and usually more capable at the top end; open weights give you privacy, control and a version that never changes. Plenty of companies use both."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Open Source Initiative, <a href="https://opensource.org/ai/open-source-ai-definition" target="_blank" rel="noopener">The Open Source AI Definition 1.0</a> (released 28 October 2024; see also OSI's <a href="https://opensource.org/blog/2024-end-of-year-review-open-source-ai-definition-v1-0" target="_blank" rel="noopener">2024 end-of-year review</a>).</li>
+<li>Meta, <a href="https://dev.meta.ai/llama/llama3_1/license" target="_blank" rel="noopener">Llama 3.1 Community License Agreement</a>.</li>
+<li>Meta, <a href="https://about.fb.com/news/2026/04/introducing-muse-spark-meta-superintelligence-labs/" target="_blank" rel="noopener">Introducing Muse Spark</a> (April 2026); <a href="https://huggingface.co/meta-models/Muse-Glimmer-30B" target="_blank" rel="noopener">Muse Glimmer 30B on Hugging Face</a>.</li>
+<li>OpenAI, <a href="https://openai.com/index/introducing-gpt-oss/" target="_blank" rel="noopener">Introducing gpt-oss</a> (August 2025, Apache 2.0).</li>
+<li>DeepSeek, <a href="https://api-docs.deepseek.com/news/news" target="_blank" rel="noopener">API news</a>; Wikipedia, <a href="https://en.wikipedia.org/wiki/DeepSeek" target="_blank" rel="noopener">DeepSeek</a> (MIT licensing, V4 sizes); Wikipedia, <a href="https://en.wikipedia.org/wiki/Qwen" target="_blank" rel="noopener">Qwen</a>; Wikipedia, <a href="https://en.wikipedia.org/wiki/Mistral_AI" target="_blank" rel="noopener">Mistral AI</a>.</li>
+<li>Cohere, <a href="https://cohere.com/blog/command-a-plus" target="_blank" rel="noopener">Command A+</a>; Wikipedia, <a href="https://en.wikipedia.org/wiki/Moonshot_AI" target="_blank" rel="noopener">Moonshot AI</a> (Kimi K3 licence, as reported).</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/embeddings" target="_blank" rel="noopener">Embeddings</a> (voyage-4-nano open-weight, Apache 2.0) and <a href="https://www.anthropic.com/claude-fable-and-mythos-5-1" target="_blank" rel="noopener">Claude Fable and Mythos 5.1</a> (restricted access to Mythos).</li>
+</ol><p class="verified">Verified 9 November 2026 against the OSI definition page, the Llama 3.1 licence text and the project's industry fact sheet. Licences and release status change; recheck before relying on them.</p></div>

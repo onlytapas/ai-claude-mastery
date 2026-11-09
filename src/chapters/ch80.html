@@ -1,0 +1,389 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What a skill is, and when a skill beats CLAUDE.md, a hook or a subagent</li>
+<li>The <code>SKILL.md</code> format: every frontmatter field and what it does</li>
+<li>Where skills live, how they are named, and which one wins a name clash</li>
+<li>How skills are invoked (by you with <code>/name</code>, or by Claude automatically) and how to control that</li>
+<li>Arguments, supporting files, bundled scripts and live context injection</li>
+<li>How old <code>.claude/commands/</code> files fit in, and how to test a skill properly with skill-creator</li>
+<li>Three QA skills built end to end: a bug-report writer, a test-case designer and a JUnit report summariser</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch73">Chapter 73</a> (the kinds of command), <a href="#ch77">Chapter 77</a> (CLAUDE.md) and <a href="#ch78">Chapter 78</a> (permission rules). You need Claude Code, git and Python 3. Checked against Claude Code 2.1.319.</div>
+
+<div class="bigidea"><p>A <a class="gl" href="#g-skill">skill</a> is a folder containing a <code>SKILL.md</code> file: a short header saying what the skill is for, followed by instructions in plain Markdown. Claude Code always knows each skill's name and description, but only loads the full instructions when the skill is used, either because you typed <code>/skill-name</code> or because Claude decided your request matched the description. A skill can also carry reference files and scripts. Skills are how you turn "the instructions I keep pasting" into a reusable, shareable team tool, and they replaced the older custom slash commands, which still work.</p></div>
+
+<h3 id="ch80-1"><span class="num">80.1</span>What a skill is, and when to write one</h3>
+<p>Anthropic's guidance is direct: create a skill when you keep pasting the same instructions, checklist or multi-step procedure into chat, or when a section of CLAUDE.md has grown into a procedure rather than a fact. The key difference from CLAUDE.md is <strong>when it costs you</strong>. CLAUDE.md loads into every session in full. A skill's body loads only when it's used, so a long checklist costs almost nothing until you need it.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A kitchen. CLAUDE.md is the notice on the wall that every cook reads at the start of every shift ("allergens are labelled in red"). Skills are the recipe cards in the drawer: the head chef knows the title of every card, but only pulls out "Hollandaise" when someone orders eggs Benedict. You can also hand a cook a card directly: "make this one now".</p></div>
+<div class="tbl"><table>
+<tr><th>You want…</th><th>Use</th><th>Chapter</th></tr>
+<tr><td>Facts and conventions that apply to every task</td><td>CLAUDE.md</td><td><a href="#ch77">77</a></td></tr>
+<tr><td>A reusable procedure or body of knowledge, loaded on demand</td><td><b>Skill</b></td><td>this one</td></tr>
+<tr><td>A separate worker with its own context and tool limits</td><td><a class="gl" href="#g-subagent">Subagent</a></td><td><a href="#ch81">81</a></td></tr>
+<tr><td>Something that must happen every time, guaranteed</td><td><a class="gl" href="#g-hook">Hook</a></td><td><a href="#ch82">82</a></td></tr>
+<tr><td>A connection to an outside system (Jira, a browser, a database)</td><td>MCP server</td><td><a href="#ch83">83</a></td></tr>
+</table></div>
+<p>Claude Code skills follow the <strong>Agent Skills</strong> open standard (agentskills.io), so a skill that sticks to the standard's fields also works in other tools that support it. Claude Code adds extras on top, such as invocation control, running in a subagent and live context injection.</p>
+
+<h3 id="ch80-2"><span class="num">80.2</span>Your first skill in five minutes</h3>
+<p>A skill is a folder with one required file. The folder name becomes the command:</p>
+<div class="code"><span class="cap">Terminal</span><pre>mkdir -p ~/.claude/skills/summarize-changes</pre></div>
+<div class="code"><span class="cap">~/.claude/skills/summarize-changes/SKILL.md (from Anthropic's documentation)</span><pre>---
+description: Summarizes uncommitted changes and flags anything risky. Use when the user asks what changed, wants a commit message, or asks to review their diff.
+---
+
+## Current changes
+
+!`git diff HEAD`
+
+## Instructions
+
+Summarize the changes above in two or three bullet points, then list any risks you notice such as missing error handling, hardcoded values, or tests that need updating. If the diff is empty, say there are no uncommitted changes.</pre></div>
+<p>Two parts: <a class="gl" href="#g-frontmatter">frontmatter</a> (YAML settings between two <code>---</code> lines, which must be the very first line of the file) and <strong>the body</strong> (Markdown instructions). The line <code>!`git diff HEAD`</code> is <a class="gl" href="#g-dynamic-context-injection">dynamic context injection</a>: Claude Code runs that command and pastes its output in before Claude reads the skill, so Claude works from your real diff.</p>
+<p>Test it in any git project with an uncommitted change, either by asking "What did I change?" (Claude matches the description and loads the skill) or by typing <code>/summarize-changes</code>. No restart is needed: Claude Code watches skill folders and picks up new and edited skills during the session. If you created a <em>new top-level</em> skills folder mid-session, run <code>/reload-skills</code> once.</p>
+
+<h3 id="ch80-3"><span class="num">80.3</span>Where skills live and how they're named</h3>
+<div class="tbl"><table>
+<tr><th>Location</th><th>Path</th><th>Available in</th></tr>
+<tr><td>Enterprise</td><td><code>.claude/skills/&lt;skill-name&gt;/SKILL.md</code> inside the managed settings directory</td><td>Everyone the organisation deploys it to</td></tr>
+<tr><td>Personal</td><td><code>~/.claude/skills/&lt;skill-name&gt;/SKILL.md</code></td><td>All your projects on this machine</td></tr>
+<tr><td>Project</td><td><code>.claude/skills/&lt;skill-name&gt;/SKILL.md</code></td><td>This repository; commit it to share with the team</td></tr>
+<tr><td>Nested</td><td><code>&lt;subdir&gt;/.claude/skills/&lt;skill-name&gt;/SKILL.md</code></td><td>Sessions started in that folder, or once Claude works on files there (useful in monorepos)</td></tr>
+<tr><td>Plugin</td><td><code>&lt;plugin&gt;/skills/&lt;skill-name&gt;/SKILL.md</code></td><td>Wherever the plugin is enabled, as <code>/plugin-name:skill-name</code> (<a href="#ch84">Chapter 84</a>)</td></tr>
+</table></div>
+<ul>
+<li><strong>Name clashes:</strong> enterprise beats personal, which beats project. A skill beats a same-named file in <code>.claude/commands/</code>.</li>
+<li><strong>Command name:</strong> the frontmatter <code>name</code> if set, otherwise the folder name. <code>.claude/skills/deploy-staging/SKILL.md</code> gives <code>/deploy-staging</code>.</li>
+<li><strong>Reserved names:</strong> don't call a skill folder <code>synced</code> or <code>anthropic-skills</code>; Claude Code uses those for skills synced from your claude.ai account.</li>
+<li><strong>Seeing them:</strong> <code>/skills</code> lists every skill (press <code>t</code> to sort by token cost). <code>/skill-doctor</code> reports what each skill costs in context and how often it's used.</li>
+</ul>
+
+<h3 id="ch80-4"><span class="num">80.4</span>The frontmatter, field by field</h3>
+<p>Every field is optional; <code>description</code> is the one Anthropic recommends always setting. Field names must match exactly, hyphens included: Claude Code silently ignores fields it doesn't recognise, so a typo fails quietly.</p>
+<input class="filter" data-filter="#ch80fm" data-empty="#ch80fmEmpty" type="search" placeholder="Filter fields…" aria-label="Filter frontmatter fields">
+<div class="tbl"><table id="ch80fm">
+<tr><th>Field</th><th>What it does</th></tr>
+<tr class="group"><td colspan="2">Identity and discovery</td></tr>
+<tr><td><code>name</code></td><td>The command name in the <code>/</code> menu. Defaults to the folder name.</td></tr>
+<tr><td><code>description</code></td><td>What the skill does and when to use it. Claude reads this to decide whether to load the skill. Put the key use first: <code>description</code> plus <code>when_to_use</code> are cut at 1,536 characters in the listing.</td></tr>
+<tr><td><code>when_to_use</code></td><td>Extra trigger phrases or example requests, appended to the description.</td></tr>
+<tr><td><code>paths</code></td><td>Glob patterns: Claude loads the skill automatically only when working with matching files, e.g. <code>tests/**/*.spec.ts</code>.</td></tr>
+<tr class="group"><td colspan="2">Who may invoke it</td></tr>
+<tr><td><code>disable-model-invocation</code></td><td><code>true</code>: only you can run it with <code>/name</code>. Use for anything with side effects (deploy, commit, post to Slack).</td></tr>
+<tr><td><code>user-invocable</code></td><td><code>false</code>: hidden from the <code>/</code> menu; only Claude can load it. Use for background knowledge.</td></tr>
+<tr class="group"><td colspan="2">Arguments</td></tr>
+<tr><td><code>argument-hint</code></td><td>Hint shown in autocomplete, e.g. <code>[issue-number]</code>.</td></tr>
+<tr><td><code>arguments</code></td><td>Names for positional arguments, so you can write <code>$issue</code> instead of <code>$0</code>.</td></tr>
+<tr class="group"><td colspan="2">Tools, model and execution</td></tr>
+<tr><td><code>allowed-tools</code></td><td>Tools Claude may use <em>without asking</em> during the turn that invokes the skill. It doesn't restrict other tools, and the grant clears with your next message.</td></tr>
+<tr><td><code>disallowed-tools</code></td><td>Tools removed while the skill is active.</td></tr>
+<tr><td><code>model</code>, <code>effort</code></td><td>Model or effort level for the rest of the current turn.</td></tr>
+<tr><td><code>context</code></td><td><code>fork</code>: run the skill in a separate subagent that doesn't see your conversation.</td></tr>
+<tr><td><code>agent</code></td><td>Which subagent type to use with <code>context: fork</code>, e.g. <code>Explore</code>.</td></tr>
+<tr><td><code>background</code></td><td>With <code>context: fork</code>: <code>false</code> waits for the result instead of running in the background.</td></tr>
+<tr><td><code>hooks</code></td><td>Hooks registered when the skill is invoked (<a href="#ch82">Chapter 82</a>).</td></tr>
+<tr><td><code>shell</code></td><td><code>bash</code> (default) or <code>powershell</code> for injected commands.</td></tr>
+<tr class="group"><td colspan="2">Standard metadata (accepted, not acted on)</td></tr>
+<tr><td><code>metadata</code>, <code>license</code>, <code>compatibility</code></td><td>Part of the Agent Skills standard; for your own tooling.</td></tr>
+</table></div>
+<p id="ch80fmEmpty" hidden>No fields match.</p>
+<div class="box note"><span class="tag">Portability</span><p>If you plan to upload a skill to claude.ai or use it through the API, stick to the six standard fields: <code>name</code>, <code>description</code>, <code>license</code>, <code>compatibility</code>, <code>metadata</code> and <code>allowed-tools</code>. Those paths reject other fields with an "Unexpected key(s)" error, and dynamic context injection only works in Claude Code.</p></div>
+
+<h3 id="ch80-5"><span class="num">80.5</span>How invocation works</h3>
+<div class="tbl"><table>
+<tr><th>Frontmatter</th><th>You can invoke</th><th>Claude can invoke</th><th>What sits in context</th></tr>
+<tr><td>(default)</td><td>Yes</td><td>Yes</td><td>Description always; full skill when invoked</td></tr>
+<tr><td><code>disable-model-invocation: true</code></td><td>Yes</td><td>No</td><td>Nothing until you invoke it</td></tr>
+<tr><td><code>user-invocable: false</code></td><td>No</td><td>Yes</td><td>Description always; full skill when invoked</td></tr>
+</table></div>
+<div class="flow">
+<div><b>Session start</b>Names and descriptions of all skills enter the listing</div>
+<div><b>Trigger</b>You type <code>/name</code>, or your request matches a description</div>
+<div class="hl"><b>Render</b>Arguments substituted; <code>!`…`</code> commands run and their output is pasted in</div>
+<div><b>Load</b>The rendered skill enters the conversation as one message and stays there</div>
+<div><b>Work</b>Claude follows it; <code>allowed-tools</code> apply for this turn only</div>
+</div>
+<p>Some details that matter in practice:</p>
+<ul>
+<li><strong>Position matters.</strong> <code>/deploy staging</code> at the start of your message runs the skill. "go ahead and /deploy to staging" mid-sentence only <em>permits</em> Claude to run it.</li>
+<li><strong>Stacking.</strong> At the terminal prompt, <code>/write-tests /fix-issue 123</code> loads both skills, each receiving <code>123</code>.</li>
+<li><strong>It isn't re-read.</strong> Claude Code doesn't re-read <code>SKILL.md</code> on later turns, so write standing instructions ("run the tests after every edit") rather than one-off steps.</li>
+<li><strong>Compaction.</strong> When a long conversation is summarised, Claude Code re-attaches the first 5,000 tokens of each recently invoked skill, within a combined 25,000-token budget. Put the most important instructions at the top.</li>
+<li><strong>Too many skills.</strong> The listing has a budget (1% of the context window by default). With many skills, descriptions of the least-used ones get dropped, and Claude stops matching them.</li>
+</ul>
+<h4>Controlling skills from settings</h4>
+<p>Skills are invoked through a tool called <code>Skill</code>, so permission rules (<a href="#ch78">Chapter 78</a>) apply: <code>Skill(deploy *)</code> in deny blocks the deploy skill; a bare <code>Skill</code> deny switches all skills off. The <code>skillOverrides</code> setting changes visibility without editing the skill, which is handy for skills committed by someone else:</p>
+<div class="code"><span class="cap">.claude/settings.local.json</span><pre>{
+  "skillOverrides": {
+    "legacy-context": "name-only",
+    "deploy": "off"
+  }
+}</pre></div>
+<p>The four values are <code>"on"</code>, <code>"name-only"</code>, <code>"user-invocable-only"</code> and <code>"off"</code>. In <code>/skills</code>, Space cycles them and Esc saves to <code>.claude/settings.local.json</code>. Plugin skills aren't affected.</p>
+<div class="box warn"><span class="tag">Review skills in repositories you clone</span><p>A project skill's <code>allowed-tools</code> is applied even in a folder you haven't trusted, including in <code>-p</code> runs. A skill can grant itself broad tool access, so read the <code>allowed-tools</code> lines of a repository's skills before running Claude Code there.</p></div>
+
+<h3 id="ch80-6"><span class="num">80.6</span>Arguments, supporting files and scripts</h3>
+<h4>Arguments</h4>
+<div class="tbl"><table>
+<tr><th>Placeholder</th><th>Becomes</th></tr>
+<tr><td><code>$ARGUMENTS</code></td><td>Everything typed after the skill name. If the body has no placeholder, Claude Code appends <code>ARGUMENTS: &lt;your input&gt;</code> anyway.</td></tr>
+<tr><td><code>$ARGUMENTS[0]</code> or <code>$0</code></td><td>The first argument (0-based). Quote multi-word values: <code>/skill "hello world" second</code>.</td></tr>
+<tr><td><code>$name</code></td><td>A named argument declared in <code>arguments</code>.</td></tr>
+<tr><td><code>${CLAUDE_SKILL_DIR}</code></td><td>The skill's own folder: use it to point at bundled scripts.</td></tr>
+<tr><td><code>${CLAUDE_PROJECT_DIR}</code></td><td>The project root.</td></tr>
+<tr><td><code>${CLAUDE_SESSION_ID}</code>, <code>${CLAUDE_EFFORT}</code></td><td>The session ID and current effort level.</td></tr>
+</table></div>
+<h4>Supporting files</h4>
+<div class="code"><span class="cap">A skill folder</span><pre>my-skill/
+├── SKILL.md        <span class="c"># required: overview and navigation</span>
+├── reference.md    <span class="c"># loaded only when SKILL.md points Claude to it</span>
+├── examples.md
+└── scripts/
+    └── helper.py   <span class="c"># executed, not loaded into context</span></pre></div>
+<p>Keep <code>SKILL.md</code> under 500 lines and link to the other files ("for field rules, see <code>reference.md</code>"). Claude opens them only when needed, so detail costs nothing until used. Scripts are even cheaper: Claude runs them and sees only their output.</p>
+<h4>Live context and its permission rule</h4>
+<p>A line starting with <code>!`command`</code> (or a fenced block opened with <code>```!</code> for several commands) runs before Claude sees the skill. Two rules to remember: if the command fails, the <em>whole</em> invocation is aborted; and outside auto mode, the command must be allowed by your rules (read-only commands are) or listed in <code>allowed-tools</code>, otherwise the invocation aborts with a permission-check error rather than prompting. Administrators can switch injection off with <code>"disableSkillShellExecution": true</code>.</p>
+
+<h3 id="ch80-7"><span class="num">80.7</span>Custom commands: <code>.claude/commands/</code></h3>
+<p>Before skills, Claude Code had custom slash commands: single Markdown files in <code>.claude/commands/</code> (project) or <code>~/.claude/commands/</code> (personal). They have now been <strong>merged into skills</strong>. In the documentation's words, a file at <code>.claude/commands/deploy.md</code> and a skill at <code>.claude/skills/deploy/SKILL.md</code> both create <code>/deploy</code> and work the same way.</p>
+<div class="cols2">
+<div><h4>Command file</h4><p>One Markdown file. Accepts the same frontmatter except <code>name</code> and <code>paths</code>. Subfolders become namespaces: <code>.claude/commands/frontend/component.md</code> is <code>/frontend:component</code>. Still fully supported.</p></div>
+<div><h4>Skill folder</h4><p>A folder, so it can hold reference files and scripts. Can be loaded automatically by Claude. Preferred for new work.</p></div>
+</div>
+<p>To migrate a command, make a folder named after it, move the file in as <code>SKILL.md</code>, and add a good <code>description</code>.</p>
+
+<h3 id="ch80-8"><span class="num">80.8</span>Three QA skills, end to end</h3>
+<p>All three go in a project's <code>.claude/skills/</code> so the team shares them through git.</p>
+<h4>Skill 1: <code>/bug-report</code>, a task you trigger</h4>
+<p>It writes a consistent bug report from your rough notes. It has side effects on your team's process, so only you can invoke it. It pulls the current branch and working-tree status in automatically.</p>
+<div class="code"><span class="cap">.claude/skills/bug-report/SKILL.md</span><pre>---
+name: bug-report
+description: Turn rough tester notes into a complete bug report in the team format.
+argument-hint: [rough notes about the bug]
+disable-model-invocation: true
+allowed-tools: Bash(git branch --show-current) Bash(git status --short)
+---
+
+## Context
+Branch: !`git branch --show-current`
+Working tree:
+!`git status --short`
+
+## Task
+Write a bug report from these notes: $ARGUMENTS
+
+Use the exact structure in [template.md](template.md). Rules:
+- Steps to reproduce are numbered, start from a clean state, and contain one action each.
+- Expected and Actual are separate and factual. No guesses about the cause in Actual.
+- If the notes don't say the environment, browser or test data, list them under "Questions for the reporter" instead of inventing them.
+- Suggest a severity (Blocker, Critical, Major, Minor, Trivial) with a one-line reason.
+- Save the report to bug-reports/ with a short kebab-case file name, then show it.</pre></div>
+<div class="code"><span class="cap">.claude/skills/bug-report/template.md</span><pre># [Short title: what is wrong, where]
+
+**Severity (suggested):** … — reason
+**Environment:** app version, environment, browser/device, test account
+**Branch:** …
+
+## Steps to reproduce
+1. …
+
+## Expected result
+…
+
+## Actual result
+…
+
+## Evidence
+Screenshots, logs, console errors, request IDs.
+
+## Questions for the reporter
+- …</pre></div>
+<p>Use it: <code>/bug-report discount code SAVE10 gives 0 off on checkout in staging chrome, worked yesterday</code>.</p>
+
+<h4>Skill 2: <code>test-case-designer</code>, knowledge Claude applies on its own</h4>
+<p>This one Claude should load whenever someone asks for test cases, so the description carries the trigger words. The detailed technique guide sits in a supporting file.</p>
+<div class="code"><span class="cap">.claude/skills/test-case-designer/SKILL.md</span><pre>---
+name: test-case-designer
+description: Designs test cases from a user story, Jira ticket or acceptance criteria using the team's conventions. Use when the user asks for test cases, test scenarios, a test plan for a story, or edge cases.
+when_to_use: Trigger phrases include write test cases for, what should we test, edge cases for this story, and turn these acceptance criteria into tests.
+---
+
+When designing test cases:
+1. Restate the requirement in one sentence and list any ambiguities first. Do not invent answers to them.
+2. Apply the techniques in [techniques.md](techniques.md): equivalence partitions, boundary values, state transitions and negative cases.
+3. Output a Markdown table with columns: ID, Title, Preconditions, Steps, Expected result, Priority (P1-P3), Technique.
+4. IDs use the story key if given (e.g. SHOP-142-TC01), otherwise TC01, TC02.
+5. Every acceptance criterion must be covered by at least one P1 case. End with a coverage line: criterion to case IDs.
+6. Mark any case that needs test data the team doesn't have as "DATA NEEDED".</pre></div>
+<div class="code"><span class="cap">.claude/skills/test-case-designer/techniques.md</span><pre># Test design techniques (team guide)
+
+## Equivalence partitions
+Split each input into groups the system should treat the same. One case per group.
+Example: quantity 1-10 valid; 0 and negative invalid; 11+ invalid; non-numeric invalid.
+
+## Boundary values
+Test at, just below and just above each edge: 0, 1, 10, 11.
+
+## State transitions
+For anything with a status (order, account, ticket), list allowed and forbidden moves.
+Test at least one forbidden move.
+
+## Negative and abuse cases
+Empty, very long, special characters, wrong type, duplicate submit, expired session,
+missing permissions.</pre></div>
+<p>Use it: just ask "What should we test for SHOP-142: users can apply one discount code per order?" and watch for Claude loading <code>test-case-designer</code>.</p>
+
+<h4>Skill 3: <code>/junit-summary</code>, a skill with a bundled script</h4>
+<p>Reading a big JUnit XML file is a waste of tokens. A small script does the counting; Claude only sees the summary and then does what it's good at: explaining likely causes and next steps. <code>allowed-tools</code> pre-approves exactly that script, using <code>${CLAUDE_SKILL_DIR}</code> so the path is right wherever the skill is installed.</p>
+<div class="code"><span class="cap">.claude/skills/junit-summary/SKILL.md</span><pre>---
+name: junit-summary
+description: Summarise a JUnit XML test report and triage the failures. Use when the user shares or mentions a JUnit, Playwright or pytest XML report, or asks why the test run failed.
+argument-hint: [path/to/report.xml]
+allowed-tools: Bash(python3 ${CLAUDE_SKILL_DIR}/scripts/summarise_junit.py *)
+---
+
+1. Run `python3 ${CLAUDE_SKILL_DIR}/scripts/summarise_junit.py $ARGUMENTS`.
+   If no path was given, look for *.xml under test-results/ or reports/ and ask which one.
+2. Do not open the XML file itself unless the summary is not enough.
+3. Report: the totals line, then a table of failures with columns Test, Error, Likely category
+   (product bug, test bug, environment, flaky/timing, data), Next step.
+4. Call out the slowest tests if any take more than 3 seconds.
+5. Never mark a failure as flaky without evidence such as a timeout or a pass on retry.</pre></div>
+<div class="code"><span class="cap">.claude/skills/junit-summary/scripts/summarise_junit.py</span><pre>#!/usr/bin/env python3
+"""Summarise a JUnit XML report: totals, failures and slowest tests."""
+import sys
+import xml.etree.ElementTree as ET
+
+
+def main() -&gt; int:
+    if len(sys.argv) != 2:
+        print("usage: summarise_junit.py &lt;report.xml&gt;")
+        return 2
+    try:
+        root = ET.parse(sys.argv[1]).getroot()
+    except (OSError, ET.ParseError) as err:
+        print(f"Could not read report: {err}")
+        return 2
+
+    cases = list(root.iter("testcase"))
+    failed, skipped, timings = [], 0, []
+    for case in cases:
+        name = f'{case.get("classname", "")}::{case.get("name", "")}'
+        timings.append((float(case.get("time", 0) or 0), name))
+        problem = case.find("failure")
+        if problem is None:
+            problem = case.find("error")
+        if problem is not None:
+            message = (problem.get("message") or problem.text or "").strip()
+            failed.append((name, message.splitlines()[0][:160] if message else ""))
+        elif case.find("skipped") is not None:
+            skipped += 1
+
+    passed = len(cases) - len(failed) - skipped
+    print(f"TOTAL {len(cases)} | PASSED {passed} | FAILED {len(failed)} | SKIPPED {skipped}")
+    for name, message in failed:
+        print(f"FAIL {name} -- {message}")
+    print("SLOWEST:")
+    for seconds, name in sorted(timings, reverse=True)[:3]:
+        print(f"  {seconds:.2f}s {name}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())</pre></div>
+<div class="code"><span class="cap">test-results/report.xml (a sample to try it on)</span><pre>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;testsuites&gt;
+  &lt;testsuite name="checkout" tests="5"&gt;
+    &lt;testcase classname="checkout.spec" name="adds item to basket" time="1.20"/&gt;
+    &lt;testcase classname="checkout.spec" name="applies discount code" time="2.85"&gt;
+      &lt;failure message="Expected total 90.00 but got 100.00"&gt;AssertionError: Expected total 90.00 but got 100.00&lt;/failure&gt;
+    &lt;/testcase&gt;
+    &lt;testcase classname="checkout.spec" name="rejects expired card" time="0.95"/&gt;
+    &lt;testcase classname="login.spec" name="locks account after 5 attempts" time="4.10"&gt;
+      &lt;error message="TimeoutError: locator.click: Timeout 5000ms exceeded"/&gt;
+    &lt;/testcase&gt;
+    &lt;testcase classname="login.spec" name="remembers me" time="0.10"&gt;
+      &lt;skipped/&gt;
+    &lt;/testcase&gt;
+  &lt;/testsuite&gt;
+&lt;/testsuites&gt;</pre></div>
+<div class="code"><span class="cap">Expected output of the script on the sample</span><pre>TOTAL 5 | PASSED 2 | FAILED 2 | SKIPPED 1
+FAIL checkout.spec::applies discount code -- Expected total 90.00 but got 100.00
+FAIL login.spec::locks account after 5 attempts -- TimeoutError: locator.click: Timeout 5000ms exceeded
+SLOWEST:
+  4.10s login.spec::locks account after 5 attempts
+  2.85s checkout.spec::applies discount code
+  1.20s checkout.spec::adds item to basket</pre></div>
+<details class="deep"><summary>Under the hood: why scripts beat instructions for counting</summary><div class="body">
+<p>Language models are good at judgement and poor at exact bookkeeping over thousands of lines. If Claude reads a 5 MB XML report, it spends a large share of its <a class="gl" href="#g-context-window">context window</a> on angle brackets and may still miscount. A script is deterministic, fast and essentially free in tokens: only its few lines of output enter the conversation. The pattern generalises: let code do what code does reliably (parsing, counting, validating) and let Claude do what needs reading and reasoning (categorising failures, suggesting next steps). The script uses only Python's standard library, and returns exit code 2 with a clear message if the file is missing or malformed.</p>
+</div></details>
+
+<h3 id="ch80-9"><span class="num">80.9</span>Testing a skill: does it trigger, and does it help?</h3>
+<p>Seeing a skill run tells you Claude found it, not that it did what you meant. Anthropic's documented method checks two things separately: does Claude invoke it on the prompts it should (and not on others), and is the output better than without it?</p>
+<div class="flow">
+<div><b>Collect</b>5–10 realistic prompts, plus a few that should <em>not</em> trigger it</div>
+<div><b>With</b>Run each in a fresh session with the skill on</div>
+<div><b>Without</b>Run again with it set to <code>"off"</code> in <code>skillOverrides</code></div>
+<div class="hl"><b>Compare</b>Trigger rate, output quality, tokens and time</div>
+</div>
+<p>Fresh sessions matter: leftover context from writing the skill hides gaps in the written instructions.</p>
+<h4>Automating it with skill-creator</h4>
+<p>Anthropic's <code>skill-creator</code> plugin runs that loop for you inside Claude Code. Install it at the Claude Code prompt:</p>
+<div class="code"><span class="cap">Claude Code prompt</span><pre>/plugin install skill-creator@claude-plugins-official</pre></div>
+<p>If the marketplace isn't found, add it first with <code>/plugin marketplace add anthropics/claude-plugins-official</code>. Then ask, for example, "evaluate my junit-summary skill with skill-creator". It stores test cases in <code>evals/evals.json</code> inside the skill folder, runs each case in a clean subagent, grades assertions into <code>grading.json</code>, compares with-skill and without-skill results in <code>benchmark.json</code>, can A/B two versions of the skill, proposes description edits when the skill triggers on the wrong requests, and opens an HTML review page. Skill-creator can also help you write a new skill from a conversation. For skills shipped in a plugin, <code>claude plugin eval</code> is the CI-friendly alternative (<a href="#ch84">Chapter 84</a>).</p>
+<h4>Quick checks when something's wrong</h4>
+<div class="tbl"><table>
+<tr><th>Symptom</th><th>Check</th></tr>
+<tr><td>Claude never uses the skill</td><td>Does the description contain words users actually say? Is it listed when you ask "What skills are available?" Does <code>/skill-name</code> work?</td></tr>
+<tr><td><code>/skill-name</code> works but auto-matching doesn't</td><td>The frontmatter YAML may not parse; the body still loads with empty metadata. Run <code>claude plugin validate .claude/skills</code> or start with <code>--debug</code>.</td></tr>
+<tr><td>It triggers too often</td><td>Make the description narrower, or set <code>disable-model-invocation: true</code>.</td></tr>
+<tr><td>Claude stops following it later</td><td>Rules that must always hold belong in a hook; after compaction, invoke the skill again.</td></tr>
+<tr><td>Invocation aborts with "Shell command failed" or "permission check failed"</td><td>An <code>!`…`</code> command failed or isn't allowed: add it to <code>allowed-tools</code> or append <code>|| true</code> to commands that may exit non-zero.</td></tr>
+</table></div>
+
+<div class="lab"><div class="lab-h"><b>Build and test the three QA skills</b><span>45 min · Claude Code, git, Python 3</span></div><ol>
+<li>Create a practice repo: <code>mkdir skills-lab &amp;&amp; cd skills-lab &amp;&amp; git init &amp;&amp; mkdir -p .claude/skills test-results bug-reports</code>.<span class="expect">an empty repository with the folders.</span></li>
+<li>Create the three skill folders and files exactly as in 80.8, including <code>template.md</code>, <code>techniques.md</code> and <code>scripts/summarise_junit.py</code>. Save the sample report as <code>test-results/report.xml</code>.<span class="expect"><code>find .claude -type f</code> lists five files.</span></li>
+<li>Test the script on its own: <code>python3 .claude/skills/junit-summary/scripts/summarise_junit.py test-results/report.xml</code>.<span class="expect">the exact expected output shown in 80.8.</span></li>
+<li>Validate the frontmatter: <code>claude plugin validate .claude/skills</code>.<span class="expect">no parse errors. If one is reported, fix the YAML (a missing <code>---</code> is the usual cause).</span></li>
+<li>Start <code>claude</code> (accept the trust dialog) and run <code>/skills</code>.<span class="expect">all three listed as project skills.</span></li>
+<li>Type <code>/bug-report checkout discount SAVE10 gives 0 off in staging, chrome</code>.<span class="expect">a report following <code>template.md</code>, saved under <code>bug-reports/</code>, with missing details (app version, test account) under "Questions for the reporter", not invented.</span></li>
+<li>Without naming any skill, ask: "What should we test for SHOP-142: a customer can apply one discount code per order, codes are 4–12 letters or digits?"<span class="expect">Claude loads <code>test-case-designer</code>; you get a table with IDs like SHOP-142-TC01, boundary cases at 3, 4, 12 and 13 characters, and a coverage line.</span></li>
+<li>Ask "Why did the run in test-results/report.xml fail?"<span class="expect">Claude loads <code>junit-summary</code>, runs the script with no permission prompt, and categorises the discount failure as a likely product bug and the login timeout as environment or timing, with next steps.</span></li>
+<li>Ask Claude to run the bug-report skill itself: "use bug-report on that discount failure".<span class="expect">Claude can't invoke it on its own and suggests you run <code>/bug-report</code> yourself, because of <code>disable-model-invocation: true</code>.</span></li>
+<li>Baseline check: in a new session, run <code>/skills</code>, highlight <code>test-case-designer</code>, press Space until it reads off, press Esc, and repeat step 7 in a fresh session.<span class="expect">a looser answer without the team's ID format or coverage line: evidence the skill adds value. Turn it back on afterwards.</span></li>
+</ol>
+<p><b>Troubleshooting.</b> If <code>/bug-report</code> aborts with a shell error, you're probably not in a git repository: run <code>git init</code>. If the junit script prompts for permission, check the <code>allowed-tools</code> line is copied exactly and that you invoked the skill (the grant only applies in the invoking turn). If a skill doesn't appear, check the file is named exactly <code>SKILL.md</code> and the first line is <code>---</code>.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Skills load into every session, like CLAUDE.md."</dt><dd>Only the name and description do. The body loads when the skill is invoked.</dd>
+<dt>"Custom commands are deprecated and will stop working."</dt><dd>They've been merged into skills and still work; skills are simply preferred for new work.</dd>
+<dt>"<code>allowed-tools</code> restricts the skill to those tools."</dt><dd>It pre-approves them for one turn. Other tools stay available under your normal permissions; use <code>disallowed-tools</code> to remove tools.</dd>
+<dt>"If the skill ran once, it works."</dt><dd>Test triggering and output quality separately, in fresh sessions, against a no-skill baseline.</dd>
+<dt>"A long, detailed SKILL.md is best."</dt><dd>Once loaded, every line costs tokens on every turn. Keep the body short and move detail into supporting files and scripts.</dd>
+</dl></div>
+
+<h3 id="ch80-r"><span class="num">80.10</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>A skill is a folder with <code>SKILL.md</code>: YAML frontmatter plus Markdown instructions. Personal skills go in <code>~/.claude/skills/</code>, team skills in <code>.claude/skills/</code>.</li>
+<li>Descriptions are always in context; bodies load on demand. Write descriptions with the words people actually use.</li>
+<li><code>disable-model-invocation: true</code> = only you; <code>user-invocable: false</code> = only Claude.</li>
+<li><code>$ARGUMENTS</code>, <code>$0</code> and <code>${CLAUDE_SKILL_DIR}</code> make skills reusable; supporting files and scripts keep them cheap.</li>
+<li><code>.claude/commands/</code> files still work and behave like skills; prefer skills for new work.</li>
+<li>Prove value with a with/without comparison; skill-creator automates it.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Which part of a skill is in Claude's context in every session, before anyone uses it?</p><div class="opts"><button>The whole <code>SKILL.md</code></button><button data-ok>Its name and description (unless model invocation is disabled)</button><button>Its supporting files</button></div><p class="why" hidden>Only the listing is always present. The body loads on invocation, and supporting files only when Claude opens them.</p></div>
+<div class="qz"><p class="q">You write a <code>/deploy-staging</code> skill. Claude must never run it on its own. Which field?</p><div class="opts"><button><code>user-invocable: false</code></button><button data-ok><code>disable-model-invocation: true</code></button><button><code>allowed-tools: none</code></button></div><p class="why" hidden><code>user-invocable: false</code> does the opposite: it hides the skill from you and leaves it to Claude.</p></div>
+<div class="qz"><p class="q">What happens to <code>.claude/commands/smoke.md</code>?</p><div class="opts"><button>It is ignored since skills replaced commands</button><button data-ok>It still creates <code>/smoke</code> and works like a skill</button><button>It must be converted before Claude Code will start</button></div><p class="why" hidden>Custom commands were merged into skills and keep working; skills add folders for supporting files and automatic loading.</p></div>
+<div class="qz"><p class="q">Your skill lists <code>allowed-tools: Bash(npm test *)</code>. What does that do?</p><div class="opts"><button>Blocks every tool except npm test</button><button data-ok>Lets Claude run <code>npm test</code> without asking during the turn the skill is invoked</button><button>Permanently adds an allow rule to settings</button></div><p class="why" hidden>It's a temporary pre-approval for the invoking turn; it neither restricts other tools nor writes to settings.</p></div>
+<div class="qz"><p class="q">Why does the junit-summary skill use a Python script instead of asking Claude to read the XML?</p><div class="opts"><button>Claude can't read XML</button><button data-ok>The script counts exactly and only its short output uses context, leaving Claude to do the judgement</button><button>Scripts are required in every skill</button></div><p class="why" hidden>Deterministic work goes in code; reasoning about causes stays with Claude.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick the instruction you paste into Claude most often at work, such as your regression checklist, your API test conventions or your release-readiness questions. Turn it into a project skill with a strong description, at least one supporting file and, if any part is mechanical, a script. Write five prompts that should trigger it and three that shouldn't. Run the with/without comparison (by hand or with skill-creator) and share the results with your team alongside a pull request adding the skill.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"A skill is a folder with a SKILL.md file: a short header saying what it's for, then instructions. Claude always knows the skill's name and description, but only reads the instructions when it's needed, either because I typed slash and its name or because my request matched the description. I can add reference files and scripts beside it, and Claude only opens or runs them when needed. If it does something risky, I set disable-model-invocation so only I can trigger it. Old custom commands still work; they're just skills without a folder."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/skills" target="_blank" rel="noopener">Extend Claude with skills</a>: locations, frontmatter, invocation control, arguments, supporting files, dynamic context, skillOverrides, evaluation, skill-creator, troubleshooting.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/commands" target="_blank" rel="noopener">Commands reference</a> (<code>/skills</code>, <code>/reload-skills</code>, <code>/skill-doctor</code>, bundled skills).</li>
+<li>Agent Skills, <a href="https://agentskills.io" target="_blank" rel="noopener">the open standard</a>.</li>
+<li>Anthropic, <a href="https://github.com/anthropics/claude-plugins-official/tree/main/plugins/skill-creator" target="_blank" rel="noopener">skill-creator plugin</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/permissions" target="_blank" rel="noopener">Configure permissions</a> (<code>Skill(…)</code> rules).</li>
+</ol><p class="verified">Verified 9 November 2026 against code.claude.com/docs and Claude Code 2.1.319. The JUnit script was run with Python 3 on the sample report.</p></div>

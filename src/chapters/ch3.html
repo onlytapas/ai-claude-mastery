@@ -1,0 +1,130 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What the Turing Test is, and why it still matters</li>
+<li>How the first artificial neuron was described in 1943</li>
+<li>What happened at the 1956 Dartmouth workshop, where AI got its name</li>
+<li>What "symbolic AI" means, with examples of early programs</li>
+<li>Why early researchers were so optimistic</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 2 introduces Turing and Shannon.</div>
+
+<div class="bigidea"><p>Between 1943 and the mid-1960s, a small group of researchers turned the question "can machines think?" into a scientific field. Turing proposed a practical test. Others described artificial neurons. In 1956 a summer workshop at Dartmouth College gave the field its name. Early programs proved maths theorems, played games and followed logical rules, and their creators predicted human-level AI within a generation. They were far too optimistic, but they laid foundations still in use today.</p></div>
+
+<h3 id="ch3-1"><span class="num">3.1</span>The first artificial neuron (1943)</h3>
+<p>In 1943 the neuroscientist Warren McCulloch and the logician Walter Pitts published a simple mathematical model of a brain cell. Their "neuron" receives several on/off signals, adds them up, and fires (outputs 1) if the total passes a threshold. They showed that networks of these simple units could, in principle, compute logical functions.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Picture a committee that approves a project only if at least three of its five members vote yes. Each member is an input; the threshold is three. That's a McCulloch–Pitts neuron. Connect many committees, each feeding its decision into others, and you get a network that can make complicated decisions out of simple votes.</p></div>
+<p>This idea lay mostly dormant for decades, but it's the ancestor of the <a class="gl" href="#g-neural-network">neural networks</a> inside every modern AI model (Chapter 11).</p>
+
+<h3 id="ch3-2"><span class="num">3.2</span>Turing asks: can machines think? (1950)</h3>
+<p>In 1950 Alan Turing published "Computing Machinery and Intelligence" in the philosophy journal <i>Mind</i>. It opens: "I propose to consider the question, 'Can machines think?'" He then sets that question aside, because "think" is too vague to argue about, and replaces it with a game.</p>
+<h4>The imitation game</h4>
+<div class="flow">
+<div><b>A judge</b>types questions and reads answers on a screen, without seeing who answers</div>
+<div><b>A person</b>answers honestly, trying to help the judge</div>
+<div class="hl"><b>A machine</b>answers too, trying to seem human</div>
+<div><b>The verdict</b>If the judge can't reliably tell which is which, the machine passes</div>
+</div>
+<p>This became known as the <a class="gl" href="#g-turing-test">Turing Test</a>. Its strength is that it's practical: it judges behaviour, which you can observe, rather than inner experience, which you can't.</p>
+<p>The paper also answers objections, several of which you still hear today:</p>
+<div class="tbl"><table>
+<tr><th>Objection</th><th>The argument</th><th>Turing's reply, briefly</th></tr>
+<tr><td>Lady Lovelace's objection</td><td>Machines only do what they're told; they can't originate anything (Chapter 2)</td><td>Machines can surprise their makers, and a learning machine could go beyond its programming</td></tr>
+<tr><td>Consciousness</td><td>A machine can't feel or truly know what it's saying</td><td>We can't directly verify that other people feel either; we judge by behaviour</td></tr>
+<tr><td>"Machines can't do X"</td><td>They'll never be kind, creative, fall in love, enjoy strawberries…</td><td>These claims are usually based on the limited machines people have seen so far</td></tr>
+<tr><td>Mathematical limits</td><td>Some problems no machine can solve</td><td>That's true, but there's no proof humans escape those limits either</td></tr>
+</table></div>
+<p>Most strikingly, Turing suggested building a "child machine" and educating it, rather than trying to program adult intelligence directly: "Instead of trying to produce a programme to simulate the adult mind, why not rather try to produce one which simulates the child's?" That is essentially the idea behind <a class="gl" href="#g-machine-learning">machine learning</a>, decades before it worked.</p>
+<div class="box example"><span class="tag">Real-world example: is the Turing Test passed?</span><p>Modern chatbots can hold conversations many people can't distinguish from a person's, at least for short chats, and researchers have run formal Turing-style tests with large language models. But most researchers no longer treat the test as the measure of intelligence: a system can imitate human conversation well while still failing at reliability, reasoning or honesty. AI is now usually judged with many specific tests instead (Chapter 24).</p></div>
+
+<h3 id="ch3-3"><span class="num">3.3</span>Dartmouth 1956: AI gets its name</h3>
+<p>In 1955 four researchers wrote a proposal for a summer research project at Dartmouth College in New Hampshire:</p>
+<div class="person"><span class="ini">JM</span><b>John McCarthy</b><span>Dartmouth mathematician who coined the term "artificial intelligence" and later created the LISP programming language.</span></div>
+<div class="person"><span class="ini">MM</span><b>Marvin Minsky</b><span>Harvard researcher who later co-founded MIT's AI lab.</span></div>
+<div class="person"><span class="ini">NR</span><b>Nathaniel Rochester</b><span>IBM engineer who designed IBM's first commercial scientific computer.</span></div>
+<div class="person"><span class="ini">CS</span><b>Claude Shannon</b><span>Bell Labs, the founder of information theory (Chapter 2).</span></div>
+<p>Their proposal made a bold claim that set the tone for the field:</p>
+<div class="box note"><span class="tag">From the 1955 proposal</span><p>"The study is to proceed on the basis of the conjecture that every aspect of learning or any other feature of intelligence can in principle be so precisely described that a machine can be made to simulate it."</p></div>
+<p>The workshop ran over the summer of 1956. It produced no single breakthrough, but it brought the key people together and gave the field a name and an ambition. Most histories date the start of AI as a field to this event.</p>
+
+<h3 id="ch3-4"><span class="num">3.4</span>Symbolic AI: intelligence as rules and symbols</h3>
+<p>The dominant approach for the next thirty years is now called <a class="gl" href="#g-symbolic-ai">symbolic AI</a>, sometimes nicknamed "good old-fashioned AI". The idea: represent knowledge as symbols (words, facts, logical statements) and write rules for manipulating them. Intelligence would come from searching through possibilities and applying logic.</p>
+<div class="cols2">
+<div><h4>Symbolic approach</h4><p>A person writes the rules: "IF temperature &gt; 38°C AND cough THEN suspect infection." The computer applies them precisely.</p></div>
+<div><h4>Learning approach (later)</h4><p>The computer is shown thousands of patient records with diagnoses and finds the patterns itself (Chapter 5).</p></div>
+</div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Symbolic AI is like a cook who follows recipes perfectly but can't cook anything without a recipe. A learning system is more like a cook who has eaten and cooked thousands of meals and has a feel for what works, but can't always explain why.</p></div>
+
+<h3 id="ch3-5"><span class="num">3.5</span>The first AI programs</h3>
+<ol class="timeline">
+<li><span class="yr">1952–59</span><span class="ev"><b>Arthur Samuel's checkers program</b> at IBM improved by playing against itself. In 1959 Samuel used the phrase "machine learning" for this kind of self-improvement.</span></li>
+<li class="key"><span class="yr">1955–56</span><span class="ev"><b>Logic Theorist</b>, by Allen Newell, Herbert Simon and Cliff Shaw, proved theorems from <i>Principia Mathematica</i>. It's often called the first AI program and was shown around the time of Dartmouth.</span></li>
+<li><span class="yr">1957–59</span><span class="ev"><b>General Problem Solver</b> (Newell and Simon) tried to solve any problem that could be described as goals and steps.</span></li>
+<li class="key"><span class="yr">1958</span><span class="ev"><b>Perceptron.</b> Frank Rosenblatt built a machine that <em>learned</em> to recognise simple patterns, a learning version of the 1943 neuron. The press predicted machines that would walk, talk and be conscious.</span></li>
+<li><span class="yr">1958</span><span class="ev"><b>LISP</b>, created by John McCarthy, becomes the main language of AI research for decades.</span></li>
+<li><span class="yr">1964–66</span><span class="ev"><b>ELIZA</b>, Joseph Weizenbaum's chatbot, imitates a therapist with simple word patterns (Chapter 6).</span></li>
+<li><span class="yr">1966–72</span><span class="ev"><b>Shakey</b>, at the Stanford Research Institute, is the first mobile robot to reason about its own actions: it could plan a route and push boxes.</span></li>
+</ol>
+
+<details class="deep"><summary>How the Perceptron learned</summary><div class="body">
+<p>The <a class="gl" href="#g-perceptron">Perceptron</a> took inputs (for example, light sensors arranged in a grid looking at a printed letter), multiplied each by a <a class="gl" href="#g-weight">weight</a>, added them up, and output "yes" if the total passed a threshold. The new part was learning. When it got an example wrong, it nudged the weights: increase the weights of inputs that should have pushed towards the right answer, decrease the others. Repeat over many examples, and the weights settle on values that classify correctly.</p>
+<div class="code"><span class="cap">The Perceptron learning rule, in plain pseudo-code</span><pre>for each training example:
+    guess = 1 if (w1*x1 + w2*x2 + ... + bias) > 0 else 0
+    error = correct_answer - guess          <span class="c"># 0 if right, +1 or -1 if wrong</span>
+    for each weight i:
+        w[i] = w[i] + learning_rate * error * x[i]
+    bias = bias + learning_rate * error</pre></div>
+<p>This "guess, measure the error, adjust slightly, repeat" loop is the ancestor of how every modern neural network is trained (Chapter 12). Its weakness, which you'll meet in Chapter 4, is that a single layer of these units can only learn very simple patterns.</p>
+</div></details>
+
+<h3 id="ch3-6"><span class="num">3.6</span>The age of optimism</h3>
+<p>Early results were exciting, and well-known researchers made bold predictions:</p>
+<div class="box opinion"><span class="tag">Predictions that didn't come true</span><ul>
+<li>Herbert Simon (1965): "machines will be capable, within twenty years, of doing any work a man can do."</li>
+<li>Marvin Minsky (1967): "Within a generation… the problem of creating 'artificial intelligence' will substantially be solved."</li>
+</ul></div>
+<p>Why were such brilliant people so wrong? Three reasons:</p>
+<ol>
+<li><strong>Toy problems.</strong> Early programs worked in tiny, tidy worlds (a chessboard, a few blocks on a table). Real problems are vastly larger and messier.</li>
+<li><strong>Hidden common sense.</strong> Everyday tasks rely on huge amounts of knowledge we don't notice we have (Moravec's paradox, Chapter 1).</li>
+<li><strong>Not enough computing power or data.</strong> The computers of the 1960s had less memory than a modern greeting card that plays a song.</li>
+</ol>
+<div class="box example"><span class="tag">Real-world lesson</span><p>When you hear confident predictions about AI today, remember 1965. Experts are often right about the direction and wrong about the timing. Good practice is to test claims against what systems can actually do now.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Run your own Turing Test</b><span>25 min · claude.ai</span></div><ol>
+<li>Ask Claude: "Let's play the imitation game. I'll ask questions; answer as a typical person would, not as an AI." Ask five everyday questions.<span class="expect">natural-sounding answers. Claude may also say it is an AI, since it aims to be honest about what it is.</span></li>
+<li>Now ask questions that tend to expose machines: "What did you have for breakfast?", "Count the letters in 'strawberry'", "What happened in the news this morning?"<span class="expect">answers that reveal limits: no real experiences, possible counting slips, no knowledge of recent news without a search tool.</span></li>
+<li>Write down which questions gave it away, and why. This is the skill of testing AI, which Chapter 125 develops.</li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Passing the Turing Test means a machine is intelligent."</dt><dd>Turing proposed it as a practical test, not a proof. Systems can imitate conversation while lacking other abilities.</dd>
+<dt>"Early AI was a failure."</dt><dd>It overpromised, but produced lasting tools: search algorithms, LISP, and the ideas behind neural networks and machine learning.</dd>
+<dt>"Neural networks are a recent invention."</dt><dd>The first artificial neuron model dates from 1943 and the Perceptron from 1958.</dd>
+</dl></div>
+
+<h3 id="ch3-r"><span class="num">3.7</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>McCulloch and Pitts (1943) described the first artificial neuron.</li>
+<li>Turing (1950) replaced "can machines think?" with a practical imitation game and anticipated machine learning.</li>
+<li>The 1956 Dartmouth workshop (McCarthy, Minsky, Rochester, Shannon) named and launched the field.</li>
+<li>Symbolic AI represented knowledge as rules and symbols; early programs proved theorems and played games.</li>
+<li>Rosenblatt's Perceptron (1958) learned from examples by adjusting weights.</li>
+<li>Researchers predicted human-level AI within decades; they badly underestimated real-world complexity.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What does the Turing Test judge?</p><div class="opts"><button>Whether a machine is conscious</button><button data-ok>Whether a judge can tell a machine's text answers from a person's</button><button>How fast a machine can calculate</button></div><p class="why" hidden>It's a behavioural test, deliberately avoiding questions about inner experience.</p></div>
+<div class="qz"><p class="q">Who coined the term "artificial intelligence"?</p><div class="opts"><button>Alan Turing</button><button data-ok>John McCarthy</button><button>Ada Lovelace</button></div><p class="why" hidden>McCarthy used it in the 1955 proposal for the 1956 Dartmouth workshop.</p></div>
+<div class="qz"><p class="q">What made the Perceptron different from earlier neuron models?</p><div class="opts"><button>It used vacuum tubes</button><button data-ok>It learned its weights from examples</button><button>It could understand language</button></div><p class="why" hidden>It adjusted its weights after each mistake: learning, not just fixed logic.</p></div>
+<div class="qz"><p class="q">Symbolic AI mainly works by…</p><div class="opts"><button data-ok>Applying rules and logic that people write</button><button>Learning patterns from millions of examples</button><button>Copying the structure of the brain exactly</button></div><p class="why" hidden>Knowledge is written down explicitly as symbols and rules.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Read the first two sections of Turing's 1950 paper (it's freely available online and very readable). Write half a page on which objection you find strongest today, and whether modern AI like Claude changes your view.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"In 1950 Turing proposed judging machines by whether their conversation can pass as human. In 1956 at Dartmouth, McCarthy, Minsky, Rochester and Shannon named the field 'artificial intelligence'. Early AI used hand-written rules and logic, while the Perceptron showed machines could learn. Everyone expected human-level AI within twenty years. They were wrong about the timing, and that's a lesson for today's predictions too."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>W. S. McCulloch and W. Pitts, "A Logical Calculus of the Ideas Immanent in Nervous Activity", <i>Bulletin of Mathematical Biophysics</i> (1943).</li>
+<li>A. M. Turing, "Computing Machinery and Intelligence", <i>Mind</i> (1950).</li>
+<li>J. McCarthy, M. Minsky, N. Rochester and C. Shannon, "A Proposal for the Dartmouth Summer Research Project on Artificial Intelligence" (1955).</li>
+<li>F. Rosenblatt, "The Perceptron: A Probabilistic Model for Information Storage and Organization in the Brain", <i>Psychological Review</i> (1958).</li>
+<li>A. L. Samuel, "Some Studies in Machine Learning Using the Game of Checkers", <i>IBM Journal</i> (1959).</li>
+<li>H. A. Simon, <i>The Shape of Automation for Men and Management</i> (1965); M. Minsky, <i>Computation: Finite and Infinite Machines</i> (1967), for the quoted predictions.</li>
+</ol><p class="verified">Content type: established history · Last reviewed 9 November 2026</p></div>

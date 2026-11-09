@@ -1,0 +1,291 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What a <a class="gl" href="#g-dataset">dataset</a> is, and what examples, features and labels are</li>
+<li>How data gets labelled, and why people disagree on labels</li>
+<li>What data cleaning involves, and why it takes most of the time in real projects</li>
+<li>Why we split data into <a class="gl" href="#g-training-set">training</a>, <a class="gl" href="#g-validation-set">validation</a> and <a class="gl" href="#g-test-set">test</a> sets, and how <a class="gl" href="#g-data-leakage">data leakage</a> fools everyone</li>
+<li>Where <a class="gl" href="#g-data-bias">bias in data</a> comes from, with well-documented real cases</li>
+<li>Why data quality is a QA problem, and how to test a dataset like you test software</li>
+<li>What <a class="gl" href="#g-synthetic-data">synthetic data</a> is good and bad for</li>
+<li>How language-model training data is gathered, and the open debates on copyright and consent</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch10">Chapter 10</a> (supervised learning and labels) and <a href="#ch12">Chapter 12</a> (training, overfitting and validation sets). No coding experience needed until the lab.</div>
+
+<div class="bigidea"><p>A model can only learn what is in its data. If the data is wrong, incomplete, duplicated or one-sided, the model will be too, and no amount of clever engineering fully fixes that. Most of the work in real AI projects is not building models but collecting, labelling, cleaning and checking data. That makes data quality a testing problem, and QA engineers already have the right instincts for it. For large language models, the data is a huge slice of written human output, which raises real and unresolved questions about copyright and consent.</p></div>
+
+<h3 id="ch13-1"><span class="num">13.1</span>What a dataset is</h3>
+<p>A <strong>dataset</strong> is a collection of examples a model learns from. Each <strong>example</strong> (or "record", or "row") has <strong>features</strong>, the information the model gets as input, and often a <strong>label</strong>, the right answer we want it to learn to produce.</p>
+<div class="tbl"><table>
+<tr><th>Task</th><th>One example</th><th>Features (input)</th><th>Label (answer)</th></tr>
+<tr><td>Route bug reports</td><td>A Jira bug</td><td>Title, description, stack trace</td><td>Component: UI, API or Data</td></tr>
+<tr><td>Predict flaky tests</td><td>One CI test run</td><td>Test name, duration, retries, machine, time of day</td><td>Flaky or not</td></tr>
+<tr><td>Spot defects in screenshots</td><td>A page screenshot</td><td>The pixels</td><td>"Layout broken" or "OK"</td></tr>
+<tr><td>Train a language model</td><td>A web page or book</td><td>The text so far</td><td>The next <a class="gl" href="#g-token">token</a> (the text labels itself)</td></tr>
+</table></div>
+<p>The last row matters. Language models are trained mostly by <strong>self-supervised learning</strong> (<a href="#ch10">Chapter 10</a>): the "label" for each position is simply the next piece of the same text. That's why they can learn from trillions of tokens without anyone labelling them by hand. Human labelling still matters a lot for the later stages (<a href="#ch18">Chapter 18</a>).</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A dataset is like a recipe book a trainee chef learns from. If half the recipes have typos in the quantities, the chef learns wrong quantities. If every recipe is Italian, the chef can't cook Thai food, however talented. If the same lasagne recipe appears forty times, the chef thinks lasagne is far more important than it is. The chef is only as good as the book.</p></div>
+<div class="box note"><span class="tag">"Garbage in, garbage out"</span><p>This old computing phrase is the single most useful sentence about AI data. A model trained on poor data doesn't announce that it's poor; it gives confident, polished, wrong answers.</p></div>
+
+<h3 id="ch13-2"><span class="num">13.2</span>Labelling: where the "right answers" come from</h3>
+<p><a class="gl" href="#g-data-labelling">Labelling</a> (or "annotation") means people attach the correct answer to each example. It sounds simple. It isn't.</p>
+<ul>
+<li><strong>It's expensive and slow.</strong> Someone has to read every bug report or look at every image.</li>
+<li><strong>Experts disagree.</strong> Is "Checkout button greyed out after API timeout" a UI bug or an API bug? Two senior testers can honestly differ.</li>
+<li><strong>Guidelines drift.</strong> Labellers on week one and week ten interpret the rules differently.</li>
+<li><strong>Labels can be quietly wrong.</strong> Tired, rushed or under-trained labellers make mistakes that nobody checks.</li>
+</ul>
+<div class="box example"><span class="tag">Real-world example: ImageNet</span><p>ImageNet, led by Fei-Fei Li and published in 2009, grew to over 14 million images labelled with thousands of categories. The labelling was done largely by crowd workers through Amazon Mechanical Turk. It made the 2012 deep-learning breakthrough possible (<a href="#ch5">Chapter 5</a>). Later studies found label errors in it and in other famous benchmark datasets: Northcutt and colleagues (2021) estimated an average of at least 3.3% errors in the test sets of ten widely used datasets. Even celebrated datasets are imperfect.</p></div>
+<p>Good labelling practice looks a lot like good test design:</p>
+<div class="tbl"><table>
+<tr><th>Practice</th><th>Why</th><th>QA equivalent</th></tr>
+<tr><td>Written labelling guidelines with examples and edge cases</td><td>Everyone labels the same way</td><td>Clear <a class="gl" href="#g-acceptance-criteria">acceptance criteria</a></td></tr>
+<tr><td>Two people label the same sample and you measure agreement</td><td>Shows how clear the task really is</td><td>Peer review of test cases</td></tr>
+<tr><td>A gold set of examples with known answers, mixed in</td><td>Catches careless labellers</td><td>Known-good regression checks</td></tr>
+<tr><td>An "unsure" option and an escalation route</td><td>Stops people guessing</td><td>Raising a question instead of assuming</td></tr>
+</table></div>
+<details class="deep"><summary>Measuring agreement between labellers</summary><div class="body">
+<p>The simplest measure is <em>percentage agreement</em>: of 200 bugs labelled by two people, how many got the same label? But if 90% of bugs are UI, two people who both always say "UI" would agree 81% of the time by pure chance. Statistics such as <strong>Cohen's kappa</strong> correct for chance agreement: 1 means perfect, 0 means no better than chance. If labellers can't agree well, a model trained on their labels can't be expected to beat that level either, and your "accuracy" target should reflect it.</p>
+</div></details>
+
+<h3 id="ch13-3"><span class="num">13.3</span>Cleaning: the unglamorous majority of the work</h3>
+<p>Raw data is almost always messy. <strong>Data cleaning</strong> means finding and fixing problems before training. Practitioners often say cleaning and preparing data takes most of a project's time; treat any exact percentage you hear as anecdote, but the pattern is real.</p>
+<div class="tbl"><table>
+<tr><th>Problem</th><th>Example in a bug-report dataset</th><th>Typical fix</th></tr>
+<tr><td>Missing values</td><td>Component field left blank</td><td>Remove, or send back for labelling</td></tr>
+<tr><td>Inconsistent formats</td><td>"UI", "ui", "Front-end", "FE"</td><td>Map to one agreed spelling</td></tr>
+<tr><td>Duplicates</td><td>The same bug raised by three people</td><td>Keep one copy</td></tr>
+<tr><td>Outliers and impossible values</td><td>Test duration of −5 seconds, or 900 hours</td><td>Investigate; fix or remove</td></tr>
+<tr><td>Wrong labels</td><td>A database bug labelled "UI"</td><td>Review a sample; relabel</td></tr>
+<tr><td>Stale data</td><td>Bugs from a product you retired in 2021</td><td>Filter by date or relevance</td></tr>
+<tr><td>Sensitive data</td><td>Customer emails and card numbers pasted into bug descriptions</td><td>Remove or mask before use (<a class="gl" href="#g-data-masking">data masking</a>)</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Cleaning can introduce bias too</span><p>"Drop every row with a missing field" sounds safe. But if one team never fills in the component field, you've just deleted that team's bugs from the dataset, and the model will be worse at exactly their kind of bug. Every cleaning rule is a decision about what the model will and won't see. Write those decisions down.</p></div>
+
+<h3 id="ch13-4"><span class="num">13.4</span>Splits: training, validation and test</h3>
+<p><a href="#ch12">Chapter 12</a> showed why a model must be checked on data it never trained on. In practice you split the cleaned dataset into three parts, before any training starts:</p>
+<div class="flow">
+<div><b>Training set</b>About 70–80%. The model adjusts its weights on this.</div>
+<div><b>Validation set</b>About 10–15%. Checked during development to compare models, tune settings and stop early.</div>
+<div class="hl"><b>Test set</b>About 10–15%. Locked away. Used once, at the end, for an honest score.</div>
+</div>
+<p>The percentages are common rules of thumb, not laws. With huge datasets, 1% can be plenty for validation.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>The training set is the homework. The validation set is the mock exams you use to decide how to revise. The test set is the real exam, which nobody may peek at. If the teacher hands out the real exam paper as homework, a perfect score means nothing.</p></div>
+<h4>Data leakage: the silent killer of honest scores</h4>
+<p><strong>Data leakage</strong> is when information from the validation or test set sneaks into training. The model looks brilliant in testing and disappoints in real use. Common causes:</p>
+<ul>
+<li><strong>Duplicates across splits.</strong> The same bug, raised twice, ends up in both training and test. The model just recognises it.</li>
+<li><strong>Time travel.</strong> Randomly splitting CI runs from the last year means the model trains on March and is tested on February. In real use it must predict the future, so split by date: train on older, test on newer.</li>
+<li><strong>Features that give the answer away.</strong> A "resolved by" field that is always the API team for API bugs. The model learns the field, not the bug.</li>
+<li><strong>Group overlap.</strong> Ten screenshots of the same page in both training and test. Split by page, not by screenshot.</li>
+</ul>
+<div class="box example"><span class="tag">Real-world example</span><p>A team reports that their test-failure classifier is 96% accurate (illustrative). A QA lead asks one question: "How did you split the data?" The answer is "randomly, by row". Many failures are the same test failing on several retries, so near-identical rows sat on both sides of the split. Re-split by test name and by date, accuracy drops to 78%. The model didn't get worse; the measurement got honest.</p></div>
+<div class="box note"><span class="tag">Language models and benchmark contamination</span><p>The same problem exists at enormous scale. If the questions and answers of a public <a class="gl" href="#g-benchmark">benchmark</a> are posted on the web, they can end up in a model's training data, and its score on that benchmark overstates its real ability. This is called <strong>contamination</strong>. It's one reason to test models on your own, private examples (<a href="#ch24">Chapter 24</a>).</p></div>
+
+<h3 id="ch13-5"><span class="num">13.5</span>Bias in data</h3>
+<p>In everyday speech "bias" means prejudice. In data it means something broader: the data is <strong>systematically unrepresentative</strong> of the world the model will be used in. A model faithfully learns whatever patterns are there, including unfair or outdated ones.</p>
+<div class="tbl"><table>
+<tr><th>Kind of bias</th><th>What happens</th><th>QA example</th></tr>
+<tr><td><b>Sampling bias</b></td><td>Some groups or situations are under-represented</td><td>A screenshot-checker trained only on Chrome desktop misses Safari mobile layout bugs</td></tr>
+<tr><td><b>Historical bias</b></td><td>The data faithfully records a past that was itself unfair or different</td><td>A triage model learns that bugs from a certain region were "low priority", because they always were, not because they should be</td></tr>
+<tr><td><b>Label bias</b></td><td>Labellers' own assumptions shape the answers</td><td>One reviewer marks every accessibility bug as "minor"</td></tr>
+<tr><td><b>Measurement bias</b></td><td>The way data is collected distorts it</td><td>"Bugs found" only counts bugs that customers bothered to report</td></tr>
+<tr><td><b>Survivorship bias</b></td><td>You only see what made it through some filter</td><td>Training on merged pull requests only, never the rejected ones</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world examples</span><p><b>Hiring.</b> Reuters reported in 2018 that Amazon had scrapped an experimental CV-screening tool after finding it penalised CVs containing the word "women's". It had learned from ten years of past hiring, which was mostly men.</p><p><b>Face analysis.</b> Joy Buolamwini and Timnit Gebru's 2018 "Gender Shades" study found that commercial gender-classification systems were far less accurate for darker-skinned women than for lighter-skinned men, largely because of who was in the training and benchmark data.</p></div>
+<div class="box opinion"><span class="tag">Opinion · fairness researchers vs. some engineers</span><p>Many fairness researchers, including the Gender Shades authors, argue that bias must be actively measured and corrected because "neutral" data reflects an unequal world. Some engineers and commentators argue that models should reflect the data as it is and that adjusting it introduces the designers' own values. There's no purely technical answer: choosing what a model should learn is a human decision. What both sides accept is that you can't fix a bias you never measured.</p></div>
+
+<h3 id="ch13-6"><span class="num">13.6</span>Data quality is a QA problem</h3>
+<p>Data deserves the same discipline as code. Data engineers commonly describe quality along a set of <strong>dimensions</strong>, and each one turns naturally into test cases.</p>
+<div class="tbl"><table>
+<tr><th>Dimension</th><th>Question</th><th>A test you could automate</th></tr>
+<tr><td>Completeness</td><td>Is anything missing?</td><td>No empty labels; every row has a title</td></tr>
+<tr><td>Validity</td><td>Do values follow the rules?</td><td>Component is one of UI, API, Data; durations are positive</td></tr>
+<tr><td>Consistency</td><td>Does the same thing look the same everywhere?</td><td>No "ui" vs "UI"; dates in one format</td></tr>
+<tr><td>Uniqueness</td><td>Are there duplicates?</td><td>No repeated titles or IDs</td></tr>
+<tr><td>Accuracy</td><td>Is it actually right?</td><td>A human re-checks a random 5% sample of labels</td></tr>
+<tr><td>Timeliness</td><td>Is it current enough?</td><td>Nothing older than the current product version</td></tr>
+<tr><td>Representativeness</td><td>Does it match real use?</td><td>Class counts and browser mix compared with production</td></tr>
+</table></div>
+<p>Two documentation habits from the research community are worth copying. <strong>"Datasheets for Datasets"</strong> (Gebru and colleagues, 2018) proposes that every dataset ship with a short document: why it was made, who collected it, how it was labelled, what's missing and what it shouldn't be used for. <strong>"Model Cards"</strong> (Mitchell and colleagues, 2019) do the same for models. AI companies publish system cards for their models in this spirit.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>Before a team trains a defect-routing model on 20,000 Jira issues, a QA engineer writes a data test suite: 12 checks covering the dimensions above, run in CI on every data refresh. On the first run it finds 1,400 duplicates, 600 unlabelled issues and a component called "Misc" holding 18% of the data (illustrative). Fixing those does more for the model than any change to the model itself.</p></div>
+
+<h3 id="ch13-7"><span class="num">13.7</span>Synthetic data</h3>
+<p><strong>Synthetic data</strong> is data generated by a program or a model rather than collected from the real world. You've probably used it already: fake customer records for a test environment are synthetic data.</p>
+<div class="cols2">
+<div><h4>Good for</h4><ul><li>Privacy: test or train without real customer data</li><li>Rare cases: generate more examples of unusual bugs or edge cases</li><li>Balancing: top up under-represented classes</li><li>Scale: thousands of varied test inputs quickly</li></ul></div>
+<div><h4>Risky because</h4><ul><li>It inherits the blind spots of whatever generated it</li><li>It can be too clean and regular compared with messy reality</li><li>Models trained heavily on their own output can degrade over generations, an effect researchers call <strong>model collapse</strong> (Shumailov et al., <i>Nature</i>, 2024)</li><li>Always validate against real data</li></ul></div>
+</div>
+<p>AI labs now use synthetic data heavily, particularly in post-training: for example, having a model generate practice problems, or critique and rewrite answers (<a href="#ch18">Chapter 18</a>). Recent Claude system cards list synthetic data generated by other models as one ingredient of the training mix.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>A tester asks Claude: "Generate 50 realistic but fake UK customer records for a checkout test, including edge cases: very long names, apostrophes, non-Latin characters, postcodes with and without spaces." That's synthetic test data. The same tester then checks the output: are all 50 actually different? Do the postcodes follow the real format? Is anything accidentally a real person? Validate synthetic data like any other input.</p></div>
+
+<h3 id="ch13-8"><span class="num">13.8</span>How language-model training data is gathered</h3>
+<p>At a high level, the text used to <a class="gl" href="#g-pre-training">pre-train</a> large language models comes from a few kinds of source:</p>
+<div class="tbl"><table>
+<tr><th>Source</th><th>What it is</th></tr>
+<tr><td>Public web crawls</td><td>Programs called <strong>crawlers</strong> visit and save publicly reachable web pages. Common Crawl, a non-profit founded in 2007, publishes a huge free archive used by many labs and researchers. Labs also run their own crawlers.</td></tr>
+<tr><td>Books, papers and code</td><td>Digitised books, scientific articles, public code repositories</td></tr>
+<tr><td>Licensed data</td><td>Data paid for under agreements with publishers and other owners</td></tr>
+<tr><td>Human-written data</td><td>Demonstrations, ratings and comparisons from paid contractors, used mostly in post-training</td></tr>
+<tr><td>User data</td><td>Conversations from users who have allowed it, under each company's policy</td></tr>
+<tr><td>Synthetic data</td><td>Text generated by models, as in 13.7</td></tr>
+</table></div>
+<p>Raw web text is mostly unusable, so it goes through heavy filtering: removing duplicates, spam, boilerplate, low-quality and harmful pages, and personal information; identifying languages; and mixing sources in chosen proportions. For example, the GPT-3 paper (Brown et al., 2020) reported that filtered Common Crawl made up 60% of its training mix by weight, alongside curated web text, books and Wikipedia. <a href="#ch17">Chapter 17</a> covers data mixtures and scale.</p>
+<div class="box note"><span class="tag">Verified 9 Nov 2026 · Anthropic</span><p>Recent Claude system cards describe the training data as a proprietary mix of publicly available information from the internet, public and private datasets, and synthetic data generated by other models (the exact wording varies between cards). Anthropic's privacy centre says its crawler honours website owners' robots.txt "do not crawl" instructions and does not try to bypass CAPTCHAs. On user data: consumer users (Free, Pro, Max) choose in their settings whether their chats and coding sessions may be used to improve Claude, and Incognito chats are excluded; for commercial products such as Claude for Work and the API, Anthropic says it does not use inputs or outputs for training by default.</p></div>
+<div class="box warn"><span class="tag">At work</span><p>Before pasting test data, logs or customer information into any AI tool, check which plan your company uses and what its data policy says. "Is this used for training?" and "Who can see it?" are separate questions. <a href="#ch98">Chapter 98</a> covers safe handling of secrets and data.</p></div>
+
+<h3 id="ch13-9"><span class="num">13.9</span>The copyright and consent debate</h3>
+<p>Training on large parts of the written internet raises questions that courts, lawmakers and the public are still working out. This section describes the debate; it is not legal advice, and positions differ by country.</p>
+<div class="cols2">
+<div><h4>Arguments made by many creators and publishers</h4><ul><li>Their work was copied without permission or payment</li><li>Models can compete with the very people whose work trained them</li><li>Opt-out tools came after much of the data had already been collected</li><li>People who posted online years ago never imagined this use</li></ul></div>
+<div><h4>Arguments made by many AI developers</h4><ul><li>Training learns patterns rather than storing copies, similar to how people learn by reading</li><li>In the US, this can be "fair use" because the use is transformative</li><li>Requiring permission for every web page would make training impractical</li><li>They respect opt-out signals such as robots.txt and license some data</li></ul></div>
+</div>
+<ol class="timeline">
+<li><span class="yr">Dec 2023</span><span class="ev"><b>The New York Times sues OpenAI and Microsoft</b> over the use of its articles in training. The case is one of many brought by authors, artists, news organisations and music publishers against AI companies.</span></li>
+<li class="key"><span class="yr">Jun 2025</span><span class="ev"><b>Bartz v. Anthropic ruling.</b> US District Judge William Alsup found that training Claude on lawfully acquired books was fair use, but that downloading and keeping pirated copies of books was not protected.</span></li>
+<li><span class="yr">Sep 2025</span><span class="ev"><b>Settlement.</b> Anthropic agreed to a $1.5 billion settlement with the authors' class, reported as about $3,000 per book for roughly 465,000–500,000 works, and to destroy the pirated datasets. It received preliminary court approval in September 2025; press reports say final approval followed in 2026.</span></li>
+</ol>
+<div class="box opinion"><span class="tag">Opinion · differing views</span><p>Some legal commentators read the Bartz ruling as a signal that training itself may be lawful in the US when the data is lawfully obtained. Others stress that it was one district-court decision, that other cases may decide differently, and that laws in the EU, UK and elsewhere differ. Creators' groups argue for consent and payment regardless of the legal answer. Treat any confident claim about "the law on AI training" with care: it is still being decided.</p></div>
+
+<h3 id="ch13-10"><span class="num">13.10</span>Lab: test a dataset like you test software</h3>
+<p>You'll run a small Python program that checks a labelled bug-report dataset for the problems in this chapter, cleans it, splits it and checks for leakage. It needs only Python 3, no extra packages.</p>
+<div class="code"><span class="cap">bugs.csv</span><pre>id,title,component
+1,Login button does nothing on Safari,UI
+2,Checkout API returns 500 for empty cart,API
+3,Order total wrong when coupon applied,Data
+4,Login button does nothing on Safari,UI
+5,Profile page layout broken on mobile,ui
+6,GET /users times out after 30 seconds,API
+7,Duplicate rows in monthly sales report,Data
+8,Password reset email never arrives,
+9,Dark mode text unreadable in settings,UI
+10,Search results show deleted products,Data
+11,POST /orders accepts negative quantity,API
+12,Tooltip overlaps the save button,UI
+13,Currency rounded incorrectly in invoice,Data
+14,Dropdown closes when scrolling on Android,UI
+15,Rate limit header missing from responses,API
+16,Navigation menu hidden behind banner,UI</pre></div>
+<div class="code"><span class="cap">check_data.py</span><pre># check_data.py - basic data-quality checks on a labelled dataset
+import csv
+import random
+import sys
+from collections import Counter
+
+path = sys.argv[1] if len(sys.argv) &gt; 1 else "bugs.csv"
+with open(path, newline="", encoding="utf-8") as f:
+    rows = list(csv.DictReader(f))
+print(f"Loaded {len(rows)} rows from {path}\n")
+
+# 1. Missing labels
+missing = [r["id"] for r in rows if not r["component"].strip()]
+print("Missing labels:", missing or "none")
+
+# 2. Inconsistent label spelling (same label, different case or spaces)
+raw = Counter(r["component"] for r in rows if r["component"].strip())
+by_norm = {}
+for label in raw:
+    by_norm.setdefault(label.strip().lower(), []).append(label)
+clashes = {k: v for k, v in by_norm.items() if len(v) &gt; 1}
+print("Inconsistent spellings:", clashes or "none")
+
+# 3. Exact duplicate texts
+seen = {}
+dupes = []
+for r in rows:
+    key = r["title"].strip().lower()
+    if key in seen:
+        dupes.append((seen[key], r["id"]))
+    else:
+        seen[key] = r["id"]
+print("Duplicate titles (first id, repeat id):", dupes or "none")
+
+# 4. Clean: drop missing labels and duplicates, normalise labels
+CANON = {"ui": "UI", "api": "API", "data": "Data"}
+clean, keys = [], set()
+for r in rows:
+    key = r["title"].strip().lower()
+    label = r["component"].strip()
+    if not label or key in keys:
+        continue
+    keys.add(key)
+    clean.append({"title": r["title"], "component": CANON.get(label.lower(), label)})
+print(f"\nAfter cleaning: {len(clean)} rows")
+
+# 5. Class balance
+counts = Counter(r["component"] for r in clean)
+for label, n in counts.most_common():
+    print(f"  {label:5s} {n:2d}  {'#' * n}")
+
+# 6. Split into train / validation / test (70 / 15 / 15) with a fixed seed
+random.seed(42)
+random.shuffle(clean)
+n = len(clean)
+a, b = int(n * 0.7), int(n * 0.85)
+train, valid, test = clean[:a], clean[a:b], clean[b:]
+print(f"\nSplit: train={len(train)}  validation={len(valid)}  test={len(test)}")
+
+# 7. Leakage check: no title may appear in more than one split
+def leaks(train, others):
+    seen = {r["title"].lower() for r in train}
+    return [r["title"] for r in others if r["title"].lower() in seen]
+
+print("Leakage between splits:", leaks(train, valid + test) or "none")
+
+# 8. For comparison: what if we had split the RAW rows, before removing duplicates?
+raw_rows = list(rows)
+random.seed(0)
+random.shuffle(raw_rows)
+print("Raw split leaks:", leaks(raw_rows[:11], raw_rows[11:]) or "none")</pre></div>
+<div class="lab"><div class="lab-h"><b>Find, fix and split a messy dataset</b><span>30 min · your computer, Python 3 (optional: Claude)</span></div><ol>
+<li>Make a new folder. Save the two files above in it as <code>bugs.csv</code> and <code>check_data.py</code>. Check Python with <code>python3 --version</code> (on Windows, use <code>py</code>).<span class="expect">Python 3.x is reported.</span></li>
+<li>Before running anything, read <code>bugs.csv</code> yourself and write down every problem you can see.<span class="expect">You should spot at least: row 8 has no label, row 5 says "ui" instead of "UI", and rows 1 and 4 are identical.</span></li>
+<li>Run <code>python3 check_data.py</code>.<span class="expect"><code>Loaded 16 rows</code>; <code>Missing labels: ['8']</code>; <code>Inconsistent spellings: {'ui': ['UI', 'ui']}</code>; <code>Duplicate titles (first id, repeat id): [('1', '4')]</code>.</span></li>
+<li>Read the cleaning and balance section of the output.<span class="expect"><code>After cleaning: 14 rows</code>, with UI 6, API 4, Data 4. UI is the biggest class; a model may lean towards guessing UI.</span></li>
+<li>Read the split and leakage lines.<span class="expect"><code>Split: train=9 validation=2 test=3</code>, <code>Leakage between splits: none</code>, and then <code>Raw split leaks: ['Login button does nothing on Safari']</code>. Splitting before removing duplicates put the same bug on both sides: that's data leakage.</span></li>
+<li>Add a check of your own: report any row whose component isn't one of UI, API or Data. Add a row <code>17,Font too small on invoice PDF,Frontend</code> to the CSV to test it.<span class="expect">Your new check flags row 17. (Hint: loop over <code>rows</code> and test <code>r["component"].strip().lower() not in CANON</code>, skipping empty labels.)</span></li>
+<li>Optional, with Claude: paste the CSV into Claude and ask: "Act as a data-quality reviewer. List every problem in this labelled dataset that would hurt a bug-routing model, including ambiguous labels." Compare its answer with the script.<span class="expect">Claude usually finds the same three mechanical problems and may also argue that some labels are debatable, such as whether row 10 is a Data or API issue. That's the labelling-agreement problem from 13.2, which no script can catch.</span></li>
+</ol></div>
+<div class="box note"><span class="tag">Troubleshooting</span><p><b>KeyError: 'component'</b>: the CSV header was changed or saved with extra spaces; the first line must be exactly <code>id,title,component</code>. <b>Strange first column name such as '﻿id'</b>: your editor saved the CSV with a byte-order mark; save as plain UTF-8, or change the encoding in the script to <code>utf-8-sig</code>. <b>Different split numbers or leak result</b>: the shuffle depends on the random seed and Python's random module; the counts of missing, inconsistent and duplicate rows must still match. <b>No company data?</b> The provided CSV is all you need; never paste real customer data into a lab.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"More data always beats better data."</dt><dd>More helps, but duplicated, mislabelled or one-sided data can make a model worse. Much recent progress in language models came from better filtering, not just more text.</dd>
+<dt>"The model is biased, so the engineers must have been biased."</dt><dd>Often the data simply reflects past patterns. That's an explanation, not an excuse: it still needs measuring and fixing.</dd>
+<dt>"A high test score proves the model works."</dt><dd>Only if the test set was truly separate. Leakage and contamination produce high scores that collapse in real use.</dd>
+<dt>"Synthetic data is free of problems because it's not real."</dt><dd>It carries the blind spots of whatever generated it, and needs validating against reality.</dd>
+<dt>"The copyright question has been settled."</dt><dd>Individual rulings and settlements exist, but the overall legal picture is still developing and differs between countries.</dd>
+</dl></div>
+
+<h3 id="ch13-r"><span class="num">13.11</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>A dataset is examples with features and, often, labels. A model can only learn what's in it.</li>
+<li>Labelling is costly and subjective; guidelines, double-labelling and gold sets keep it honest.</li>
+<li>Cleaning fixes missing values, inconsistent formats, duplicates, wrong labels and sensitive data, and every cleaning rule is a decision.</li>
+<li>Split into training, validation and test sets before training; split by time or group when that matches real use.</li>
+<li>Data leakage and benchmark contamination make scores look better than reality.</li>
+<li>Bias in data comes from sampling, history, labels and measurement; measure it before you trust a model.</li>
+<li>Data quality has testable dimensions, so treat datasets like code: write checks and run them in CI.</li>
+<li>Language models train mostly on filtered web text plus books, code, licensed, human-written and synthetic data. Copyright and consent are live, unresolved debates.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">A flaky-test model is trained and tested on a random split of last year's CI runs. What is the main risk?</p><div class="opts"><button>The model will be too small</button><button data-ok>Leakage: it trains on later runs and is tested on earlier ones, so the score overstates real performance</button><button>The test set will be too large</button></div><p class="why" hidden>In real use the model must predict the future. Split by date so the test set comes after the training set.</p></div>
+<div class="qz"><p class="q">Which dataset problem is a script least able to detect on its own?</p><div class="opts"><button>Duplicate rows</button><button>Missing labels</button><button data-ok>A label that is plausible but wrong</button></div><p class="why" hidden>Duplicates and blanks are mechanical. Judging whether a bug really belongs to "Data" or "API" needs human or model review.</p></div>
+<div class="qz"><p class="q">A screenshot-checker trained only on Chrome desktop images misses Safari mobile layout bugs. What kind of bias is this?</p><div class="opts"><button data-ok>Sampling bias</button><button>Label bias</button><button>Survivorship bias</button></div><p class="why" hidden>Some situations the model will meet were under-represented, or absent, in the data it learned from.</p></div>
+<div class="qz"><p class="q">What is the test set for?</p><div class="opts"><button>Tuning settings during development</button><button data-ok>One final, honest score on data never used for training or tuning</button><button>Making the training set bigger</button></div><p class="why" hidden>The validation set is used for tuning; the test set stays locked away until the end.</p></div>
+<div class="qz"><p class="q">According to Anthropic's privacy centre, is data from the Claude API used to train models by default?</p><div class="opts"><button>Yes, always</button><button data-ok>No, not by default for commercial products such as the API</button><button>Only if the request includes code</button></div><p class="why" hidden>Anthropic says it does not use commercial-product inputs or outputs for training by default. Consumer users choose in their settings.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick one dataset your team owns or relies on: test data in a staging database, a Jira export, CI history or a spreadsheet of test cases. Write a one-page "datasheet" for it in the style of Gebru et al.: why it exists, where it comes from, how it's labelled or maintained, what's missing or over-represented, how fresh it is, and what it shouldn't be used for. Then list five automated checks, one per quality dimension in 13.6, that you could run on it in CI. If you can, implement one by adapting <code>check_data.py</code>.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"An AI model is only as good as its data. Real data is messy: missing values, duplicates, inconsistent labels and labels people disagree on. Cleaning it is most of the work. We split data into training, validation and test sets so we can check the model on things it never saw, and we watch for leakage, where the same examples sneak into both sides and make scores look better than they are. Data can also be biased, under-representing some groups or repeating old unfairness. As testers, we're good at this: treat a dataset like code and write tests for it. And for big language models, the data is much of the public web, which is why copyright and consent are still being argued in court."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>J. Deng et al., "ImageNet: A Large-Scale Hierarchical Image Database", CVPR 2009.</li>
+<li>C. Northcutt, A. Athalye and J. Mueller, "<a href="https://arxiv.org/abs/2103.14749" target="_blank" rel="noopener">Pervasive Label Errors in Test Sets Destabilize Machine Learning Benchmarks</a>" (2021).</li>
+<li>T. Gebru et al., "<a href="https://arxiv.org/abs/1803.09010" target="_blank" rel="noopener">Datasheets for Datasets</a>" (2018); M. Mitchell et al., "<a href="https://arxiv.org/abs/1810.03993" target="_blank" rel="noopener">Model Cards for Model Reporting</a>" (2019).</li>
+<li>J. Buolamwini and T. Gebru, "<a href="https://proceedings.mlr.press/v81/buolamwini18a.html" target="_blank" rel="noopener">Gender Shades</a>", FAT* 2018.</li>
+<li>J. Dastin, "Amazon scraps secret AI recruiting tool that showed bias against women", Reuters, 10 October 2018.</li>
+<li>I. Shumailov et al., "<a href="https://www.nature.com/articles/s41586-024-07566-y" target="_blank" rel="noopener">AI models collapse when trained on recursively generated data</a>", <i>Nature</i> (2024).</li>
+<li>T. Brown et al., "<a href="https://arxiv.org/abs/2005.14165" target="_blank" rel="noopener">Language Models are Few-Shot Learners</a>" (GPT-3, 2020), table 2.2.</li>
+<li><a href="https://commoncrawl.org/" target="_blank" rel="noopener">Common Crawl</a>.</li>
+<li>Anthropic Privacy Center, <a href="https://privacy.claude.com/en/articles/10023580-is-my-data-used-for-model-training" target="_blank" rel="noopener">Is my data used for model training? (consumer)</a>, <a href="https://privacy.claude.com/en/articles/7996868-is-my-data-used-for-model-training" target="_blank" rel="noopener">(commercial)</a> and <a href="https://privacy.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler" target="_blank" rel="noopener">Does Anthropic crawl data from the web?</a></li>
+<li>Anthropic, <a href="https://www.anthropic.com/system-cards" target="_blank" rel="noopener">System cards</a> (training data descriptions).</li>
+<li>Coverage of Bartz v. Anthropic: <a href="https://www.jurist.org/news/2026/07/judge-approves-record-1-5-billion-settlement-involving-anthropic/" target="_blank" rel="noopener">JURIST</a> and the <a href="https://publishers.org/news/faq-for-publishers-bartz-v-anthropic/" target="_blank" rel="noopener">Association of American Publishers FAQ</a>.</li>
+</ol><p class="verified">Verified 9 November 2026: Anthropic training-data, crawler and data-use policies (privacy centre). Bartz v. Anthropic details are from press and publisher coverage, not the court docket; the exact final-approval date was not independently confirmed. Concepts: established · Last reviewed 9 November 2026. Lab output produced by running the code shown with Python 3.</p></div>

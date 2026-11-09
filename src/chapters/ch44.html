@@ -1,0 +1,223 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What a prompt is, and why small changes in wording change the answer</li>
+<li>The six building blocks of a good prompt: task, context, input, constraints, format and examples</li>
+<li>Anthropic's own core advice: be clear and direct, explain why, and say what to do rather than what not to do</li>
+<li>How to use XML tags to separate instructions from the material Claude should work on</li>
+<li>How to improve a prompt step by step, the way you would debug a failing test</li>
+<li>A reusable prompt checklist for everyday QA work</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch43">Chapter 43</a> (using the Claude apps). It helps to know what tokens and the context window are (<a href="#ch14">Chapter 14</a> and <a href="#ch20">Chapter 20</a>), and that models predict text rather than look things up (<a href="#ch16">Chapter 16</a>). Advanced techniques follow in <a href="#ch45">Chapter 45</a>.</div>
+
+<div class="bigidea"><p>A <a class="gl" href="#g-prompt">prompt</a> is everything you give Claude to work with: your request, the background, the material and any examples. Claude can only use what is in front of it, so a vague prompt gets a generic answer and a precise prompt gets a precise one. Anthropic's advice is to treat Claude like a brilliant new colleague who knows nothing about your project: say exactly what you want, explain why, show the format, and give it the real material. Then check the answer and refine the prompt, the same way you would fix a test that fails.</p></div>
+
+<h3 id="ch44-1"><span class="num">44.1</span>Why the words matter</h3>
+<p>A language model writes the most fitting continuation of the text it has been given (<a href="#ch16">Chapter 16</a>). It has no access to your Jira board, your team's conventions or what you had in mind, unless you put them into the conversation. Everything it doesn't know, it fills in with the most typical guess. That's why "Write test cases for login" produces the same generic list for everyone: email format, wrong password, empty fields.</p>
+<p>Anthropic's prompting guide puts it this way: "Think of Claude as a brilliant but new employee who lacks context on your norms and workflows. The more precisely you explain what you want, the better the result." It also suggests a simple test:</p>
+<div class="box note"><span class="tag">The colleague test</span><p>"Show your prompt to a colleague with minimal context on the task and ask them to follow it. If they'd be confused, Claude will be too." (Anthropic, <i>Prompting best practices</i>.)</p></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Imagine asking a skilled contractor who has never seen your house to "fix the kitchen". You might get new cupboards when you wanted a dripping tap repaired. Tell them "the cold tap on the kitchen sink drips; please replace the washer, keep the existing tap, and don't start before 9 because the baby is asleep" and you get exactly the job you wanted. The contractor's skill didn't change; your instructions did.</p></div>
+<p>This skill is often called <a class="gl" href="#g-prompt-engineering">prompt engineering</a>. The name sounds technical, but most of it is clear writing. You already practise it whenever you write a good bug report: steps, expected result, actual result, environment. A good prompt has the same discipline.</p>
+
+<h3 id="ch44-2"><span class="num">44.2</span>The six building blocks</h3>
+<p>Not every prompt needs all six, but knowing them helps you notice what is missing.</p>
+<div class="tbl"><table>
+<tr><th>Block</th><th>The question it answers</th><th>QA example</th></tr>
+<tr><td><b>Task</b></td><td>What exactly should Claude do?</td><td>"Write manual test cases for this user story."</td></tr>
+<tr><td><b>Context</b></td><td>Who is this for, why, and what's the situation?</td><td>"For our regression pack. The app is a UK online bank; testers are new to the product."</td></tr>
+<tr><td><b>Input</b></td><td>What material should it work on?</td><td>The story text and acceptance criteria, pasted in full</td></tr>
+<tr><td><b>Constraints</b></td><td>What are the rules and limits?</td><td>"Only cover the transfer limit rule. Use test data from our standard list. Flag anything ambiguous instead of guessing."</td></tr>
+<tr><td><b>Format</b></td><td>What should the answer look like?</td><td>"A table with columns ID, Title, Steps, Expected result, Priority."</td></tr>
+<tr><td><b>Examples</b></td><td>What does a good answer look like?</td><td>One finished test case written in your team's style</td></tr>
+</table></div>
+<div class="flow"><div><b>Task</b>what to do</div><div><b>Context</b>why and for whom</div><div class="hl"><b>Input</b>the real material</div><div><b>Constraints</b>rules and limits</div><div><b>Format</b>shape of the answer</div><div><b>Examples</b>show, don't tell</div></div>
+<p>A useful order for longer prompts is: material first, then the instructions and question at the end. Anthropic's long-context advice is to put long documents "near the top of your prompt, above your query, instructions, and examples", and notes that queries at the end improved quality "by up to 30 percent" in its tests with complex, multi-document inputs.</p>
+
+<h3 id="ch44-3"><span class="num">44.3</span>Be clear and direct</h3>
+<p>Say exactly what you want, including things that seem obvious to you. Anthropic's guide: "If you want Claude to do more than the task strictly requires, explicitly request it rather than relying on the model to infer this from vague prompts." When order or completeness matters, give the instructions as numbered steps.</p>
+<h4>Before and after: test cases from a story</h4>
+<div class="cols2"><div><h4>Before</h4><div class="code"><span class="cap">Prompt</span><pre>Write test cases for the transfer feature.</pre></div><p>Result: a generic list that might fit any banking app, in an arbitrary format, with invented business rules.</p></div><div><h4>After</h4><div class="code"><span class="cap">Prompt</span><pre>Write manual test cases for the user story below.
+
+Context: UK retail banking web app. These go into
+our regression pack and will be run by testers who
+are new to the product, so every step must be
+explicit.
+
+Requirements:
+1. Cover every acceptance criterion at least once.
+2. Include boundary values for the daily limit.
+3. Include at least two negative cases.
+4. If a rule is unclear, list it under "Questions
+   for the product owner" instead of guessing.
+
+Format: a table with columns ID, Title, Steps,
+Expected result, Priority (High/Medium/Low).
+
+Story:
+As a customer I want to transfer money between
+my own accounts so that I can manage my savings.
+AC1: Transfers up to £10,000 per day are allowed.
+AC2: The source account cannot go overdrawn.
+AC3: A confirmation screen shows before submitting.</pre></div></div></div>
+<p>The second prompt is longer, but it saves time: the answer is usable first time, the boundaries (£10,000.00, £10,000.01) are tested, and Claude flags gaps such as "does the limit include pending transfers?" instead of inventing an answer.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>A tester asked Claude to "summarise this bug". It returned a friendly paragraph. She changed the prompt to "Rewrite this bug report in our format: Title (under 80 characters, starting with the component), Steps to reproduce (numbered), Expected, Actual, Environment, Severity with one-line justification." Every report after that dropped straight into Jira without editing.</p></div>
+
+<h3 id="ch44-4"><span class="num">44.4</span>Give context and explain why</h3>
+<p>Telling Claude <em>why</em> a rule exists helps it apply the rule sensibly to cases you didn't think of. Anthropic's example: instead of "NEVER use ellipses", write "Your response will be read aloud by a text-to-speech engine, so never use ellipses since the text-to-speech engine will not know how to pronounce them." The guide adds: "Claude can generalize from the explanation."</p>
+<div class="tbl"><table>
+<tr><th>Bare rule</th><th>Rule with a reason</th><th>What Claude can now infer</th></tr>
+<tr><td>"Keep it short."</td><td>"Keep it short: this goes in a Slack message to the release manager, who reads it on her phone."</td><td>Lead with the decision, avoid tables, no long code blocks</td></tr>
+<tr><td>"Don't use real names."</td><td>"Don't use real names: this test data will be shared with an offshore vendor and must contain no personal data."</td><td>Also avoid real addresses, real card numbers and real email domains</td></tr>
+<tr><td>"Use Gherkin."</td><td>"Use Gherkin: these scenarios will be automated with our Cucumber step library."</td><td>Reuse consistent step wording; keep one action per step</td></tr>
+</table></div>
+<p>Good context usually covers: <b>who the audience is</b>, <b>what the output will be used for</b>, <b>what "good" looks like</b> on your team, and <b>what Claude can't know</b> (your product rules, your environments, your naming conventions).</p>
+<div class="box warn"><span class="tag">Context is not a dumping ground</span><p>More context isn't always better. Irrelevant material competes for attention and costs usage. A 200-page specification when you only need section 4 makes the answer worse and slower (<a href="#ch20">Chapter 20</a> on context rot). Give what's relevant, and say which part matters.</p></div>
+
+<h3 id="ch44-5"><span class="num">44.5</span>Shape the output</h3>
+<p>If you care what the answer looks like, say so. Anthropic's guide gives several tips for controlling format:</p>
+<ul>
+<li><b>Say what to do, not what not to do.</b> Instead of "Do not use markdown", try "Your response should be composed of smoothly flowing prose paragraphs."</li>
+<li><b>Match your prompt's style to the output you want.</b> A prompt full of bullet points and headings tends to get one back; plain prose tends to get prose.</li>
+<li><b>Be specific.</b> Name the columns, the length, the headings, the order, the tone.</li>
+</ul>
+<div class="tbl"><table>
+<tr><th>Vague</th><th>Specific</th></tr>
+<tr><td>"Make it brief."</td><td>"Maximum five bullet points, each under 20 words."</td></tr>
+<tr><td>"Give me a summary of the test run."</td><td>"Start with one line: GO or NO-GO. Then a table of failures with columns Test, Error, Likely cause. Then at most three recommended actions."</td></tr>
+<tr><td>"Don't be so formal."</td><td>"Write as a friendly colleague would in a team chat: short sentences, no headings."</td></tr>
+<tr><td>"Output it as data."</td><td>"Output CSV with the header row <code>id,title,priority</code> and nothing before or after it."</td></tr>
+</table></div>
+<p>For data you will process with code, ask for a precise format such as CSV or <a class="gl" href="#g-json">JSON</a>, and still check it. In the apps a model can occasionally add a sentence before the data; in the API you can enforce a schema with structured outputs (<a href="#ch45">Chapter 45</a>, <a href="#ch89">Chapter 89</a>).</p>
+
+<h3 id="ch44-6"><span class="num">44.6</span>Show an example</h3>
+<p>Anthropic calls examples "one of the most reliable ways to steer Claude's output format, tone, and structure." One example of a finished bug report, test case or release note in your team's style often does more than a paragraph of description.</p>
+<div class="code"><span class="cap">Prompt with one example</span><pre>Write test cases for the story below in exactly the same style as this example.
+
+&lt;example&gt;
+TC-014 | Login locks after 5 failed attempts | High
+Given a registered user "test.user01"
+When they enter a wrong password 5 times in a row
+Then the account is locked
+And the message "Your account is locked. Reset your password." is shown
+&lt;/example&gt;
+
+Story: ...paste the story here...</pre></div>
+<p>Two cautions. First, Claude copies examples closely, including their quirks: if your only example is about login, you may get login-flavoured wording everywhere. Second, wrap examples in tags (as above) so Claude can tell the example from the instruction. Choosing and designing several examples (few-shot prompting) is covered in <a href="#ch45">Chapter 45</a>.</p>
+
+<h3 id="ch44-7"><span class="num">44.7</span>Use XML tags to separate the parts</h3>
+<p>When a prompt mixes instructions with material (a story, a log, a document), Claude needs to know which is which. <a class="gl" href="#g-xml-tags">XML tags</a> are a simple way to label each part: you wrap text in a pair of made-up labels such as <code>&lt;story&gt;</code> and <code>&lt;/story&gt;</code>. There's nothing special about the names; they just need to be clear and consistent. Anthropic's guide says tags "help Claude parse complex prompts unambiguously, especially when your prompt mixes instructions, context, examples, and variable inputs."</p>
+<div class="code"><span class="cap">Prompt structured with XML tags</span><pre>&lt;context&gt;
+We test a UK online banking web app. Releases go out every two weeks.
+&lt;/context&gt;
+
+&lt;story&gt;
+As a customer I want to transfer money between my own accounts...
+AC1: Transfers up to £10,000 per day are allowed.
+AC2: The source account cannot go overdrawn.
+&lt;/story&gt;
+
+&lt;existing_tests&gt;
+TC-001 Transfer £50 between current and savings
+TC-002 Transfer with insufficient funds
+&lt;/existing_tests&gt;
+
+&lt;instructions&gt;
+1. Compare the story with the existing tests.
+2. List acceptance criteria that no existing test covers.
+3. Write new test cases only for those gaps, in the same style.
+&lt;/instructions&gt;</pre></div>
+<p>Tags help in four ways: Claude can't confuse your log file with your instructions; you can refer to parts by name ("using only the tests in &lt;existing_tests&gt;"); you can swap the material and reuse the rest of the prompt; and you can ask for answers inside tags (for example <code>&lt;gaps&gt;</code> and <code>&lt;new_tests&gt;</code>) so they are easy to pick out.</p>
+<details class="deep"><summary>Under the hood: why tags and ordering help</summary><div class="body"><p>A model reads your prompt as one long stream of <a class="gl" href="#g-token">tokens</a>. Nothing in the stream says "this bit is data" or "this bit is a command" unless the text itself signals it. Tags are an unambiguous signal, and Claude models have been trained on a great deal of structured text and are tuned to respect this kind of structure. They also give attention (<a href="#ch17">Chapter 17</a>) clear landmarks to find relevant parts again in a long prompt.</p><p>Putting the question at the end, after long material, means the instruction sits closest to where the answer begins. This doesn't make Claude immune to <a class="gl" href="#g-lost-in-the-middle">lost in the middle</a> effects, but it helps, and asking Claude to first quote the relevant passages ("ground responses in quotes", in Anthropic's guide) helps further on long documents. Note that tags don't make untrusted text safe: they make the boundary clearer, not unbreakable (<a href="#ch45">Chapter 45</a>, <a href="#ch131">Chapter 131</a>).</p></div></details>
+
+<h3 id="ch44-8"><span class="num">44.8</span>Iterate like a tester</h3>
+<p>Your first prompt is a first draft. Treat a poor answer as a failing test: work out <em>why</em> it failed, change one thing, and run it again.</p>
+<div class="flow"><div><b>Write</b>a first prompt</div><div><b>Run</b>read the answer critically</div><div class="hl"><b>Diagnose</b>what was missing or unclear?</div><div><b>Change one thing</b>add context, format or an example</div><div><b>Re-run</b>and compare</div></div>
+<div class="tbl"><table>
+<tr><th>Symptom</th><th>Likely cause</th><th>Fix</th></tr>
+<tr><td>Generic, could apply to any product</td><td>Missing context or input</td><td>Paste the real story, rules, product facts</td></tr>
+<tr><td>Wrong shape or length</td><td>Format not specified</td><td>Name the structure, length and order; give an example</td></tr>
+<tr><td>Invents business rules</td><td>Gaps in the input, no instruction for uncertainty</td><td>Say "If something isn't stated, list it as a question instead of guessing"</td></tr>
+<tr><td>Ignores part of a long document</td><td>Too much material, question buried</td><td>Trim the material, put the question last, ask for quotes first</td></tr>
+<tr><td>Does more (or less) than you wanted</td><td>Scope unclear</td><td>State scope explicitly: "only", "also", "do not change X"</td></tr>
+</table></div>
+<p>Two habits make iteration faster. First, <b>edit your original message</b> rather than adding corrections on top: the bad answer then disappears from the context (<a href="#ch43">Chapter 43</a>). Second, when a prompt works well, <b>save it</b> in a shared document or a project's instructions so the team can reuse it. In <a href="#ch45">Chapter 45</a> you'll turn good prompts into templates.</p>
+<div class="box opinion"><span class="tag">Opinion · many practitioners, including Anthropic's prompting guide</span><p>A prompt you haven't tested against a few real inputs isn't finished. Anthropic's guide assumes you already have "a clear definition of the success criteria" and "some ways to empirically test against those criteria" before you tune a prompt. For one-off chats that is overkill; for a prompt your team will reuse every sprint, it's worth doing (<a href="#ch125">Chapter 125</a> on evals).</p></div>
+<div class="box note"><span class="tag">Ask Claude to ask you</span><p>When you're not sure what context to give, end with: "Before you start, ask me any questions you need answered to do this well." Anthropic's getting-started tutorial suggests the same. It turns Claude into the colleague who checks the brief before starting.</p></div>
+
+<h3 id="ch44-9"><span class="num">44.9</span>A prompt checklist</h3>
+<p>Use this before sending any prompt that matters. Most everyday prompts need only the first three lines.</p>
+<div class="tbl"><table>
+<tr><th>#</th><th>Check</th><th>Ask yourself</th></tr>
+<tr><td>1</td><td><b>Task</b></td><td>Does the first sentence say exactly what I want done?</td></tr>
+<tr><td>2</td><td><b>Input</b></td><td>Have I pasted or attached the real material, not described it?</td></tr>
+<tr><td>3</td><td><b>Format</b></td><td>Have I said what the answer should look like?</td></tr>
+<tr><td>4</td><td><b>Context</b></td><td>Would a new colleague know who this is for and why?</td></tr>
+<tr><td>5</td><td><b>Constraints</b></td><td>Have I stated scope, limits and what to do when unsure?</td></tr>
+<tr><td>6</td><td><b>Positive wording</b></td><td>Have I said what to do rather than only what not to do?</td></tr>
+<tr><td>7</td><td><b>Structure</b></td><td>If there's more than one kind of content, are the parts tagged?</td></tr>
+<tr><td>8</td><td><b>Example</b></td><td>Would one example make the style unmistakable?</td></tr>
+<tr><td>9</td><td><b>Safety</b></td><td>Have I removed secrets, passwords and personal data?</td></tr>
+<tr><td>10</td><td><b>Check</b></td><td>How will I verify the answer before I use it?</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">A good prompt doesn't guarantee a correct answer</span><p>Even with an excellent prompt, Claude can be wrong or <a class="gl" href="#g-hallucination">hallucinate</a> details. Prompting reduces the chance; it doesn't remove it. You remain responsible for checking test cases against the real requirement, and code against the real system.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Lab: rescue a bad prompt</b><span>30 min · claude.ai (any plan)</span></div><ol>
+<li>Start a new chat and send exactly: <code>Write test cases for password reset.</code><span class="expect">A generic list (email sent, link expires, password rules) in a format Claude chose, possibly with invented rules.</span></li>
+<li>Note three things wrong with the answer for a real team: for example wrong format, invented rules, missing boundaries.<span class="expect">A short list of problems. This is your "failing test" diagnosis.</span></li>
+<li>Start a new chat and send this improved prompt:
+<div class="code"><span class="cap">Prompt</span><pre>&lt;story&gt;
+As a registered user I want to reset my password by email so that I can
+regain access if I forget it.
+AC1: The reset link expires after 30 minutes.
+AC2: The new password must be 12-64 characters.
+AC3: The last 3 passwords cannot be reused.
+AC4: After a reset, all other sessions are signed out.
+&lt;/story&gt;
+
+&lt;instructions&gt;
+Write manual test cases for the story above, for a regression pack run by
+testers who are new to the product.
+1. Cover every acceptance criterion at least once.
+2. Include boundary values for AC1 and AC2.
+3. If anything is unclear, list it under "Questions for the product owner"
+   instead of guessing.
+Format: a table with columns ID, Title, Steps, Expected result, AC covered.
+&lt;/instructions&gt;</pre></div><span class="expect">A table where every row names an acceptance criterion; boundary tests such as 11, 12, 64 and 65 characters and around 30 minutes; and a short list of questions (for example: does "last 3" include the current password?).</span></li>
+<li>Compare the two answers side by side against your list from step 2.<span class="expect">Most or all of your three problems are gone.</span></li>
+<li>Add one example test case in your own team's style inside <code>&lt;example&gt;</code> tags, and ask Claude to rewrite the table in that style.<span class="expect">The cases now follow your example's wording, ID scheme and layout.</span></li>
+<li>Edit your prompt (don't add a new message) to remove the line about questions. Run it again.<span class="expect">There's a good chance Claude now quietly assumes answers to the unclear points. This shows why the uncertainty instruction matters.</span></li>
+<li>Save your best version in a document called "Prompt: test cases from a story".<span class="expect">A reusable prompt you will turn into a template in Chapter 45.</span></li>
+</ol>
+<p><b>Troubleshooting:</b> answers look very similar between steps 1 and 3: check that you started a new chat, so the first answer isn't in the context. Table is cut off: ask "continue the table from the last row". Claude still invents rules: move the uncertainty instruction higher and give the reason ("these tests will be signed off as matching the requirement").</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"There are magic words that make Claude better."</dt><dd>Clarity, context and examples matter far more than any phrase. Anthropic's guidance is about clear communication, not secret keywords.</dd>
+<dt>"Shorter prompts are always better."</dt><dd>Shorter is better only when nothing important is missing. A precise 15-line prompt often saves five rounds of correction.</dd>
+<dt>"Writing in capitals and saying NEVER makes rules stick."</dt><dd>Explaining why usually works better than shouting, and current models can over-apply forceful wording.</dd>
+<dt>"XML tags must use special names Claude knows."</dt><dd>Any clear, consistent names work. The point is to label the parts.</dd>
+<dt>"If the prompt is good, I don't need to check the answer."</dt><dd>Good prompts reduce errors; they don't remove them. Always review.</dd>
+</dl></div>
+
+<h3 id="ch44-r"><span class="num">44.10</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Claude only knows what is in the conversation. Treat it as a brilliant new colleague with no background on your project.</li>
+<li>The building blocks: task, context, input, constraints, format and examples.</li>
+<li>Be clear and direct; explain why rules exist; say what to do rather than what not to do.</li>
+<li>Put long material first and the question last; use XML tags to separate instructions from material.</li>
+<li>One good example often beats a paragraph of description.</li>
+<li>Iterate like a tester: diagnose, change one thing, re-run, and save prompts that work.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What is Anthropic's "colleague test" for a prompt?</p><div class="opts"><button>Ask a colleague to write the prompt for you</button><button data-ok>Check whether a colleague with little context could follow it without confusion</button><button>Send the prompt to two colleagues and compare results</button></div><p class="why" hidden>If a person with minimal context would be confused, Claude will be too.</p></div>
+<div class="qz"><p class="q">Which rewrite follows the "say what to do" advice?</p><div class="opts"><button>"Don't use bullet points."</button><button>"NEVER EVER use bullet points."</button><button data-ok>"Write the answer as two short prose paragraphs."</button></div><p class="why" hidden>Positive instructions describe the target, so Claude knows what to aim for, not just what to avoid.</p></div>
+<div class="qz"><p class="q">You're pasting a 40-page specification and asking one question about it. Where should the question go?</p><div class="opts"><button>At the very top, before the specification</button><button data-ok>After the specification, at the end of the prompt</button><button>In a separate chat</button></div><p class="why" hidden>Anthropic recommends long material at the top and the query at the end, which improved quality in its tests.</p></div>
+<div class="qz"><p class="q">Claude invents a business rule that isn't in the story. What's the best prompt fix?</p><div class="opts"><button>Switch to a bigger model and hope</button><button data-ok>Tell it to list unclear points as questions instead of guessing, and say why</button><button>Remove the acceptance criteria to keep it short</button></div><p class="why" hidden>An explicit instruction for uncertainty, with a reason, stops gap-filling far more reliably.</p></div>
+<div class="qz"><p class="q">Why wrap a log file in <code>&lt;log&gt;</code> tags?</p><div class="opts"><button>Claude can only read tagged text</button><button data-ok>So Claude can clearly tell the material apart from your instructions, and you can refer to it by name</button><button>Tags make the prompt use fewer tokens</button></div><p class="why" hidden>Tags label parts of the prompt; they add a few tokens rather than saving any.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Choose three prompts you or your team actually used in the last month (for example: test cases, bug report rewrites, log analysis). For each, score it against the ten-point checklist, rewrite it, and run both versions on the same real input. Record in a short table: original score, new score, what changed in the answer, and how many follow-up messages each version needed. Share the best rewritten prompt with your team.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Claude is like a brilliant new starter who knows nothing about our project. If you just say 'write tests for login', you get generic tests. Tell it what to do, give it the real story, say who it's for and why, show the format with one example, and tell it to ask rather than guess when something's unclear. Put long material first and your question last, and label the parts with simple tags. Then check the answer, and if it's wrong, fix the prompt like you'd fix a failing test."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices" target="_blank" rel="noopener">Prompting best practices</a>: be clear and direct, add context, examples, XML tags, long-context prompting, format control.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/overview" target="_blank" rel="noopener">Prompt engineering overview</a>.</li>
+<li>Anthropic, <a href="https://github.com/anthropics/prompt-eng-interactive-tutorial" target="_blank" rel="noopener">Interactive prompt engineering tutorial</a> (written for Claude 3 models; follow the best-practices page where they differ).</li>
+<li>Anthropic, <a href="https://claude.com/blog/best-practices-for-prompt-engineering" target="_blank" rel="noopener">Best practices for prompt engineering</a> (blog).</li>
+<li>Claude Academy, <a href="https://academy.claude.com/tutorials/getting-started-with-claude-ai" target="_blank" rel="noopener">Getting started with Claude.ai</a>.</li>
+</ol><p class="verified">Verified 9 November 2026 against Anthropic's prompting documentation. Content type: established practice · Last reviewed 9 November 2026.</p></div>

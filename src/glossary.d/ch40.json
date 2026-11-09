@@ -1,0 +1,34 @@
+{
+ "Claude Console": {
+  "d": "Anthropic's web console for developers at platform.claude.com, where you create API keys, manage members, workspaces and spending limits, and see API usage.",
+  "see": "ch41"
+ },
+ "Claude Agent SDK": {
+  "d": "Anthropic's library for Python and TypeScript that gives your own programs the same tools, agent loop and context management that power Claude Code. Formerly the Claude Code SDK.",
+  "see": "ch41"
+ },
+ "Managed Agents": {
+  "d": "A Claude API service (in beta since April 2026) in which Anthropic hosts the agent loop and a managed sandbox for you, instead of you running the harness yourself.",
+  "see": "ch41"
+ },
+ "Single sign-on": {
+  "d": "Logging in to many services with one company account managed by an identity provider, instead of separate passwords. Often shortened to SSO.",
+  "see": "ch42"
+ },
+ "SCIM": {
+  "d": "System for Cross-domain Identity Management: a standard that lets a company directory automatically create, update and remove user accounts in other services.",
+  "see": "ch42"
+ },
+ "Domain capture": {
+  "d": "An organisation feature that brings accounts created with the company's email domain into the organisation's managed workspace.",
+  "see": "ch42"
+ },
+ "Zero data retention": {
+  "d": "A contractual arrangement in which a provider agrees not to store your prompts and responses beyond what is needed to process each request. Often shortened to ZDR.",
+  "see": "ch42"
+ },
+ "Managed settings": {
+  "d": "Claude Code settings deployed by an organisation (from the admin console, MDM or a system file) that sit above every personal and project setting and cannot be overridden by users.",
+  "see": "ch42"
+ }
+}

@@ -1,0 +1,212 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>The four current Claude models (Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 5.5) and what each one is for</li>
+<li>What Fable is, how it relates to Mythos, and why it is not simply "a better Opus"</li>
+<li>The numbers that matter: context window, maximum output, prices, default effort and thinking</li>
+<li>Anthropic's own advice to start with Opus 5.5, and when to move up or down</li>
+<li>How to choose a model for everyday QA tasks, and how to estimate the cost before you commit</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch14">Chapter 14</a> (tokens), <a href="#ch19">Chapter 19</a> (reasoning and thinking time) and <a href="#ch31">Chapter 31</a> (why there are so many models). <a href="#ch39">Chapter 39</a> tells the story of how we got to this lineup.</div>
+
+<div class="bigidea"><p>As of 9 November 2026, Anthropic offers four current Claude models. Fable 5.1 is the most capable and the most expensive. Opus 5.5 is the one Anthropic tells most people to start with. Sonnet 5.5 is faster and cheaper, and Haiku 5.5 is the fastest and cheapest by far. All four can read up to a million tokens at once. Choosing well means starting with Opus 5.5, measuring how well it does on <em>your</em> task, and then moving up to Fable or down to Sonnet or Haiku based on evidence rather than habit.</p></div>
+
+<h3 id="ch40-1"><span class="num">40.1</span>The lineup in one picture</h3>
+<p>Claude comes in named <a class="gl" href="#g-model-tier">tiers</a>. A tier is a size level within the family. Larger tiers usually think harder and get more right on difficult work, but they are slower and cost more per <a class="gl" href="#g-token">token</a>. Since June 2026 there have been four tiers rather than three, because Anthropic added Fable above Opus.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a consultancy with four grades of staff. The senior partner (Fable) takes the hardest, longest engagements and charges the most. The principal consultant (Opus) handles most serious client work well and is who you usually ask first. The consultant (Sonnet) is quick and capable for routine projects. The analyst (Haiku) clears huge volumes of simple, well-defined tasks at a tiny fraction of the cost. You wouldn't send the partner to sort the post, and you wouldn't send the analyst to negotiate the merger.</p></div>
+<div class="tbl"><table>
+<tr><th></th><th>Claude Fable 5.1</th><th>Claude Opus 5.5</th><th>Claude Sonnet 5.5</th><th>Claude Haiku 5.5</th></tr>
+<tr><td><b>Anthropic's description</b></td><td>Demanding reasoning and long-horizon agentic work</td><td>Long-running agentic coding and knowledge work; the recommended starting point</td><td>Best combination of speed and intelligence</td><td>High-volume, latency-sensitive tasks (classification, extraction, routing)</td></tr>
+<tr><td><b>Released</b></td><td>1 Sep 2026</td><td>22 Sep 2026</td><td>28 Sep 2026</td><td>7 Oct 2026</td></tr>
+<tr><td><b>API model ID</b></td><td><code>claude-fable-5-1</code></td><td><code>claude-opus-5-5</code></td><td><code>claude-sonnet-5-5</code></td><td><code>claude-haiku-5-5</code></td></tr>
+<tr><td><b>Context window</b></td><td>1M tokens</td><td>1M</td><td>1M</td><td>1M</td></tr>
+<tr><td><b>Max output (normal request)</b></td><td>128K tokens</td><td>128K</td><td>128K</td><td>128K</td></tr>
+<tr><td><b>Input / output price per million tokens</b></td><td>$10 / $50</td><td>$4 / $20</td><td>$2 / $10</td><td>$0.10 / $0.50 (prompts up to 100K tokens); $0.50 / $2.50 above that</td></tr>
+<tr><td><b>Relative speed</b></td><td>Slower</td><td>Moderate</td><td>Fast</td><td>Fastest</td></tr>
+<tr><td><b>Thinking</b></td><td>Adaptive, always on</td><td>Adaptive, always on</td><td>Adaptive</td><td>Adaptive</td></tr>
+<tr><td><b>Default effort (API)</b></td><td><code>high</code></td><td><code>medium</code></td><td><code>high</code></td><td><code>medium</code></td></tr>
+<tr><td><b>Knowledge cutoff</b></td><td>June 2026</td><td>June 2026</td><td>June 2026</td><td>June 2026</td></tr>
+<tr><td><b>Earliest retirement</b></td><td>Not before 1 Sep 2027</td><td>Not before 22 Sep 2027</td><td>Not before 28 Sep 2027</td><td>Not before 7 Oct 2027</td></tr>
+</table></div>
+<p class="verified">Figures from Anthropic's models overview and pricing pages, checked 9 November 2026. Prices are Anthropic's own API list prices in US dollars; cloud partners set their own. Check the pricing page before you budget.</p>
+
+<div class="figure" role="img" aria-label="Bar chart of output price per million tokens: Fable 5.1 $50, Opus 5.5 $20, Sonnet 5.5 $10, Haiku 5.5 $0.50."><div class="bars"><div class="bt">Output price per million tokens (USD, Claude API list price)</div>
+  <div class="bar-row"><span>Fable 5.1</span><span class="track"><span class="fill hl" style="width:100%">$50</span></span></div>
+  <div class="bar-row"><span>Opus 5.5</span><span class="track"><span class="fill" style="width:40%">$20</span></span></div>
+  <div class="bar-row"><span>Sonnet 5.5</span><span class="track"><span class="fill" style="width:20%">$10</span></span></div>
+  <div class="bar-row"><span>Haiku 5.5</span><span class="track"><span class="fill" style="width:2%">$0.50</span></span></div></div>
+  <div class="cap">Source: platform.claude.com pricing page, checked 9 November 2026. Haiku 5.5 price shown for prompts up to 100K tokens. The gap between Haiku and the rest is about a factor of 20 or more.</div></div>
+
+<h3 id="ch40-2"><span class="num">40.2</span>What Fable is (and what Mythos is)</h3>
+<p>"Fable" is the newest name in the family and the one people most often misunderstand. It is <strong>not</strong> a rename of Opus. It is a new tier that sits above Opus.</p>
+<p>When Anthropic launched Claude Fable 5 on 9 June 2026, it described it as "a Mythos-class model that we've made safe for general use", and as its most capable generally available model. Fable 5.1 followed on 1 September 2026.</p>
+<p>To understand that sentence you need to know about <strong>Mythos</strong>. In April 2026 Anthropic previewed a very capable model called Claude Mythos Preview, but only to invited partners in a cybersecurity programme called Project Glasswing (<a href="#ch38">Chapter 38</a>). Its abilities, especially in finding software vulnerabilities, were judged too risky for open release. Fable is the same underlying model as Mythos, released with extra safeguards. Anthropic's documentation says Mythos is "the same underlying model" as Fable "with the safeguards lifted in some areas". Mythos 5.1 has the same specifications and prices as Fable 5.1, but only organisations verified through programmes such as the Cyber Verification Program can use it.</p>
+<div class="flow">
+<div><b>One underlying model</b>Very capable, including at security work</div>
+<div class="hl"><b>Fable 5.1</b>General release, with safety classifiers switched on</div>
+<div><b>Mythos 5.1</b>Same model, some safeguards lifted, verified organisations only</div>
+</div>
+<p>The safeguards are <a class="gl" href="#g-classifier">classifiers</a>: separate checking systems that watch for requests in sensitive areas (cybersecurity, biology and chemistry, and attempts to copy the model's skills by <a class="gl" href="#g-distillation">distillation</a>). When a classifier flags a request, Claude doesn't simply refuse. The request is answered by the next-most-capable model instead. At Fable 5's launch that fallback was Opus 4.8, and Anthropic said more than 95% of sessions involved no fallback at all.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>A security tester asks Fable to analyse a deliberately vulnerable demo app for injection flaws. Part of the request trips the cybersecurity classifier. The answer still arrives, but from the fallback model, so it may be less thorough than Fable would have been. If your team's real job is security testing and you keep hitting this, the official route is a verification programme, not prompt tricks. For ordinary functional and API testing you will rarely notice the classifiers.</p></div>
+<details class="deep"><summary>Under the hood: how Fable differs in the API</summary><div class="body">
+<p>The Fable 5.1 model page lists a few behaviours that differ from the other tiers (checked 9 November 2026):</p>
+<ul>
+<li><b>Thinking is always on.</b> Fable uses <a class="gl" href="#g-adaptive-thinking">adaptive thinking</a> on every request: it decides how much to reason before answering. You cannot switch it off.</li>
+<li><b>Default effort is <code>high</code></b>, compared with <code>medium</code> for Opus 5.5.</li>
+<li><b>Forcing a specific tool returns an error.</b> In the API you can normally tell Claude "you must call this tool now" (forced tool use). On Fable 5.1 that returns an error, so code written for other models may need a small change.</li>
+<li><b>Cache reads are cheaper relative to input:</b> 0.025 times the base input price ($0.25 per million tokens), against 0.05 times for Opus and Sonnet 5.5. <a class="gl" href="#g-prompt-caching">Prompt caching</a> is covered in <a href="#ch90">Chapter 90</a>.</li>
+</ul>
+<p>Fable also arrived with a plan change worth knowing. Fable 5 was included in Pro, Max, Team and seat-based Enterprise plans only until 22 June 2026; after that it needed usage credits on most plans. As of November 2026 the pricing page says Max includes Fable "up to half your weekly limit", and Pro reaches it only through usage credits. <a href="#ch42">Chapter 42</a> covers plans.</p>
+</div></details>
+
+<h3 id="ch40-3"><span class="num">40.3</span>The numbers that matter, in plain words</h3>
+<h4>Context window: 1 million tokens for all four</h4>
+<p>The <a class="gl" href="#g-context-window">context window</a> is how much text the model can consider at once: your instructions, the conversation so far, attached files and its own reply. One million tokens is very roughly a few thousand pages of ordinary prose. In QA terms you can paste a long requirements document, a full test plan and a large log file into one request. <a href="#ch20">Chapter 20</a> explains why "fits in the window" does not mean "used equally well": quality can drop when the window is crowded, so a tidy, relevant context still beats a huge one.</p>
+<div class="box note"><span class="tag">Tokens are not words</span><p>Claude models from 4.7 onward use a newer tokenizer that Anthropic says produces "approximately 30% more tokens for the same text". If you compare costs with an old spreadsheet built on Claude 4.5 or earlier, the same document now counts as more tokens. See <a href="#ch14">Chapter 14</a>.</p></div>
+
+<h4>Maximum output: 128K tokens</h4>
+<p>This is the most the model can write in one reply to a normal request. It is far more than you need for a bug report or a set of test cases. For very large generation jobs, Opus 5.5, Sonnet 5.5 and Haiku 5.5 can write up to 300K tokens per reply through the Message Batches API with a beta setting. Fable 5.1's documented limit is 128K.</p>
+
+<h4>Price: input, output and discounts</h4>
+<p>You pay separately for what you send (input) and what Claude writes (output). Output costs five times input on every current model. Two discounts matter for QA work:</p>
+<ul>
+<li><b>Batch processing:</b> the Message Batches API is 50% cheaper. You submit many requests together and collect the answers later (most batches finish within an hour). Ideal for overnight jobs such as classifying yesterday's test failures.</li>
+<li><b>Prompt caching:</b> if many requests start with the same long text (a style guide, a test-case template), the repeated part can be read from a cache at a small fraction of the input price.</li>
+</ul>
+<p>Haiku 5.5 has <strong>two</strong> prices. Prompts up to 100K tokens cost $0.10 in and $0.50 out per million. Above 100K they cost five times as much ($0.50 / $2.50). That is still cheap, but it means Haiku is at its best on short, frequent requests.</p>
+<div class="box warn"><span class="tag">Thinking costs output tokens</span><p>Fable 5.1 and Opus 5.5 always think before answering, and the others can. Thinking tokens are billed as output tokens. A short visible answer can still carry a lot of hidden reasoning cost, especially at high effort. Measure real usage from the API's usage figures rather than estimating from the length of the reply.</p></div>
+
+<h4>Effort and thinking</h4>
+<p>An <a class="gl" href="#g-effort-level">effort level</a> tells Claude how hard to work: how much to think, how thoroughly to check, how many tool calls to make. The levels are <code>low</code>, <code>medium</code>, <code>high</code>, <code>xhigh</code> and <code>max</code>. Higher effort usually means better answers on hard problems, at the cost of time and tokens. <a href="#ch19">Chapter 19</a> explains the idea.</p>
+<p>Defaults differ by model and by product. In the Claude API, Fable 5.1 and Sonnet 5.5 default to <code>high</code>, while Opus 5.5 and Haiku 5.5 default to <code>medium</code>. Claude Code's own documentation says it runs Opus 5.5, Sonnet 5.5 and Haiku 5.5 at <code>medium</code> by default. So the same model can behave a little differently in two products simply because effort is set differently. If results surprise you, check the effort before blaming the model.</p>
+<details class="deep"><summary>Under the hood: "extended thinking" versus "adaptive thinking"</summary><div class="body">
+<p>Older Claude models used <b>extended thinking</b>: you switched thinking on and set a fixed token budget for it (<code>budget_tokens</code>). Anthropic deprecated that manual mode on Opus 4.6 and Sonnet 4.6, and later models don't accept it. Current models use <b>adaptive thinking</b>: the model decides how much to think, guided by the effort level. Sonnet 5.5 also offers a <code>between_tools</code> option that skips up-front thinking and reasons only between tool calls, which can speed up agent loops. If you have old code that sets <code>budget_tokens</code>, it needs updating before you switch to a 5.x model.</p>
+</div></details>
+
+<h3 id="ch40-4"><span class="num">40.4</span>Anthropic's advice: start with Opus 5.5</h3>
+<p>Anthropic's models overview gives a clear default. Start with Opus 5.5 "for most workloads". Move to Fable 5.1 only when your evaluations show that Opus 5.5, even at a higher effort level, still falls short.</p>
+<p>The reasoning is practical. Fable costs two and a half times as much as Opus per token, is slower, and refuses forced tool use. Opus 5.5 is strong enough for most professional work. And raising Opus's effort is a cheap first lever: you may get the quality you need without changing model at all.</p>
+<div class="flow">
+<div><b>1. Start</b>Opus 5.5 at its default effort</div>
+<div><b>2. Measure</b>Run your own small eval set (<a href="#ch36">Chapter 36</a>)</div>
+<div class="hl"><b>3a. Falls short?</b>Raise effort first; then try Fable 5.1</div>
+<div class="hl"><b>3b. Comfortably passes?</b>Try Sonnet 5.5, then Haiku 5.5, and keep the cheapest that still passes</div>
+<div><b>4. Record</b>Write down the decision, the date and the results</div>
+</div>
+<div class="box opinion"><span class="tag">Opinion · common practice among teams that run evals</span><p>Many engineering teams argue that the "move down" step matters more than the "move up" step. In their experience, most bulk jobs (labelling, extraction, routing) work fine on a smaller model, and the savings pay for the time spent testing. This is a widely held view, not a guarantee: only your own eval set can tell you whether it holds for your task.</p></div>
+<div class="box note"><span class="tag">Speed options</span><p>If you need Opus quality but faster replies, Anthropic offers a <b>fast mode</b> for Opus 5.5 on the Claude API, and Claude Code has a matching <code>/fast</code> toggle. Check the pricing page for what fast mode costs before switching it on for a big job.</p></div>
+
+<h3 id="ch40-5"><span class="num">40.5</span>Choosing for QA tasks</h3>
+<p>Here is how the advice plays out across common QA work. Treat it as a starting hypothesis to test, not a rule. <a href="#ch35">Chapter 35</a> works through more scenarios across vendors.</p>
+<input class="filter" data-filter="#ch40Tasks" data-empty="#ch40Empty" type="search" placeholder="Filter QA tasks…" aria-label="Filter QA tasks">
+<div class="tbl"><table id="ch40Tasks">
+<tr><th>Task</th><th>Sensible first choice</th><th>Why</th></tr>
+<tr class="group"><td colspan="3">High volume, simple, well-defined</td></tr>
+<tr><td>Tag thousands of bug reports by component and severity</td><td>Haiku 5.5 (batch)</td><td>Short prompts, clear labels, huge volume; batch halves the price again</td></tr>
+<tr><td>Extract fields (steps, expected, actual) from free-text tickets into JSON</td><td>Haiku 5.5</td><td>Extraction is what Haiku is positioned for; validate with a schema</td></tr>
+<tr><td>Route incoming test failures to the right team</td><td>Haiku 5.5</td><td>Fast, cheap, and a wrong route is easy to correct</td></tr>
+<tr class="group"><td colspan="3">Everyday interactive work</td></tr>
+<tr><td>Draft test cases from a Jira story with acceptance criteria</td><td>Sonnet 5.5 or Opus 5.5</td><td>Needs judgement about edge cases; try Sonnet and compare</td></tr>
+<tr><td>Explain a stack trace and suggest a likely cause</td><td>Sonnet 5.5</td><td>Quick turnaround matters while you debug</td></tr>
+<tr><td>Review a pull request's test changes</td><td>Opus 5.5</td><td>Reading code carefully and spotting gaps rewards a stronger model</td></tr>
+<tr class="group"><td colspan="3">Long, agentic or high-stakes</td></tr>
+<tr><td>Agent in Claude Code builds a Playwright suite for a new feature</td><td>Opus 5.5</td><td>Long-running agentic coding is its stated strength; Claude Code's default</td></tr>
+<tr><td>Release-readiness analysis across requirements, results and open defects</td><td>Opus 5.5, then Fable 5.1 if it falls short</td><td>Long context and careful reasoning; mistakes are costly</td></tr>
+<tr><td>Multi-hour migration of a large legacy test framework</td><td>Fable 5.1 (after trying Opus)</td><td>"Long-horizon agentic work" is Fable's description; slower and pricier, so justify it</td></tr>
+</table></div>
+<p id="ch40Empty" hidden>No tasks match.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>A QA lead wants every overnight CI failure summarised and labelled "product bug", "test bug" or "environment" before stand-up. On a sample of 100 past failures with known answers (illustrative), she runs Opus 5.5, Sonnet 5.5 and Haiku 5.5. If Haiku scores close to Opus on this narrow task, she picks Haiku with the Batch API and spot-checks a few labels each morning. She records the scores and the date, because a model update could change the result.</p></div>
+
+<h4>Choosing inside the products</h4>
+<ul>
+<li><b>Claude apps (web, desktop, mobile):</b> pick a model from the model selector in the chat box. Which models you see depends on your plan; the Free plan offers Sonnet and Haiku only. <a href="#ch43">Chapter 43</a> shows where the controls are.</li>
+<li><b>Claude Code:</b> use <code>/model</code> to switch, or start with <code>claude --model sonnet</code>. Aliases such as <code>opus</code>, <code>sonnet</code>, <code>haiku</code> and <code>fable</code> resolve to the current model of each tier on the Anthropic API. The <code>default</code> alias resolves to Opus 5.5 on Pro, Max, Ultra, Team, Enterprise and the API. <a href="#ch68">Chapter 68</a> covers model and effort settings in depth.</li>
+<li><b>Claude API:</b> put the exact ID, such as <code>claude-sonnet-5-5</code>, in the <code>model</code> field. From the 4.6 generation onward, IDs carry no date and each points to a fixed <a class="gl" href="#g-model-snapshot">snapshot</a>.</li>
+</ul>
+<div class="box warn"><span class="tag">Cloud platforms may differ</span><p>On Amazon Bedrock, Google Cloud and Microsoft Foundry, Claude Code's aliases can resolve to older models (for example, <code>sonnet</code> resolving to Sonnet 4.5), and partners set their own prices. If your company reaches Claude through a cloud provider, pin full model names and check that provider's price list.</p></div>
+
+<h4>Older models you may still meet</h4>
+<p>Several earlier models are still available as "legacy" models, including Fable 5, Opus 5, Opus 4.8, Sonnet 5, Sonnet 4.6 and Haiku 4.5. Existing integrations often still point at them. Some are priced differently from their successors: Opus 5 is $5 / $25 per million tokens, more than Opus 5.5's $4 / $20, and Haiku 4.5 is $1 / $5, ten times Haiku 5.5's short-prompt price. Moving to the current model can be both better and cheaper, but test first. Sonnet 4.5 is deprecated and retires on 30 November 2026, so anything still using it needs moving now. <a href="#ch39">Chapter 39</a> has the full history of retirements.</p>
+
+<div class="lab"><div class="lab-h"><b>Lab: estimate the cost of a QA job on each model</b><span>20 min · your computer, Python 3, no API key needed</span></div><ol>
+<li>Check you have Python 3: run <code>python3 --version</code> in a terminal.<span class="expect">A version number such as Python 3.12.x.</span></li>
+<li>Save the script below as <code>model_cost.py</code> in any folder.
+<div class="code"><span class="cap">model_cost.py</span><pre><span class="c"># model_cost.py - estimate the API cost of one QA job on each current Claude model.</span>
+<span class="c"># Prices: USD per million tokens, from platform.claude.com pricing, checked 9 Nov 2026.</span>
+<span class="c"># Re-check the pricing page before relying on these numbers.</span>
+
+PRICES = {
+    <span class="c"># name: (input per MTok, output per MTok)</span>
+    "Fable 5.1":  (10.00, 50.00),
+    "Opus 5.5":   (4.00, 20.00),
+    "Sonnet 5.5": (2.00, 10.00),
+    "Haiku 5.5":  (0.10, 0.50),   <span class="c"># prompts up to 100K tokens</span>
+}
+HAIKU_LONG = (0.50, 2.50)          <span class="c"># Haiku 5.5 prompts over 100K tokens</span>
+
+def cost(model, input_tokens, output_tokens, batch=False):
+    price_in, price_out = PRICES[model]
+    if model == "Haiku 5.5" and input_tokens &gt; 100_000:
+        price_in, price_out = HAIKU_LONG
+    dollars = input_tokens / 1_000_000 * price_in + output_tokens / 1_000_000 * price_out
+    return dollars * 0.5 if batch else dollars
+
+<span class="c"># Illustrative job: triage 2,000 bug reports.</span>
+<span class="c"># Each request: about 1,500 input tokens (instructions + report), 200 output tokens.</span>
+JOBS = 2000
+IN_PER_JOB = 1500
+OUT_PER_JOB = 200
+
+print(f"Job: {JOBS} requests, {IN_PER_JOB} input + {OUT_PER_JOB} output tokens each (illustrative)")
+print(f"{'Model':&lt;12}{'Normal':&gt;10}{'Batch':&gt;10}")
+for model in PRICES:
+    normal = cost(model, IN_PER_JOB, OUT_PER_JOB) * JOBS
+    batch = cost(model, IN_PER_JOB, OUT_PER_JOB, batch=True) * JOBS
+    print(f"{model:&lt;12}{normal:&gt;10.2f}{batch:&gt;10.2f}")</pre></div></li>
+<li>Run it: <code>python3 model_cost.py</code>.<span class="expect"><pre>Job: 2000 requests, 1500 input + 200 output tokens each (illustrative)
+Model           Normal     Batch
+Fable 5.1        50.00     25.00
+Opus 5.5         20.00     10.00
+Sonnet 5.5       10.00      5.00
+Haiku 5.5         0.50      0.25</pre></span></li>
+<li>Change <code>OUT_PER_JOB</code> to 1200 to imitate heavy thinking (remember thinking is billed as output). Run again.<span class="expect">Every cost rises sharply, and Fable's rises the most in dollars, showing why effort and thinking matter for budgets.</span></li>
+<li>Now set <code>IN_PER_JOB</code> to 150000 (a long log per request) and <code>OUT_PER_JOB</code> back to 200. Run again.<span class="expect">Haiku's cost jumps because the over-100K price applies; it is still far cheaper than the others.</span></li>
+<li>Replace the illustrative numbers with a real job from your team: how many requests per week, and roughly how long each prompt and answer is. If you have API access, take real token counts from the <code>usage</code> field of a few responses (<a href="#ch86">Chapter 86</a>).<span class="expect">A weekly cost estimate per model that you can put next to your quality results.</span></li>
+</ol>
+<p><b>Troubleshooting:</b> <code>python3: command not found</code> on Windows: try <code>py model_cost.py</code>. A <code>SyntaxError</code> near the f-strings means a very old Python; install Python 3.8 or later. If your numbers look a thousand times too big, check you typed 1_000_000 (one million) in the cost function.</p>
+</div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Fable is the new name for Opus."</dt><dd>Fable is a separate, higher tier. Opus 5.5 still exists and is the recommended starting point.</dd>
+<dt>"Always use the best model; it's safer."</dt><dd>The most capable model is slower, costs more, and is not always more accurate on simple tasks. Anthropic itself says to start with Opus 5.5 and move up only when evals show a need.</dd>
+<dt>"A bigger context window means it reads everything equally well."</dt><dd>All four accept a million tokens, but crowded context can reduce quality. Send what is relevant.</dd>
+<dt>"The price is per word."</dt><dd>It is per token, input and output priced separately, with thinking billed as output. Newer models also count more tokens for the same text.</dd>
+<dt>"Haiku is a toy."</dt><dd>Haiku 5.5 is designed for real production work in classification, extraction and routing, where speed and volume matter.</dd>
+<dt>"The same model always behaves the same everywhere."</dt><dd>Default effort differs between the API and Claude Code, and cloud platforms may map aliases to older models.</dd>
+</dl></div>
+
+<h3 id="ch40-r"><span class="num">40.6</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>As of 9 November 2026 there are four current models: Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 5.5. All have a 1M-token context window and 128K-token maximum output.</li>
+<li>Fable is a new top tier above Opus: the Mythos-class model with safety classifiers. Mythos is the same model with some safeguards lifted, for verified organisations only.</li>
+<li>Prices per million tokens (input/output): Fable $10/$50, Opus $4/$20, Sonnet $2/$10, Haiku $0.10/$0.50 for prompts up to 100K tokens. Batch is half price.</li>
+<li>Anthropic says to start with Opus 5.5 and use Fable 5.1 only when Opus at higher effort still falls short.</li>
+<li>Choose with your own eval set, try cheaper models for bulk work, and write down the date and results of every decision.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Which model does Anthropic recommend as the starting point for most workloads?</p><div class="opts"><button>Fable 5.1</button><button data-ok>Opus 5.5</button><button>Haiku 5.5</button></div><p class="why" hidden>Anthropic's models overview says to start with Opus 5.5 and use Fable 5.1 when evals at higher effort still fall short.</p></div>
+<div class="qz"><p class="q">What is the relationship between Fable and Mythos?</p><div class="opts"><button>Mythos is a smaller, cheaper version of Fable</button><button>They are unrelated models from different teams</button><button data-ok>They are the same underlying model; Mythos has some safeguards lifted and is for verified organisations</button></div><p class="why" hidden>Fable is released for general use with safety classifiers; Mythos shares its specifications and price but is restricted to verified programmes.</p></div>
+<div class="qz"><p class="q">You need to tag 50,000 short bug reports overnight. Which choice should you test first?</p><div class="opts"><button data-ok>Haiku 5.5 through the Batch API</button><button>Fable 5.1 at max effort</button><button>Opus 5.5 in the chat app, one report at a time</button></div><p class="why" hidden>High-volume, simple classification is Haiku's stated purpose, and batch processing halves the price. Confirm accuracy on a labelled sample.</p></div>
+<div class="qz"><p class="q">A reply looks short, yet the bill for Opus 5.5 is higher than expected. What is the most likely reason?</p><div class="opts"><button>The context window was too small</button><button data-ok>Hidden thinking tokens, which are billed as output</button><button>Input tokens cost more than output tokens</button></div><p class="why" hidden>Opus 5.5 always uses adaptive thinking, and thinking is charged at the output rate. Output is five times the input price, not cheaper.</p></div>
+<div class="qz"><p class="q">The same prompt on Opus 5.5 gives a more thorough answer through the API than in Claude Code. What should you check first?</p><div class="opts"><button>Whether the model has been retired</button><button>The context window size</button><button data-ok>The effort level each product is using</button></div><p class="why" hidden>Effort controls how hard the model works, and defaults and user settings can differ between products. The context window is the same 1M tokens everywhere.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick one recurring AI task your team does or wants to do (for example, drafting test cases from stories, or labelling CI failures). Build a sample of 20 cases with answers you trust. Run them on Opus 5.5 and on at least one cheaper model, and score the results. Use the lab script to estimate the monthly cost of each. Write a one-page decision record: task, models tried, scores, cost, the model you chose, the date, and when you will re-test.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Claude has four current models. Fable is the top tier: most capable, slowest and most expensive. It's the same model as Mythos, but with safety checks on. Opus is the one Anthropic says to start with. Sonnet is quicker and half Opus's price, and Haiku is tiny-cost and fast, built for bulk sorting and extraction. All four read a million tokens. So start with Opus, test on our real examples, and only pay for Fable if Opus genuinely can't do it. For bulk jobs, try Haiku first. Always write down the date, because prices and models change every few months."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/models/overview" target="_blank" rel="noopener">Models overview</a>: lineup, positioning, IDs, context, max output, cutoffs, latency, "start with Opus 5.5" guidance.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Pricing</a>: per-token prices, Haiku 5.5 tiered pricing, batch discount, cache read and write multipliers.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/models/fable-5-1/overview" target="_blank" rel="noopener">Claude Fable 5.1 overview</a>: always-on adaptive thinking, default effort, forced tool use, Mythos relationship.</li>
+<li>Anthropic, <a href="https://www.anthropic.com/news/claude-fable-5-mythos-5" target="_blank" rel="noopener">Introducing Claude Fable 5 and Claude Mythos 5</a> (9 June 2026): "Mythos-class" description, classifiers and fallback, plan changes.</li>
+<li>Anthropic, <a href="https://www.anthropic.com/claude-fable-and-mythos-5-1" target="_blank" rel="noopener">Claude Fable and Mythos 5.1</a>: verification programmes.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/model-deprecations" target="_blank" rel="noopener">Model deprecations</a>: retirement dates.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/model-config" target="_blank" rel="noopener">Claude Code model configuration</a>: aliases, effort levels and defaults in Claude Code.</li>
+<li>Anthropic, <a href="https://claude.com/pricing" target="_blank" rel="noopener">Claude plans and pricing</a>: which models each plan includes.</li>
+</ol><p class="verified">Verified 9 November 2026 against Anthropic's models overview, pricing, Fable 5.1 and deprecations pages and the Claude Code model-configuration docs. Models and prices change often: re-check before relying on them.</p></div>

@@ -1,0 +1,213 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>Why training a frontier model needs thousands of chips working as one machine</li>
+<li>Where the memory goes during training, and why it's far more than running the model</li>
+<li>The three classic ways to split the work: data, tensor and pipeline parallelism</li>
+<li>What a training cluster looks like, and why failures and checkpoints are part of daily life</li>
+<li>What scaling laws are, what Kaplan et al. (2020) and the Chinchilla paper (2022) found, and how labs use them</li>
+<li>How to make your own back-of-the-envelope estimates of compute, memory and time</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch17">Chapter 17</a> (pre-training), <a href="#ch25">Chapter 25</a> (chips, memory bandwidth, data centres and energy) and <a href="#ch16">Chapter 16</a> (the Transformer). This is an optional, expert-level chapter: the first paragraph of each section is plain language, and the detail comes after. You can skip the maths and still follow the story.</div>
+
+<div class="bigidea"><p>Training a large language model means showing it trillions of words and adjusting billions of numbers after each batch. No single chip has enough memory or speed for that, so the work is split across thousands of GPUs or TPUs that must stay in step, connected by very fast networks. How to split it (by data, by layer, or by slicing each layer) is an engineering craft of its own. Deciding how big a model to build and how much data to feed it is guided by <a class="gl" href="#g-scaling-laws">scaling laws</a>: smooth, predictable relationships between compute, model size, data and quality. Those laws are why labs can plan a training run costing many millions before they start it.</p></div>
+
+<h3 id="ch138-1"><span class="num">138.1</span>Why training is so much bigger than using</h3>
+<p><a href="#ch25">Chapter 25</a> looked at <a class="gl" href="#g-inference">inference</a>: running a finished model to answer you. Training is a different scale of problem. Inference reads the weights once per token. Training has to, for every token in a dataset of trillions:</p>
+<ol>
+<li>run the model forwards to make a prediction (the <a class="gl" href="#g-forward-pass">forward pass</a>),</li>
+<li>work out how wrong it was and how each weight contributed (<a class="gl" href="#g-backpropagation">backpropagation</a>),</li>
+<li>nudge every weight a little (<a class="gl" href="#g-gradient-descent">gradient descent</a>).</li>
+</ol>
+<p>A widely used approximation from Kaplan et al. (2020) puts the total training work at about <strong>6 × N × D</strong> floating-point operations (<a class="gl" href="#g-flop">FLOPs</a>), where N is the number of parameters and D the number of training tokens. Roughly 2 of those 6 are the forward pass and 4 the backward pass.</p>
+<div class="box example"><span class="tag">Real-world example: a sense of scale</span><p>Meta reported training Llama 3.1 405B on "over 15 trillion tokens" using "over 16 thousand H100 GPUs". Plugging N = 405 billion and D = 15 trillion into 6 × N × D gives about 3.6 × 10<sup>25</sup> FLOPs. If you could do one calculation per second, that would take about 80 million times the age of the universe. Even at the speed of thousands of GPUs, it takes weeks to months.</p></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Inference is a chef cooking one meal from a finished recipe. Training is writing the recipe book from scratch by cooking millions of test dishes, tasting each one, and adjusting every recipe slightly after each tasting. You don't do that in one kitchen with one chef.</p></div>
+
+<h3 id="ch138-2"><span class="num">138.2</span>Where the memory goes</h3>
+<p>Running a model at 16-bit precision needs about 2 bytes per parameter (<a href="#ch32">Chapter 32</a>). Training needs far more, because you must also keep the gradients (the "which way to nudge" for each weight) and the optimiser's running statistics.</p>
+<div class="tbl"><table>
+<tr><th>What's stored</th><th>Bytes per parameter (typical mixed-precision setup)</th><th>Why</th></tr>
+<tr><td>Weights in 16-bit</td><td>2</td><td>Used for the fast forward and backward passes</td></tr>
+<tr><td>Gradients in 16-bit</td><td>2</td><td>One "nudge direction" per weight</td></tr>
+<tr><td>Master copy of weights in 32-bit</td><td>4</td><td>Small updates would be lost in 16-bit rounding</td></tr>
+<tr><td>Adam optimiser: two running averages in 32-bit</td><td>8</td><td>Adam tracks momentum and variance for every weight</td></tr>
+<tr><td><b>Total, before activations</b></td><td><b>16</b></td><td>Eight times the 2 bytes needed just to run it</td></tr>
+</table></div>
+<p>This accounting comes from the ZeRO paper (Rajbhandari et al., 2019) and is a standard starting point. On top of it come <strong>activations</strong>: the intermediate results of the forward pass, kept so the backward pass can use them. They grow with batch size and sequence length and can be as large as everything else combined.</p>
+<p>So a 70-billion-parameter model needs about 70 × 16 = 1,120 GB just for weights, gradients and optimiser state. One NVIDIA H100 has 80 GB of memory. Even before activations, that's at least 14 GPUs, and that's only to hold one copy of the training state.</p>
+<details class="deep"><summary>Under the hood: mixed precision and activation recomputation</summary><div class="body">
+<p><a class="gl" href="#g-mixed-precision-training">Mixed-precision training</a> does the heavy matrix maths in 16-bit formats (or 8-bit on newer hardware), which is faster and uses less memory, while keeping a 32-bit master copy of the weights so that tiny updates aren't rounded away. The format <strong>bfloat16</strong> is popular because it keeps the same range of values as 32-bit numbers while giving up some precision.</p>
+<p><strong>Activation recomputation</strong> (also called gradient checkpointing) trades compute for memory: instead of storing every intermediate result, the system stores a few and recomputes the rest during the backward pass. It typically adds a fraction more compute but can cut activation memory dramatically. Real training runs combine this with the parallelism techniques below until everything fits.</p>
+</div></details>
+
+<h3 id="ch138-3"><span class="num">138.3</span>Splitting the work: three kinds of parallelism</h3>
+<p>There are three classic ways to divide training across many chips. Real systems combine all three, often called "3D parallelism".</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Imagine marking 100,000 exam scripts. <strong>Data parallelism:</strong> give each of 100 teachers their own copy of the marking scheme and 1,000 scripts; they compare notes at the end of each day. <strong>Pipeline parallelism:</strong> one teacher marks question 1, passes the script to the next who marks question 2, and so on, like an assembly line. <strong>Tensor parallelism:</strong> one enormous question is split so that four teachers each mark a quarter of it at the same moment and immediately combine their scores.</p></div>
+<div class="tbl"><table>
+<tr><th>Type</th><th>What is split</th><th>What must be shared</th><th>Main limitation</th><th>Landmark paper</th></tr>
+<tr><td><a class="gl" href="#g-data-parallelism">Data parallelism</a></td><td>The training data: each chip has a full copy of the model and processes different examples</td><td>Gradients, averaged across all chips after every step</td><td>Each chip must hold the whole model and its training state</td><td>Standard technique; ZeRO (Rajbhandari et al., 2019) removes the duplicated memory</td></tr>
+<tr><td><a class="gl" href="#g-pipeline-parallelism">Pipeline parallelism</a></td><td>The layers: chip 1 holds layers 1–20, chip 2 layers 21–40, and so on</td><td>Activations passed from stage to stage</td><td>"Bubbles": stages sit idle while the pipeline fills and drains</td><td>GPipe (Huang et al., 2018)</td></tr>
+<tr><td><a class="gl" href="#g-tensor-parallelism">Tensor parallelism</a></td><td>Each layer's big matrices, sliced across chips</td><td>Partial results, exchanged inside every layer</td><td>Needs extremely fast links, so usually kept within one server</td><td>Megatron-LM (Shoeybi et al., 2019)</td></tr>
+</table></div>
+<p>Two more appear in modern systems. <strong>Sharded data parallelism</strong> (the ZeRO family, and PyTorch's FSDP) keeps data parallelism but splits the optimiser state, gradients and even weights across chips instead of copying them, fetching pieces only when needed. <strong>Expert parallelism</strong> places the different experts of a <a class="gl" href="#g-mixture-of-experts">mixture-of-experts</a> model on different chips and routes each token to the chips holding its chosen experts.</p>
+<details class="deep"><summary>Under the hood: what the papers reported</summary><div class="body">
+<ul>
+<li><b>Megatron-LM (2019)</b> showed "a simple, efficient intra-layer model parallel approach" and trained transformer models of up to 8.3 billion parameters on 512 GPUs, sustaining 15.1 petaFLOPs with 76% scaling efficiency.</li>
+<li><b>GPipe (2018)</b> introduced a batch-splitting pipelining algorithm: a batch is split into smaller micro-batches so different stages work on different micro-batches at once, shrinking the idle bubble. It reported almost linear speed-up and trained a 6-billion-parameter, 128-layer Transformer for translation across over 100 languages.</li>
+<li><b>ZeRO (2019)</b> "eliminates memory redundancies in data- and model-parallel training", reported training models over 100 billion parameters on 400 GPUs, and could train models up to 13 billion parameters without any model parallelism.</li>
+</ul>
+<p>The communication pattern behind data parallelism is called <strong>all-reduce</strong>: every chip contributes its gradients and every chip ends up with the average. Its cost grows with model size, not with the number of examples, which is why network speed matters so much.</p>
+</div></details>
+
+<h3 id="ch138-4"><span class="num">138.4</span>Clusters: thousands of chips acting as one</h3>
+<p>A training cluster is a building, or part of one, full of servers, each with several accelerators, linked by networks designed for this one job. It is closer to a single giant computer than to an office network.</p>
+<div class="flow">
+<div><b>Chip</b>One GPU or TPU with its own fast memory (an H100 SXM has 80 GB at 3.35 TB/s)</div>
+<div><b>Server</b>Several chips joined by very fast links inside the box (NVLink on NVIDIA systems): ideal for tensor parallelism</div>
+<div class="hl"><b>Cluster</b>Thousands of servers joined by a high-speed network fabric: used for pipeline and data parallelism</div>
+<div><b>Storage</b>Training data streams in; checkpoints stream out</div>
+</div>
+<p>The hardware families (NVIDIA GPUs, Google TPUs, AWS Trainium) and the energy and cooling story are in <a href="#ch25">Chapter 25</a>. What changes at training scale is <strong>coordination</strong>:</p>
+<ul>
+<li><strong>The slowest chip sets the pace.</strong> In data parallelism, every chip waits for the gradient average at each step. One slow or faulty chip slows thousands.</li>
+<li><strong>Failures are routine.</strong> With tens of thousands of components running for weeks, hardware faults, network hiccups and software bugs are expected, not exceptional.</li>
+<li><strong>Checkpoints are the safety net.</strong> The full training state is saved regularly so a failed run can restart from the last checkpoint instead of from zero.</li>
+<li><strong>Monitoring is constant.</strong> Engineers watch the loss curve for sudden spikes or stalls, which can signal bad data, numerical instability or a hardware fault.</li>
+</ul>
+<div class="box example"><span class="tag">Real-world example: it's a QA problem</span><p>A large training run looks a lot like a long-running production system under test. Teams track a "health dashboard" (loss, throughput per chip, failed nodes, time lost to restarts), run small-scale rehearsals before the big run, and keep evaluation suites that run on checkpoints along the way, much like a regression suite running on every build. If you've ever triaged a flaky nightly test run, you understand the daily life of a training-infrastructure team.</p></div>
+
+<h3 id="ch138-5"><span class="num">138.5</span>Scaling laws: predicting quality before you train</h3>
+<p>Plain idea first. If you train the same kind of model several times at small sizes, and plot how good each one gets against how much compute it used, the points fall on a smooth curve. That curve keeps going in the same way when you go much bigger. So you can run cheap small experiments, draw the line, and predict roughly how good an expensive large model will be before you spend the money. That predictable relationship is a <strong>scaling law</strong>.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A runner who logs training hours and race times can predict, roughly, what extra training will buy: big improvements at first, smaller ones later, but in a steady pattern. Scaling laws are that training log for AI models, measured across many orders of magnitude.</p></div>
+<ol class="timeline">
+<li class="key"><span class="yr">Jan 2020</span><span class="ev"><b>Kaplan et al., "Scaling Laws for Neural Language Models" (OpenAI).</b> Loss "scales as a power-law with model size, dataset size, and the amount of compute used for training", across a very wide range. Architectural details like width or depth mattered little. "Larger models are significantly more sample-efficient", so the paper concluded that the compute-efficient approach is to train very large models on a relatively modest amount of data and stop well before convergence.</span></li>
+<li><span class="yr">2020–2021</span><span class="ev"><b>Very large models follow.</b> Labs built models with hundreds of billions of parameters trained on a few hundred billion tokens, consistent with the "make the model bigger" reading of Kaplan.</span></li>
+<li class="key"><span class="yr">Mar 2022</span><span class="ev"><b>Hoffmann et al., "Training Compute-Optimal Large Language Models" (DeepMind), the "Chinchilla paper".</b> After over 400 training runs it found that current large models were "significantly undertrained" and that "the model size and the number of training tokens should be scaled equally". Chinchilla, at 70 billion parameters trained on about four times more data than the 280-billion-parameter Gopher with the same compute, outperformed Gopher, GPT-3 and others, reaching 67.5% average accuracy on MMLU.</span></li>
+<li><span class="yr">2023 onward</span><span class="ev"><b>Training past "optimal".</b> Many open models are trained on far more tokens per parameter than Chinchilla suggests. Llama 3.1 405B used over 15 trillion tokens, about 37 per parameter.</span></li>
+</ol>
+<div class="figure" role="img" aria-label="Bar chart comparing Gopher and Chinchilla: Gopher 280 billion parameters, Chinchilla 70 billion; Chinchilla trained on about four times more data with the same compute"><div class="bars"><div class="bt">Same compute budget, different split (Hoffmann et al., 2022)</div>
+<div class="bar-row"><span>Gopher: parameters</span><span class="track"><span class="fill" style="width:100%">280B</span></span></div>
+<div class="bar-row"><span>Chinchilla: parameters</span><span class="track"><span class="fill hl" style="width:25%">70B</span></span></div>
+<div class="bar-row"><span>Gopher: training data</span><span class="track"><span class="fill" style="width:25%">1×</span></span></div>
+<div class="bar-row"><span>Chinchilla: training data</span><span class="track"><span class="fill hl" style="width:100%">~4×</span></span></div></div>
+<div class="cap">A smaller model trained on more data beat a larger one trained on less, for the same compute. Source: Hoffmann et al., arXiv:2203.15556.</div></div>
+<p>From the Chinchilla results, people commonly derive a rule of thumb of about <a class="gl" href="#g-compute-optimal-training">20 training tokens per parameter</a> for compute-optimal training (70 billion parameters × 20 = 1.4 trillion tokens). It's a rule of thumb, not a law of nature, and it depends on the data and the setup.</p>
+<div class="cols2">
+<div><h4>Kaplan (2020) in one line</h4><p>With more compute, grow the model much faster than the data.</p></div>
+<div><h4>Chinchilla (2022) in one line</h4><p>With more compute, grow the model and the data at the same rate.</p></div>
+</div>
+<details class="deep"><summary>Under the hood: power laws, and why the two papers disagreed</summary><div class="body">
+<p>A power law has the form <code>loss ≈ a × C<sup>−b</sup></code>, where C is compute and b a small positive number. Take logarithms of both sides and it becomes a straight line: <code>log(loss) = log(a) − b × log(C)</code>. That's why scaling-law plots use log-log axes and why the results look like straight lines. The lab below fits exactly such a line.</p>
+<p>The two papers reached different allocations partly because of experimental choices. The Chinchilla authors point out that Kaplan's runs used the same number of training tokens and learning-rate schedule across model sizes, which tends to understate how much smaller models gain from longer training. Chinchilla tuned the schedule to each run's length and used three different estimation methods, which agreed with one another. Differences in how parameters were counted and in the scale of the experiments also contributed.</p>
+<p>Two caveats matter. First, scaling laws predict the <em>loss</em> (how well the model predicts the next token), not specific abilities; some skills appear to improve gradually and others more abruptly on particular benchmarks. Second, "compute-optimal" means optimal for <em>training</em> cost. If a model will answer billions of requests, a smaller model trained for longer can be cheaper overall because every answer costs less to serve. That's a common explanation for why today's open models are trained far beyond 20 tokens per parameter.</p>
+</div></details>
+<div class="person"><span class="ini">JK</span><b>Jared Kaplan</b><span>Lead author of the 2020 scaling-laws paper (with Sam McCandlish, Tom Brown, Dario Amodei and others at OpenAI); later a co-founder of Anthropic (<a href="#ch37">Chapter 37</a>).</span></div>
+<div class="person"><span class="ini">JH</span><b>Jordan Hoffmann</b><span>Lead author of the 2022 Chinchilla paper at DeepMind. Co-author Arthur Mensch went on to co-found Mistral AI (<a href="#ch30">Chapter 30</a>).</span></div>
+<div class="box opinion"><span class="tag">Opinion · debated across the field</span><p>Whether scaling pre-training will keep paying off is openly argued. Some researchers and lab leaders expect continued gains from more compute; others point to limits on high-quality text and to rising costs, and argue that the next gains come from other axes, such as reinforcement learning after pre-training and spending more compute at answer time (<a class="gl" href="#g-test-time-compute">test-time compute</a>, <a href="#ch19">Chapter 19</a>). Treat any confident forecast either way as an opinion. <a href="#ch140">Chapter 140</a> looks at research frontiers.</p></div>
+
+<h3 id="ch138-6"><span class="num">138.6</span>Energy, cost and what it means for you</h3>
+<p>All this compute turns into electricity and heat. A rough way to think about a run's energy is: number of chips × power per chip (plus cooling and networking) × hours. With thousands of chips running for weeks, the total is large, but exact energy figures for specific frontier models are rarely published, so treat any number you see quoted for a closed model with care. <a href="#ch25">Chapter 25</a> gives the International Energy Agency's estimates for data centres overall.</p>
+<div class="tbl"><table>
+<tr><th>Lever</th><th>How it reduces training cost</th></tr>
+<tr><td>Better allocation (scaling laws)</td><td>Don't waste compute on a model that's too big for its data, or vice versa</td></tr>
+<tr><td>Lower precision (16-bit, 8-bit)</td><td>More operations per second and less memory per number</td></tr>
+<tr><td>Mixture of experts</td><td>Only part of the model runs for each token, so more parameters per FLOP</td></tr>
+<tr><td>Data quality</td><td>Cleaner, deduplicated data can reach the same quality with fewer tokens</td></tr>
+<tr><td>Fewer failed runs</td><td>Small-scale rehearsals, good monitoring and frequent checkpoints</td></tr>
+</table></div>
+<p>For a QA engineer or manager, three practical lessons follow. First, model releases come in generations because each training run is a huge, planned project, not a nightly build. Second, the "knowledge cutoff" (<a href="#ch20">Chapter 20</a>) exists because the training data is frozen when the run starts. Third, when a vendor says a new model is "better at the same price", one reason can be a smaller, longer-trained model that's cheaper to serve, which links directly to <a href="#ch139">Chapter 139</a>.</p>
+
+<div class="lab"><div class="lab-h"><b>Estimate a training run, then fit a scaling law</b><span>15 min · Python 3, no installs</span></div><ol>
+<li>Save the first script below as <code>scale_calc.py</code> and run <code>python3 scale_calc.py</code>.<span class="expect">The table shown under the script, with four rows from 1B to 405B.</span></li>
+<li>Read the 70B row. At 20 tokens per parameter it needs 1.4 trillion tokens, about 5.9 × 10<sup>23</sup> FLOPs, and at least 14 GPUs just to hold the training state.<span class="expect">The "min GPUs" figure is a floor: activations and parallelism overheads push the real number much higher.</span></li>
+<li>Read the 405B row. With the illustrative 1,024-GPU cluster it would take about 24,700 hours (nearly three years). Change <code>NUM_GPUS</code> to <code>16384</code> and run again.<span class="expect">About 1,545 hours, roughly nine weeks. That's why frontier runs use tens of thousands of chips.</span></li>
+<li>Save the second script as <code>powerlaw.py</code> and run it.<span class="expect"><code>loss ~= 62.1 * C^(-0.065)</code> and two predictions: 1.99 at 1e+23 FLOPs and 1.71 at 1e+24.</span></li>
+<li>Change the last data point from <code>2.31</code> to <code>2.45</code> (as if your biggest run underperformed) and run again.<span class="expect">A flatter slope and higher predictions. One bad run changes the forecast, which is why real studies use many runs.</span></li>
+</ol></div>
+<div class="code"><span class="cap">scale_calc.py</span><pre><span class="c"># scale_calc.py - back-of-envelope training estimates. Rules of thumb, not a simulator.</span>
+import math
+
+TOKENS_PER_PARAM = 20      <span class="c"># Chinchilla-style rule of thumb for compute-optimal training</span>
+BYTES_PER_PARAM = 16       <span class="c"># mixed-precision Adam: weights, gradients, optimiser state</span>
+GPU_MEMORY_GB = 80         <span class="c"># one H100 SXM has 80 GB</span>
+GPU_FLOPS = 400e12         <span class="c"># ILLUSTRATIVE effective speed per GPU (FLOP per second)</span>
+NUM_GPUS = 1024            <span class="c"># ILLUSTRATIVE cluster size</span>
+
+def estimate(params, tokens=None):
+    tokens = tokens or params * TOKENS_PER_PARAM
+    flops = 6 * params * tokens                       <span class="c"># about 6 FLOPs per parameter per token</span>
+    hours = flops / (GPU_FLOPS * NUM_GPUS) / 3600
+    state_gb = params * BYTES_PER_PARAM / 1e9
+    min_gpus = math.ceil(state_gb / GPU_MEMORY_GB)    <span class="c"># ignores activations: a lower bound</span>
+    return tokens, flops, hours, state_gb, min_gpus
+
+print(f"{'model':&lt;14}{'tokens':&gt;10}{'FLOPs':&gt;11}{'hours':&gt;10}{'state GB':&gt;10}{'min GPUs':&gt;10}")
+for name, n, d in [("1B", 1e9, None), ("8B", 8e9, None), ("70B", 70e9, None),
+                   ("405B @ 15T", 405e9, 15e12)]:
+    tokens, flops, hours, state_gb, min_gpus = estimate(n, d)
+    print(f"{name:&lt;14}{tokens/1e12:&gt;9.2f}T{flops:&gt;11.1e}{hours:&gt;10,.1f}{state_gb:&gt;10,.0f}{min_gpus:&gt;10}")</pre></div>
+<div class="code"><span class="cap">Expected output (cluster speed and size are illustrative)</span><pre>model             tokens      FLOPs     hours  state GB  min GPUs
+1B                 0.02T    1.2e+20       0.1        16         1
+8B                 0.16T    7.7e+21       5.2       128         2
+70B                1.40T    5.9e+23     398.8     1,120        14
+405B @ 15T        15.00T    3.6e+25  24,719.2     6,480        81</pre></div>
+<div class="code"><span class="cap">powerlaw.py</span><pre><span class="c"># powerlaw.py - fit a straight line on a log-log plot, the way scaling-law papers do.</span>
+import math
+
+<span class="c"># ILLUSTRATIVE (made-up) results: compute used (FLOPs) and the loss each run reached</span>
+runs = [(1e18, 4.20), (1e19, 3.62), (1e20, 3.11), (1e21, 2.68), (1e22, 2.31)]
+
+xs = [math.log10(c) for c, _ in runs]
+ys = [math.log10(l) for _, l in runs]
+n = len(runs)
+mx, my = sum(xs) / n, sum(ys) / n
+slope = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sum((x - mx) ** 2 for x in xs)
+intercept = my - slope * mx
+
+print(f"loss ~= {10 ** intercept:.1f} * C^({slope:.3f})")
+for c in (1e23, 1e24):
+    print(f"predicted loss at {c:.0e} FLOPs: {10 ** (intercept + slope * math.log10(c)):.2f}")</pre></div>
+<div class="code"><span class="cap">Expected output</span><pre>loss ~= 62.1 * C^(-0.065)
+predicted loss at 1e+23 FLOPs: 1.99
+predicted loss at 1e+24 FLOPs: 1.71</pre></div>
+<div class="box note"><span class="tag">Troubleshooting</span><ul>
+<li><b><code>SyntaxError</code> on the f-strings</b>: you're on Python 2 or a very old Python 3. Run <code>python3 --version</code>; you need 3.6 or newer.</li>
+<li><b>Numbers differ slightly</b>: check you copied the constants exactly; the outputs above come from the scripts as printed.</li>
+<li><b>"Why is the H100 speed only 400 TFLOP/s?"</b>: it's a deliberately round, illustrative figure for real-world sustained throughput, not NVIDIA's peak specification.</li>
+</ul></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Scaling laws say bigger models are always better."</dt><dd>They describe how loss falls with compute, data and size together. Chinchilla showed a smaller model with more data can beat a bigger one at the same compute.</dd>
+<dt>"Training just needs the same memory as running the model."</dt><dd>Training needs roughly eight times more for weights, gradients and optimiser state alone, before activations.</dd>
+<dt>"More GPUs means proportionally faster training."</dt><dd>Communication, pipeline bubbles and stragglers mean efficiency drops as clusters grow. Papers report scaling efficiency precisely because it's below 100%.</dd>
+<dt>"20 tokens per parameter is the right amount for every model."</dt><dd>It's a rule of thumb for minimising training compute. Models meant to serve many users are often trained much longer.</dd>
+<dt>"Scaling laws predict what a model will be able to do."</dt><dd>They predict the loss. Specific abilities still have to be measured with evaluations.</dd>
+</dl></div>
+
+<h3 id="ch138-r"><span class="num">138.7</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Training compute is roughly 6 × parameters × tokens FLOPs; frontier runs reach the order of 10<sup>25</sup> and beyond.</li>
+<li>Training needs about 16 bytes per parameter before activations, so even a 70B model's state spans many 80 GB GPUs.</li>
+<li>Data parallelism splits examples, pipeline parallelism splits layers, tensor parallelism splits each layer's matrices; real systems combine them, plus sharding (ZeRO/FSDP) and expert parallelism.</li>
+<li>Clusters are tightly coupled machines where failures are routine, so checkpoints and monitoring are essential.</li>
+<li>Kaplan et al. (2020) showed loss follows power laws in size, data and compute; Chinchilla (2022) showed size and data should grow together, about 20 tokens per parameter as a rule of thumb.</li>
+<li>Labs often train smaller models for longer than "compute-optimal" because they're cheaper to serve.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What was the Chinchilla paper's main finding?</p><div class="opts"><button>Model size matters far more than data</button><button data-ok>For a fixed compute budget, model size and training tokens should grow in equal proportion</button><button>Scaling laws stop working above 10 billion parameters</button></div><p class="why" hidden>That's why 70B Chinchilla, trained on about four times more data, beat 280B Gopher at the same compute.</p></div>
+<div class="qz"><p class="q">Which kind of parallelism slices each layer's matrices across chips and needs the fastest links?</p><div class="opts"><button>Data parallelism</button><button>Pipeline parallelism</button><button data-ok>Tensor parallelism</button></div><p class="why" hidden>Partial results are exchanged inside every layer, so it's usually kept within one server.</p></div>
+<div class="qz"><p class="q">Roughly how many bytes per parameter does mixed-precision training with Adam need before activations?</p><div class="opts"><button>2</button><button data-ok>16</button><button>64</button></div><p class="why" hidden>2 for weights, 2 for gradients, 4 for the 32-bit master weights and 8 for Adam's two running averages.</p></div>
+<div class="qz"><p class="q">Why are many open models trained on far more than 20 tokens per parameter?</p><div class="opts"><button>Because the Chinchilla paper was disproved</button><button data-ok>Because a smaller model trained longer can be cheaper to serve to many users</button><button>Because more tokens always reduce training cost</button></div><p class="why" hidden>"Compute-optimal" minimises training cost only; serving cost depends on model size.</p></div>
+<div class="qz"><p class="q">What do scaling laws actually predict?</p><div class="opts"><button data-ok>How the model's loss changes with compute, model size and data</button><button>Which benchmark questions a model will get right</button><button>The release date of the next model</button></div><p class="why" hidden>Specific abilities still have to be measured with evaluations (Chapter 24, Chapter 125).</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Use <code>scale_calc.py</code> to compare two plans for the same compute budget as a 70B model at 1.4 trillion tokens: (a) a 140B model and (b) a 35B model. Work out how many tokens each can be trained on for the same FLOPs. Then write half a page for a non-technical manager explaining which plan Kaplan's 2020 reading would favour, which Chinchilla would favour, and why a company serving millions of users might prefer the smaller model anyway.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Training a big model is too much work for one chip, so thousands of GPUs split it up: each handles different data, different layers, or slices of the same layer, and they constantly share results. It needs roughly eight times the memory of just running the model. Before spending millions, labs use scaling laws: train small models, plot quality against compute on a log scale, and extend the straight line. In 2020 Kaplan's team said 'make the model bigger'; in 2022 DeepMind's Chinchilla showed you should grow the data just as fast. Today many labs go further and train smaller models for longer because they're cheaper to run."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>J. Kaplan, S. McCandlish, T. Henighan, T. B. Brown, B. Chess, R. Child, S. Gray, A. Radford, J. Wu and D. Amodei, <a href="https://arxiv.org/abs/2001.08361" target="_blank" rel="noopener">"Scaling Laws for Neural Language Models"</a>, arXiv:2001.08361 (23 January 2020).</li>
+<li>J. Hoffmann, S. Borgeaud, A. Mensch, E. Buchatskaya et al., <a href="https://arxiv.org/abs/2203.15556" target="_blank" rel="noopener">"Training Compute-Optimal Large Language Models"</a>, arXiv:2203.15556 (29 March 2022).</li>
+<li>M. Shoeybi et al., <a href="https://arxiv.org/abs/1909.08053" target="_blank" rel="noopener">"Megatron-LM: Training Multi-Billion Parameter Language Models Using Model Parallelism"</a>, arXiv:1909.08053 (2019).</li>
+<li>Y. Huang et al., <a href="https://arxiv.org/abs/1811.06965" target="_blank" rel="noopener">"GPipe: Efficient Training of Giant Neural Networks using Pipeline Parallelism"</a>, arXiv:1811.06965 (2018).</li>
+<li>S. Rajbhandari, J. Rasley, O. Ruwase and Y. He, <a href="https://arxiv.org/abs/1910.02054" target="_blank" rel="noopener">"ZeRO: Memory Optimizations Toward Training Trillion Parameter Models"</a>, arXiv:1910.02054 (2019).</li>
+<li>Meta AI, <a href="https://ai.meta.com/blog/meta-llama-3-1/" target="_blank" rel="noopener">"Introducing Llama 3.1"</a> (training tokens and GPU count) and <a href="https://arxiv.org/abs/2407.21783" target="_blank" rel="noopener">"The Llama 3 Herd of Models"</a>, arXiv:2407.21783 (2024).</li>
+<li>NVIDIA, <a href="https://www.nvidia.com/en-us/data-center/h100/" target="_blank" rel="noopener">H100 Tensor Core GPU specifications</a> (memory capacity and bandwidth).</li>
+<li>Anthropic co-founders: this book's <code>research/anthropic-claude-facts.md</code>; Mistral founders: <code>research/ai-industry-facts.md</code>.</li>
+</ol>
+<p class="verified">Verified 9 November 2026 against the papers and official pages listed above. Research findings are established; hardware figures and training practices change.</p></div>

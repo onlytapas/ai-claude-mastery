@@ -1,0 +1,153 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>The difference between memory, chat search, account instructions, project instructions, skills and styles</li>
+<li>How Claude's memory works today, where to see it, and how to edit, pause or reset it</li>
+<li>How project memory keeps client or product work separate</li>
+<li>How to write account-wide instructions that make every chat more useful for QA work</li>
+<li>What happened to styles, and what to use if they're not available to you</li>
+<li>When to use incognito chats, and what they do and don't hide</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch43">Chapter 43</a> (getting started) and <a href="#ch47">Chapter 47</a> (Projects). <a href="#ch44">Chapter 44</a> on prompting helps with writing instructions. Claude Code has its own, separate memory system (CLAUDE.md files), covered in <a href="#ch77">Chapter 77</a>.</div>
+
+<div class="bigidea"><p>Every new chat with an AI starts from almost nothing, so people waste time re-explaining who they are and how they like answers. Claude has several ways to carry context forward. <a class="gl" href="#g-chat-memory">Memory</a> saves lasting facts about you and your work. Chat search lets Claude look back through earlier conversations. <a class="gl" href="#g-instructions-for-claude">Instructions</a> are standing rules you write yourself. Projects and <a class="gl" href="#g-skill">skills</a> add context for particular kinds of work. <a class="gl" href="#g-incognito-chat">Incognito chats</a> go the other way: nothing is saved to history or memory. Knowing which is which lets you get consistent answers without telling Claude more than you mean to.</p></div>
+
+<h3 id="ch50-1"><span class="num">50.1</span>Six ways to personalise, side by side</h3>
+<p>These features overlap, and the names have changed over time. The table sorts them by who writes the context and where it applies.</p>
+<div class="tbl"><table>
+<tr><th>Feature</th><th>Who writes it</th><th>Applies to</th><th>Best for</th></tr>
+<tr><td><b>Memory</b></td><td>Claude, as you chat (you can edit)</td><td>New chats; projects have their own</td><td>Facts that build up: your role, current release, tools you use</td></tr>
+<tr><td><b>Chat search</b></td><td>Nobody: it searches what's already there</td><td>Past chats, when relevant</td><td>"What did we decide about the login tests last week?"</td></tr>
+<tr><td><b>Instructions for Claude</b> (account-wide)</td><td>You</td><td>Every chat</td><td>How you want answers: format, length, spelling, assumptions</td></tr>
+<tr><td><b>Project instructions</b></td><td>You</td><td>Chats in one project</td><td>Rules for one product, client or task (<a href="#ch47">Chapter 47</a>)</td></tr>
+<tr><td><b>Skills</b></td><td>You, Anthropic or your organisation</td><td>When relevant, on demand</td><td>Repeatable ways of working: a bug-report format, a test-case template</td></tr>
+<tr><td><b>Styles</b></td><td>You or presets</td><td>Chats where a style is selected</td><td>Tone and format. Status uncertain: see section 50.5</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of starting at a new team. Memory is what a good colleague picks up about you over the weeks ("she prefers tables; she's on the payments squad"). Chat search is them scrolling back through the team channel. Instructions are the note you pinned to your desk ("British spelling, short answers, ask before assuming"). A project is the folder for one client. A skill is the team's how-to page for writing bug reports. Incognito is a conversation in a corridor that nobody writes down.</p></div>
+
+<h3 id="ch50-2"><span class="num">50.2</span>How memory works today</h3>
+<p>Memory lets Claude keep useful context about you, such as your role, preferences and ongoing projects, and apply it in new chats. As of 9 November 2026, Anthropic describes it this way:</p>
+<ul>
+<li><b>It's stored as topics.</b> Memory is a set of individual topics that update as you chat. (An earlier version wrote a daily summary instead; Anthropic calls that the legacy experience.)</li>
+<li><b>Claude saves on its own, or when asked.</b> You can say "remember that our regression suite runs on Thursdays" and it will.</li>
+<li><b>It's on by default</b> for Free, Pro, Max and Ultra. On Team and Enterprise, the organisation's Owners decide whether memory is available (section 50.7).</li>
+<li><b>Sensitive topics are separate.</b> Memory about sensitive topics needs its own opt-in.</li>
+</ul>
+<h4>Chat search is a different feature</h4>
+<p>Chat search lets Claude look through your past conversations when that would help, and it shows each search as a tool call so you can see it happened. When Claude uses an earlier chat, citations link to the original conversation. Chat search needs a paid plan (Pro, Max, Ultra, Team or Enterprise). It works across your non-project chats, and within each project separately. You can turn it off with the <b>Search and reference chats</b> setting.</p>
+<div class="cols2"><div><h4>Memory</h4><p>A short, curated set of facts. Always available to new chats. You can read and edit it. Small and cheap.</p></div><div><h4>Chat search</h4><p>Looks up whole past conversations on demand. Finds details memory never saved. Uses more context when it runs.</p></div></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A tester has spent a month asking Claude about the checkout service. Memory holds: "Works as a QA engineer on the checkout team; uses Playwright with TypeScript; release train every two weeks; prefers test cases as tables." When she asks "write negative tests for the new voucher field", Claude already writes Playwright-flavoured tables. When she asks "what edge cases did we list for gift cards last sprint?", chat search finds the earlier conversation and links to it.</p></div>
+
+<h3 id="ch50-3"><span class="num">50.3</span>Seeing, editing and controlling memory</h3>
+<p>As of 9 November 2026 the controls are in <b>Settings &gt; Your Claude</b>. Select <b>Manage</b> next to <b>Your memory</b>. Older layouts and some help pages use different names, so look for "memory" if the path has moved.</p>
+<div class="tbl"><table>
+<tr><th>You want to…</th><th>Do this</th><th>What happens</th></tr>
+<tr><td>See what Claude remembers</td><td>Settings &gt; Your Claude &gt; Manage (Your memory)</td><td>Entries are listed under <b>Topics</b>; select one to read it</td></tr>
+<tr><td>Correct a memory</td><td>Select the topic, use the edit icon; or tell Claude in a chat</td><td>The topic is updated</td></tr>
+<tr><td>Remove one memory</td><td>Select the topic, then <b>Delete</b>; or say "forget that…"</td><td>That entry is gone</td></tr>
+<tr><td>Stop memory for a while</td><td><b>Pause memory</b></td><td>Existing memory is kept but not used, and no new entries are made. Chats during the pause aren't added later.</td></tr>
+<tr><td>Wipe everything</td><td><b>Reset memory</b></td><td>Permanently deletes all memories, including project memories. Can't be undone.</td></tr>
+<tr><td>Skip memory for one chat</td><td>In a new chat, before the first message, select <b>+</b> and turn off <b>Memory</b></td><td>A crossed-out memory icon marks the chat (web and desktop). The chat still appears in your history and is still searchable.</td></tr>
+<tr><td>Turn off chat search</td><td>Settings &gt; Your Claude &gt; <b>Search and reference chats</b></td><td>Claude no longer looks through past chats</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Deleting a chat doesn't delete what was learned from it</span><p>In the current memory system, deleting a conversation does <b>not</b> remove memory entries that were created from it. If you shared something you regret, delete the chat <em>and</em> check your memory topics for anything that came from it. On mobile, the per-chat memory switch locks once you send the first message, so decide before you type.</p></div>
+<h4>Moving memory in and out</h4>
+<p>Anthropic describes an experimental option to import memories from other AI assistants, or export Claude's memory for backup or migration. Treat imported text as data to review: read what came in and delete anything that's wrong or private before relying on it. Your full data export (<a href="#ch51">Chapter 51</a>) also includes memory.</p>
+<details class="deep"><summary>Why memory is "topics" and not a transcript</summary><div class="body"><p>A language model has no built-in memory between conversations: each chat starts with whatever text is placed in its <a class="gl" href="#g-context-window">context window</a>. "Memory" features are a layer around the model. Some text about you is stored, and the relevant parts are added to the context of new chats.</p><p>Storing short topics rather than whole transcripts keeps that added text small, so it doesn't crowd out your actual question, and it lets you inspect and edit exactly what is being carried forward. Chat search is the complementary approach: instead of saving facts up front, it retrieves past conversations when they seem relevant, which is a form of <a class="gl" href="#g-rag">retrieval-augmented generation</a>. <a href="#ch88">Chapter 88</a> covers this design space for developers, and Claude Code's file-based approach is in <a href="#ch77">Chapter 77</a>.</p></div></details>
+
+<h3 id="ch50-4"><span class="num">50.4</span>Project memory: keeping work separate</h3>
+<p>Each project has its own memory. Inside a project, Claude uses that project's memory plus your general account memory, but not other projects' memory. New memories made in a project are saved to that project.</p>
+<p>There's one subtlety: if your account memory is on, Claude can also refer to a project's memories outside that project. To seal a project off completely, turn off <b>Use account memory</b> on the project's page.</p>
+<div class="flow"><div><b>Account memory</b>Your role, general preferences</div><div class="hl"><b>Project A memory</b>Checkout service details, used inside Project A</div><div><b>Project B memory</b>Client X's portal, used inside Project B</div></div>
+<div class="box example"><span class="tag">Real-world example: consultancy testers</span><p>A test consultant works for two clients who must never see each other's details. She creates one project per client and turns off <b>Use account memory</b> in both. Memory learned while testing Client A's mobile app stays in that project; nothing about it can surface in Client B's chats or in her general chats. She also keeps a rule in each project's instructions: "Never mention other clients or projects."</p></div>
+
+<h3 id="ch50-5"><span class="num">50.5</span>Instructions, skills and the question of styles</h3>
+<h4>Instructions for Claude (account-wide)</h4>
+<p>This is a block of text you write that applies to every conversation. As of 9 November 2026: select your initials at the lower left, then <b>Settings &gt; Your Claude</b>, and find <b>Instructions</b>. Older layouts call it "Instructions for Claude" under <b>Account</b>, and older guides call the same idea "profile preferences". Anthropic notes that global instructions used in Claude Cowork are now part of this setting.</p>
+<p>Good instructions are short, specific and about how you work, not about one task. Compare:</p>
+<div class="cols2"><div><h4>Weak</h4><div class="code"><span class="cap">Instructions</span><pre>I am a tester. Be helpful and
+accurate. Give good answers.</pre></div><p>Tells Claude nothing it wouldn't do anyway.</p></div><div><h4>Stronger</h4><div class="code"><span class="cap">Instructions</span><pre>I'm a QA engineer (web and API testing,
+Playwright + TypeScript, Jira).
+- Use British spelling.
+- Lead with the answer, then the detail.
+- Put test cases in a table: ID, title,
+  steps, expected result, priority.
+- If requirements are ambiguous, list
+  the questions before writing tests.
+- Say clearly when you're unsure or a
+  fact may be out of date.</pre></div></div></div>
+<p>Keep personal and sensitive details out of instructions. They're applied everywhere, including incognito chats (section 50.6), and they're unnecessary for good answers.</p>
+<h4>Project instructions and skills</h4>
+<p>Project instructions apply only inside one project (<a href="#ch47">Chapter 47</a>). Skills are packaged instructions, and sometimes scripts, that Claude uses when a task calls for them (<a href="#ch80">Chapter 80</a> shows how to build them). Anthropic's personalisation help page now lists exactly three features: account instructions, project instructions and skills. It describes skills as the way to adjust tone and format or add specialised know-how on demand.</p>
+<h4>What about styles?</h4>
+<p>Styles were a claude.ai feature that let you choose how Claude writes: preset styles and custom ones you could create by describing a style or giving writing samples. Press coverage at the time reports they launched in late 2024 with presets such as Formal, Concise and Explanatory.</p>
+<div class="box warn"><span class="tag">Status unconfirmed as of 9 November 2026</span><p>We couldn't confirm that styles are still a current feature. On 9 November 2026, Anthropic's help articles on configuring styles returned "not found", the original announcement page also returned "not found", and the current personalisation article doesn't mention styles. However, the incognito-chat help article still says Claude can access "custom styles" in incognito chats. So styles may have been retired, renamed, or still exist for some accounts or interfaces. If you see a style selector in your interface, it works as described above. If you don't, use account instructions for standing preferences and a skill for a specific format or voice.</p></div>
+<div class="box note"><span class="tag">Not the same as Claude Code output styles</span><p>Claude Code has a separate feature called <b>output styles</b> that changes how Claude Code behaves in the terminal. It's documented and current, and covered in <a href="#ch84">Chapter 84</a>. Don't confuse the two when searching for help.</p></div>
+
+<h3 id="ch50-6"><span class="num">50.6</span>Incognito chats</h3>
+<p>An incognito chat is a temporary conversation that isn't saved to your chat history or to memory. It's available on all plans, and Anthropic says incognito chats aren't used for model training.</p>
+<p>To start one (web, as of 9 November 2026): outside a project, select the ghost icon at the upper right of a new chat. The chat shows a black border and an <b>Incognito chat</b> label. Close it with the <b>x</b> at the upper right; once closed, it can't be reopened.</p>
+<div class="tbl"><table>
+<tr><th>Incognito does</th><th>Incognito does not</th></tr>
+<tr><td>Keep the chat out of your history and out of chat search</td><td>Delete it immediately: chats are kept for 30 days by default (longer on Enterprise if the organisation's retention setting says so)</td></tr>
+<tr><td>Ignore your existing memory, and add nothing to it</td><td>Ignore your instructions: Claude can still see your profile information and preferences</td></tr>
+<tr><td>Leave it out of your monthly recap</td><td>Work inside projects (it isn't available there)</td></tr>
+<tr><td>Give you a clean slate for a one-off question</td><td>Hide it from your organisation: on Team and Enterprise, Owners can find incognito chats in data exports, and Enterprise includes them in the Compliance API</td></tr>
+</table></div>
+<p>Anthropic's help page also notes that in the newer Claude interface, incognito chats open in the previous chat interface, so Claude can't create files or run code in them. An incognito chat can't be turned into a normal one later.</p>
+<div class="box note"><span class="tag">Incognito or "Memory off"?</span><p>Inside a project, use the per-chat <b>Memory</b> switch instead (section 50.3): the chat isn't added to memory but stays in your history. Outside projects, incognito is the stronger choice when you don't want the chat in your history at all.</p></div>
+<div class="box warn"><span class="tag">Incognito is not a privacy shield for work data</span><p>Incognito changes what <em>Claude</em> remembers and what appears in your history. It doesn't change your company's rules about what data you may paste into an AI tool. Production customer data, credentials and secrets stay out of every chat, incognito or not (<a href="#ch127">Chapter 127</a>).</p></div>
+
+<h3 id="ch50-7"><span class="num">50.7</span>Team and Enterprise: who controls memory</h3>
+<p>On work accounts, the organisation decides. As of 9 November 2026:</p>
+<ul>
+<li>Owners and Primary Owners turn memory on or off for the whole organisation in <b>Organization settings &gt; Capabilities</b>.</li>
+<li>Whether a member's memory starts on depends on when the organisation was created: Anthropic says organisations created on or after 31 October 2026 start with memory on (unless the member had turned it off before), older ones start with it off until each member turns it on. Some organisation types (HIPAA-enabled, government platform, Claude for Teachers) don't start with memory on.</li>
+<li>Owners can't turn memory on for one person, and can't see or edit anyone's memories.</li>
+<li>Turning memory off for the organisation permanently deletes all users' memory data.</li>
+<li>Memory entries are included in standard conversation exports, and a custom retention period for chats also applies to memory (except project memory) in the newer interface.</li>
+</ul>
+<div class="box opinion"><span class="tag">Opinion · this book's authors</span><p>For QA teams, memory is most useful for stable facts (your stack, your formats) and least useful for things that change every sprint. A quick monthly look at your memory topics, deleting anything stale like "current release is 4.2", keeps answers sharp. Put team-wide rules in a shared project or a skill instead of hoping everyone's memory learns them.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Set up and audit your personal context</b><span>25 min · claude.ai (any plan; step 6 needs a paid plan)</span></div><ol>
+<li>Open <b>Settings &gt; Your Claude</b> and find <b>Instructions</b>. Paste the "Stronger" example from section 50.5, edited for your real job.<span class="expect">The instructions save. Nothing else visibly changes yet.</span></li>
+<li>Start a new chat: <code>Write test cases for a password reset form.</code><span class="expect">Test cases in the table format you specified, and probably questions about ambiguous requirements first, without you asking.</span></li>
+<li>In the same chat: <code>Remember that I mostly test the checkout and payments area.</code><span class="expect">Claude confirms it will remember. (If memory is off on your work account, it will say so; switch to a personal account for this lab or skip to step 5.)</span></li>
+<li>Open <b>Settings &gt; Your Claude &gt; Manage</b> next to <b>Your memory</b>.<span class="expect">A topic mentioning checkout and payments appears under <b>Topics</b>. Edit it to add "Playwright with TypeScript", then save.</span></li>
+<li>Start an incognito chat (ghost icon, upper right of a new chat) and ask: <code>What area do I mostly test?</code><span class="expect">Claude doesn't know, because incognito ignores memory. It still follows your instructions (for example, British spelling). Close the chat with the <b>x</b>; it doesn't appear in your history.</span></li>
+<li>(Paid plans) In a normal chat ask: <code>What did I ask you about password reset earlier?</code><span class="expect">Claude runs a visible chat search and links to the chat from step 2.</span></li>
+<li>Clean up: delete the test memory topic if you don't want it, and decide whether to keep your instructions.<span class="expect">The topic disappears from the list.</span></li>
+</ol>
+<p><b>Troubleshooting:</b> No <b>Your Claude</b> section: look for <b>Account</b> or <b>Profile</b> in an older layout. No memory controls on a work account: your Owners have memory off. No ghost icon: you're inside a project (incognito isn't available there) or on a different interface version. Claude doesn't search past chats: you're on Free, or <b>Search and reference chats</b> is off.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Deleting a chat removes everything Claude learned from it."</dt><dd>In the current memory system, memory entries made from a chat stay until you delete them yourself.</dd>
+<dt>"Incognito means nobody can ever see the chat."</dt><dd>It's kept for at least 30 days, and on Team and Enterprise, Owners can access incognito chats through data exports.</dd>
+<dt>"Incognito chats ignore my instructions."</dt><dd>They ignore memory, but Claude can still see your profile information and preferences.</dd>
+<dt>"My admin can read my memories."</dt><dd>Owners can switch memory on or off for the organisation but can't view or edit individual memories. (Memory entries are, however, included in standard exports.)</dd>
+<dt>"Styles are the way to set my tone."</dt><dd>Styles may no longer exist. Account instructions and skills are the documented ways to shape tone and format.</dd>
+</dl></div>
+
+<h3 id="ch50-r"><span class="num">50.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Memory saves lasting facts as editable topics; chat search (paid plans) looks up whole past chats on demand.</li>
+<li>See and edit memory in Settings &gt; Your Claude (as of 9 November 2026). Pause keeps memories; Reset deletes them permanently.</li>
+<li>Each project has its own memory; turn off "Use account memory" to fully isolate one.</li>
+<li>Account instructions apply to every chat; keep them short, about how you work, and free of sensitive details.</li>
+<li>Styles could not be confirmed as current; use instructions and skills instead if you don't see them.</li>
+<li>Incognito keeps a chat out of history and memory, but it's retained for 30 days and isn't hidden from your organisation.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">You told Claude something private in a chat, then deleted the chat. What else should you do?</p><div class="opts"><button>Nothing: deleting the chat removes everything</button><button data-ok>Check your memory topics and delete any entry that came from that chat</button><button>Start an incognito chat to overwrite it</button></div><p class="why" hidden>Deleting a conversation doesn't remove memory entries generated from it in the current system.</p></div>
+<div class="qz"><p class="q">You test for two clients and want nothing from one to appear in the other's chats. What's the best set-up?</p><div class="opts"><button>One shared project for both clients, with memory paused on Fridays</button><button data-ok>One project per client, with "Use account memory" turned off in each, plus a project instruction not to mention other clients</button><button>Use incognito chats inside each project</button></div><p class="why" hidden>Projects keep their own memory; turning off account memory seals them. Incognito isn't available inside projects. The instruction adds a second safeguard.</p></div>
+<div class="qz"><p class="q">Which statement about incognito chats is true?</p><div class="opts"><button>They are deleted the moment you close them</button><button>They work inside projects</button><button data-ok>They aren't saved to history or memory, but Claude can still see your profile preferences</button></div><p class="why" hidden>Incognito ignores memory and history, is kept for 30 days by default, isn't available in projects, and still applies your profile information.</p></div>
+<div class="qz"><p class="q">What's the difference between memory and chat search?</p><div class="opts"><button data-ok>Memory keeps short, editable facts; chat search looks up past conversations when relevant</button><button>They're two names for the same feature</button><button>Memory is paid-only; chat search is on all plans</button></div><p class="why" hidden>Memory stores topics you can read and edit; chat search retrieves whole earlier chats and needs a paid plan.</p></div>
+<div class="qz"><p class="q">You can't find the styles menu. What should you use to make every answer lead with a summary and use tables for test cases?</p><div class="opts"><button>Claude Code output styles</button><button data-ok>Account-wide instructions (and a skill for a detailed format)</button><button>Incognito mode</button></div><p class="why" hidden>Styles couldn't be confirmed as current. Instructions apply to every chat, and skills package detailed formats. Output styles are a Claude Code feature.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Draft a "personal Claude setup" for your role: (1) account instructions of no more than ten lines; (2) a list of three facts you'd want memory to hold and three you would never want it to hold; (3) a plan for projects, saying which work gets its own project and whether account memory is on; (4) a rule for when you'll use incognito. Use it for a week, then review your memory topics and rewrite anything that made answers worse.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Claude has a few ways to remember. Memory saves short facts about you, and you can read and edit them under Settings, Your Claude. Chat search lets it look back at old chats on paid plans. Instructions are your standing rules, like 'tables for test cases, British spelling'. Projects have their own memory, so client work stays separate. Incognito chats don't go into history or memory, but they're still kept for 30 days and your admin can export them, so it's not a place for secrets. And styles may have been retired; use instructions or skills instead."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic Help Center, <a href="https://support.claude.com/en/articles/11817273-use-claude-s-chat-search-and-memory-to-build-on-previous-context" target="_blank" rel="noopener">Use Claude's chat search and memory to build on previous context</a> (topics, project memory, controls, plans, Team/Enterprise behaviour).</li>
+<li>Anthropic Help Center, <a href="https://support.claude.com/en/articles/10185728-understanding-claude-s-personalization-features" target="_blank" rel="noopener">Understanding Claude's personalization features</a> (account instructions, project instructions, skills).</li>
+<li>Anthropic Help Center, <a href="https://support.claude.com/en/articles/12260368-use-incognito-chats" target="_blank" rel="noopener">Use incognito chats</a> (start, retention, limits, Team/Enterprise).</li>
+<li>Anthropic Help Center, <a href="https://support.claude.com/en/articles/12512176-what-are-skills" target="_blank" rel="noopener">What are skills?</a></li>
+<li>Claude Code documentation, <a href="https://code.claude.com/docs/en/output-styles" target="_blank" rel="noopener">Output styles</a> (the separate Claude Code feature).</li>
+</ol><p class="verified">Verified 9 November 2026 against the Anthropic Help Center. Styles: the former help articles (support.claude.com articles 10181068 and 10185698) and the announcement page returned "not found" on that date; current status unconfirmed.</p></div>

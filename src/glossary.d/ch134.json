@@ -1,0 +1,50 @@
+{
+ "Defence in depth": {
+  "d": "A security approach that uses several independent layers of protection, so an attacker (or a mistake) has to get past all of them before harm is done.",
+  "see": "ch134"
+ },
+ "Supply chain attack": {
+  "d": "An attack that targets something you install or depend on, such as a plugin, package or MCP server, instead of attacking you directly.",
+  "see": "ch134"
+ },
+ "AI review board": {
+  "d": "A small cross-functional group that reviews new uses of AI before launch, sorts them by risk and keeps an eye on existing ones.",
+  "see": "ch135"
+ },
+ "Automation bias": {
+  "d": "The human tendency to over-trust suggestions from an automated system, so that reviewers approve outputs without really checking them.",
+  "see": "ch135"
+ },
+ "Counterfactual test": {
+  "d": "A test that changes one detail of an input that shouldn't matter, such as a name or pronoun, and checks that the output stays the same.",
+  "see": "ch135"
+ },
+ "Demographic parity": {
+  "d": "A fairness measure that asks whether each group receives a positive outcome (such as approval) at the same rate.",
+  "see": "ch135"
+ },
+ "Catastrophic forgetting": {
+  "d": "When fine-tuning a model on a narrow task makes it noticeably worse at things it could do before.",
+  "see": "ch136"
+ },
+ "Continued pre-training": {
+  "d": "Extra next-token training of an existing model on large amounts of unlabelled text from one domain, before or instead of fine-tuning.",
+  "see": "ch136"
+ },
+ "Hyperparameter": {
+  "d": "A setting chosen before training rather than learned from data, such as the number of epochs, the learning rate or the batch size.",
+  "see": "ch136"
+ },
+ "LoRA": {
+  "d": "Low-Rank Adaptation: a fine-tuning method that freezes the model's weights and trains two small extra matrices per layer, producing a small adapter file.",
+  "see": "ch136"
+ },
+ "PEFT": {
+  "d": "Parameter-efficient fine-tuning: methods such as LoRA that adapt a model by training only a small number of new or selected parameters.",
+  "see": "ch136"
+ },
+ "Reinforcement fine-tuning": {
+  "d": "Fine-tuning in which the model's answers are scored by a grader or reward function, and the model is trained to earn higher scores.",
+  "see": "ch136"
+ }
+}

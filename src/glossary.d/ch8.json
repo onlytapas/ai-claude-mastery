@@ -1,0 +1,14 @@
+{
+ "Jagged frontier": {
+  "d": "The uneven edge of what AI can do: it may handle one task brilliantly and fail at a similar-looking one. The term comes from a 2023 Harvard Business School field experiment with BCG consultants.",
+  "see": "ch8"
+ },
+ "Distribution shift": {
+  "d": "When the data a model or test meets in real use differs from the data it was trained or measured on, so earlier scores stop predicting real performance.",
+  "see": "ch8"
+ },
+ "Rule of three": {
+  "d": "A statistics rule of thumb: if you see zero failures in n independent trials, the true failure rate is probably (95% confidence) below about 3/n.",
+  "see": "ch8"
+ }
+}

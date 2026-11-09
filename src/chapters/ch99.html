@@ -1,0 +1,266 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>The three roles in every MCP connection (host, client and server) and what each one does</li>
+<li>The three things a server can offer (tools, resources and prompts) and who decides when each is used</li>
+<li>How the messages actually look: JSON-RPC requests, responses and notifications, with real annotated examples</li>
+<li>What changed in the current specification (version 2026-07-28), and why older servers still work</li>
+<li>How messages travel (stdio and Streamable HTTP) and how sign-in works at a high level (OAuth 2.1)</li>
+<li>The full journey of one tool call through Claude Code, from your prompt to Claude's answer</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 97 (what MCP is). Chapter 85 (APIs, HTTP and JSON) helps if JSON is new to you. Chapter 98 covers keys, tokens and OAuth in depth; this chapter only summarises them.</div>
+
+<div class="bigidea"><p>MCP is a set of rules for a conversation between an AI application and a tool. The AI application (the <strong>host</strong>, such as Claude Code) runs a small connector (a <strong>client</strong>) for each tool it talks to. The tool side (the <strong>server</strong>) says what it can do, and the client asks it to do things. Every message is a short piece of structured text in a format called JSON-RPC. Once you can read those messages, MCP stops being magic: you can see exactly what Claude asked Jira or Playwright to do, what came back, and where it went wrong.</p></div>
+
+<h3 id="ch99-1"><span class="num">99.1</span>Three roles: host, client and server</h3>
+<p>The official specification describes every MCP setup with three roles:</p>
+<div class="tbl"><table>
+<tr><th>Role</th><th>Plain meaning</th><th>Example</th></tr>
+<tr><td><b><a class="gl" href="#g-mcp-host">Host</a></b></td><td>The AI application you use. It holds the conversation, talks to the model and decides what the model may do.</td><td>Claude Code, the Claude desktop app, claude.ai</td></tr>
+<tr><td><b><a class="gl" href="#g-mcp-client">Client</a></b></td><td>A connector inside the host. There's one client per server, and each keeps its own line of communication.</td><td>The part of Claude Code that talks to your Jira server</td></tr>
+<tr><td><b><a class="gl" href="#g-mcp-server">Server</a></b></td><td>A program that offers capabilities for a particular system.</td><td>The Atlassian server for Jira, the Playwright server for a browser</td></tr>
+</table></div>
+<div class="flow">
+<div class="hl"><b>Host: Claude Code</b>Holds the chat, talks to the Claude model, enforces your permissions</div>
+<div><b>Client 1 → Jira server</b>Reads stories, creates bugs</div>
+<div><b>Client 2 → Playwright server</b>Opens a browser, clicks, takes screenshots</div>
+<div><b>Client 3 → Database server</b>Runs read-only queries</div>
+</div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a hotel concierge desk (the host). Behind the desk are several phones, each with a direct line to one service: the restaurant, the taxi company, the theatre box office. Each phone line is a client, and each service is a server. The guest (you) talks only to the concierge. The concierge decides which service to call, makes the call, and passes the answer back. Crucially, the concierge also refuses requests the guest isn't allowed to make. In Claude Code, that's your permission settings.</p></div>
+<p>The model itself (Claude) never talks to a server directly. It asks the host to call a tool, and the host does the calling. That's why the host is where permissions, approvals and logging live.</p>
+
+<h3 id="ch99-2"><span class="num">99.2</span>What a server can offer: tools, resources and prompts</h3>
+<p>A server can offer three kinds of thing. The difference between them is <em>who decides when they're used</em>:</p>
+<div class="tbl"><table>
+<tr><th>Feature</th><th>What it is</th><th>Who decides when it's used</th><th>QA example</th></tr>
+<tr><td><b>Tools</b></td><td>Actions the AI can run, like functions</td><td>The <em>model</em> ("model-controlled"), with the host asking you for approval</td><td><code>create_issue</code> in Jira; <code>browser_click</code> in Playwright</td></tr>
+<tr><td><b>Resources</b></td><td>Data the server can provide, each with an address (URI)</td><td>The <em>application</em> ("application-driven"): the host lets you pick them</td><td>A Jira issue, a test report file, a database table description</td></tr>
+<tr><td><b>Prompts</b></td><td>Ready-made message templates for a workflow</td><td>The <em>user</em> ("user-controlled"): you choose one</td><td>A "review this pull request" template from a GitHub server</td></tr>
+</table></div>
+<p>In Claude Code you'll meet all three. Tools are what Claude calls on its own. Resources appear when you type <code>@</code> (for example <code>@github:issue://123</code>). Prompts appear as slash commands such as <code>/mcp__github__pr_review 456</code>. Chapter 100 shows each in practice.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>You ask Claude Code: "Check whether bug SHOP-812 is reproducible on staging." Claude might use the Jira server's <em>tool</em> to read SHOP-812, then the Playwright server's <em>tools</em> to open staging and follow the steps, then the Jira tool again to add a comment with screenshots. If you'd typed <code>@</code> and attached the issue yourself, the issue would have arrived as a <em>resource</em> instead.</p></div>
+
+<h3 id="ch99-3"><span class="num">99.3</span>The language they speak: JSON-RPC</h3>
+<p>Every MCP message is written in <a class="gl" href="#g-json-rpc">JSON-RPC 2.0</a>, a long-established, simple format for "please run this procedure" messages. It's plain text in JSON, the same curly-bracket format used by most web APIs (Chapter 85). There are three message types:</p>
+<div class="tbl"><table>
+<tr><th>Type</th><th>Plain meaning</th><th>Must have</th></tr>
+<tr><td><b>Request</b></td><td>"Please do this, and tell me the result."</td><td>An <code>id</code>, a <code>method</code> (what to do) and usually <code>params</code> (details)</td></tr>
+<tr><td><b>Response</b></td><td>"Here's the result" or "Here's what went wrong."</td><td>The same <code>id</code> as the request, plus either <code>result</code> or <code>error</code></td></tr>
+<tr><td><b>Notification</b></td><td>"For your information…" No reply expected.</td><td>A <code>method</code>, and <em>no</em> <code>id</code></td></tr>
+</table></div>
+<p>The <code>id</code> is how answers are matched to questions. If Claude Code sends three requests at once, the server's replies may come back in any order; the ids say which is which.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>It's like ordering at a busy café with numbered tickets. You order (request) and get ticket 42. Your coffee comes out with "42" on it (response with the same id). The barista shouting "we're out of oat milk!" to everyone is a notification: nobody is expected to answer.</p></div>
+
+<h3 id="ch99-4"><span class="num">99.4</span>A real conversation, message by message</h3>
+<p>Here's what a client and server actually say to each other. These examples follow the current specification (2026-07-28). The tool is the specification's own weather example; a Jira or Playwright server works exactly the same way, just with different tool names. The grey <code>//</code> comments are explanations added for this book. Real JSON messages contain no comments.</p>
+<h4>Step 1: "What can you do?" (<code>tools/list</code>)</h4>
+<div class="code"><span class="cap">Client → server: request</span><pre>{
+  "jsonrpc": "2.0",
+  "id": 1,                                   <span class="c">// ticket number for matching the reply</span>
+  "method": "tools/list",                    <span class="c">// what we want</span>
+  "params": {
+    "_meta": {                               <span class="c">// required on every request since 2026-07-28</span>
+      "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+      "io.modelcontextprotocol/clientCapabilities": {},
+      "io.modelcontextprotocol/clientInfo": { "name": "ExampleClient", "version": "1.0.0" }
+    }
+  }
+}</pre></div>
+<div class="code"><span class="cap">Server → client: response</span><pre>{
+  "jsonrpc": "2.0",
+  "id": 1,                                   <span class="c">// same ticket number</span>
+  "result": {
+    "resultType": "complete",                <span class="c">// a finished answer (see 92.6)</span>
+    "tools": [
+      {
+        "name": "get_weather",               <span class="c">// what the AI will call</span>
+        "title": "Weather Information Provider",
+        "description": "Get current weather information for a location",
+        "inputSchema": {                     <span class="c">// JSON Schema: what arguments are allowed</span>
+          "type": "object",
+          "properties": {
+            "location": { "type": "string", "description": "City name or zip code" }
+          },
+          "required": ["location"]
+        }
+      }
+    ],
+    "ttlMs": 300000,                         <span class="c">// the client may cache this list for 5 minutes</span>
+    "cacheScope": "public"
+  }
+}</pre></div>
+<p>The <strong>description</strong> and <strong>inputSchema</strong> matter enormously: they're what the model reads to decide whether and how to use the tool. A vague description is the most common reason an AI "won't use" a server's tool, or uses it wrongly. This is a testable quality of any MCP server.</p>
+<h4>Step 2: "Please do it" (<code>tools/call</code>)</h4>
+<div class="code"><span class="cap">Client → server: request (the _meta block is shortened here; it's required in practice)</span><pre>{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/call",
+  "params": {
+    "name": "get_weather",
+    "arguments": { "location": "New York" },  <span class="c">// must match the inputSchema</span>
+    "_meta": { "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+               "io.modelcontextprotocol/clientCapabilities": {} }
+  }
+}</pre></div>
+<div class="code"><span class="cap">Server → client: response</span><pre>{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "resultType": "complete",
+    "content": [
+      { "type": "text",
+        "text": "Current weather in New York:\nTemperature: 72°F\nConditions: Partly cloudy" }
+    ],
+    "isError": false                         <span class="c">// the tool itself succeeded</span>
+  }
+}</pre></div>
+<h4>Two different kinds of failure</h4>
+<p>The specification separates errors in a way every tester should know:</p>
+<div class="cols2">
+<div><h4>Protocol error</h4><p>The request itself was wrong: unknown tool, malformed message. It comes back as a JSON-RPC <code>error</code> with a code, for example <code>-32602</code> "Unknown tool: invalid_tool_name". The model can rarely fix these itself.</p></div>
+<div><h4>Tool execution error</h4><p>The request was fine but the job failed: the API was down, a date was in the past, a Jira project didn't exist. It comes back as a normal <code>result</code> with <code>"isError": true</code> and a message. The model is meant to read it and try again differently.</p></div>
+</div>
+<div class="box example"><span class="tag">Real-world example: a QA view</span><p>When you test an MCP server your team built, check both kinds. Does an unknown tool produce a proper protocol error? Does a bad argument produce a clear <code>isError</code> message the model can act on, such as "Project key SHOPP not found; did you mean SHOP?", rather than a stack trace?</p></div>
+
+<h3 id="ch99-5"><span class="num">99.5</span>Versions: from handshake to stateless</h3>
+<p>MCP is versioned by date. The current version is <strong>2026-07-28</strong>. The previous one, <strong>2025-11-25</strong>, is still widely used, and you'll meet both.</p>
+<div class="tbl"><table>
+<tr><th></th><th>Legacy versions (2025-11-25 and earlier)</th><th>Modern version (2026-07-28)</th></tr>
+<tr><td>Starting a conversation</td><td>An <code>initialize</code> handshake: client and server exchange versions and capabilities once, then the client sends <code>notifications/initialized</code></td><td>No handshake. Every request carries its own version and capabilities in <code>_meta</code></td></tr>
+<tr><td>Learning about a server</td><td>From the <code>initialize</code> reply</td><td>Optional <code>server/discover</code> request, which every server must support</td></tr>
+<tr><td>Sessions over HTTP</td><td>An <code>Mcp-Session-Id</code> header tied requests together</td><td>Removed. Any request can go to any server instance</td></tr>
+<tr><td>Server asking the user something</td><td>The server sent its own requests to the client</td><td>The server replies "input required"; the client asks the user and retries (92.6)</td></tr>
+</table></div>
+<p><strong>Why the change?</strong> Remote MCP servers now run at large scale behind load balancers, like any web service. If every request carries everything needed to process it, any copy of the server can answer it, and nothing breaks when a connection drops. The specification calls this being <em>stateless</em>.</p>
+<p>A version mismatch doesn't have to be fatal. If a server doesn't support the requested version, it replies with an <code>UnsupportedProtocolVersion</code> error (code <code>-32022</code>) listing the versions it does support, and the client retries with one of those. Clients and servers can also be "dual-era", speaking both styles.</p>
+<details class="deep"><summary>How Claude Code handles both versions</summary><div class="body">
+<p>Claude Code has two MCP client "runtimes". The v1 runtime is built on version 1 of the official MCP TypeScript SDK. The v2 runtime uses SDK 2.0, which adds the 2026-07-28 revision. On v2, Claude Code asks each server whether it supports the newer revision and uses it with those that do; other servers are spoken to the older way. Which runtime you get depends on your version and settings (recent versions use v2 by default in most sessions). You can choose explicitly with the <code>MCP_SDK_GENERATION</code> environment variable (<code>v1</code> or <code>v2</code>), and <code>MCP_PROTOCOL_NEGOTIATION</code> (<code>auto</code> or <code>legacy</code>) controls whether it asks servers about the newer revision. You rarely need these. They're useful when diagnosing an older server that misbehaves.</p>
+</div></details>
+
+<h3 id="ch99-6"><span class="num">99.6</span>When a server needs more from you</h3>
+<p>Sometimes a server can't finish without more information, for example "which Jira project?" or "please sign in to this second system". The current specification handles this with a pattern called <strong>multi round-trip requests</strong>:</p>
+<div class="flow">
+<div><b>1 · Client asks</b><code>tools/call</code> create_bug</div>
+<div class="hl"><b>2 · Server replies "input required"</b><code>resultType: "input_required"</code> plus what it needs</div>
+<div><b>3 · Host asks you</b>A form or a link appears in Claude Code</div>
+<div><b>4 · Client retries</b>The same call, now including your answers</div>
+<div><b>5 · Server completes</b><code>resultType: "complete"</code></div>
+</div>
+<p>The main kind of "what it needs" is <strong>elicitation</strong>, which has two modes:</p>
+<ul>
+<li><strong>Form mode</strong>: a small structured form, such as choosing a project or confirming a severity. The specification forbids using form mode to ask for passwords, API keys, access tokens or payment details.</li>
+<li><strong>URL mode</strong>: send you to a web page for anything sensitive, such as signing in, so the secret never passes through the AI application.</li>
+</ul>
+<p>Two older client features, <strong>sampling</strong> (a server asking the host's model to generate text) and <strong>roots</strong> (the host telling a server which folders it may use), still work but are <em>deprecated</em> in 2026-07-28, along with server <strong>logging</strong>. New servers shouldn't rely on them. The specification guarantees deprecated features at least twelve months' notice before removal.</p>
+
+<h3 id="ch99-7"><span class="num">99.7</span>How messages travel: transports</h3>
+<p>A <a class="gl" href="#g-transport">transport</a> is the delivery method for those JSON-RPC messages. The meaning of the messages is identical on every transport. There are two standard ones:</p>
+<div class="tbl"><table>
+<tr><th></th><th><a class="gl" href="#g-stdio">stdio</a> (local)</th><th><a class="gl" href="#g-streamable-http">Streamable HTTP</a> (remote)</th></tr>
+<tr><td>How it works</td><td>The host <em>starts the server as a program on your computer</em> and writes messages to its input, reading replies from its output, one message per line</td><td>The server runs somewhere else (a company or vendor server) at one web address, such as <code>https://mcp.example.com/mcp</code>. Each message is an HTTP POST</td></tr>
+<tr><td>Typical use</td><td>Tools that need your machine: a local browser (Playwright), local files, a database on your laptop</td><td>Cloud services: Jira, Confluence, GitHub, Sentry, Notion</td></tr>
+<tr><td>Sign-in</td><td>Credentials come from environment variables you set when adding the server</td><td>Usually OAuth 2.1 sign-in in the browser, or a fixed header such as an API key</td></tr>
+<tr><td>In Claude Code</td><td><code>claude mcp add name -- command args</code></td><td><code>claude mcp add --transport http name URL</code></td></tr>
+</table></div>
+<p>A third option, the older <strong>HTTP+SSE</strong> transport (URLs often ending in <code>/sse</code>), has been deprecated since 2025 in favour of Streamable HTTP. You'll still see it in some setup instructions. Claude Code still accepts <code>--transport sse</code>, and recent versions fall back to SSE automatically when an HTTP server needs it.</p>
+<details class="deep"><summary>Two stdio rules that cause real bugs</summary><div class="body">
+<ul>
+<li>A stdio server must write <em>only</em> MCP messages to its standard output. If a developer adds a debugging <code>print</code> or <code>console.log</code> that writes to standard output, it corrupts the message stream and the host disconnects. Logs belong on standard error (<code>stderr</code>).</li>
+<li>Messages are one per line and must not contain raw line breaks. Line breaks inside text are escaped as <code>\n</code>, as in the weather example above.</li>
+</ul>
+<p>For Streamable HTTP, the specification requires servers to validate the <code>Origin</code> header (to stop malicious web pages reaching a local server) and recommends that local servers listen only on <code>127.0.0.1</code>, not on all network interfaces. These are worth checking in a security test (Chapter 105).</p>
+</div></details>
+
+<h3 id="ch99-8"><span class="num">99.8</span>Signing in: authorization in brief</h3>
+<p>For remote servers, the specification uses <a class="gl" href="#g-oauth">OAuth 2.1</a>, the same standard behind "Sign in with Google". Chapter 98 explains OAuth step by step; here's the shape of it as MCP uses it:</p>
+<div class="flow">
+<div><b>1 · Try</b>The client calls the server without a token</div>
+<div><b>2 · "401 Unauthorized"</b>The server replies with where to find its sign-in details</div>
+<div><b>3 · Discover</b>The client reads the server's metadata and finds its authorization server</div>
+<div class="hl"><b>4 · You sign in</b>A browser opens; you approve the access requested</div>
+<div><b>5 · Token</b>The client receives an access token and sends it as <code>Authorization: Bearer …</code> on each request</div>
+</div>
+<ul>
+<li>Servers should ask only for the <strong>scopes</strong> (permissions) they need, such as "read issues" rather than "administer everything".</li>
+<li>Tokens must be issued <em>for that specific server</em>. A server must reject tokens meant for something else.</li>
+<li>stdio servers don't use this flow; they read credentials from the environment.</li>
+<li>Claude Code runs the browser sign-in for you when you open <code>/mcp</code>, or from the shell with <code>claude mcp login &lt;name&gt;</code>. It stores tokens securely and refreshes them automatically. Non-interactive <code>claude -p</code> runs can't complete a browser sign-in, so sign in interactively first.</li>
+</ul>
+
+<h3 id="ch99-9"><span class="num">99.9</span>One tool call, start to finish, in Claude Code</h3>
+<p>Now put it all together. You type: <em>"Find open P1 bugs in Jira project SHOP and summarise them."</em></p>
+<div class="flow">
+<div><b>1 · Tool list</b>At startup Claude Code learned each server's tools (or their names, with tool search)</div>
+<div><b>2 · Model decides</b>Claude replies with a <em>tool_use</em> request for a Jira search tool and arguments</div>
+<div class="hl"><b>3 · Permission check</b>Claude Code checks your rules for <code>mcp__jira__…</code> and asks you if needed</div>
+<div><b>4 · tools/call</b>The Jira client sends the JSON-RPC request</div>
+<div><b>5 · Server works</b>The server calls Jira's own API with your token</div>
+<div><b>6 · Result</b>Content (or <code>isError</code>) returns; large output is limited or saved to a file</div>
+<div><b>7 · Back to Claude</b>The result joins the context; Claude writes the summary or calls another tool</div>
+</div>
+<h4>How MCP tools are named in Claude Code</h4>
+<p>Inside Claude Code, every MCP tool gets a name with double underscores: <code>mcp__&lt;server&gt;__&lt;tool&gt;</code>. That's the name you use in permission rules:</p>
+<div class="code"><span class="cap">Permission rules for MCP tools (in a settings file)</span><pre>{
+  "permissions": {
+    "allow": [
+      "mcp__jira__search_issues",          <span class="c">// one specific tool, no prompt</span>
+      "mcp__playwright__*"                  <span class="c">// every tool from the playwright server</span>
+    ],
+    "deny": [
+      "mcp__jira__delete_issue"             <span class="c">// never, even if asked</span>
+    ]
+  }
+}</pre></div>
+<ul>
+<li>Server names with dots or spaces become underscores in rule names.</li>
+<li>claude.ai connectors appear as <code>mcp__claude_ai_&lt;server&gt;__&lt;tool&gt;</code>; plugin servers as <code>mcp__plugin_&lt;plugin&gt;_&lt;server&gt;__…</code>.</li>
+<li>The tool names in these examples (<code>search_issues</code>, <code>delete_issue</code>) are illustrations. Run <code>/mcp</code> to see the real names a server offers.</li>
+</ul>
+<h4>Limits that protect your context</h4>
+<p>A single tool result can be huge, such as a database dump or a long log. Claude Code warns when an MCP tool's output exceeds 10,000 tokens and, by default, limits it at 25,000 tokens (adjustable with the <code>MAX_MCP_OUTPUT_TOKENS</code> environment variable). An over-limit result is saved to a file, and Claude is told where it is, so it can read just the part it needs. With many servers connected, <strong>tool search</strong> loads only tool names at the start and fetches full definitions when Claude needs them, so adding servers costs little context.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>It's like a manager with a team of specialists. The manager (Claude) doesn't need every specialist's full manual on the desk all day, just a list of who does what. When a job comes up, the manager pulls that one manual. And if a specialist hands back a 500-page report, it goes in a filing cabinet with a note on the desk saying where it is.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Watch MCP messages yourself</b><span>30 min · terminal · needs Node.js 22.19 or newer</span></div><ol>
+<li>Open the official MCP Inspector with the reference "everything" server, which exists to demonstrate every MCP feature: <code>npx -y @modelcontextprotocol/inspector npx -y @modelcontextprotocol/server-everything</code><span class="expect">a browser tab with the Inspector, connected to the server.</span></li>
+<li>Open the <b>Tools</b> tab and list the tools. Click one and look at its description and input schema.<span class="expect">a list of demo tools, each with a description and a schema describing its arguments. This is the <code>tools/list</code> reply from 92.4.</span></li>
+<li>Run one tool with valid arguments, then again with a wrong or missing argument.<span class="expect">a normal result the first time; the second time either an <code>isError</code> result or a protocol error. Note which kind you got.</span></li>
+<li>Try the same from the command line: <code>npx -y @modelcontextprotocol/inspector --cli npx -y @modelcontextprotocol/server-everything --method tools/list</code><span class="expect">the tool list printed as JSON, ready to save or check in a script.</span></li>
+<li>In a Claude Code session with any MCP server added, run <code>/mcp</code> and open the server's details.<span class="expect">its status, its tools, and their <code>mcp__server__tool</code> names.</span></li>
+</ol></div>
+<div class="box note"><span class="tag">If a command doesn't work</span><p>Package names and Inspector options were checked on 9 November 2026 against the MCP documentation and npm. If something has changed, check the Inspector page on modelcontextprotocol.io. The Inspector runs the server on your computer, so only point it at servers you trust.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Claude connects to the server directly."</dt><dd>The model only requests a tool call. The host (Claude Code) makes the call, after checking your permissions.</dd>
+<dt>"MCP is a product or a server."</dt><dd>It's a protocol: rules for messages. Servers, clients and hosts are built by many different companies.</dd>
+<dt>"If the server says a tool is read-only, it's safe."</dt><dd>Tool descriptions and annotations come from the server and should be treated as untrusted unless you trust the server. Your permission rules are the real safeguard.</dd>
+<dt>"Every MCP server needs OAuth."</dt><dd>Local stdio servers use environment variables, and some remote servers use a fixed API key header. OAuth is the standard for remote servers acting on your behalf.</dd>
+<dt>"SSE and Streamable HTTP are the same."</dt><dd>SSE is the older, deprecated transport. Use Streamable HTTP (<code>--transport http</code>) unless a server's documentation says otherwise.</dd>
+</dl></div>
+
+<h3 id="ch99-r"><span class="num">99.10</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Host (the AI app), client (one per server, inside the host), server (offers capabilities for a system).</li>
+<li>Tools are model-controlled actions, resources are application-driven data, prompts are user-chosen templates.</li>
+<li>All messages are JSON-RPC 2.0: requests and responses matched by <code>id</code>, plus notifications with no reply.</li>
+<li>Version 2026-07-28 made MCP stateless: no <code>initialize</code> handshake, per-request <code>_meta</code>, <code>server/discover</code>, and "input required" replies for elicitation. Older 2025-11-25 servers still work through version negotiation.</li>
+<li>stdio for local programs, Streamable HTTP for remote services; HTTP+SSE is deprecated. Remote sign-in uses OAuth 2.1.</li>
+<li>Tool execution errors (<code>isError: true</code>) are for the model to fix; protocol errors mean the request itself was wrong.</li>
+<li>In Claude Code, MCP tools are named <code>mcp__server__tool</code>, and that's how you allow or deny them.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">In Claude Code connected to Jira and Playwright, how many MCP clients are there?</p><div class="opts"><button>One, shared by both servers</button><button data-ok>Two: one client per server, both inside the host</button><button>None; the model connects directly</button></div><p class="why" hidden>Each server gets its own client inside the host application.</p></div>
+<div class="qz"><p class="q">A message has a <code>method</code> but no <code>id</code>. What is it?</p><div class="opts"><button>A request</button><button>A response</button><button data-ok>A notification, which gets no reply</button></div><p class="why" hidden>Notifications are one-way and must not include an id.</p></div>
+<div class="qz"><p class="q">Jira is down, and the server returns a result with <code>"isError": true</code> and the message "Jira API timed out". What kind of error is this?</p><div class="opts"><button data-ok>A tool execution error that the model can read and react to</button><button>A JSON-RPC protocol error</button><button>A transport failure</button></div><p class="why" hidden>The request was valid; the job failed. That's reported inside a normal result.</p></div>
+<div class="qz"><p class="q">What did MCP version 2026-07-28 remove?</p><div class="opts"><button>Tools</button><button data-ok>The initialize handshake and protocol-level sessions</button><button>JSON-RPC</button></div><p class="why" hidden>Every request now carries its version and capabilities in <code>_meta</code>.</p></div>
+<div class="qz"><p class="q">Which permission rule allows every tool from a server named playwright?</p><div class="opts"><button><code>playwright:*</code></button><button data-ok><code>mcp__playwright__*</code></button><button><code>Bash(playwright *)</code></button></div><p class="why" hidden>MCP tools are named <code>mcp__server__tool</code>.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick one MCP server your team uses or plans to use. Using the Inspector or <code>/mcp</code>, document its tools in a table: tool name, what its description says, its required arguments, and whether it reads or changes data. Then mark each tool <em>allow</em>, <em>ask</em> or <em>deny</em> for your team, and write the matching permission rules. That table is a real deliverable for any team adopting MCP.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"MCP is a message format between an AI app and a tool. The app is the host; it runs one client per server. Servers offer tools (actions the model chooses), resources (data you attach) and prompts (templates you pick). Messages are JSON-RPC: requests and replies matched by an id. Local servers run as programs on your machine over stdio; remote ones are web addresses using HTTP and OAuth sign-in. In Claude Code every tool is called <code>mcp__server__tool</code>, and that's what you allow or deny."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Model Context Protocol, <a href="https://modelcontextprotocol.io/specification/2026-07-28" target="_blank" rel="noopener">Specification, version 2026-07-28</a>: overview, architecture, base protocol, versioning, transports, authorization, tools, resources, prompts and elicitation pages.</li>
+<li>Model Context Protocol, <a href="https://modelcontextprotocol.io/specification/2026-07-28/changelog" target="_blank" rel="noopener">Key changes in 2026-07-28</a> and <a href="https://modelcontextprotocol.io/specification/2026-07-28/deprecated" target="_blank" rel="noopener">Deprecated features</a>.</li>
+<li>JSON-RPC Working Group, <a href="https://www.jsonrpc.org/specification" target="_blank" rel="noopener">JSON-RPC 2.0 Specification</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/mcp" target="_blank" rel="noopener">Connect Claude Code to tools via MCP</a>: client runtimes, OAuth, output limits and tool search.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/permissions" target="_blank" rel="noopener">Claude Code permissions</a>: MCP tool naming in rules.</li>
+<li>Model Context Protocol, <a href="https://modelcontextprotocol.io/docs/2026-07-28/tools/inspector" target="_blank" rel="noopener">MCP Inspector</a>.</li>
+</ol><p class="verified">Verified 9 November 2026 against MCP specification 2026-07-28 and Claude Code 2.1.319 documentation.</p></div>

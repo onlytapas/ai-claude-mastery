@@ -1,0 +1,546 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What changes when a RAG demo becomes a production system people rely on</li>
+<li>How to ingest and clean PDFs, web pages and wiki content, and how to chunk them with useful metadata</li>
+<li>How to choose embeddings and a vector store, and why hybrid search (BM25 plus vectors) with reranking beats either alone</li>
+<li>How Anthropic's contextual retrieval works, what it costs, and what it achieved in Anthropic's tests</li>
+<li>How to get answers with verifiable citations from Claude using search result blocks</li>
+<li>How to enforce permissions, keep the index fresh, evaluate retrieval and answers, control cost, and recognise the common failure modes</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch23">Chapter 23</a> (RAG concepts: the pipeline, chunking, embeddings, keyword versus semantic search) and <a href="#ch15">Chapter 15</a> (embeddings). <a href="#ch86">Chapter 86</a> (Claude API calls), <a href="#ch90">Chapter 90</a> (caching and cost) and <a href="#ch125">Chapter 125</a> (evals) are used throughout. <a href="#ch93">Chapter 93</a> then builds a complete RAG assistant project.</div>
+
+<div class="bigidea"><p><a class="gl" href="#g-rag">RAG</a> (retrieval-augmented generation) looks simple in a demo: split some documents, embed them, find the closest chunks, paste them into the prompt. In production it is mostly a <em>data and search engineering</em> problem, not a prompting problem. Answers are only as good as the text you extracted, the way you cut it up, the metadata you kept, and the search that finds it. A production system adds permission checks so people only see what they're allowed to, keeps the index in step with changing documents, cites its sources so answers can be checked, and is measured with an evaluation set so you know when it gets better or worse. This chapter walks through each stage, with a working, offline Python core you can test.</p></div>
+
+<h3 id="ch92-1"><span class="num">92.1</span>From demo to production</h3>
+<p>A RAG demo answers ten hand-picked questions about five clean documents. A production RAG system answers thousands of unpredictable questions about tens of thousands of messy, changing, partly confidential documents, and people make decisions based on its answers.</p>
+<div class="tbl"><table>
+<tr><th>Concern</th><th>Typical demo</th><th>Production</th></tr>
+<tr><td>Sources</td><td>A folder of clean text files</td><td>Confluence, SharePoint, PDFs, Jira, Git, web pages; each with its own format and quirks</td></tr>
+<tr><td>Chunking</td><td>Every 500 characters</td><td>Structure-aware, with headings, tables and code handled deliberately</td></tr>
+<tr><td>Search</td><td>Vector similarity only</td><td>Hybrid keyword + vector, metadata filters, reranking</td></tr>
+<tr><td>Answers</td><td>"Based on the documents…"</td><td>Every claim cited to a specific passage that the user can open</td></tr>
+<tr><td>Permissions</td><td>None</td><td>Users only ever retrieve chunks they could open in the source system</td></tr>
+<tr><td>Freshness</td><td>Indexed once</td><td>Changes, deletions and moves flow through within a known time</td></tr>
+<tr><td>Quality</td><td>"Looks good to me"</td><td>A golden question set, retrieval and answer metrics, a CI gate</td></tr>
+<tr><td>Cost</td><td>Ignored</td><td>Budgeted per question and per re-index</td></tr>
+</table></div>
+<p>A production RAG system has two pipelines that share one index:</p>
+<div class="flow"><div><b>Ingest</b>pull from sources, extract text</div><div><b>Clean</b>strip boilerplate, de-duplicate</div><div><b>Chunk</b>split by structure, attach metadata</div><div><b>Enrich</b>contextual notes (optional)</div><div class="hl"><b>Index</b>embeddings + keyword index + metadata</div></div>
+<div class="flow"><div><b>Question</b>plus the user's identity</div><div><b>Filter</b>permissions, product, date</div><div class="hl"><b>Retrieve</b>hybrid search, then rerank</div><div><b>Generate</b>Claude answers from the results</div><div><b>Cite</b>link each claim to its source</div></div>
+<div class="box note"><span class="tag">Do you need RAG at all?</span><p>Anthropic's contextual retrieval article makes a point worth repeating: if your knowledge base is smaller than about 200,000 tokens (roughly 500 pages), you can often put all of it in the prompt and use prompt caching (<a href="#ch90">Chapter 90</a>) to keep it fast and cheap. Current Claude models have a 1M-token context window. RAG earns its complexity when the material is too big, changes too often, or has per-user permissions.</p></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A demo is a friend who has read your five favourite books and answers questions about them. Production is a reference library: books arrive and are withdrawn every day, some rooms need a staff badge, the catalogue must be kept accurate, and the librarian is expected to tell you exactly which page an answer came from.</p></div>
+
+<h3 id="ch92-2"><span class="num">92.2</span>Ingestion: getting clean text out</h3>
+<p><a class="gl" href="#g-ingestion">Ingestion</a> collects documents from their source systems and turns them into clean text plus metadata. It's the least glamorous stage and the one that decides most of your quality. If extraction mangles a table, no embedding model will fix it.</p>
+<div class="tbl"><table>
+<tr><th>Source</th><th>How it usually arrives</th><th>Common problems</th><th>What to do</th></tr>
+<tr><td><b>Wiki pages</b> (Confluence and similar)</td><td>The tool's REST API returns HTML or a storage format; pages have IDs, versions, labels, parents and permissions</td><td>Macros, expand sections, attachments, navigation and "related pages" boilerplate; page permissions inherited from parents</td><td>Use the API rather than scraping; keep page ID, version, space and last-modified; fetch permissions too (92.9)</td></tr>
+<tr><td><b>PDFs</b></td><td>Files from shares or uploads</td><td>Headers and footers repeated on every page; multi-column layouts read in the wrong order; tables flattened into word soup; scanned pages with no text at all</td><td>Use a layout-aware extractor; drop repeated headers/footers; detect pages with no text layer and send them to OCR or flag them; keep page numbers for citations</td></tr>
+<tr><td><b>HTML / web pages</b></td><td>Crawled or exported</td><td>Menus, cookie banners, footers and sidebars outweigh the content</td><td>Extract the main content element; keep headings (<code>h1</code>–<code>h4</code>) as structure</td></tr>
+<tr><td><b>Tickets</b> (Jira and similar)</td><td>API, often as JSON</td><td>Most value is in comments and links, not the description; huge auto-generated logs</td><td>Combine summary, description, key comments and resolution; truncate pasted logs; keep the issue key</td></tr>
+<tr><td><b>Code and Markdown</b> (Git)</td><td>Repository checkout</td><td>Generated files, vendored libraries, binary assets</td><td>Allow-list file types; respect <code>.gitignore</code>; keep the path and commit</td></tr>
+</table></div>
+<h4>Cleaning checklist</h4>
+<ul>
+<li><strong>Normalise</strong> whitespace, Unicode (curly quotes, non-breaking spaces) and line endings.</li>
+<li><strong>Remove boilerplate</strong> that appears on every page; otherwise every chunk looks similar to every query.</li>
+<li><strong>De-duplicate.</strong> The same release checklist copied into three spaces gives three near-identical chunks that crowd out everything else. Hash normalised text to find exact copies; flag near-duplicates for an owner to resolve.</li>
+<li><strong>Keep a stable ID</strong> for every document (page ID, file path, issue key). Everything later (updates, deletes, citations, permissions) depends on it.</li>
+<li><strong>Quarantine failures.</strong> A document that extracts to nearly nothing (a scanned PDF, a page that is just an embedded diagram) should be logged and reported, not silently indexed as empty.</li>
+</ul>
+<div class="box example"><span class="tag">Real-world example: the footer that won every search</span><p>A team indexed 4,000 PDF test reports. Every page ended with "Confidential. Test Report Template v3. Page N of M. Contact qa-office for questions about this report." Questions containing the words "test report" retrieved footers instead of findings. Stripping lines that repeated on most pages of a document fixed it. A tester spotted it by reading the top five retrieved chunks for ten real questions: the cheapest and most effective RAG test there is.</p></div>
+<div class="box warn"><span class="tag">Documents are untrusted input</span><p>Anything you ingest can contain text written to manipulate the model ("ignore your instructions and…"). This is indirect <a class="gl" href="#g-prompt-injection">prompt injection</a>. Treat retrieved text as data, never as instructions: keep it clearly separated from your instructions, and don't give a RAG assistant tools that can act on what it reads without checks (<a href="#ch88">Chapter 88</a>, <a href="#ch130">Chapter 130</a>).</p></div>
+
+<h3 id="ch92-3"><span class="num">92.3</span>Chunking strategies and sizes</h3>
+<p><a class="gl" href="#g-chunking">Chunking</a> decides the unit of retrieval. Too small and a chunk loses its meaning ("It must finish in under 10 minutes": what must?). Too large and one chunk mixes several topics, matches weakly, and wastes prompt space.</p>
+<div class="tbl"><table>
+<tr><th>Strategy</th><th>How it works</th><th>Good for</th><th>Watch out for</th></tr>
+<tr><td><b>Fixed size with overlap</b></td><td>Cut every N tokens, repeating the last few as the start of the next chunk</td><td>Plain prose with little structure; a quick baseline</td><td>Cuts through sentences, tables and lists</td></tr>
+<tr><td><b>Structure-aware</b></td><td>Split on headings, then paragraphs, then sentences, until pieces fit a size limit; keep the heading path with each piece</td><td>Wikis, docs, Markdown, HTML: most company content</td><td>Very short sections; merge them with neighbours</td></tr>
+<tr><td><b>Semantic</b></td><td>Start a new chunk where the topic shifts, detected with embeddings</td><td>Long transcripts and unstructured text</td><td>Extra cost and less predictable sizes</td></tr>
+<tr><td><b>Parent–child ("small-to-big")</b></td><td>Search small chunks for precision, then send their larger parent section to the model</td><td>Questions answered by one sentence but understood only in context</td><td>More storage and bookkeeping</td></tr>
+<tr><td><b>Unit-based</b></td><td>One chunk per natural unit: one test case, one Jira issue, one API endpoint, one FAQ entry</td><td>Structured records</td><td>Units that are huge (split them) or tiny (fine)</td></tr>
+</table></div>
+<p><strong>Sizes.</strong> There is no universally right size; measure it with your evaluation set (92.11). As an illustration only, many teams start somewhere around a few hundred tokens per chunk with 10–20% overlap and tune from there. Anthropic's contextual retrieval cost estimate assumed 800-token chunks. Whatever you choose, check that your embedding model's input limit is larger than your biggest chunk, or the end of the chunk is silently ignored.</p>
+<div class="box example"><span class="tag">Real-world example: tables and test cases</span><p>A requirements document has a table of 40 validation rules. Fixed-size chunking slices it into fragments where row 23's error message sits in a different chunk from its field name. Better: convert each row into a self-contained sentence ("Field: postcode. Rule: required. Error: 'Enter a postcode'") or keep the whole table as one chunk with its caption and header row repeated. Treat code blocks the same way: never split a function in the middle.</p></div>
+
+<h3 id="ch92-4"><span class="num">92.4</span>Metadata: the part demos skip</h3>
+<p>Each chunk should carry structured fields alongside its text. Metadata powers <a class="gl" href="#g-metadata-filter">metadata filters</a>, citations, permissions and freshness. Adding it later means re-ingesting everything, so design it up front.</p>
+<div class="tbl"><table>
+<tr><th>Field</th><th>Example</th><th>Used for</th></tr>
+<tr><td><code>doc_id</code>, <code>chunk_id</code></td><td><code>TS-01</code>, <code>TS-01#0</code></td><td>Updates, deletes, de-duplication, evaluation labels</td></tr>
+<tr><td><code>title</code>, <code>section</code> path</td><td>Test strategy › Smoke suite</td><td>Context for the model; citation display; contextual headers</td></tr>
+<tr><td><code>url</code> / source link</td><td><code>kb://test-strategy</code></td><td>Clickable citations</td></tr>
+<tr><td><code>source</code> system, <code>space</code>/project</td><td>confluence / QA</td><td>Filters ("only release docs"), debugging</td></tr>
+<tr><td><code>acl</code> (allowed groups)</td><td><code>["qa", "dev"]</code></td><td>Permission filtering before retrieval</td></tr>
+<tr><td><code>updated</code>, <code>version</code></td><td>2026-10-02, v14</td><td>Freshness, preferring newer content, showing dates to users</td></tr>
+<tr><td><code>owner</code></td><td>qa-platform team</td><td>Routing "this answer is wrong" feedback to someone who can fix the source</td></tr>
+<tr><td><code>hash</code></td><td>sha256 of the chunk text</td><td>Detecting what changed so you only re-embed that</td></tr>
+<tr><td><code>product</code>, <code>release</code>, <code>language</code></td><td>payments, 26.4, en</td><td>Scoping answers to the right product or version</td></tr>
+</table></div>
+<p>Metadata can also be added to the chunk <em>text</em>. Prefixing "Test strategy › Smoke suite:" to the chunk is a cheap form of context that helps both keyword and vector search. Contextual retrieval (92.7) takes the idea further.</p>
+
+<h3 id="ch92-5"><span class="num">92.5</span>Embeddings and vector stores</h3>
+<p>An <a class="gl" href="#g-embedding-model">embedding model</a> turns each chunk into a <a class="gl" href="#g-vector">vector</a>; similar meanings give nearby vectors (<a href="#ch15">Chapter 15</a>). Claude generates text; Anthropic doesn't offer its own embedding model. Anthropic's documentation describes Voyage AI (part of MongoDB) as one provider and advises assessing several vendors. <span class="vchip">Verified 9 Nov 2026</span></p>
+<h4>Choosing an embedding model</h4>
+<ul>
+<li><strong>Retrieval quality on <em>your</em> data.</strong> Public leaderboards are a starting point. Your golden set is the judge.</li>
+<li><strong>Domain.</strong> Specialised models exist for code, law and finance. Voyage, for example, lists <code>voyage-code-4</code> for code retrieval alongside general models such as <code>voyage-4</code>, <code>voyage-4-large</code> and <code>voyage-4-lite</code>, and an open-weight <code>voyage-4-nano</code> you can run yourself.</li>
+<li><strong>Query versus document mode.</strong> Many models embed queries and documents slightly differently. Voyage's API takes <code>input_type="query"</code> or <code>"document"</code>, and its docs say not to omit it for retrieval.</li>
+<li><strong>Dimensions and storage.</strong> More dimensions can hold more nuance but cost more storage and search time. Some models let you choose (Voyage 4 models offer 256 to 2048) or quantise vectors to 8-bit or 1-bit values to cut storage.</li>
+<li><strong>Data handling.</strong> Sending documents to an external embedding API is a data-sharing decision. A local open-weight model keeps text in-house (<a href="#ch93">Chapter 93</a> uses one).</li>
+</ul>
+<div class="code"><span class="cap">Python: embedding documents and a query with Voyage AI (as shown in Anthropic's docs)</span><pre>import voyageai                       <span class="c"># pip install -U voyageai ; key in VOYAGE_API_KEY</span>
+
+vo = voyageai.Client()
+docs = ["Smoke suite runs on every pull request and must finish in under 10 minutes.",
+        "Rollback must be possible within 15 minutes using the blue-green switch."]
+doc_vectors = vo.embed(docs, model="voyage-4", input_type="document").embeddings
+query_vector = vo.embed(["How long may the smoke suite take?"],
+                        model="voyage-4", input_type="query").embeddings[0]
+<span class="c"># Voyage vectors are normalised to length 1, so a dot product equals cosine similarity.</span></pre></div>
+<div class="box warn"><span class="tag">Changing embedding model means re-embedding everything</span><p>Vectors from different models (or different versions or dimensions of one model) live in different "spaces" and can't be compared. If you switch, re-embed the whole corpus into a new index, evaluate it, then switch traffic over. Record the model name and version in the index's own metadata.</p></div>
+<h4>Where the vectors live</h4>
+<p>A <a class="gl" href="#g-vector-database">vector database</a> stores vectors with their metadata and finds nearest neighbours quickly. Options fall into a few families: a vector extension for a database you already run (such as PostgreSQL), a dedicated vector database, a search engine that supports both keyword and vector search, or a small embedded library for prototypes. What to check:</p>
+<div class="tbl"><table>
+<tr><th>Need</th><th>Question to ask of any store</th></tr>
+<tr><td>Hybrid search</td><td>Can it do keyword (BM25-style) and vector search, or will you run two systems and fuse results yourself?</td></tr>
+<tr><td>Filtering</td><td>Can it filter on metadata (groups, product, date) <em>during</em> the vector search, not only afterwards?</td></tr>
+<tr><td>Updates and deletes</td><td>Can you update or delete by <code>doc_id</code> cheaply and immediately?</td></tr>
+<tr><td>Scale and latency</td><td>How does query time grow with millions of chunks?</td></tr>
+<tr><td>Operations</td><td>Backups, access control, hosting location, who runs it</td></tr>
+</table></div>
+<details class="deep"><summary>Under the hood: approximate nearest neighbour search</summary><div class="body">
+<p>Comparing a query against every one of ten million vectors is too slow. Vector stores use <strong>approximate nearest neighbour</strong> (ANN) indexes instead. A popular one, HNSW (hierarchical navigable small world graphs), links each vector to a few close neighbours in layered graphs and walks the graph from a coarse layer to a fine one, visiting only a small fraction of the vectors.</p>
+<p>"Approximate" is literal: ANN search can miss a true nearest neighbour. Index settings trade recall for speed. Your retrieval evaluation should run against the real index, not an exact brute-force search in a notebook, or you'll overestimate quality.</p>
+<p>Filtering interacts with ANN. If you search for the top 20 and <em>then</em> remove chunks the user can't see, you may end up with 3 results or none. Stores that filter during the search avoid this.</p>
+</div></details>
+
+<h3 id="ch92-6"><span class="num">92.6</span>Hybrid search and reranking</h3>
+<p>Chapter 23 explained why neither search method is enough alone. Vectors understand that "revert a deployment" is close to "rollback", but they blur exact identifiers: <code>QA-1432</code> and <code>QA-1423</code> embed almost identically. <a class="gl" href="#g-bm25">BM25</a> keyword search nails identifiers, error codes and rare terms but misses synonyms. <a class="gl" href="#g-hybrid-search">Hybrid search</a> runs both and merges the results.</p>
+<h4>Merging rankings with reciprocal rank fusion</h4>
+<p>The two searches produce scores on completely different scales, so you can't just add them. <a class="gl" href="#g-reciprocal-rank-fusion">Reciprocal rank fusion</a> (RRF) ignores the scores and uses only positions:</p>
+<div class="code"><span class="cap">RRF score for a chunk</span><pre>RRF(chunk) = Σ over each ranking of  1 / (k + rank of chunk in that ranking)
+             <span class="c"># k = 60 in the original paper (Cormack, Clarke and Büttcher, 2009)</span>
+
+Example: a chunk ranked 1st by BM25 and 4th by vectors:
+         1/(60+1) + 1/(60+4) = 0.0164 + 0.0156 = 0.0320
+A chunk ranked 2nd by vectors only:
+         1/(60+2)            = 0.0161</pre></div>
+<p>Chunks that both methods like rise to the top. RRF is simple, needs no tuning to start, and is a common default. Weighted score blending is the main alternative when you have data to tune the weights.</p>
+<h4>Reranking</h4>
+<p>First-stage retrieval is fast but rough: it compares a query vector with chunk vectors computed separately. A <a class="gl" href="#g-reranking">reranker</a> is a model that reads the query and each candidate chunk <em>together</em> and scores how well the chunk answers the question. It's slower and more accurate, so you use it on a shortlist.</p>
+<div class="flow"><div><b>Hybrid retrieve</b>top ~100–150 candidates (illustrative)</div><div class="hl"><b>Rerank</b>score each candidate against the query</div><div><b>Keep</b>top ~20 for the prompt</div></div>
+<p>Rerankers are offered by several vendors; for example, Voyage AI lists <code>rerank-3</code> and <code>rerank-3-lite</code>, and Anthropic's contextual retrieval experiments used Cohere's reranker. In those experiments Anthropic also found that passing the top 20 chunks to the model worked better than the top 10 or top 5. Treat that as a starting point to test, not a law.</p>
+<div class="box example"><span class="tag">Real-world example: the ticket number</span><p>A tester asks "What was the root cause of QA-1432?" Vector-only search returns QA-1423, QA-1342 and QA-1432 in roughly random order, because the numbers barely change the embedding. BM25 puts QA-1432 first because the exact token matches. With RRF, the right ticket wins. Always include identifier questions in your evaluation set.</p></div>
+
+<h3 id="ch92-7"><span class="num">92.7</span>Contextual retrieval</h3>
+<p>Chunks lose context when cut out of their document. "Revenue grew 3% over the previous quarter" doesn't say which company or which quarter; "It must finish in under 10 minutes" doesn't say what "it" is. In September 2024 Anthropic published <a class="gl" href="#g-contextual-retrieval">contextual retrieval</a>: before indexing, ask a model to write a short note situating each chunk in its whole document, and prepend that note to the chunk for <em>both</em> the embeddings ("contextual embeddings") and the BM25 index ("contextual BM25"). <span class="vchip">Verified 9 Nov 2026</span></p>
+<div class="figure" role="img" aria-label="Anthropic-reported top-20 retrieval failure rates: baseline 5.7%, contextual embeddings 3.7%, contextual embeddings plus contextual BM25 2.9%, plus reranking 1.9%"><div class="bars"><div class="bt">Top-20 chunk retrieval failure rate (lower is better)</div>
+<div class="bar-row"><span>Baseline</span><span class="track"><span class="fill" style="width:100%">5.7%</span></span></div>
+<div class="bar-row"><span>Contextual embeddings</span><span class="track"><span class="fill" style="width:65%">3.7%</span></span></div>
+<div class="bar-row"><span>+ Contextual BM25</span><span class="track"><span class="fill" style="width:51%">2.9%</span></span></div>
+<div class="bar-row"><span>+ Reranking</span><span class="track"><span class="fill hl" style="width:33%">1.9%</span></span></div></div>
+<div class="cap">Source: Anthropic, "Introducing Contextual Retrieval" (19 September 2024): reductions of 35%, 49% and 67%. Results are vendor-reported on Anthropic's own test sets; measure on yours.</div></div>
+<p>Key details from the article:</p>
+<ul>
+<li>The added context is usually 50–100 tokens per chunk.</li>
+<li>The prompt asks the model to "give a short succinct context to situate this chunk within the overall document" and to "answer only with the succinct context and nothing else".</li>
+<li>Because each chunk's request includes the whole document, prompt caching is what makes it affordable: the document is cached once and reused for each of its chunks. Anthropic estimated the one-time cost at <strong>$1.02 per million document tokens</strong>, assuming 800-token chunks, 8,000-token documents, 50 tokens of instructions and 100 tokens of context per chunk. That figure used 2024 model prices; re-estimate with today's.</li>
+<li>Gemini and Voyage embeddings did particularly well in their tests.</li>
+</ul>
+<div class="code"><span class="cap">contextualise.py: add context notes before indexing (adapted; needs an API key)</span><pre>"""contextualise.py - add a short context note to each chunk before indexing.
+Adapted from Anthropic's contextual retrieval technique. Needs ANTHROPIC_API_KEY."""
+import anthropic
+
+client = anthropic.Anthropic()
+
+def contextualise(document_text, chunks, model="claude-haiku-5-5"):
+    notes = []
+    for chunk in chunks:
+        msg = client.messages.create(
+            model=model,
+            max_tokens=200,
+            system=[{
+                "type": "text",
+                "text": "&lt;document&gt;\n" + document_text + "\n&lt;/document&gt;",
+                "cache_control": {"type": "ephemeral"},   # the document is cached once, reused per chunk
+            }],
+            messages=[{"role": "user", "content":
+                "&lt;chunk&gt;\n" + chunk + "\n&lt;/chunk&gt;\n"
+                "Please give a short succinct context to situate this chunk within the "
+                "overall document, to improve search retrieval of the chunk. "
+                "Answer only with the succinct context and nothing else."}],
+        )
+        note = "".join(b.text for b in msg.content if b.type == "text").strip()
+        notes.append(note + "\n\n" + chunk)   # index THIS text for both BM25 and embeddings
+    return notes</pre></div>
+<div class="box note"><span class="tag">An embedding-side alternative</span><p>Some embedding providers now build document context into the embedding itself. Voyage, for example, lists <code>voyage-context-4</code>, a "contextualized chunk embedding" model that produces chunk vectors capturing full document context without manual augmentation. That helps the vector side; contextual notes added to the text also help BM25. Evaluate both if retrieval misses are your main problem.</p></div>
+
+<h3 id="ch92-8"><span class="num">92.8</span>Generating answers with citations</h3>
+<p>A production answer must be checkable. The Claude API has built-in <a class="gl" href="#g-citation">citation</a> support, and for RAG the most direct form is the <code>search_result</code> content block: you pass each retrieved chunk with its source and title, and Claude's answer comes back with citations pointing at the exact passages. <span class="vchip">Verified 9 Nov 2026</span></p>
+<div class="code"><span class="cap">Request: retrieved chunks as search_result blocks</span><pre>{
+  "model": "claude-opus-5-5",
+  "max_tokens": 1000,
+  "messages": [{
+    "role": "user",
+    "content": [
+      {
+        "type": "search_result",
+        "source": "kb://test-strategy",
+        "title": "Test strategy - Smoke suite (updated 2026-10-02)",
+        "content": [{"type": "text", "text": "Test strategy &gt; Smoke suite: It runs on every pull request. It must finish in under 10 minutes. Failures block the merge."}],
+        "citations": {"enabled": true}
+      },
+      {"type": "text", "text": "How long may the smoke suite take? Answer only from the search results. If they do not contain the answer, say you don't know."}
+    ]
+  }]
+}</pre></div>
+<div class="code"><span class="cap">Response (shape): text blocks carry citations</span><pre>"content": [
+  {"type": "text", "text": "The smoke suite "},
+  {"type": "text", "text": "must finish in under 10 minutes",
+   "citations": [{
+     "type": "search_result_location",
+     "source": "kb://test-strategy",
+     "title": "Test strategy - Smoke suite (updated 2026-10-02)",
+     "cited_text": "Test strategy &gt; Smoke suite: It runs on every pull request. ...",
+     "search_result_index": 0,
+     "start_block_index": 0,
+     "end_block_index": 1
+   }]},
+  {"type": "text", "text": ", and failures block the merge."}
+]</pre></div>
+<ul>
+<li><code>search_result</code> blocks can go directly in a user message (as above) or be returned from your own search tool in a <code>tool_result</code>, so Claude can decide when to search (<a href="#ch89">Chapter 89</a>).</li>
+<li><code>source</code> can be any stable string: a URL or an internal ID such as <code>kb://article-1234</code>. Use something your UI can turn into a link.</li>
+<li>Citations are off by default and all search results in a request must use the same setting.</li>
+<li><code>cited_text</code> doesn't count toward output tokens.</li>
+<li>Citations can't be combined with structured outputs (<code>output_config.format</code>); the API returns a 400. If you need both, ask for one line per field with citations and parse the lines yourself, as Anthropic's docs show.</li>
+<li>For whole documents rather than chunks, <code>document</code> blocks with <code>"citations": {"enabled": true}</code> return <code>char_location</code> (plain text) or <code>page_location</code> (PDF) citations instead.</li>
+</ul>
+<div class="box warn"><span class="tag">A citation is a pointer, not a proof</span><p>The API guarantees citations point at real passages you supplied. It doesn't guarantee the passage actually supports the sentence it's attached to, or that every sentence has a citation. Test for both (92.11), and show users the cited text so they can judge.</p></div>
+<h4>Prompt habits that reduce wrong answers</h4>
+<ul>
+<li>Tell Claude to answer only from the provided results and to say when they don't contain the answer. An honest "I don't know" is a correct output; test that it happens.</li>
+<li>Include the <code>updated</code> date in each title, and tell Claude to prefer the newest source when two conflict and to mention the conflict.</li>
+<li>Keep instructions separate from retrieved text, and never let retrieved text change what tools may do.</li>
+</ul>
+
+<h3 id="ch92-9"><span class="num">92.9</span>Access control and permissions</h3>
+<p>The most serious production RAG bug isn't a wrong answer; it's a <em>right</em> answer given to someone who shouldn't see it. If the security test policy is restricted to the security team in Confluence, a RAG assistant must not quote it to a contractor, even if the question is innocent. The principle is <a class="gl" href="#g-least-privilege">least privilege</a>: users retrieve only what they could open in the source system.</p>
+<div class="flow"><div><b>Sync</b>copy each document's allowed users/groups into chunk metadata</div><div><b>Identify</b>the asking user and their groups, from your login system</div><div class="hl"><b>Filter first</b>search only chunks the user may see</div><div><b>Generate</b>Claude only ever receives permitted text</div><div><b>Audit</b>log who asked, what was retrieved</div></div>
+<div class="tbl"><table>
+<tr><th>Approach</th><th>How</th><th>Trade-off</th></tr>
+<tr><td><b>Pre-filter (recommended default)</b></td><td>Apply the user's groups as a metadata filter inside the search</td><td>Needs a store that filters efficiently during search</td></tr>
+<tr><td><b>Post-filter</b></td><td>Search everything, then drop forbidden chunks</td><td>Simple, but can leave too few results; any bug leaks data</td></tr>
+<tr><td><b>Separate indexes</b></td><td>One index per team, tenant or classification level</td><td>Strong isolation, more to run; good for multi-customer products</td></tr>
+<tr><td><b>Check at source</b></td><td>Before showing results, ask the source system whether the user can still open each document</td><td>Most accurate; adds latency and depends on source APIs</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Never enforce permissions in the prompt</span><p>"Don't reveal restricted documents to non-security users" in a system prompt is not access control. If restricted text reaches the model, assume it can reach the user. Filter before generation, and test it with a user who lacks access (the lab does this).</p></div>
+<ul>
+<li><strong>Permissions change.</strong> Someone leaves a group, a page is restricted. Sync permission changes on the same schedule as content changes, or faster, and test that revocation takes effect.</li>
+<li><strong>Deletions are permissions too.</strong> A deleted document must disappear from the index, its vectors and any answer caches. Data-protection requests may legally require it (<a href="#ch132">Chapter 132</a>).</li>
+<li><strong>Logs contain data.</strong> Questions and retrieved chunks in your logs inherit the sensitivity of the documents. Protect and expire them.</li>
+</ul>
+
+<h3 id="ch92-10"><span class="num">92.10</span>Freshness and re-indexing</h3>
+<p>Documents change. A RAG assistant that confidently quotes last quarter's release criteria is worse than none. Freshness means changes, moves and deletions reach the index within a known, agreed time.</p>
+<div class="tbl"><table>
+<tr><th>Technique</th><th>What it does</th></tr>
+<tr><td><b>Change detection by hash</b></td><td>Hash each chunk's text; on each sync, re-embed only chunks whose hash changed, add new ones, delete missing ones. Cheap, and the lab implements it.</td></tr>
+<tr><td><b>Event-driven updates</b></td><td>Use the source system's webhooks or change feeds ("page updated", "issue closed") to re-index within minutes</td></tr>
+<tr><td><b>Scheduled full sync</b></td><td>A nightly or weekly sweep catches anything events missed, including deletions and permission changes</td></tr>
+<tr><td><b>Index versioning</b></td><td>Build a new index alongside the old (for a new chunker or embedding model), evaluate it, then switch over, like a blue-green deployment</td></tr>
+<tr><td><b>Show dates</b></td><td>Display "source updated 2 Oct 2026" with each citation, so users can judge staleness</td></tr>
+</table></div>
+<p>Remember that changing the chunking rules changes chunk IDs and boundaries. Treat it as a full re-index, not an incremental update.</p>
+<div class="box example"><span class="tag">Real-world example: the two release checklists</span><p>An old release checklist allowed 5 open P2 bugs; the new one allows 3. Both were indexed, because the old page was archived but not deleted. The assistant quoted whichever chunk ranked higher that day. Fixes: exclude archived spaces at ingestion, put the update date into each chunk's title, instruct Claude to prefer the newest source and mention conflicts, and add "how many P2 bugs can be open?" to the golden set with the current answer.</p></div>
+
+<h3 id="ch92-11"><span class="num">92.11</span>Evaluating a RAG system</h3>
+<p>Evaluate retrieval and generation <strong>separately</strong>. If the right chunk was never retrieved, no prompt will fix the answer; if it was retrieved and the answer is still wrong, the problem is generation. <a href="#ch125">Chapter 125</a> covers evals in general; here are the RAG-specific measures.</p>
+<div class="tbl"><table>
+<tr><th>Stage</th><th>Metric</th><th>Plain meaning</th><th>How to measure</th></tr>
+<tr><td rowspan="3">Retrieval</td><td><a class="gl" href="#g-recall-k">Recall@k</a></td><td>Did the right chunk appear in the top k?</td><td>Golden set with labelled chunk IDs; exact code check</td></tr>
+<tr><td>Precision@k</td><td>What share of the top k was relevant?</td><td>Labelled relevance; matters for cost and distraction</td></tr>
+<tr><td>MRR (mean reciprocal rank)</td><td>How high was the first right chunk? 1st = 1, 2nd = 0.5, 3rd = 0.33</td><td>Average of 1/rank over questions</td></tr>
+<tr><td rowspan="4">Generation</td><td><a class="gl" href="#g-faithfulness">Faithfulness</a></td><td>Is every claim supported by the retrieved text?</td><td><a class="gl" href="#g-llm-as-judge">LLM-as-judge</a> with a rubric, spot-checked by people</td></tr>
+<tr><td>Correctness</td><td>Does it match the <a class="gl" href="#g-golden-answer">golden answer</a>?</td><td>Key facts check in code, or judge</td></tr>
+<tr><td>Citation accuracy</td><td>Does each cited passage support its sentence?</td><td>Judge per citation; human sample</td></tr>
+<tr><td>Abstention</td><td>Does it say "I don't know" when the answer isn't in the sources?</td><td>Include unanswerable questions; code check</td></tr>
+<tr><td>Security</td><td>Permission leaks</td><td>Did a user retrieve anything they can't access?</td><td>Questions asked as low-privilege users; must be zero</td></tr>
+</table></div>
+<h4>Building the golden set</h4>
+<ul>
+<li>Start with 30–100 real questions (illustrative range) from support channels, search logs or testers, not questions you invented while reading the documents.</li>
+<li>Label the chunk(s) that answer each one, and a short golden answer.</li>
+<li>Include the hard cases on purpose: identifiers (QA-1432), synonyms ("revert" for "rollback"), questions spanning two documents, questions with no answer, questions from users without access, and recently changed facts.</li>
+<li>Re-label when documents change; a stale golden set fails the right answers.</li>
+</ul>
+<div class="box note"><span class="tag">Evaluate at chunk level</span><p>Checking only "was the right <em>document</em> retrieved?" hides problems: the lab's first version counted a hit when any chunk of the release checklist came back, even the wrong section. Label the specific chunk.</p></div>
+<p>Run the evaluation on every change to chunking, embeddings, search settings, prompts or models, and fail the CI build if recall or faithfulness drop below agreed thresholds, or if permission leaks are above zero. That's a quality gate, exactly like a regression suite.</p>
+
+<h3 id="ch92-12"><span class="num">92.12</span>Cost and latency</h3>
+<p>RAG costs fall into two buckets: one-off (or per-change) indexing costs, and per-question costs.</p>
+<div class="tbl"><table>
+<tr><th>Cost</th><th>When</th><th>Driven by</th></tr>
+<tr><td>Extraction and OCR</td><td>Indexing</td><td>Number and type of documents</td></tr>
+<tr><td>Embedding documents</td><td>Indexing, and every re-embed</td><td>Total tokens in the corpus (incremental updates keep this small)</td></tr>
+<tr><td>Contextual notes</td><td>Indexing</td><td>Tokens per document × chunks per document; prompt caching cuts it sharply</td></tr>
+<tr><td>Vector storage</td><td>Ongoing</td><td>Chunks × dimensions × bytes per number (quantisation helps)</td></tr>
+<tr><td>Query embedding, reranking</td><td>Per question</td><td>Small per call, adds latency</td></tr>
+<tr><td>LLM input and output</td><td>Per question</td><td>Usually the biggest: retrieved chunks × chunk size, plus the answer</td></tr>
+</table></div>
+<div class="code"><span class="cap">Worked example (illustrative): per-question LLM cost on Sonnet 5.5</span><pre>20 retrieved chunks × 800 tokens = 16,000 tokens
++ instructions and question       =    500 tokens
+Input:  16,500 × $2  / 1M = $0.033
+Output:    600 × $10 / 1M = $0.006   (answer plus thinking; measure yours)
+                            ──────
+Per question ≈ $0.039   → 10,000 questions a month ≈ $390
+
+Same with top 8 chunks after a good reranker: 6,900 input tokens ≈ $0.020 per question</pre></div>
+<p>The biggest levers: retrieve fewer but better chunks (reranking), keep chunks tight, cache stable instructions, use a smaller model where evals show it's good enough, and cache answers to frequent identical questions (carefully, respecting permissions and freshness). For latency, run keyword and vector search in parallel, and stream the answer (<a href="#ch87">Chapter 87</a>).</p>
+
+<h3 id="ch92-13"><span class="num">92.13</span>Failure modes and how to test for them</h3>
+<input class="filter" data-filter="#ragFail" data-empty="#ragFailEmpty" type="search" placeholder="Filter failure modes…" aria-label="Filter failure modes">
+<div class="tbl"><table id="ragFail">
+<tr><th>Failure</th><th>Symptom</th><th>Test</th><th>Fix</th></tr>
+<tr class="group"><td colspan="4">Ingestion and chunking</td></tr>
+<tr><td>Garbled extraction</td><td>Nonsense answers about tables or PDFs</td><td>Read extracted text for a sample of files</td><td>Layout-aware extraction, OCR, table handling</td></tr>
+<tr><td>Boilerplate pollution</td><td>Footers and menus retrieved</td><td>Top-5 chunks for ten real questions</td><td>Strip repeated lines and navigation</td></tr>
+<tr><td>Context lost in chunking</td><td>"It" and "this" chunks never match</td><td>Questions whose answer sits under a heading</td><td>Heading paths, contextual retrieval</td></tr>
+<tr><td>Silent empties</td><td>Some documents never found</td><td>Count chunks per document; flag zero</td><td>Quarantine and report extraction failures</td></tr>
+<tr class="group"><td colspan="4">Retrieval</td></tr>
+<tr><td>Vocabulary mismatch</td><td>"I don't know" although the answer exists</td><td>Synonym questions in the golden set</td><td>Better embeddings, hybrid search, contextual notes</td></tr>
+<tr><td>Identifier confusion</td><td>Answer about QA-1423 instead of QA-1432</td><td>Identifier questions</td><td>BM25 in the mix; metadata filter on IDs</td></tr>
+<tr><td>Duplicates crowd results</td><td>Top results are copies of one page</td><td>Check diversity of top k</td><td>De-duplicate at ingestion; limit chunks per document</td></tr>
+<tr><td>Over-filtering</td><td>Too few results after permission filter</td><td>Questions from low-privilege users</td><td>Filter during search, not after</td></tr>
+<tr class="group"><td colspan="4">Generation</td></tr>
+<tr><td>Unfaithful answer</td><td>Claims not in any source</td><td>Faithfulness judge</td><td>"Answer only from the results"; citations; smaller, better context</td></tr>
+<tr><td>No abstention</td><td>Confident answer to an unanswerable question</td><td>Unanswerable questions</td><td>Explicit "say you don't know" instruction; test it</td></tr>
+<tr><td>Wrong citation</td><td>Citation points at an unrelated passage</td><td>Judge per citation</td><td>Fewer, cleaner chunks; review prompt</td></tr>
+<tr><td>Lost in the middle</td><td>Relevant chunk present but ignored</td><td>Vary the position of the right chunk</td><td>Rerank, send fewer chunks (<a class="gl" href="#g-lost-in-the-middle">lost in the middle</a>)</td></tr>
+<tr class="group"><td colspan="4">Operations and security</td></tr>
+<tr><td>Stale answer</td><td>Quotes an old version</td><td>Golden questions on recently changed facts</td><td>Incremental sync, delete handling, dates in titles</td></tr>
+<tr><td>Permission leak</td><td>Restricted text quoted to the wrong user</td><td>Ask as a user without access; must be zero</td><td>Pre-filter by ACL; sync permissions</td></tr>
+<tr><td>Indirect prompt injection</td><td>Answer follows instructions hidden in a document</td><td>Plant a test document with an injected instruction</td><td>Treat retrieved text as data; no risky tools</td></tr>
+<tr><td>Cost creep</td><td>Bill grows faster than usage</td><td>Track input tokens per question</td><td>Cap chunks, rerank, cache</td></tr>
+</table></div>
+<p id="ragFailEmpty" hidden>No failure modes match.</p>
+
+<div class="lab"><div class="lab-h"><b>A production RAG core: chunk, filter, fuse, evaluate, re-index</b><span>60 min · terminal · Python 3 standard library · no API key needed</span></div>
+<p>This script implements the production pieces from this chapter on three small documents: heading-aware chunking with metadata and contextual headers, BM25 plus a stand-in vector search fused with RRF, permission pre-filtering, hash-based change detection, a Claude request with <code>search_result</code> blocks (printed, not sent), and chunk-level evaluation. The "embedding" is a hashed bag of words so it runs offline; it has no real understanding of meaning, which the lab uses to show a real failure. <a href="#ch93">Chapter 93</a> swaps in a real embedding model and calls Claude.</p>
+<div class="code"><span class="cap">rag_core.py (tested with Python 3.11, standard library only)</span><pre>"""rag_core.py - production RAG building blocks, standard library only.
+Heading-aware chunking with metadata, BM25 + vector hybrid search fused with
+reciprocal rank fusion, permission filtering, change detection and evaluation.
+The 'embedding' here is a hashed bag of words: a stand-in so the lab runs
+offline. Swap embed() for a real embedding model in production (Chapter 93)."""
+import hashlib, json, math, re
+from collections import Counter
+
+# ---------- 1. Source documents (normally loaded from Confluence, PDFs, Git) ----------
+DOCS = [
+    {"id": "TS-01", "title": "Test strategy", "url": "kb://test-strategy",
+     "acl": ["qa", "dev"], "updated": "2026-10-02", "text": """
+# Smoke suite
+It runs on every pull request. It must finish in under 10 minutes.
+Failures block the merge.
+# Regression suite
+It runs nightly at 02:00 UTC against staging. Flaky tests are quarantined after 3 failures in 7 days."""},
+    {"id": "REL-07", "title": "Release checklist", "url": "kb://release-checklist",
+     "acl": ["qa", "dev", "pm"], "updated": "2026-09-15", "text": """
+# Go/no-go
+Release needs zero open P1 bugs and at most 3 open P2 bugs.
+# Rollback
+Rollback must be possible within 15 minutes using the blue-green switch."""},
+    {"id": "SEC-02", "title": "Security test policy", "url": "kb://sec-policy",
+     "acl": ["security"], "updated": "2026-08-01", "text": """
+# Penetration tests
+External penetration tests run twice a year. Findings rated critical must be fixed in 7 days."""},
+]
+
+# ---------- 2. Chunking: split on headings, keep the heading, add metadata ----------
+def chunk_document(doc, max_words=60):
+    chunks, section, buf = [], "", []
+    def flush():
+        if buf:
+            body = " ".join(buf)
+            chunks.append({
+                "chunk_id": f"{doc['id']}#{len(chunks)}", "doc_id": doc["id"],
+                "title": doc["title"], "section": section, "url": doc["url"],
+                "acl": doc["acl"], "updated": doc["updated"],
+                # contextual header: the chunk carries where it came from
+                "text": f"{doc['title']} &gt; {section}: {body}",
+                "hash": hashlib.sha256(body.encode()).hexdigest()[:12]})
+            buf.clear()
+    for line in doc["text"].strip().splitlines():
+        if line.startswith("#"):
+            flush(); section = line.lstrip("# ").strip()
+        elif line.strip():
+            buf.append(line.strip())
+            if sum(len(x.split()) for x in buf) &gt;= max_words:
+                flush()
+    flush()
+    return chunks
+
+# ---------- 3. Two retrievers: BM25 (keywords) and vectors (meaning) ----------
+def tokens(text):
+    return re.findall(r"[a-z0-9]+", text.lower())
+
+class BM25:
+    def __init__(self, chunks, k1=1.5, b=0.75):
+        self.chunks, self.k1, self.b = chunks, k1, b
+        self.tfs = [Counter(tokens(c["text"])) for c in chunks]
+        self.avg = sum(sum(tf.values()) for tf in self.tfs) / len(chunks)
+        df = Counter(t for tf in self.tfs for t in tf)
+        n = len(chunks)
+        self.idf = {t: math.log(1 + (n - d + 0.5) / (d + 0.5)) for t, d in df.items()}
+    def scores(self, query):
+        out = []
+        for tf in self.tfs:
+            length, s = sum(tf.values()), 0.0
+            for t in tokens(query):
+                if t in tf:
+                    f = tf[t]
+                    s += self.idf[t] * f * (self.k1 + 1) / (
+                        f + self.k1 * (1 - self.b + self.b * length / self.avg))
+            out.append(s)
+        return out
+
+def embed(text, dims=256):
+    """Stand-in embedding: hashed word counts, normalised to length 1."""
+    v = [0.0] * dims
+    for t in tokens(text):
+        v[int(hashlib.md5(t.encode()).hexdigest(), 16) % dims] += 1.0
+    norm = math.sqrt(sum(x * x for x in v)) or 1.0
+    return [x / norm for x in v]
+
+def cosine(a, b):
+    return sum(x * y for x, y in zip(a, b))
+
+# ---------- 4. Hybrid search with permission filter and RRF ----------
+def rrf(rankings, k=60):
+    fused = Counter()
+    for ranking in rankings:
+        for rank, idx in enumerate(ranking, start=1):
+            fused[idx] += 1.0 / (k + rank)
+    return [idx for idx, _ in fused.most_common()]
+
+class Index:
+    def __init__(self, docs):
+        self.chunks = [c for d in docs for c in chunk_document(d)]
+        self.bm25 = BM25(self.chunks)
+        self.vectors = [embed(c["text"]) for c in self.chunks]
+    def search(self, query, user_groups, k=3):
+        allowed = [i for i, c in enumerate(self.chunks) if set(c["acl"]) &amp; set(user_groups)]
+        kw = self.bm25.scores(query)
+        qv = embed(query)
+        by_kw = sorted(allowed, key=lambda i: -kw[i])
+        by_vec = sorted(allowed, key=lambda i: -cosine(qv, self.vectors[i]))
+        return [self.chunks[i] for i in rrf([by_kw, by_vec])[:k]]
+
+# ---------- 5. Freshness: which chunks changed since the last index? ----------
+def diff_index(old_hashes, new_chunks):
+    new = {c["chunk_id"]: c["hash"] for c in new_chunks}
+    changed = [cid for cid, h in new.items() if old_hashes.get(cid) != h]
+    deleted = [cid for cid in old_hashes if cid not in new]
+    return changed, deleted
+
+# ---------- 6. Build the Claude request with search_result blocks ----------
+def claude_request(question, hits, model="claude-opus-5-5"):
+    blocks = [{"type": "search_result", "source": h["url"],
+               "title": f"{h['title']} - {h['section']} (updated {h['updated']})",
+               "content": [{"type": "text", "text": h["text"]}],
+               "citations": {"enabled": True}} for h in hits]
+    blocks.append({"type": "text", "text": question +
+                   "\nAnswer only from the search results. If they do not contain"
+                   " the answer, say you don't know."})
+    return {"model": model, "max_tokens": 1000,
+            "messages": [{"role": "user", "content": blocks}]}
+
+# ---------- 7. Evaluation: recall@k and MRR on a golden set ----------
+GOLDEN = [  # question, user's groups, the chunk that must be retrieved
+    ("How long may the smoke suite take?", ["qa"], "TS-01#0"),
+    ("When does the nightly regression run?", ["dev"], "TS-01#1"),
+    ("How many P2 bugs can be open at release?", ["pm"], "REL-07#0"),
+    ("How fast must we be able to roll back?", ["qa"], "REL-07#1"),
+    ("When are critical pen test findings due?", ["security"], "SEC-02#0"),
+    ("When are critical pen test findings due?", ["qa"], None),  # must NOT leak
+]
+
+def evaluate(index, k=3):
+    hits, rr, leaks = 0, 0.0, 0
+    for q, groups, want in GOLDEN:
+        got = [c["chunk_id"] for c in index.search(q, groups, k)]
+        if want is None:
+            leaks += any(g.startswith("SEC-02") for g in got)
+            continue
+        if want in got:
+            hits += 1
+            rr += 1.0 / (got.index(want) + 1)
+    n = sum(1 for g in GOLDEN if g[2] is not None)
+    return {"recall@k": round(hits / n, 3), "mrr": round(rr / n, 3), "permission_leaks": leaks}
+
+if __name__ == "__main__":
+    index = Index(DOCS)
+    print(f"Indexed {len(index.chunks)} chunks from {len(DOCS)} documents")
+    print("First chunk metadata:", {k: v for k, v in index.chunks[0].items() if k != "text"})
+    q = "How long may the smoke suite take?"
+    print(f"\nQuery: {q}")
+    for c in index.search(q, ["qa"]):
+        print(f"  {c['chunk_id']:9} {c['section']:18} {c['text'][:60]}...")
+    print("\nEvaluation:", evaluate(index))
+    old = {c["chunk_id"]: c["hash"] for c in index.chunks}
+    DOCS[1]["text"] = DOCS[1]["text"].replace("at most 3 open P2", "at most 5 open P2")
+    changed, deleted = diff_index(old, [c for d in DOCS for c in chunk_document(d)])
+    print("\nAfter editing the release checklist -&gt; re-embed:", changed, "delete:", deleted)
+    req = claude_request(q, index.search(q, ["qa"], k=2))
+    print("\nClaude request preview:", json.dumps(req)[:150], "...")</pre></div>
+<ol>
+<li>Make a folder, <code>mkdir rag-lab &amp;&amp; cd rag-lab</code>, save the script as <code>rag_core.py</code>, and run <code>python3 rag_core.py</code>.<span class="expect">"Indexed 5 chunks from 3 documents"; the metadata of chunk <code>TS-01#0</code> (section "Smoke suite", acl ['qa', 'dev'], a 12-character hash); for the smoke-suite query, <code>TS-01#0</code> ranked first; "Evaluation: {'recall@k': 1.0, 'mrr': 1.0, 'permission_leaks': 0}"; "After editing the release checklist -&gt; re-embed: ['REL-07#0'] delete: []"; and the start of a JSON request containing a <code>search_result</code> block.</span></li>
+<li>Look at the permission test: the last <code>GOLDEN</code> entry asks about pen-test findings as a <code>qa</code> user, with expected chunk <code>None</code>. Temporarily break the filter: in <code>Index.search</code>, change <code>allowed = [i for i, c in enumerate(self.chunks) if set(c["acl"]) &amp; set(user_groups)]</code> to <code>allowed = list(range(len(self.chunks)))</code>, and run again.<span class="expect">"permission_leaks": 1. A QA user retrieved the security policy. Restore the line and confirm leaks are back to 0.</span></li>
+<li>Add a vocabulary-mismatch question to <code>GOLDEN</code> (before the <code>None</code> entry): <code>("How quickly can we revert a deployment?", ["qa"], "REL-07#1"),</code> and run again.<span class="expect">recall@k drops to 0.833 and mrr to 0.833. The query says "revert a deployment"; the document says "Rollback". BM25 finds no shared rare words and the stand-in embedding has no idea they mean the same thing.</span></li>
+<li>Fix it the contextual way, at indexing time: change the release checklist heading <code># Rollback</code> to <code># Rollback (revert a deployment)</code>, imitating what a contextual note or a synonym-aware heading adds. Run again.<span class="expect">recall@k back to 1.0 and mrr 1.0. In production a real embedding model would usually catch this synonym; contextual notes help the keyword side too.</span></li>
+<li>Check freshness: look at the last part of the output. The script changed "at most 3 open P2" to "at most 5 open P2" in the release checklist and compared hashes.<span class="expect">only <code>REL-07#0</code> is listed for re-embedding, not all five chunks. That's incremental re-indexing.</span></li>
+<li>Test deletions: in the <code>__main__</code> block, after the edit line, add <code>DOCS.pop(2)</code> (removing the security policy) before <code>diff_index</code> is called.<span class="expect">"delete: ['SEC-02#0']". Your sync job would now remove that chunk's vectors and keyword entries.</span></li>
+<li>Add an identifier test: append a document <code>{"id": "BUG-1", "title": "Bug QA-1432", "url": "kb://QA-1432", "acl": ["qa"], "updated": "2026-11-01", "text": "# Root cause\nQA-1432 failed because the SMS gateway timed out."}</code> and a similar one for QA-1423 with a different cause, then a golden question "Root cause of QA-1432?" expecting <code>BUG-1#0</code>.<span class="expect">the QA-1432 chunk ranks first. BM25 matches the exact identifier token <code>1432</code>.</span></li>
+</ol>
+<p><b>Troubleshooting.</b> <code>IndentationError</code> after editing <code>GOLDEN</code>: each entry is a tuple ending in a comma, inside the list. Recall not dropping in step 3: check you added the question before the <code>None</code> entry and used <code>"REL-07#1"</code> exactly. Different hash values from those shown are fine if you changed any document text.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"RAG quality is mostly about the prompt."</dt><dd>Mostly it's extraction, chunking, metadata and search. If the right chunk isn't retrieved, the prompt can't help.</dd>
+<dt>"Vector search is all you need."</dt><dd>Vectors miss exact identifiers and rare terms. Hybrid search with BM25 is the safer default.</dd>
+<dt>"We'll tell the model not to reveal restricted documents."</dt><dd>Prompts aren't access control. Filter by permission before anything reaches the model.</dd>
+<dt>"Citations mean the answer is correct."</dt><dd>They point at real passages, but the passage may not support the claim. Evaluate faithfulness and citation accuracy.</dd>
+<dt>"Index once and you're done."</dt><dd>Documents, permissions and deletions change daily. Freshness needs a pipeline and a test.</dd>
+<dt>"More chunks in the prompt is safer."</dt><dd>Beyond a point, extra chunks add cost, distraction and lost-in-the-middle errors. Rerank and keep the best.</dd>
+</dl></div>
+
+<h3 id="ch92-r"><span class="num">92.14</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Production RAG is two pipelines (indexing and querying) around one index, and most quality comes from ingestion, chunking and search.</li>
+<li>Clean extraction, structure-aware chunking and rich metadata (IDs, sections, ACLs, dates, hashes) are designed in from the start.</li>
+<li>Use hybrid search (BM25 + vectors) fused with RRF, then rerank a shortlist; include identifier and synonym questions in tests.</li>
+<li>Contextual retrieval adds a short, model-written context to each chunk before indexing; Anthropic reported 49% fewer retrieval failures (67% with reranking) on its tests.</li>
+<li>Pass chunks to Claude as <code>search_result</code> blocks with citations enabled, tell it to answer only from them, and test abstention.</li>
+<li>Enforce permissions before retrieval, sync changes and deletions, and evaluate retrieval (recall@k, MRR) and answers (faithfulness, citations, abstention, zero leaks) on every change.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">A user without access to the security space asks an innocent question and receives a quote from a restricted security policy. Which fix is correct?</p><div class="opts"><button>Add "never reveal restricted documents" to the system prompt</button><button data-ok>Store each chunk's allowed groups as metadata and filter by the user's groups before retrieval</button><button>Use a larger embedding model</button></div><p class="why" hidden>Access control must happen before text reaches the model. Prompts can't enforce permissions.</p></div>
+<div class="qz"><p class="q">Questions containing ticket numbers like QA-1432 often retrieve the wrong ticket. What helps most?</p><div class="opts"><button>Larger chunks</button><button data-ok>Adding BM25 keyword search and fusing it with the vector results</button><button>Removing metadata</button></div><p class="why" hidden>Embeddings blur near-identical identifiers; keyword search matches the exact token.</p></div>
+<div class="qz"><p class="q">In reciprocal rank fusion with k = 60, a chunk ranked 1st by BM25 and 2nd by vector search scores about what?</p><div class="opts"><button>3</button><button data-ok>1/61 + 1/62 ≈ 0.0325</button><button>0.5</button></div><p class="why" hidden>RRF adds 1/(k + rank) for each ranking the chunk appears in.</p></div>
+<div class="qz"><p class="q">What does Anthropic's contextual retrieval add to each chunk?</p><div class="opts"><button>A list of synonyms from a thesaurus</button><button>The full document text</button><button data-ok>A short model-written note (usually 50–100 tokens) situating the chunk in its document, used for both embeddings and BM25</button></div><p class="why" hidden>The note restores context lost by chunking; prompt caching keeps generating it affordable.</p></div>
+<div class="qz"><p class="q">Your RAG answers are wrong, and your evaluation shows recall@20 is 0.95. Where should you look first?</p><div class="opts"><button>The chunking strategy</button><button data-ok>Generation: the prompt, chunk order and number, and whether answers are faithful to the retrieved text</button><button>The embedding model</button></div><p class="why" hidden>If the right chunk is retrieved 95% of the time, retrieval is mostly working; the problem is how the answer is generated from it.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Write a one-to-two page design for a RAG assistant over your team's test documentation (test strategy, release checklists, runbooks). Cover: sources and how you'll ingest each; chunking strategy and the metadata schema (as a table); search design (hybrid, reranking, how many chunks to send); how permissions are synced and enforced; freshness targets ("changes visible within N hours") and how deletions are handled; a golden set plan with at least 20 questions, including identifiers, synonyms, unanswerable and low-privilege questions; metrics and CI thresholds; and an illustrative monthly cost estimate. Then extend <code>rag_core.py</code> with five of your golden questions using your own sample text.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"A RAG demo is easy; production RAG is a search system with an AI on the end. Most of the work is getting clean text out of PDFs and wikis, cutting it into chunks that keep their headings, and storing metadata like IDs, dates and who's allowed to see it. Search with both keywords and embeddings, merge the results, and rerank the best ones. Anthropic's contextual retrieval adds a little note to each chunk saying where it came from, which cuts missed retrievals a lot. Send the chunks to Claude as search results with citations so every answer can be checked. Filter by permissions before the model sees anything, keep the index in step with changes and deletions, and measure retrieval and answers separately with a golden question set."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://www.anthropic.com/news/contextual-retrieval" target="_blank" rel="noopener">Introducing Contextual Retrieval</a> (19 September 2024): method, results, cost estimate, recommendations.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/search-results" target="_blank" rel="noopener">Search results</a>: <code>search_result</code> blocks and <code>search_result_location</code> citations for RAG.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/citations" target="_blank" rel="noopener">Citations</a>: document citations, token costs, incompatibility with structured outputs.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/embeddings" target="_blank" rel="noopener">Embeddings</a>: Voyage AI models, <code>input_type</code>, dimensions, quantisation, rerankers.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/prompt-caching" target="_blank" rel="noopener">Prompt caching</a> and <a href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Pricing</a>.</li>
+<li>G. V. Cormack, C. L. A. Clarke and S. Büttcher, "Reciprocal Rank Fusion outperforms Condorcet and individual rank learning methods", SIGIR 2009.</li>
+<li>S. Robertson and H. Zaragoza, "The Probabilistic Relevance Framework: BM25 and Beyond", Foundations and Trends in Information Retrieval, 2009.</li>
+<li>Y. A. Malkov and D. A. Yashunin, "Efficient and robust approximate nearest neighbor search using Hierarchical Navigable Small World graphs" (<a href="https://arxiv.org/abs/1603.09320" target="_blank" rel="noopener">arXiv:1603.09320</a>).</li>
+</ol><p class="verified">Verified 9 November 2026 against platform.claude.com documentation and Anthropic's contextual retrieval article. <code>rag_core.py</code> was run offline with Python 3.11; <code>contextualise.py</code> and the Voyage example were syntax-checked but not executed (no API keys available). Chunk sizes, candidate counts and costs marked illustrative are examples, not benchmarks.</p></div>

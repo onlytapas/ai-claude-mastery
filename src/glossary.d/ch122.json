@@ -1,0 +1,46 @@
+{
+ "Synthetic data": {
+  "d": "Test data that is invented rather than copied from real people or systems, but realistic enough to behave like the real thing.",
+  "see": "ch122"
+ },
+ "Flaky test": {
+  "d": "A test that sometimes passes and sometimes fails without any change to the code, usually because of timing, test order, shared state, the environment or data.",
+  "see": "ch122"
+ },
+ "Test fixture": {
+  "d": "The fixed starting data or setup a test needs, such as a set of users and orders loaded before the test runs.",
+  "see": "ch122"
+ },
+ "Data masking": {
+  "d": "Replacing sensitive values (names, emails, card numbers) with fake ones while keeping the data's structure, so it can be used safely for testing.",
+  "see": "ch122"
+ },
+ "Visual regression": {
+  "d": "An unintended change in how a page looks, caught by comparing new screenshots with approved ones.",
+  "see": "ch123"
+ },
+ "Baseline": {
+  "d": "In visual testing, the approved reference screenshot that new screenshots are compared against.",
+  "see": "ch123"
+ },
+ "Load testing": {
+  "d": "Sending many requests at the same time to see how fast and reliable a system stays under pressure.",
+  "see": "ch123"
+ },
+ "Percentile": {
+  "d": "A way of describing a spread of results. The 95th percentile (p95) response time is the time within which 95% of requests finished.",
+  "see": "ch123"
+ },
+ "WCAG": {
+  "d": "Web Content Accessibility Guidelines: the W3C standard for making web content usable by people with disabilities. Version 2.2 is current, with levels A, AA and AAA.",
+  "see": "ch123"
+ },
+ "axe-core": {
+  "d": "A widely used open-source engine that automatically checks web pages for detectable accessibility problems.",
+  "see": "ch123"
+ },
+ "Screen reader": {
+  "d": "Software that reads screen content aloud (or to a braille display) for people who are blind or have low vision, such as VoiceOver, NVDA or JAWS.",
+  "see": "ch123"
+ }
+}

@@ -1,0 +1,165 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How OpenAI began as a non-profit in 2015 and became the company behind ChatGPT</li>
+<li>How its unusual structure works today, and why it keeps changing</li>
+<li>The GPT model line from GPT-1 to GPT-6 Astra and the GPT-6.1 Sol and Terra models</li>
+<li>OpenAI's main products (ChatGPT, Codex and the API) and how it makes money</li>
+<li>Its research contributions, its partnerships, and a balanced view of its strengths and limits</li>
+<li>How OpenAI's tools and Claude can share the same project instructions through <code>AGENTS.md</code></li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch7">Chapter 7</a> (scaling and the ChatGPT moment) and <a href="#ch26">Chapter 26</a> (how the AI industry fits together). The lab's optional parts use Claude Code (<a href="#ch63">Chapter 63</a>).</div>
+
+<div class="bigidea"><p>OpenAI is the company that brought large language models to the public with ChatGPT in November 2022. It started in 2015 as a non-profit research lab, added a profit-making arm to raise money, and since October 2025 has been a public benefit corporation controlled by a non-profit foundation, with Microsoft owning about 27%. Its GPT models helped prove that scaling up next-word prediction produces broadly capable AI, and its products now range from ChatGPT to the Codex coding agent and a developer API. It is one of Anthropic's main competitors, and many of Anthropic's founders once worked there. Understanding OpenAI helps you understand the whole industry, and the tools your colleagues may already be using.</p></div>
+
+<h3 id="ch27-1"><span class="num">27.1</span>Founding and early years (2015–2019)</h3>
+<p>OpenAI was founded in December 2015 in San Francisco as a non-profit research organisation. Its founders included Sam Altman, Elon Musk, Ilya Sutskever, Greg Brockman and Trevor Blackwell, among others. Its stated aim was to make sure advanced AI benefits all of humanity, and in its early years it published research openly.</p>
+<ol class="timeline">
+<li><span class="yr">Dec 2015</span><span class="ev"><b>OpenAI founded</b> as a non-profit.</span></li>
+<li><span class="yr">2018</span><span class="ev"><b>GPT-1</b>: "Improving Language Understanding by Generative Pre-Training" shows that pre-training a <a class="gl" href="#g-transformer">Transformer</a> on lots of text, then fine-tuning, works well across tasks (<a href="#ch6">Chapter 6</a>).</span></li>
+<li><span class="yr">2019</span><span class="ev"><b>GPT-2</b>: much larger. OpenAI initially held back the full model over misuse concerns, then released it in stages, an early public argument about AI release policy.</span></li>
+<li class="key"><span class="yr">2019</span><span class="ev"><b>The "capped-profit" arm.</b> Training large models needed far more money than donations could provide. OpenAI created a for-profit subsidiary whose investors' returns were capped, still controlled by the non-profit. Microsoft made its first investment the same year.</span></li>
+</ol>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Picture a charity that runs a research hospital, then realises it needs billions for new equipment. It sets up a company to sell services and attract investors, while the charity's board keeps control. That arrangement can work, but it creates a lasting tension: are decisions made for the mission or for the investors? Much of OpenAI's later history is about that tension.</p></div>
+
+<h3 id="ch27-2"><span class="num">27.2</span>Scaling up and the ChatGPT moment (2020–2023)</h3>
+<ul>
+<li><strong>2020: GPT-3.</strong> The paper "Language Models are Few-Shot Learners" (Brown et al.) showed that a big enough model could do new tasks from just a few examples in the prompt. OpenAI offered it through a paid <a class="gl" href="#g-api">API</a> rather than releasing the weights, a business model it still uses.</li>
+<li><strong>2021–2022: images and code.</strong> CLIP linked images and text; DALL-E generated images from descriptions. OpenAI's Codex model powered the first version of GitHub Copilot.</li>
+<li><strong>2022: InstructGPT.</strong> OpenAI showed that <a class="gl" href="#g-rlhf">RLHF</a> (training with human feedback, <a href="#ch18">Chapter 18</a>) made a model much better at following instructions, even when smaller.</li>
+<li><strong>30 November 2022: ChatGPT.</strong> A chat interface on an RLHF-trained model, released as a "research preview". It became one of the fastest-adopted consumer products ever, and started the race described in <a href="#ch7">Chapter 7</a>.</li>
+<li><strong>March 2023: GPT-4.</strong> A large step in capability, and the first GPT to accept images as input.</li>
+</ul>
+<div class="box note"><span class="tag">Connection to Anthropic</span><p>Anthropic was founded in 2021 by former OpenAI staff, including Dario Amodei and Daniela Amodei. The two companies share research roots and compete directly today. <a href="#ch37">Chapter 37</a> tells Anthropic's side of the story.</p></div>
+
+<h3 id="ch27-3"><span class="num">27.3</span>Structure, governance and the Microsoft relationship</h3>
+<p>OpenAI's structure is unusual, and it has changed more than once.</p>
+<ol class="timeline">
+<li class="key"><span class="yr">Nov 2023</span><span class="ev"><b>Board crisis.</b> The non-profit board removed Sam Altman as CEO, saying he had not been consistently candid with it. Within days, after most staff threatened to leave and Microsoft offered to hire them, Altman returned and the board was reshaped. It showed how hard it is for a mission-focused board to control a company worth many billions.</span></li>
+<li class="key"><span class="yr">Oct 2025</span><span class="ev"><b>Recapitalisation.</b> The for-profit arm became <b>OpenAI Group PBC</b>, a <a class="gl" href="#g-public-benefit-corporation">public benefit corporation</a>, controlled by the non-profit <b>OpenAI Foundation</b>. Microsoft received a stake of about 27%.</span></li>
+<li><span class="yr">Apr 2026</span><span class="ev"><b>Microsoft deal rewritten</b> (Apr 27). Microsoft's licence to OpenAI's technology is now non-exclusive, through 2032. OpenAI may serve products on any cloud, with Azure staying primary and getting launches first. The "AGI clause" was removed. OpenAI keeps paying a 20% revenue share, now capped, through 2030.</span></li>
+</ol>
+<p>A public benefit corporation is a for-profit company that is legally required to weigh a stated public benefit alongside shareholders' interests. Anthropic is also a public benefit corporation, though its governance differs (<a href="#ch37">Chapter 37</a>).</p>
+<details class="deep"><summary>Under the hood: what was the "AGI clause"?</summary><div class="body">
+<p>Under earlier versions of the Microsoft deal, Microsoft's rights to OpenAI's technology were tied to whether OpenAI had achieved <a class="gl" href="#g-agi">AGI</a> (artificial general intelligence). That created an odd incentive: a technical milestone with no agreed definition could change billions of dollars of commercial rights. The April 2026 amendment removed the clause, replacing it with fixed dates (licence through 2032, revenue share capped through 2030). It's a useful reminder that "AGI" is used in contracts and marketing as well as science, and that its meaning depends on who's using it.</p>
+</div></details>
+
+<h3 id="ch27-4"><span class="num">27.4</span>The GPT line today</h3>
+<p>After GPT-4 came GPT-4o (2024), the "o-series" <a class="gl" href="#g-reasoning-model">reasoning models</a> starting with o1 in 2024 (<a href="#ch19">Chapter 19</a>), GPT-5 (2025) and GPT-5.5 (April 2026). OpenAI's naming has often been confusing; in 2026 it began adding a name to each model.</p>
+<div class="tbl"><table>
+<tr><th>Model</th><th>Released</th><th>How OpenAI positions it</th></tr>
+<tr><td><b>GPT-6 Astra</b></td><td>3 Sep 2026</td><td>"Most capable model": the flagship</td></tr>
+<tr><td><b>GPT-6.1 Sol</b></td><td>29 Sep 2026 (DevDay)</td><td>Near-Astra performance at lower cost</td></tr>
+<tr><td><b>GPT-6.1 Terra</b></td><td>26 Oct 2026</td><td>Fast, efficient model</td></tr>
+<tr><td><b>GPT-6 Luna</b></td><td>2026 (exact date unverified)</td><td>Most efficient, for high-volume tasks</td></tr>
+<tr><td>gpt-oss-120b and gpt-oss-20b</td><td>Aug 2025</td><td>Open-weight models under Apache 2.0; can be run on your own hardware</td></tr>
+</table></div>
+<p>Notice that GPT-6.1 Sol and Terra are newer than GPT-6 Astra but are not more capable: they're cheaper and faster. A higher version number does not always mean a stronger model. A planned GPT-6.1 Astra was reportedly cancelled over safety regressions; that comes from press reports, not an OpenAI statement.</p>
+<div class="box warn"><span class="tag">Check before you quote</span><p>Model names, prices and "most capable" labels change often. The table above was checked against OpenAI's models documentation on 9 November 2026. Some model names you may see online (for example "GPT-6 Cyber") appear only on aggregator sites and are not confirmed. Use <a href="https://developers.openai.com/api/docs/models" target="_blank" rel="noopener">OpenAI's own models page</a> as the source of truth, and compare models on your own tasks (<a href="#ch36">Chapter 36</a>).</p></div>
+
+<h3 id="ch27-5"><span class="num">27.5</span>Products and business model</h3>
+<div class="tbl"><table>
+<tr><th>Product</th><th>What it is</th><th>Closest Anthropic equivalent</th></tr>
+<tr><td><b>ChatGPT</b></td><td>The chat assistant on web, desktop and mobile; free tier plus paid Plus, Pro, Business and Enterprise plans</td><td>Claude apps (<a href="#ch43">Chapter 43</a>)</td></tr>
+<tr><td><b>Codex</b></td><td>A coding agent: the open-source Codex CLI in the terminal, an IDE extension, Codex Cloud, and inside the ChatGPT apps. Reads <code>AGENTS.md</code> for project instructions.</td><td>Claude Code (<a href="#ch63">Chapter 63</a>)</td></tr>
+<tr><td><b>The API</b></td><td>Pay-per-token access to GPT models for developers</td><td>Claude API (<a href="#ch86">Chapter 86</a>)</td></tr>
+<tr><td>Deep Research</td><td>Multi-step web research producing a cited report</td><td>Research features in the Claude apps</td></tr>
+<tr><td>GPT Image</td><td>Image generation</td><td>None: Claude reads images but does not generate them</td></tr>
+<tr><td>ChatGPT Atlas</td><td>A web browser with ChatGPT built in</td><td>Claude in Chrome</td></tr>
+</table></div>
+<p>OpenAI said in March 2026 that it would discontinue the Sora video app and API, an example of how quickly product lines change.</p>
+<p>The business model is a mix: ChatGPT subscriptions for individuals and companies, pay-per-token API usage, and large enterprise deals. Its computing comes mainly from Microsoft Azure, plus a growing list of other suppliers: the Stargate project (with Oracle, SoftBank and MGX, announced January 2025), a large Oracle compute deal (September 2025), AMD chips (October 2025), AWS (November 2025), a custom chip with Broadcom, and NVIDIA (<a href="#ch25">Chapter 25</a>, <a href="#ch26">Chapter 26</a>).</p>
+<div class="box example"><span class="tag">Real-world example</span><p>In a typical QA department in 2026, a tester might use ChatGPT to draft a test plan, a developer might use Codex in the terminal, and the automation team might use Claude Code with Playwright MCP. That's normal. What matters is that the team has shared rules about data, review and verification that apply whichever tool is used (<a href="#ch119">Chapter 119</a>), and a way of comparing tools on its own work (<a href="#ch36">Chapter 36</a>).</p></div>
+
+<h3 id="ch27-6"><span class="num">27.6</span>Research contributions</h3>
+<p>Whatever you think of its commercial path, OpenAI's research shaped the field:</p>
+<ul>
+<li><strong>The GPT series</strong> popularised large generative pre-training (GPT-1, GPT-2) and showed few-shot learning at scale (GPT-3).</li>
+<li><strong>Scaling laws</strong>: "Scaling Laws for Neural Language Models" (Kaplan et al., 2020) described how performance improves predictably with more data, parameters and compute (<a href="#ch138">Chapter 138</a>).</li>
+<li><strong>RLHF at scale</strong> through InstructGPT and ChatGPT (<a href="#ch18">Chapter 18</a>).</li>
+<li><strong>CLIP and DALL-E</strong> for linking and generating images and text (<a href="#ch21">Chapter 21</a>).</li>
+<li><strong>Reasoning models</strong>: the o1 line (2024) made "thinking before answering" a mainstream product feature (<a href="#ch19">Chapter 19</a>).</li>
+<li><strong>Benchmarks</strong>: OpenAI created SWE-bench Verified (August 2024), a human-checked set of real coding tasks. In February 2026 it stopped reporting it, citing contamination and flawed tasks, and recommended SWE-bench Pro instead (<a href="#ch24">Chapter 24</a>).</li>
+</ul>
+
+<h3 id="ch27-7"><span class="num">27.7</span>Strengths and limits: a balanced view</h3>
+<div class="cols2">
+<div><h4>Widely cited strengths</h4><ul>
+<li>The best-known consumer AI brand; ChatGPT is many people's first AI tool</li>
+<li>A broad product range: chat, coding, images, research, browser, API</li>
+<li>A long record of influential research</li>
+<li>Large computing commitments from many suppliers</li>
+</ul></div>
+<div><h4>Widely cited concerns</h4><ul>
+<li>A governance history with sudden changes (the 2023 board crisis, repeated restructuring)</li>
+<li>Confusing model naming and frequent product changes</li>
+<li>Less openness than its name suggests: frontier models are closed, though gpt-oss is open-weight</li>
+<li>Large financial commitments that depend on continued fast growth</li>
+</ul></div>
+</div>
+<div class="box opinion"><span class="tag">Opinion · views on OpenAI differ</span><p>Supporters, including OpenAI's leadership, argue that shipping products widely and early is the best way for society to adapt to AI. Critics, including some former employees and AI-safety researchers, argue that commercial pressure has pushed safety down the priority list. Some of Anthropic's founders left OpenAI partly over differences in approach. These are views held by those people and groups; this textbook doesn't rank the companies, and you should judge tools on evidence from your own use.</p></div>
+
+<div class="lab"><div class="lab-h"><b>One instruction file for Codex and Claude Code</b><span>25 min · your computer; Claude Code optional; Codex optional</span></div><ol>
+<li>Create an empty folder called <code>agents-lab</code> and, inside it, a file named <code>AGENTS.md</code> with this content:
+<div class="code"><span class="cap">AGENTS.md</span><pre># Project instructions for AI coding agents
+
+## About this project
+A small checkout web app tested with Playwright (TypeScript).
+
+## Testing rules
+- Prefer getByRole and getByTestId locators. Never use XPath.
+- Every new test must include at least one assertion on visible text.
+- Test data lives in tests/data/. Never hard-code passwords; read them from environment variables.
+
+## Before you finish
+- Run: npx playwright test
+- Summarise which tests you added and why.</pre></div>
+<span class="expect">a folder containing only <code>AGENTS.md</code>.</span></li>
+<li>If you have Claude Code (<a href="#ch63">Chapter 63</a>): open a terminal in <code>agents-lab</code>, run <code>claude</code>, and ask: "What project instructions have you loaded? List the testing rules."<span class="expect">Claude lists the three testing rules. Since version 2.1.277, Claude Code reads <code>AGENTS.md</code> directly when there is no <code>CLAUDE.md</code> in the project.</span></li>
+<li>Now create a <code>CLAUDE.md</code> in the same folder containing just the line <code>Always answer in British English.</code> Restart <code>claude</code> and ask the same question.<span class="expect">Claude mentions British English but not the testing rules. When both files exist, Claude Code loads <code>CLAUDE.md</code> only.</span></li>
+<li>Edit <code>CLAUDE.md</code> so it reads:
+<div class="code"><span class="cap">CLAUDE.md</span><pre>@AGENTS.md
+
+Always answer in British English.</pre></div>
+Restart <code>claude</code> and ask again.<span class="expect">Claude lists both the testing rules and the British English rule. The <code>@AGENTS.md</code> line imports the shared file, so one set of team rules serves every tool.</span></li>
+<li>Optional, if you have OpenAI's Codex CLI (see its <a href="https://github.com/openai/codex" target="_blank" rel="noopener">official repository</a> for installation): run it in the same folder and ask the same question.<span class="expect">Codex lists the testing rules from <code>AGENTS.md</code>; it does not use <code>CLAUDE.md</code>.</span></li>
+<li>No Claude Code or Codex? Open the two vendors' documentation pages (Claude Code memory docs and <a href="https://agents.md/" target="_blank" rel="noopener">agents.md</a>) and fill in a two-row table: tool, file it reads, what happens when both files exist.<span class="expect">a table matching the results described in steps 2–5.</span></li>
+</ol></div>
+<div class="box note"><span class="tag">Troubleshooting</span><p><b>Claude doesn't mention the rules:</b> make sure you started <code>claude</code> inside <code>agents-lab</code> (run <code>pwd</code> to check) and the file is named exactly <code>AGENTS.md</code>. Run <code>/memory</code> in Claude Code to see which instruction files loaded. <b>Old Claude Code version:</b> run <code>claude --version</code>; direct <code>AGENTS.md</code> reading needs 2.1.277 or later. Use the <code>@AGENTS.md</code> import from step 4 instead. <b>Claude also mentions other rules:</b> instruction files from parent folders and your personal <code>~/.claude/CLAUDE.md</code> load too; that is expected. <b>Company laptop blocks installs:</b> do step 6.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"OpenAI is a non-profit."</dt><dd>It started as one. Today the operating company is OpenAI Group PBC, a for-profit public benefit corporation controlled by the non-profit OpenAI Foundation.</dd>
+<dt>"Microsoft owns OpenAI."</dt><dd>Microsoft holds about 27%. Since April 2026 its licence is non-exclusive and OpenAI can use other clouds.</dd>
+<dt>"OpenAI invented the Transformer."</dt><dd>The Transformer came from Google researchers in 2017. OpenAI's GPT models applied it to generative pre-training at scale.</dd>
+<dt>"The newest GPT number is always the strongest."</dt><dd>GPT-6.1 Sol and Terra are newer than GPT-6 Astra but positioned as cheaper and faster, not more capable.</dd>
+<dt>"ChatGPT and Claude can't share project instructions."</dt><dd>Codex reads <code>AGENTS.md</code>, and Claude Code can read or import it, so one file can serve both.</dd>
+</dl></div>
+
+<h3 id="ch27-r"><span class="num">27.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>OpenAI was founded in December 2015 as a non-profit, added a capped-profit arm in 2019, and became OpenAI Group PBC, controlled by the OpenAI Foundation, in October 2025.</li>
+<li>Microsoft holds about 27%; the April 2026 amendment made its licence non-exclusive and removed the AGI clause.</li>
+<li>ChatGPT (November 2022) launched the generative AI boom; GPT-4 (2023), the o-series (2024) and GPT-5 (2025) followed.</li>
+<li>As of 9 November 2026: GPT-6 Astra is the flagship; GPT-6.1 Sol and Terra are newer, cheaper and faster.</li>
+<li>Main products are ChatGPT, Codex and the API; revenue comes from subscriptions, API usage and enterprise deals.</li>
+<li>Key research: GPT series, scaling laws, RLHF at scale, CLIP and DALL-E, reasoning models.</li>
+<li><code>AGENTS.md</code> lets Codex and Claude Code share one set of project rules.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What is OpenAI's structure as of November 2026?</p><div class="opts"><button>A pure non-profit research lab</button><button data-ok>A public benefit corporation (OpenAI Group PBC) controlled by the non-profit OpenAI Foundation</button><button>A wholly owned Microsoft subsidiary</button></div><p class="why" hidden>The October 2025 recapitalisation created OpenAI Group PBC; Microsoft holds about 27%.</p></div>
+<div class="qz"><p class="q">What did the April 2026 Microsoft–OpenAI amendment change?</p><div class="opts"><button>Microsoft bought the rest of OpenAI</button><button data-ok>Microsoft's licence became non-exclusive, OpenAI can use other clouds, and the AGI clause was removed</button><button>OpenAI stopped using Azure entirely</button></div><p class="why" hidden>Azure remains primary and gets launches first, but is no longer exclusive.</p></div>
+<div class="qz"><p class="q">How does GPT-6.1 Sol relate to GPT-6 Astra?</p><div class="opts"><button>It is much more capable</button><button>It is an open-weight version</button><button data-ok>It is newer, cheaper, and positioned near Astra's performance</button></div><p class="why" hidden>OpenAI describes Sol as near-Astra performance at lower cost; Astra remains "most capable".</p></div>
+<div class="qz"><p class="q">Which OpenAI research result showed a model doing new tasks from a few examples in the prompt?</p><div class="opts"><button data-ok>GPT-3, "Language Models are Few-Shot Learners" (2020)</button><button>CLIP (2021)</button><button>The Transformer (2017)</button></div><p class="why" hidden>GPT-3 showed few-shot learning; the Transformer was a Google paper.</p></div>
+<div class="qz"><p class="q">A repository has both <code>AGENTS.md</code> and <code>CLAUDE.md</code>, and <code>CLAUDE.md</code> doesn't import anything. What does Claude Code load by default?</p><div class="opts"><button>Both files</button><button data-ok>Only CLAUDE.md</button><button>Only AGENTS.md</button></div><p class="why" hidden>Add <code>@AGENTS.md</code> to CLAUDE.md to share the rules.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Write a one-page "OpenAI fact card" for your team, dated today. Include: structure and ownership, the current model line-up with each model's positioning (from OpenAI's models page), the products your team might meet (ChatGPT, Codex, API), and one paragraph on how your team would choose between an OpenAI tool and a Claude tool for a specific QA task, based on a small side-by-side test rather than reputation. Cite every fact.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"OpenAI started in 2015 as a non-profit, then added a profit-making arm to pay for huge models. Its GPT models proved that scaling next-word prediction works, and ChatGPT in 2022 kicked off the boom. Today it's a public benefit corporation controlled by a non-profit foundation, with Microsoft owning about 27%, and since April 2026 it's free to use other clouds. Its flagship is GPT-6 Astra, with cheaper GPT-6.1 Sol and Terra. Its coding agent, Codex, reads AGENTS.md, which Claude Code can read too, so we can keep one set of project rules for both."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>OpenAI, <a href="https://developers.openai.com/api/docs/models" target="_blank" rel="noopener">Models documentation</a> (current model line-up and positioning).</li>
+<li>CNBC, <a href="https://www.cnbc.com/2026/09/03/open-ai-astra-gpt-6-cyber.html" target="_blank" rel="noopener">OpenAI releases GPT-6 Astra</a> (Sep 2026); TechCrunch, <a href="https://techcrunch.com/2026/09/29/openai-launches-gpt-6-1-sol-says-it-nearly-matches-gpt-6-astra-and-costs-less/" target="_blank" rel="noopener">GPT-6.1 Sol</a>; Wikipedia, <a href="https://en.wikipedia.org/wiki/GPT-6.1" target="_blank" rel="noopener">GPT-6.1</a>; Gizmodo, <a href="https://gizmodo.com/openai-cancels-release-of-gpt-6-1-astra-because-it-regressed-on-safety-2000818566" target="_blank" rel="noopener">report on a cancelled GPT-6.1 Astra</a> (press report).</li>
+<li>Microsoft, <a href="https://blogs.microsoft.com/blog/2025/10/28/the-next-chapter-of-the-microsoft-openai-partnership/" target="_blank" rel="noopener">The next chapter of the Microsoft–OpenAI partnership</a> (Oct 2025); CNBC, <a href="https://www.cnbc.com/2026/04/27/openai-microsoft-partnership-revenue-cap.html" target="_blank" rel="noopener">partnership amended</a> (Apr 2026).</li>
+<li>Wikipedia, <a href="https://en.wikipedia.org/wiki/OpenAI" target="_blank" rel="noopener">OpenAI</a> (history, founders, products, compute partners, Sora discontinuation).</li>
+<li>OpenAI, <a href="https://openai.com/index/introducing-gpt-oss/" target="_blank" rel="noopener">Introducing gpt-oss</a>; <a href="https://openai.com/index/why-we-no-longer-evaluate-swe-bench-verified/" target="_blank" rel="noopener">Why we no longer evaluate SWE-bench Verified</a>.</li>
+<li>T. Brown et al., <a href="https://arxiv.org/abs/2005.14165" target="_blank" rel="noopener">Language Models are Few-Shot Learners</a> (2020); L. Ouyang et al., <a href="https://arxiv.org/abs/2203.02155" target="_blank" rel="noopener">Training language models to follow instructions with human feedback</a> (2022); J. Kaplan et al., <a href="https://arxiv.org/abs/2001.08361" target="_blank" rel="noopener">Scaling Laws for Neural Language Models</a> (2020).</li>
+<li>OpenAI, <a href="https://github.com/openai/codex" target="_blank" rel="noopener">Codex CLI repository</a>; <a href="https://agents.md/" target="_blank" rel="noopener">AGENTS.md</a>; Anthropic, <a href="https://code.claude.com/docs/en/memory" target="_blank" rel="noopener">Claude Code memory (CLAUDE.md and AGENTS.md)</a>.</li>
+</ol><p class="verified">Verified 9 November 2026 against OpenAI's models documentation, the sources above and the project's research fact sheets. The GPT-6 Luna release date and the cancelled GPT-6.1 Astra are unverified.</p></div>

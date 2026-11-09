@@ -1,0 +1,241 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>Three very different AI bets: Meta (AI inside social apps), NVIDIA (the chips and software everyone trains on) and Amazon (a cloud marketplace of models)</li>
+<li>Meta's open-weights era with Llama, and why it moved to the mostly proprietary Muse family in April 2026</li>
+<li>Why NVIDIA's GPUs and its CUDA software sit underneath almost all modern AI, and how NVIDIA is moving "up the stack" with Nemotron models and the Hugging Face deal</li>
+<li>What Amazon Bedrock, the Nova models and Trainium chips are, and how Amazon's partnership with Anthropic works</li>
+<li>How to read a model's licence before you use it, with a script that audits licences on the Hugging Face Hub</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch26">Chapter 26</a> (the AI stack) and <a href="#ch28">Chapter 28</a> (Google and Microsoft, including Mixture of Experts). <a href="#ch25">Chapter 25</a> on chips and data centres helps but is not required. The lab needs Python 3 (optional) or a web browser.</div>
+
+<div class="bigidea"><p>Meta, NVIDIA and Amazon all spend enormous sums on AI, but they earn from it in completely different ways. Meta uses AI to make its social apps and ads better; for years it gave away its Llama models as open weights, then in 2026 switched to mostly proprietary Muse models. NVIDIA sells the GPUs and CUDA software that nearly every lab trains on, and now also releases its own open models. Amazon runs the largest cloud, sells many companies' models through Bedrock (including Claude), builds its own Nova models and Trainium chips, and is Anthropic's main cloud partner and a major investor.</p></div>
+
+<h3 id="ch29-1"><span class="num">29.1</span>Three companies, three bets</h3>
+<p>Recall the AI stack from <a href="#ch26">Chapter 26</a>. These three companies sit at different layers, and that explains most of their choices.</p>
+<div class="flow">
+<div class="hl"><b>Chips</b>NVIDIA GPUs and CUDA; Amazon Trainium</div>
+<div><b>Cloud</b>Amazon Web Services (AWS)</div>
+<div><b>Models</b>Meta Llama and Muse; Amazon Nova; NVIDIA Nemotron</div>
+<div><b>Platforms</b>Amazon Bedrock; Hugging Face (NVIDIA deal pending)</div>
+<div><b>Apps</b>Meta AI in WhatsApp, Instagram, Facebook; Alexa+</div>
+</div>
+<div class="tbl"><table>
+<tr><th></th><th>Meta</th><th>NVIDIA</th><th>Amazon</th></tr>
+<tr><td>Founded</td><td>2004 (as Facebook), Menlo Park</td><td>5 April 1993, Santa Clara</td><td>1994, Seattle (AWS launched 2006)</td></tr>
+<tr><td>Main AI money comes from</td><td>Advertising: AI makes feeds and ads work better</td><td>Selling GPUs, networking and full systems</td><td>Cloud usage: compute and model tokens</td></tr>
+<tr><td>Own models</td><td>Llama (open weights, 2023–2025), Muse (mostly proprietary, 2026)</td><td>Nemotron (open weights)</td><td>Nova (proprietary)</td></tr>
+<tr><td>Relationship with Claude</td><td>Competitor</td><td>Supplier and investor (up to $10B announced Nov 2025)</td><td>Primary cloud, chip supplier, investor, reseller via Bedrock</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a gold rush. Meta is a big town that uses gold to make its shops more attractive. NVIDIA sells the picks and shovels to every miner. Amazon owns the land, rents plots to many miners (including Anthropic) and also digs a little gold of its own.</p></div>
+
+<h3 id="ch29-2"><span class="num">29.2</span>Meta and the Llama open-weights era</h3>
+<p>Meta has a long research history. Its lab FAIR (Facebook AI Research) was founded in 2013, with Yann LeCun as a founding director. Two FAIR contributions you will meet constantly:</p>
+<ul>
+<li><b>PyTorch</b>, the free deep-learning framework that started at Meta and is now used to build most research models.</li>
+<li><b>Segment Anything (SAM)</b>, models that cut out objects in images.</li>
+</ul>
+<p>Then came <strong>Llama</strong>. LLaMA 1 appeared in February 2023. Unlike GPT or Claude, its <a class="gl" href="#g-weight">weights</a> could be downloaded. Later versions became the default starting point for thousands of companies and hobbyists who wanted to run a capable model on their own machines or <a class="gl" href="#g-fine-tuning">fine-tune</a> it for their own data. Llama 4 followed on 5 April 2025.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>A bank's QA team cannot send customer data to an outside AI service. In 2024 they download a Llama model, run it on an internal server, and use it to turn anonymised production logs into draft bug reports. Nothing leaves the building. This kind of "private" use was a big reason Llama was popular, and it is the main appeal of <a class="gl" href="#g-open-weight-model">open-weight models</a> generally (<a href="#ch32">Chapter 32</a>).</p></div>
+<h4>"Open weights" is not the same as "open source"</h4>
+<p>Llama models were released under Meta's own licences, not a standard open-source licence such as Apache 2.0 or MIT. On the Hugging Face Hub you can see this directly: Llama models carry licence tags like <code>llama3.1</code> or <code>llama3.2</code>, which point to Meta's custom terms. You may download and use the weights, but you must follow those terms. A <a class="gl" href="#g-model-licence">model licence</a> is something a tester should check before a model goes anywhere near a product, exactly as you would check a third-party library.</p>
+
+<h3 id="ch29-3"><span class="num">29.3</span>The shift to Muse (2026)</h3>
+<p>In 2025 Meta formed <strong>Meta Superintelligence Labs (MSL)</strong>, with Alexandr Wang as Chief AI Officer. Its first model changed Meta's direction.</p>
+<ol class="timeline">
+<li><span class="yr">Feb 2023</span><span class="ev"><b>LLaMA 1</b>, open weights for researchers.</span></li>
+<li><span class="yr">Apr 2025</span><span class="ev"><b>Llama 4</b> (5 April), the last Llama generation so far.</span></li>
+<li class="key"><span class="yr">Apr 2026</span><span class="ev"><b>Muse Spark</b> (8 April), the first MSL model. <b>Not open-weight</b>: available through the Meta AI apps and a private-preview API.</span></li>
+<li><span class="yr">Jul–Sep 2026</span><span class="ev"><b>Muse Spark 1.1, 1.2 and 1.3</b> (9 Jul, 5 Aug, 2 Sep), all proprietary.</span></li>
+<li><span class="yr">Aug 2026</span><span class="ev"><b>Muse Glimmer</b> (10 Aug), a 30-billion-parameter open-weight model under Apache 2.0. <b>Muse Code</b>, a terminal coding agent, also arrives in August.</span></li>
+</ol>
+<p>When it launched Muse Spark, Meta said it "hope[s] to open-source future versions". So the honest summary is: Meta's <em>frontier</em> models are now proprietary, while it still releases some smaller open-weight models such as Muse Glimmer. Meta has not announced a next-generation Llama.</p>
+<div class="box note"><span class="tag">Reported but not verified</span><p>Secondary sources describe further releases called Muse Wonder (October 2026) and Muse Spark Open (reported as a very large open-weight Mixture-of-Experts model). The research for this book could not confirm their details or licence terms from Meta's own pages. If you see them in the lab below, read their model cards rather than relying on this book.</p></div>
+<div class="box opinion"><span class="tag">Opinion · technology press</span><p>Coverage at the time, for example VentureBeat's "Goodbye, Llama", framed Muse Spark as Meta stepping back from open weights at the frontier. Meta's own framing is about building "personal superintelligence" inside its apps. If you built on Llama, the practical point is unchanged: weights you already downloaded keep working under the licence they came with; what changes is where the newest models come from.</p></div>
+<p>Meta's AI shows up where its users already are: the Meta AI assistant in WhatsApp, Instagram, Facebook, Messenger and Threads, the meta.ai app, and Ray-Ban Meta and Oakley Meta smart glasses. It is funded mainly by advertising, with optional paid tiers for Meta AI. Meta also runs very large NVIDIA GPU clusters, plus its own MTIA accelerator chips.</p>
+
+<h3 id="ch29-4"><span class="num">29.4</span>NVIDIA: the engine room</h3>
+<p>NVIDIA was founded on 5 April 1993 by Jensen Huang (still CEO), Chris Malachowsky and Curtis Priem, to make graphics chips for games. Two things turned a graphics company into the centre of the AI industry.</p>
+<ol>
+<li><b>GPUs do many small sums at once.</b> Drawing a game frame means calculating millions of pixels in parallel. Training a neural network means multiplying huge grids of numbers, which is the same kind of parallel work (<a href="#ch2">Chapter 2</a>).</li>
+<li><b><a class="gl" href="#g-cuda">CUDA</a> made that power usable.</b> Released in 2006–07, CUDA let programmers use GPUs for general computing, not just graphics. In 2012, AlexNet, the image-recognition network that kicked off the deep-learning boom, was trained on NVIDIA GPUs.</li>
+</ol>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A CPU is like a few brilliant professors who can solve any problem, one at a time. A GPU is like a stadium full of students who can each do simple arithmetic, all at once. For the giant, repetitive sums inside AI, the stadium wins. CUDA is the language the stadium understands, and almost everyone has learned it.</p></div>
+<div class="tbl"><table>
+<tr><th>Data-centre GPU generation</th><th>When</th><th>Notes</th></tr>
+<tr><td>Ampere (A100)</td><td>2020</td><td>The data-centre generation before Hopper</td></tr>
+<tr><td>Hopper (H100)</td><td>After Ampere</td><td>Widely used for training large language models</td></tr>
+<tr><td>Blackwell</td><td>Announced 18 Mar 2024</td><td>Sold increasingly as whole racks of linked GPUs</td></tr>
+<tr><td>Vera Rubin</td><td>Detailed at GTC, Mar 2026</td><td>Successor to Blackwell; deployment reported for the second half of 2026 (exact shipment dates not verified)</td></tr>
+</table></div>
+<p>Alongside chips, NVIDIA sells DGX systems (complete AI servers), networking, and software such as NIM microservices for running models. On 29 October 2025 it became the first company to reach a $5 trillion market value.</p>
+<details class="deep"><summary>Why is it so hard to compete with NVIDIA?</summary><div class="body">
+<p>Rivals exist. Google has <a class="gl" href="#g-tpu">TPUs</a>, Amazon has Trainium, Meta has MTIA, Microsoft has Maia, and AMD sells GPUs (OpenAI signed for 6 GW of AMD chips in October 2025). The difficulty is not only the hardware. Years of AI software (frameworks, libraries, tuned kernels, engineers' habits) were written for CUDA first. Moving to another chip means re-testing and often rewriting that software.</p>
+<p>A tester will recognise the pattern: it is like moving a large automated test suite from one framework to another. The new tool may be cheaper or faster, but the migration, re-validation and retraining cost is real. That switching cost is what analysts usually mean by NVIDIA's "CUDA moat".</p>
+</div></details>
+
+<h3 id="ch29-5"><span class="num">29.5</span>NVIDIA moves up the stack</h3>
+<p>NVIDIA no longer only sells chips. It increasingly releases models and buys into the software layer.</p>
+<ul>
+<li><b>Nemotron</b> is NVIDIA's open-weight model family. Nemotron 3 was announced on 15 December 2025 in Nano, Super and Ultra sizes, using a hybrid Mixture-of-Experts design. Nemotron 3 Ultra has about 550 billion total parameters. Nemotron 3.5 Super VL (vision and language) has 120 billion total and 12 billion active parameters. Exact Nemotron 3.5 release dates were not verified.</li>
+<li><b>Groq</b>: in December 2025 NVIDIA licensed Groq's inference technology and hired key staff, in a deal of about $20 billion.</li>
+<li><b>Hugging Face</b>: on 2 September 2026 NVIDIA signed a definitive agreement to buy Hugging Face, the main public hub for open models and datasets, for about $12.9 billion. It had <b>not closed</b> as of 9 November 2026 and is expected to close in the first half of 2027, subject to regulators.</li>
+<li><b>OpenAI and Anthropic</b>: a 10 GW letter of intent with OpenAI (September 2025, later restructured), and an investment of up to $10 billion in Anthropic (November 2025).</li>
+</ul>
+<div class="box warn"><span class="tag">Why the Hugging Face deal matters to you</span><p>Hugging Face hosts many of the open models and datasets testers use for experiments and local tools. Until the deal closes it remains independent, and nobody outside the companies knows what, if anything, will change afterwards. If your team depends on the Hub, note it as a supplier in your risk register and keep local copies of the models you rely on.</p></div>
+
+<h3 id="ch29-6"><span class="num">29.6</span>Amazon: Bedrock, Nova and Trainium</h3>
+<p>Amazon's AI strategy is to be the neutral marketplace: one cloud where you can pick models from many vendors, plus Amazon's own cheaper options.</p>
+<div class="tbl"><table>
+<tr><th>Product</th><th>What it is</th><th>Key facts</th></tr>
+<tr><td><b>Amazon Bedrock</b></td><td>A managed service for using many companies' models through one AWS API, including Claude</td><td>Announced 13 Apr 2023; generally available 28 Sep 2023</td></tr>
+<tr><td><b>Amazon SageMaker</b></td><td>Tools for building, training and hosting your own models</td><td>Older than Bedrock; aimed at machine-learning teams</td></tr>
+<tr><td><b>Nova</b> models</td><td>Amazon's own proprietary models</td><td>Nova Micro, Lite and Pro (Dec 2024). Nova 2 (re:Invent, Dec 2025): Nova 2 Lite, Nova 2 Pro (preview), Nova 2 Omni and Nova 2 Sonic (speech)</td></tr>
+<tr><td><b>Nova Act</b></td><td>A service for agents that automate tasks in a web browser</td><td>Relevant to testers watching AI browser automation (<a href="#ch112">Chapter 112</a>)</td></tr>
+<tr><td><b>Nova Forge</b></td><td>Build custom models on top of Nova</td><td></td></tr>
+<tr><td><b>Trainium</b> chips</td><td>Amazon's own AI training chips</td><td>Trainium3, Amazon's first 3-nanometre AI chip, in Trn3 UltraServers of 144 chips; generally available at re:Invent 2025</td></tr>
+<tr><td><b>Alexa+</b></td><td>The AI-powered version of Alexa</td><td>Consumer product</td></tr>
+</table></div>
+<p>Amazon also has an agentic development tool called Kiro, but its details were not checked for this book. Reports of a Nova 2.5 Sonic release and of older Nova models being retired in 2026 also come from secondary sources only.</p>
+
+<h3 id="ch29-7"><span class="num">29.7</span>Amazon and Anthropic</h3>
+<p>Amazon is Anthropic's closest infrastructure partner. Anthropic's own announcement on 25 September 2023 said Amazon would invest "up to $4 billion" for a minority stake, and that AWS would become Anthropic's primary cloud provider, with Anthropic using Amazon's Trainium and Inferentia chips. <strong>Project Rainier</strong> is a giant Trainium2 cluster that Amazon built for Anthropic. An expansion in April 2026 was reported as $5 billion now plus up to $20 billion tied to milestones, and about 5 gigawatts of Trainium compute; reports differ on the exact totals, so treat those figures as unconfirmed.</p>
+<p>Anthropic is not exclusive to Amazon: it also uses Google TPUs and Microsoft Azure (<a href="#ch28">Chapter 28</a>). <a href="#ch37">Chapter 37</a> covers Anthropic's investors in full.</p>
+<h4>Using Claude through AWS</h4>
+<p>For a company that already runs on AWS, Bedrock is often the easiest approved route to Claude: billing, access control and logging all go through the existing AWS account.</p>
+<div class="tbl"><table>
+<tr><th>Route</th><th>Example model ID or setting</th></tr>
+<tr><td>Amazon Bedrock API</td><td><code>anthropic.claude-opus-5-5</code>, <code>anthropic.claude-sonnet-5-5</code>, <code>anthropic.claude-haiku-5-5</code></td></tr>
+<tr><td>Claude Code on Bedrock</td><td>Set <code>CLAUDE_CODE_USE_BEDROCK=1</code> and provide AWS credentials; the <code>/setup-bedrock</code> wizard helps with region and models</td></tr>
+<tr><td>Claude Platform on AWS</td><td>Anthropic's own platform, offered through AWS; all four current models are available</td></tr>
+</table></div>
+<div class="code"><span class="cap">Terminal: start Claude Code against Bedrock (macOS / Linux)</span><pre>export CLAUDE_CODE_USE_BEDROCK=1     <span class="c"># use Amazon Bedrock instead of Anthropic's API</span>
+export AWS_PROFILE=qa-sandbox        <span class="c"># an AWS profile your admin gave you (illustrative name)</span>
+claude                               <span class="c"># then run /setup-bedrock if region or models need setting</span></pre></div>
+<div class="box warn"><span class="tag">Things that differ on Bedrock</span><ul>
+<li>Bedrock sets its own prices, which may differ from Anthropic's list prices.</li>
+<li>In Claude Code, short aliases such as <code>sonnet</code> can resolve to older models on Bedrock. Pin a full model name.</li>
+<li>Some Claude Code features (for example Claude in Chrome and <code>/import</code>) are not available on Bedrock.</li>
+</ul></div>
+
+<div class="lab"><div class="lab-h"><b>Audit the licences of open models before you use them</b><span>30 min · Python 3 or a browser</span></div><ol>
+<li>Save the script below as <code>licence_audit.py</code>. It uses only Python's standard library and the public Hugging Face Hub API; no account or key is needed.<span class="expect">a file of about 40 lines.</span></li>
+<li>Run <code>python3 licence_audit.py</code>. With no arguments it checks four organisations on the Hub: <code>meta-llama</code> (Llama), <code>meta-models</code> (Muse open models), <code>nvidia</code> and <code>amazon</code>.<span class="expect">for each organisation, a count of licences across its 20 most-downloaded models, with custom licences flagged, as in the sample output.</span></li>
+<li>Look at <code>meta-llama</code>. Every licence is a Llama-specific one.<span class="expect">tags such as <code>llama3.1</code>, <code>llama3.2</code>, <code>llama2</code>: open weights under custom terms, not a standard open-source licence.</span></li>
+<li>Look at <code>meta-models</code>. Find Muse Glimmer.<span class="expect">Muse Glimmer shows <code>apache-2.0</code>, matching Meta's announcement. Any model tagged <code>other</code> needs its model card read.</span></li>
+<li>Look at <code>amazon</code>. Notice that Nova does not appear.<span class="expect">Amazon's open models on the Hub are mostly forecasting and research models; Nova is proprietary and only available through AWS.</span></li>
+<li>Pick one flagged model. Open its page on huggingface.co (the address is <code>https://huggingface.co/</code> followed by the model id) and find the licence section. Write two sentences: may your company use it commercially, and what conditions apply?<span class="expect">a short, plain-language licence summary you could attach to a tool-approval request.</span></li>
+</ol></div>
+<div class="code"><span class="cap">licence_audit.py (Python 3, standard library only)</span><pre>"""Count the licences on each organisation's most-downloaded Hugging Face models."""
+import json
+import sys
+import urllib.parse
+import urllib.request
+from collections import Counter
+
+API = "https://huggingface.co/api/models"
+STANDARD = {"apache-2.0", "mit", "bsd-3-clause", "bsd-2-clause"}
+
+
+def top_models(author, limit=20):
+    query = urllib.parse.urlencode({"author": author, "sort": "downloads", "limit": limit})
+    with urllib.request.urlopen(f"{API}?{query}", timeout=20) as resp:
+        return json.load(resp)
+
+
+def licence_of(model):
+    for tag in model.get("tags", []):
+        if tag.startswith("license:"):
+            return tag.split(":", 1)[1]
+    return "(not stated)"
+
+
+def main():
+    authors = sys.argv[1:] or ["meta-llama", "meta-models", "nvidia", "amazon"]
+    for author in authors:
+        models = top_models(author)
+        counts = Counter(licence_of(m) for m in models)
+        print(f"\n== {author}: top {len(models)} models by downloads ==")
+        for licence, n in counts.most_common():
+            flag = "" if licence in STANDARD else "   &lt;- read this licence before use"
+            print(f"  {n:&gt;3}  {licence}{flag}")
+        custom = [m["id"] for m in models if licence_of(m) not in STANDARD][:3]
+        if custom:
+            print("  examples to check:", ", ".join(custom))
+
+
+if __name__ == "__main__":
+    main()</pre></div>
+<div class="code"><span class="cap">Terminal: sample run on 9 November 2026 (your counts will differ)</span><pre>python3 licence_audit.py
+
+== meta-llama: top 20 models by downloads ==
+    6  llama3.1   &lt;- read this licence before use
+    4  llama3.2   &lt;- read this licence before use
+    3  llama3   &lt;- read this licence before use
+    3  llama2   &lt;- read this licence before use
+    3  other   &lt;- read this licence before use
+    1  llama3.3   &lt;- read this licence before use
+  examples to check: meta-llama/Llama-3.1-8B-Instruct, meta-llama/Prompt-Guard-86M, meta-llama/Llama-3.2-1B-Instruct
+
+== meta-models: top 6 models by downloads ==
+    4  apache-2.0
+    2  other   &lt;- read this licence before use
+  examples to check: meta-models/Muse-Spark-Open-816B-A42B-NVFP4, meta-models/Muse-Spark-Open-816B-A42B
+
+== nvidia: top 20 models by downloads ==
+   14  other   &lt;- read this licence before use
+    3  apache-2.0
+    2  mit
+    1  cc-by-4.0   &lt;- read this licence before use
+  examples to check: nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16, nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16, nvidia/Qwen2.5-VL-7B-Instruct-NVFP4
+
+== amazon: top 20 models by downloads ==
+   17  apache-2.0
+    2  cc-by-nc-4.0   &lt;- read this licence before use
+    1  other   &lt;- read this licence before use
+  examples to check: amazon/ALoDLM-8B, amazon/ALoDLM-1.7B, amazon/Titan-text-embeddings-v2</pre></div>
+<p>Two things are worth noticing. First, <code>other</code> simply means the licence is not one of the Hub's standard tags; it is a prompt to read, not a verdict. Second, <code>cc-by-nc-4.0</code> includes "NC", meaning non-commercial: such a model may not be usable in a paid product. The script deliberately flags anything outside a short list of well-known permissive licences, the same way a test might flag anything outside an allow-list. It is a triage tool, not legal advice.</p>
+<div class="box note"><span class="tag">Troubleshooting</span><ul>
+<li><b><code>CERTIFICATE_VERIFY_FAILED</code> on a Mac:</b> run <code>Install Certificates.command</code> from your <code>/Applications/Python 3.x/</code> folder once, then try again.</li>
+<li><b>Network blocked at work:</b> open <code>https://huggingface.co/meta-llama</code> (and the other organisations) in a browser, sort by "Most downloads" and read the licence on each model page.</li>
+<li><b><code>HTTP Error 429</code>:</b> you have sent too many requests in a short time. Wait a minute and run it again.</li>
+<li><b>An organisation shows "top 0 models":</b> check the spelling; organisation names on the Hub are case-sensitive.</li>
+</ul></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Llama is open source."</dt><dd>Llama weights are downloadable, but under Meta's custom licences, not a standard open-source licence. "Open weights" and "open source" are different things (<a href="#ch32">Chapter 32</a>).</dd>
+<dt>"Meta stopped releasing open models."</dt><dd>Its frontier Muse Spark models are proprietary, but it released Muse Glimmer under Apache 2.0 in August 2026.</dd>
+<dt>"NVIDIA is just a chip company."</dt><dd>It also sells full systems and software (CUDA, NIM), releases the open Nemotron models, and has agreed to buy Hugging Face (pending).</dd>
+<dt>"Claude on Bedrock is a different, Amazon version of Claude."</dt><dd>It is the same Claude model family reached through AWS. Prices, available features and default aliases can differ, so check them.</dd>
+<dt>"Amazon owns Anthropic."</dt><dd>Amazon is a major investor with a minority stake and Anthropic's primary cloud. Anthropic also works with Google and Microsoft.</dd>
+</dl></div>
+
+<h3 id="ch29-r"><span class="num">29.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Meta earns from ads, NVIDIA from hardware and systems, Amazon from cloud usage; their AI choices follow from that.</li>
+<li>Meta's Llama (2023–2025) made strong open weights mainstream, under custom licences. Since Muse Spark (April 2026) Meta's frontier models are proprietary, with some open models such as Muse Glimmer.</li>
+<li>NVIDIA's GPUs plus CUDA underpin most AI training; generations run Ampere, Hopper, Blackwell and Vera Rubin.</li>
+<li>NVIDIA now also releases Nemotron open models and has agreed to buy Hugging Face (about $12.9B, pending, expected first half of 2027).</li>
+<li>Amazon offers Bedrock (many vendors' models, including Claude), its own Nova models and Trainium chips.</li>
+<li>Amazon is Anthropic's primary cloud and a major investor; Claude Code can run on Bedrock with <code>CLAUDE_CODE_USE_BEDROCK=1</code>.</li>
+<li>Always read a model's licence before use; licence tags on the Hub are a quick first check.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What changed with Meta's Muse Spark in April 2026?</p><div class="opts"><button>Meta released its most powerful model with open weights under Apache 2.0</button><button data-ok>Meta's new frontier model was not open-weight, ending the Llama-style open release at the frontier</button><button>Meta stopped building AI models</button></div><p class="why" hidden>Muse Spark was offered through Meta AI apps and a private-preview API. Smaller Muse Glimmer later came with open weights.</p></div>
+<div class="qz"><p class="q">Why did CUDA matter so much for AI?</p><div class="opts"><button>It made GPUs cheaper to manufacture</button><button>It is a type of neural network</button><button data-ok>It let programmers use NVIDIA GPUs for general computing, so deep-learning software was built on it</button></div><p class="why" hidden>Years of AI software were written for CUDA first, which makes switching to other chips costly.</p></div>
+<div class="qz"><p class="q">What was the status of NVIDIA's Hugging Face acquisition on 9 November 2026?</p><div class="opts"><button>Completed in September 2026</button><button data-ok>Agreed but not closed; expected in the first half of 2027, pending regulators</button><button>Cancelled</button></div><p class="why" hidden>The definitive agreement was signed on 2 September 2026.</p></div>
+<div class="qz"><p class="q">A model on the Hub has the licence tag <code>cc-by-nc-4.0</code>. What should a QA lead conclude first?</p><div class="opts"><button>It is fully open source, so anything goes</button><button data-ok>"NC" means non-commercial, so check before using it in anything paid or customer-facing</button><button>It can only be used on NVIDIA hardware</button></div><p class="why" hidden>Licence tags are a quick first check; the full licence text decides.</p></div>
+<div class="qz"><p class="q">Your company runs entirely on AWS. Which is a realistic way to use Claude Code under the existing cloud account?</p><div class="opts"><button data-ok>Set <code>CLAUDE_CODE_USE_BEDROCK=1</code> with AWS credentials and pin a full model name</button><button>Use Amazon Nova, which is Claude under another name</button><button>Download Claude's weights from Hugging Face</button></div><p class="why" hidden>Claude is available on Bedrock. Nova is Amazon's own model, and Claude's weights are not downloadable.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Your team wants to run a small open model locally to summarise test logs. Using the lab script or the Hub website, shortlist three candidate models from Meta, NVIDIA or Amazon. For each, record: the licence, whether commercial use is allowed, any conditions, and the model size from its name or card. Recommend one, or none, in a half-page note, and say what you would need legal or security to confirm.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Meta, NVIDIA and Amazon make money from AI in totally different ways. Meta uses AI to improve its apps and ads; it gave away Llama as open weights for years, then in 2026 switched its top Muse models to proprietary, while still releasing some smaller open ones. NVIDIA makes the GPUs and the CUDA software almost everyone trains on, and now releases its own open models and is buying Hugging Face. Amazon runs AWS, sells lots of companies' models through Bedrock, including Claude, makes its own Nova models and Trainium chips, and is Anthropic's main cloud partner. And whenever you download an open model, read the licence first: open weights doesn't mean you can do anything you like."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Meta, "Introducing Muse Spark" (8 Apr 2026): <a href="https://about.fb.com/news/2026/04/introducing-muse-spark-meta-superintelligence-labs/" target="_blank" rel="noopener">about.fb.com</a>; Meta research blog, "Introducing Muse Spark 1.3": <a href="https://research.meta.ai/blog/introducing-muse-spark-1-3" target="_blank" rel="noopener">research.meta.ai</a></li>
+<li>VentureBeat, "Goodbye, Llama: Meta launches new proprietary AI model Muse Spark": <a href="https://venturebeat.com/technology/goodbye-llama-meta-launches-new-proprietary-ai-model-muse-spark-first-since" target="_blank" rel="noopener">venturebeat.com</a></li>
+<li>Muse Glimmer model card: <a href="https://huggingface.co/meta-models/Muse-Glimmer-30B" target="_blank" rel="noopener">huggingface.co/meta-models/Muse-Glimmer-30B</a>; H. Touvron et al., "LLaMA" (2023): <a href="https://arxiv.org/abs/2302.13971" target="_blank" rel="noopener">arXiv:2302.13971</a></li>
+<li>Wikipedia, "Meta AI": <a href="https://en.wikipedia.org/wiki/Meta_AI" target="_blank" rel="noopener">en.wikipedia.org/wiki/Meta_AI</a>; "Llama (language model)": <a href="https://en.wikipedia.org/wiki/Llama_(language_model)" target="_blank" rel="noopener">en.wikipedia.org</a></li>
+<li>Wikipedia, "Nvidia": <a href="https://en.wikipedia.org/wiki/Nvidia" target="_blank" rel="noopener">en.wikipedia.org/wiki/Nvidia</a>; NVIDIA blog, Nemotron 3.5 Super VL: <a href="https://blogs.nvidia.com/blog/nemotron-3-5-super-vl/" target="_blank" rel="noopener">blogs.nvidia.com</a>; NVIDIA research, Nemotron 3 Ultra: <a href="https://research.nvidia.com/labs/nemotron/Nemotron-3-Ultra/" target="_blank" rel="noopener">research.nvidia.com</a></li>
+<li>NVIDIA Form 8-K on the Hugging Face agreement: <a href="https://www.sec.gov/Archives/edgar/data/0001045810/000104581026000078/nvda-20260902.htm" target="_blank" rel="noopener">sec.gov</a>; TechCrunch coverage: <a href="https://techcrunch.com/2026/09/03/nvidia-confirms-it-will-buy-hugging-face-for-12-9-billion/" target="_blank" rel="noopener">techcrunch.com</a></li>
+<li>Amazon Nova: <a href="https://aws.amazon.com/nova/" target="_blank" rel="noopener">aws.amazon.com/nova</a>; Wikipedia, "Amazon Bedrock": <a href="https://en.wikipedia.org/wiki/Amazon_Bedrock" target="_blank" rel="noopener">en.wikipedia.org</a>; TechRepublic on re:Invent 2025 (Nova 2, Trainium3): <a href="https://www.techrepublic.com/article/news-aws-reinvent-day-2-2025/" target="_blank" rel="noopener">techrepublic.com</a></li>
+<li>Anthropic, Amazon partnership announcement (25 Sep 2023): <a href="https://www.anthropic.com/news/anthropic-amazon" target="_blank" rel="noopener">anthropic.com</a>; Amazon, additional investment in Anthropic: <a href="https://www.aboutamazon.com/news/company-news/amazon-invests-additional-5-billion-anthropic-ai" target="_blank" rel="noopener">aboutamazon.com</a></li>
+<li>Claude models overview (Bedrock IDs): <a href="https://platform.claude.com/docs/en/about-claude/models/overview" target="_blank" rel="noopener">platform.claude.com</a>; Claude Code documentation (third-party providers): <a href="https://code.claude.com/docs" target="_blank" rel="noopener">code.claude.com/docs</a></li>
+<li>Hugging Face Hub API documentation: <a href="https://huggingface.co/docs/hub/api" target="_blank" rel="noopener">huggingface.co/docs/hub/api</a></li>
+</ol><p class="verified">Verified 9 November 2026 against the official pages above and the project's research fact sheets. Treated as unverified: Muse Wonder and Muse Spark Open details, exact Rubin shipment and Nemotron 3.5 dates, the exact size of Amazon's April 2026 Anthropic investment, Nova 2.5 Sonic, and Kiro.</p></div>

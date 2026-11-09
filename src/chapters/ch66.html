@@ -1,0 +1,211 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>The full life of one task in Claude Code, from your prompt to the final answer</li>
+<li>What runs on your computer, what runs at Anthropic, and what data travels between them</li>
+<li>What goes into the context before the model sees your request</li>
+<li>How a permission check decides: hooks, rules, modes and the auto-mode classifier</li>
+<li>The built-in tools Claude uses, with their exact names</li>
+<li>How context grows, how compaction works, and what checkpoints can and can't undo</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 65 (your first session). Chapter 20 (context windows) and Chapter 14 (tokens) help with the later sections.</div>
+
+<div class="bigidea"><p>Claude Code is a loop. You give it a goal. It packs everything relevant into a message and sends it to a Claude model. The model either answers or asks to use a tool, such as reading a file or running a command. Claude Code checks whether that action is allowed, runs it on your computer, and sends the result back. The model decides the next step. This repeats until the job is done. Understanding this loop explains almost everything Claude Code does, including its mistakes.</p></div>
+
+<h3 id="ch66-1"><span class="num">66.1</span>Two parts: the model and the harness</h3>
+<p>Anthropic's documentation describes Claude Code as two components working together:</p>
+<div class="cols2">
+<div><h4>The model</h4><p>A Claude model (for example Opus 5.5) running on Anthropic's servers. It reads, reasons and decides. On its own it can only produce text.</p></div>
+<div><h4>The harness</h4><p>Claude Code itself, running on your computer. It provides the tools, manages what the model sees (the context), enforces permissions, and runs the actions. Anthropic calls this layer the <a class="gl" href="#g-agentic-harness">agentic harness</a>.</p></div>
+</div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a remote expert guiding a technician over the phone. The expert (the model) can't touch anything; they reason and give instructions. The technician (the harness) is on site with the tools, follows the house safety rules, does the work and reports back what they see. Neither could fix the problem alone.</p></div>
+<p>The documentation describes the loop in three overlapping phases: <strong>gather context, take action, verify results</strong>. A question about your code may only need the first phase. Fixing a failing test usually cycles through all three several times.</p>
+
+<h3 id="ch66-2"><span class="num">66.2</span>The whole journey on one page</h3>
+<div class="flow">
+<div><b>1 · You</b>Type a request and press Enter</div>
+<div><b>2 · Build context</b>Harness gathers instructions, CLAUDE.md, memory, tool list, conversation</div>
+<div class="hl"><b>3 · Model</b>Reasons, then replies with text or a tool request</div>
+<div><b>4 · Permission check</b>Hooks, rules, mode, classifier: allow, ask or block</div>
+<div><b>5 · Execute</b>Tool runs on your machine</div>
+<div><b>6 · Result back</b>Output added to the context; back to step 3</div>
+</div>
+<p>The loop ends when the model replies with text and no tool request: that's the final answer you see. You can break into the loop at any time with <kbd>Esc</kbd>, or queue a correction by typing while it works.</p>
+
+<h3 id="ch66-3"><span class="num">66.3</span>Where things run, and what travels</h3>
+<div class="tbl"><table>
+<tr><th>On your computer</th><th>At Anthropic (or your cloud provider)</th></tr>
+<tr><td>Claude Code (the harness)<br>Every tool: file reads and edits, shell commands, searches<br>Local MCP servers<br>Your settings, CLAUDE.md, hooks<br>Saved conversations under <code>~/.claude/projects/</code><br>Checkpoint snapshots</td><td>The Claude model that does the reasoning<br>(and, in auto mode, the classifier model that reviews actions)</td></tr>
+</table></div>
+<p>Anthropic's data-usage documentation says Claude Code runs locally and sends data over the network to talk to the model: <strong>your prompts and the model's outputs</strong>, encrypted in transit (TLS 1.2 or later). In practice the "prompt" sent each turn includes everything in the context: instructions, the conversation, and the contents of any file Claude read or command output it saw. What isn't sent: files Claude never read. It doesn't upload your whole disk or repository.</p>
+<div class="box note"><span class="tag">Data and training</span><p>Under commercial terms (Team and Enterprise plans, the API and cloud platforms), Anthropic's documentation states that it does not train models on code or prompts sent to Claude Code unless the customer opts in. Consumer plans have their own settings. Usage telemetry, which can be switched off, never includes your code, prompts or file paths. Check your organisation's agreement for retention details (Chapter 125).</p></div>
+<div class="box warn"><span class="tag">So, practically</span><p>Anything Claude reads is sent to the model. That's why you keep secrets out of reach with deny rules, for example <code>Read(./.env)</code> (Chapter 78), rather than hoping Claude won't open them.</p></div>
+
+<h3 id="ch66-4"><span class="num">66.4</span>Step 2 in detail: building the context</h3>
+<p>Before the model sees your words, the harness assembles the <a class="gl" href="#g-context-window">context</a>. According to Anthropic's "How Claude Code works" page, the context window holds:</p>
+<div class="tbl"><table>
+<tr><th>Ingredient</th><th>What it is</th><th>Where it comes from</th></tr>
+<tr><td>System instructions</td><td>Claude Code's built-in guidance on how to behave and use tools</td><td>Claude Code itself</td></tr>
+<tr><td>Tool definitions</td><td>Names, descriptions and inputs of the tools available</td><td>Built-in tools, plus MCP servers. MCP tools are deferred by default: only names and server instructions load until a tool is needed (tool search).</td></tr>
+<tr><td><a class="gl" href="#g-claude-md">CLAUDE.md</a> files</td><td>Your project and personal instructions</td><td>Chapter 77</td></tr>
+<tr><td>Auto memory</td><td>Things Claude saved about you and the project</td><td>The first 200 lines or 25 KB of MEMORY.md load at the start</td></tr>
+<tr><td>Skill descriptions</td><td>Short descriptions of installed skills; the full skill loads only when used</td><td>Chapter 80</td></tr>
+<tr><td>Environment and git state</td><td>Working folder, current branch, uncommitted changes, recent commits</td><td>Your machine</td></tr>
+<tr><td>The conversation</td><td>Your messages, Claude's replies, every tool result so far</td><td>This session</td></tr>
+<tr><td>System reminders</td><td>Notes the harness adds as you work, such as "a file you read earlier changed on disk"</td><td>Claude Code</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example</span><p>Your team's CLAUDE.md says "Select elements by data-testid only". You never mention it in your prompt, yet Claude follows it, because CLAUDE.md is in the context every turn. Equally, if Claude adds a "Co-Authored-By" line to a commit you didn't ask for, that's an instruction the harness added, not the model improvising. Both are context at work.</p></div>
+<p>Run <code>/context</code> at any time to see what's using space.</p>
+
+<h3 id="ch66-5"><span class="num">66.5</span>Step 3: the model decides</h3>
+<p>The model reads the whole context and produces a reply. On current models it may think first (extended thinking is always on for Opus 5.5, Sonnet 5.5, Haiku 5.5 and Fable; the <strong>effort</strong> level controls how much, Chapter 68). The reply is one of two things:</p>
+<ul>
+<li><strong>Text</strong>: an explanation, a question for you, or the final answer.</li>
+<li><strong>A tool request</strong>: "I want to use the Bash tool with the command <code>npx playwright test checkout</code>", often with some text explaining why. A reply can contain several tool requests at once, for example reading three files in parallel.</li>
+</ul>
+<details class="deep"><summary>What a tool request and its result look like</summary><div class="body">
+<p>Under the hood, Claude Code talks to the model through Anthropic's Messages API (Chapter 86). A tool request arrives as a <code>tool_use</code> block, and the harness answers with a <code>tool_result</code> block that refers back to it by ID. Simplified:</p>
+<div class="code"><span class="cap">Model → harness: a tool request (simplified)</span><pre>{
+  "type": "tool_use",
+  "id": "toolu_01A...",            <span class="c">// ticket number for this request</span>
+  "name": "Bash",                   <span class="c">// which tool</span>
+  "input": { "command": "npx playwright test checkout", "description": "Run the checkout tests" }
+}</pre></div>
+<div class="code"><span class="cap">Harness → model: the result (simplified)</span><pre>{
+  "type": "tool_result",
+  "tool_use_id": "toolu_01A...",    <span class="c">// matches the request</span>
+  "content": "1 failed: checkout.spec.ts:42 expected 90, received 100 ..."
+}</pre></div>
+<p>The model never runs anything itself. It only ever writes requests like the first block. Everything that touches your computer happens in the harness, which is why the harness can enforce permissions. MCP tools (Chapter 99) travel the same way; their names look like <code>mcp__playwright__browser_navigate</code>.</p>
+</div></details>
+
+<h3 id="ch66-6"><span class="num">66.6</span>Step 4: the permission check</h3>
+<p>Every tool request passes a gate before it runs. The order matters, and it's the same idea a tester applies to access control: <em>the most restrictive rule wins</em>.</p>
+<div class="flow">
+<div><b>PreToolUse hooks</b>Your scripts run first. A hook that blocks (exit code 2) stops the call outright.</div>
+<div><b>Rules</b>Checked in order: deny, then ask, then allow. First match wins.</div>
+<div><b>Mode</b>If no rule matched, the permission mode decides: prompt you, allow, or send to the classifier.</div>
+<div class="hl"><b>Outcome</b>Run, ask you, or block (and tell the model why)</div>
+</div>
+<ul>
+<li><strong>Hooks</strong> (Chapter 82) run before the permission prompt. A hook can block a call, but it can't override your deny or ask rules: a matching deny still blocks even if the hook said "allow".</li>
+<li><strong>Rules</strong> (Chapter 78) are evaluated deny → ask → allow. A broad deny like <code>Bash(git push *)</code> beats a narrower allow. A deny written at any settings level beats an allow at any other level.</li>
+<li><strong>Read-only actions</strong> such as reading files inside the working folder, and a built-in list of read-only shell commands, don't need approval in any mode.</li>
+<li><strong>The mode</strong> decides the rest. In Manual mode you're asked before edits and most commands. In Accept edits, file edits go through. In Plan mode, edits wait for an approved plan.</li>
+</ul>
+<h4>What the auto-mode classifier does</h4>
+<p>In Auto mode, a second model (the classifier) reviews actions instead of you. According to Anthropic's documentation, each action goes through a fixed order, and the first matching step wins:</p>
+<ol>
+<li>Your allow, ask and deny rules resolve first (with safety exceptions: for example, no allow rule can approve deleting critical paths such as your home folder).</li>
+<li>Read-only actions and file edits inside your working folder are approved automatically, except writes to protected paths such as settings files.</li>
+<li>Everything else goes to the classifier, which blocks actions that go beyond your request, target infrastructure it doesn't recognise, or appear to be driven by hostile content Claude read.</li>
+<li>If it blocks, Claude is told why and can try a different approach.</li>
+</ol>
+<p>When you enter Auto mode, broad allow rules that would permit arbitrary code (for example <code>Bash(*)</code>) are switched off for the session; narrow ones like <code>Bash(npm test)</code> stay. Explicit ask rules still prompt you.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>The permission check is building security. Your own sign-in rules (hooks) come first, then the official access list (deny, ask, allow), then the duty policy (the mode). In Auto mode, a security officer (the classifier) reviews visitors the list doesn't cover, and turns away anyone acting suspiciously.</p></div>
+
+<h3 id="ch66-7"><span class="num">66.7</span>Step 5: the built-in tools</h3>
+<p>These are the exact tool names from Anthropic's tools reference. You'll use the same names in permission rules, subagent tool lists and hook matchers.</p>
+<div class="tbl"><table>
+<tr><th>Tool</th><th>What it does</th><th>Asks in Manual mode?</th></tr>
+<tr><td><code>Read</code></td><td>Reads a file</td><td>No (inside the working folder)</td></tr>
+<tr><td><code>Edit</code></td><td>Makes a targeted change to a file</td><td>Yes</td></tr>
+<tr><td><code>Write</code></td><td>Creates or overwrites a file</td><td>Yes</td></tr>
+<tr><td><code>Bash</code></td><td>Runs shell commands (tests, git, npm…)</td><td>Yes, except built-in read-only commands</td></tr>
+<tr><td><code>Glob</code> / <code>Grep</code></td><td>Find files by name; search inside files. On macOS, Linux and WSL these are left out by default and Claude searches with <code>find</code> and <code>grep</code> through Bash instead.</td><td>No</td></tr>
+<tr><td><code>WebFetch</code></td><td>Fetches a web page. Usually a separate model summarises the page and Claude receives that summary.</td><td>Yes, except pre-approved documentation sites</td></tr>
+<tr><td><code>WebSearch</code></td><td>Searches the web</td><td>Yes</td></tr>
+<tr><td><code>Agent</code></td><td>Starts a subagent with its own context window (Chapter 81)</td><td>No</td></tr>
+<tr><td><code>Skill</code></td><td>Runs a skill in the conversation (Chapter 80)</td><td>Yes</td></tr>
+<tr><td><code>TaskCreate</code>, <code>TaskList</code>, <code>TaskUpdate</code>, <code>TaskGet</code></td><td>Keep the task checklist you see with <kbd>Ctrl</kbd>+<kbd>T</kbd> (these replaced the older <code>TodoWrite</code>, now disabled by default)</td><td>No</td></tr>
+<tr><td><code>AskUserQuestion</code></td><td>Asks you multiple-choice questions</td><td>No</td></tr>
+<tr><td><code>EnterPlanMode</code> / <code>ExitPlanMode</code></td><td>Switch into plan mode; present a plan for approval</td><td>Exit: yes</td></tr>
+<tr><td><code>LSP</code></td><td>Code intelligence: definitions, references, type errors</td><td>No</td></tr>
+<tr><td><code>Monitor</code></td><td>Runs a command in the background and feeds its output lines back to Claude</td><td>Yes</td></tr>
+<tr><td><code>NotebookEdit</code></td><td>Edits Jupyter notebook cells</td><td>Yes</td></tr>
+<tr><td><code>mcp__server__tool</code></td><td>Any tool from a connected MCP server (Part XII)</td><td>Depends on rules</td></tr>
+</table></div>
+<p>The reference lists more specialised tools (scheduling, worktrees, notifications, messaging other agents and so on). The ones above cover almost everything you'll see in a QA session.</p>
+
+<h3 id="ch66-8"><span class="num">66.8</span>A real QA task, traced step by step</h3>
+<p>You type: <em>"The checkout test is failing on CI. Find out why and fix it, but tell me first if the app is wrong rather than the test."</em> Here's an illustrative trace of how the loop might go in Manual mode. Real sessions vary.</p>
+<div class="tbl"><table>
+<tr><th>Turn</th><th>Model decides</th><th>Tool request</th><th>Permission</th><th>Result fed back</th></tr>
+<tr><td>1</td><td>"First, see the failure."</td><td><code>Bash</code>: <code>npx playwright test checkout</code></td><td>Prompt → you approve</td><td>1 failed: expected total 90, received 100</td></tr>
+<tr><td>2</td><td>"Read the test and the page object."</td><td><code>Read</code> × 2 (in parallel)</td><td>No prompt (read-only)</td><td>File contents</td></tr>
+<tr><td>3</td><td>"Find where the discount is calculated."</td><td><code>Bash</code>: <code>grep -rn "discount" src/</code></td><td>No prompt (read-only command)</td><td>Three matches</td></tr>
+<tr><td>4</td><td>"Read the pricing code."</td><td><code>Read</code></td><td>No prompt</td><td>The code: discount skipped when a coupon is applied</td></tr>
+<tr><td>5</td><td>Text, no tool</td><td>none</td><td>none</td><td>"The test is right; the app skips the discount when a coupon is present. This looks like a real bug. Shall I write it up instead of changing the test?"</td></tr>
+</table></div>
+<p>Notice turn 5. Because you asked to be told first, the model stopped and returned text: the loop ended with a question. That's the red-test rule from Chapter 121 working through the prompt. Without it, the model might have "fixed" the test by changing 90 to 100.</p>
+
+<h3 id="ch66-9"><span class="num">66.9</span>Context grows, then compacts</h3>
+<p>Every tool result is added to the context, so a long session fills up. Near the limit, Claude Code <strong>compacts</strong> automatically: it replaces the conversation with a summary that keeps your requests and key code, but early detailed instructions can be lost. That's why permanent rules belong in CLAUDE.md, which is reloaded, not in an early chat message.</p>
+<div class="flow">
+<div><b>Fresh session</b>Instructions, CLAUDE.md, tool list</div>
+<div><b>Working</b>Each file read and command output adds tokens</div>
+<div class="hl"><b>Near the limit</b>Automatic compaction: conversation becomes a summary</div>
+<div><b>Continues</b>Summary + CLAUDE.md + new work</div>
+</div>
+<ul>
+<li><code>/context</code> shows what's using space.</li>
+<li><code>/compact focus on the checkout failure</code> compacts now, keeping what you name.</li>
+<li><code>/clear</code> starts fresh when the next task is unrelated.</li>
+<li>Subagents work in their own context; only their summary comes back, which keeps your main context lean.</li>
+</ul>
+<p>If one file or output is so large that the context refills right after each summary, Claude Code stops auto-compacting after a few attempts and shows a "thrashing" error. The fix is to read the file in parts, use a subagent, or <code>/clear</code>.</p>
+
+<h3 id="ch66-10"><span class="num">66.10</span>Checkpoints: the undo button, and its limits</h3>
+<p>Before Claude edits a file, the harness saves a snapshot. Every prompt that starts a turn creates a checkpoint, and you can go back with <kbd>Esc</kbd> <kbd>Esc</kbd> or <code>/rewind</code>, choosing to restore the code, the conversation, or both (Chapter 67).</p>
+<div class="box warn"><span class="tag">What checkpoints can't undo</span><ul>
+<li>Files changed by shell commands (for example a script that rewrites files) aren't tracked.</li>
+<li>Most subagent edits, and edits you or other programs make outside Claude, aren't tracked.</li>
+<li>Anything outside your computer (a database change, an API call, a Jira ticket created through MCP, a deployment) can't be checkpointed. Permissions are your protection there.</li>
+<li>Checkpoints are not a replacement for git. Commit good states.</li>
+</ul></div>
+
+<div class="lab"><div class="lab-h"><b>Watch the loop happen</b><span>30 min · your practice project from Chapter 65</span></div><ol>
+<li>Start <code>claude</code> in <code>~/claude-practice</code>, switch to Manual mode, and run <code>/context</code>.<span class="expect">a breakdown of what's already in the context before you've asked anything: instructions, tools, any CLAUDE.md.</span></li>
+<li>Ask: <em>"Run the tests, then explain the result."</em> Watch each step.<span class="expect">a <code>Bash</code> request for <code>node --test</code> (a permission prompt), the output, then a text explanation. That's one loop with one tool call.</span></li>
+<li>Press <kbd>Ctrl</kbd>+<kbd>O</kbd> to open the transcript view, then press it again to close.<span class="expect">a detailed view of the tool calls and their results.</span></li>
+<li>Ask: <em>"Search the project for the word 'percent' and list every place it appears."</em><span class="expect">a search through Bash (<code>grep</code>) or the Grep tool, usually without a prompt because it's read-only.</span></li>
+<li>Ask: <em>"Which tools did you use in this session, in order, and why?"</em><span class="expect">a list matching what you saw. Compare it with the transcript: this is how you audit an agent.</span></li>
+<li>Run <code>/context</code> again.<span class="expect">more space used than in step 1, mostly by tool results.</span></li>
+<li>Ask Claude to add a comment to <code>src/discount.js</code>, approve it, then press <kbd>Esc</kbd> <kbd>Esc</kbd> and choose to restore the code to before that change.<span class="expect">the comment gone. You've used a checkpoint.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Claude Code uploads my whole repository."</dt><dd>It sends what's in the context: your messages, instructions, and the files and outputs Claude actually read. Unread files stay on your machine.</dd>
+<dt>"The model runs the commands."</dt><dd>The model only requests actions. The harness on your computer checks permissions and runs them.</dd>
+<dt>"A hook that says allow overrides my deny rules."</dt><dd>No. Deny and ask rules are still enforced after hooks. A hook can block, but it can't unlock a denied action.</dd>
+<dt>"Auto mode means no safety checks."</dt><dd>It means a classifier checks instead of you. Rules still apply, and some actions always prompt. (That's different from bypass mode, which skips checks and belongs only in isolated sandboxes.)</dd>
+<dt>"Rewind can undo anything."</dt><dd>It only restores file edits Claude made through its edit tools. External effects (databases, tickets, deployments) can't be undone.</dd>
+</dl></div>
+
+<h3 id="ch66-r"><span class="num">66.11</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Claude Code = a model that decides + a harness that holds the tools, manages context and enforces permissions.</li>
+<li>The loop: build context → model replies → permission check → run locally → result back → repeat, until a text-only reply.</li>
+<li>The harness runs on your computer; the model runs at Anthropic. Whatever Claude reads is sent to the model, encrypted.</li>
+<li>Context includes system instructions, tools, CLAUDE.md, auto memory, skill descriptions, git state, the conversation and reminders.</li>
+<li>Permission order: hooks, then rules (deny → ask → allow), then the mode; in Auto mode, a classifier reviews what's left.</li>
+<li>Exact tool names (Read, Edit, Write, Bash, WebFetch, Agent, Skill, Task…) are what you use in rules and hooks.</li>
+<li>Compaction summarises long sessions; checkpoints undo Claude's file edits only.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Where does the command <code>npx playwright test</code> actually run when Claude Code requests it?</p><div class="opts"><button>On Anthropic's servers</button><button data-ok>On your computer, run by the harness</button><button>Inside the model</button></div><p class="why" hidden>The model only writes a tool request; the harness runs it locally after the permission check.</p></div>
+<div class="qz"><p class="q">You have an allow rule for <code>Bash(git *)</code> and a deny rule for <code>Bash(git push *)</code>. Claude requests <code>git push</code>. What happens?</p><div class="opts"><button>It runs, because the allow rule matches</button><button data-ok>It's blocked, because deny rules are checked first</button><button>Claude asks you</button></div><p class="why" hidden>Rules are evaluated deny, then ask, then allow; the first match wins.</p></div>
+<div class="qz"><p class="q">Which of these is NOT normally part of the context sent to the model?</p><div class="opts"><button>Your CLAUDE.md</button><button>The output of a test command Claude ran</button><button data-ok>A file in your repository that Claude never opened</button></div><p class="why" hidden>Only what Claude reads or is given enters the context.</p></div>
+<div class="qz"><p class="q">In Auto mode, who decides whether an unusual shell command may run?</p><div class="opts"><button>Nobody; everything runs</button><button data-ok>A classifier model reviews it, after your rules are checked</button><button>The command always prompts you</button></div><p class="why" hidden>Rules resolve first; anything they don't cover goes to the classifier.</p></div>
+<div class="qz"><p class="q">Claude's change created a Jira ticket through MCP and edited two files. What can <code>/rewind</code> undo?</p><div class="opts"><button>Both the ticket and the edits</button><button data-ok>The file edits only</button><button>Nothing</button></div><p class="why" hidden>Checkpoints cover Claude's file edits, not external systems.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick a real task you did with Claude Code this week. Reconstruct its trace as a table like the one in 63.8: each turn's decision, tool, permission outcome and result (use the transcript view, <kbd>Ctrl</kbd>+<kbd>O</kbd>). Mark one point where a deny rule, an ask rule or a better prompt would have made the session safer or faster. Then draw the loop from memory for a colleague and explain where your data goes.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Claude Code is a loop between a model in the cloud and a harness on your laptop. The harness packs up instructions, CLAUDE.md and the conversation and sends them to the model. The model either answers or asks to use a tool. The harness checks hooks, then deny-ask-allow rules, then the mode (in Auto mode a classifier reviews it), runs the tool locally and sends the result back. When the model replies with plain text, the task is done. Only what Claude reads leaves your machine, and rewind only undoes file edits."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/how-claude-code-works" target="_blank" rel="noopener">How Claude Code works</a>: the agentic loop, harness, context window, compaction, checkpoints.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/tools-reference" target="_blank" rel="noopener">Tools reference</a>: exact tool names and permission requirements.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/permissions" target="_blank" rel="noopener">Permissions</a>: rule evaluation order; precedence among rules and hooks.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/permission-modes" target="_blank" rel="noopener">Permission modes</a>: auto mode and how the classifier evaluates actions.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/data-usage" target="_blank" rel="noopener">Data usage</a>: local data flow, encryption in transit, training and retention.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/context-window" target="_blank" rel="noopener">Explore the context window</a> (interactive) and <a href="https://code.claude.com/docs/en/checkpointing" target="_blank" rel="noopener">Checkpointing</a>.</li>
+</ol><p class="verified">Verified 9 November 2026 against Claude Code 2.1.319</p></div>

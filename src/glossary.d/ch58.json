@@ -1,0 +1,86 @@
+{
+ "Package manager": {
+  "d": "A tool that downloads, installs, updates and removes software packages and the other packages they depend on. Examples: Homebrew, npm, pip and uv.",
+  "see": "ch58"
+ },
+ "Dependency": {
+  "d": "A package your project needs in order to run or be built. Dependencies often have dependencies of their own (transitive dependencies).",
+  "see": "ch58"
+ },
+ "Lock file": {
+  "d": "A file such as package-lock.json or uv.lock that records the exact version of every installed package, so everyone and every CI run gets the same set.",
+  "see": "ch58"
+ },
+ "Semantic versioning": {
+  "d": "A version-number convention MAJOR.MINOR.PATCH: major for breaking changes, minor for new features, patch for fixes. Often shortened to semver.",
+  "see": "ch58"
+ },
+ "Node.js": {
+  "d": "A program that runs JavaScript outside the browser, on your computer or a server. Many developer tools, including Playwright, run on it.",
+  "see": "ch58"
+ },
+ "npm": {
+  "d": "The package manager that comes with Node.js. It installs JavaScript packages into a project's node_modules folder and records them in package.json.",
+  "see": "ch58"
+ },
+ "npx": {
+  "d": "A command that comes with npm and runs a package's command-line tool, downloading the package first if it is not installed.",
+  "see": "ch58"
+ },
+ "Homebrew": {
+  "d": "A free package manager for macOS and Linux that installs command-line tools and apps with commands such as brew install.",
+  "see": "ch58"
+ },
+ "Virtual environment": {
+  "d": "A self-contained folder (usually .venv) holding a Python interpreter link and its own installed packages, so each project's packages stay separate.",
+  "see": "ch58"
+ },
+ "pip": {
+  "d": "Python's standard package installer. Run it as python -m pip inside a virtual environment to install packages from PyPI.",
+  "see": "ch58"
+ },
+ "uv": {
+  "d": "A fast Python package and project manager from Astral that can install Python, create virtual environments, add dependencies and write a uv.lock lock file.",
+  "see": "ch58"
+ },
+ "Python": {
+  "d": "A popular, readable programming language widely used for automation, data work, testing and AI applications.",
+  "see": "ch59"
+ },
+ "Variable": {
+  "d": "A name that points to a value in a program, such as passed = 47.",
+  "see": "ch59"
+ },
+ "Dictionary": {
+  "d": "In Python, a collection of key-value pairs written with braces, such as {\"id\": \"QA-1\"}. The Python equivalent of a JSON object.",
+  "see": "ch59"
+ },
+ "Function": {
+  "d": "A named, reusable block of code that takes inputs (parameters) and usually returns a result.",
+  "see": "ch59"
+ },
+ "Exception": {
+  "d": "An error raised while a program runs, such as KeyError or FileNotFoundError. It stops the program unless code catches it with try/except.",
+  "see": "ch59"
+ },
+ "Traceback": {
+  "d": "Python's report of an uncaught exception: the chain of calls that led to the error, ending with the error type and message on the last line.",
+  "see": "ch59"
+ },
+ "Timeout": {
+  "d": "The longest a program will wait for something, such as a server's reply, before giving up with an error.",
+  "see": "ch60"
+ },
+ "Exponential backoff": {
+  "d": "A retry strategy where the wait doubles after each failed attempt (for example 0.5s, 1s, 2s), usually with a little randomness (jitter) added.",
+  "see": "ch60"
+ },
+ "Pagination": {
+  "d": "Splitting a long list from an API into pages that the client fetches one at a time, using a page number, cursor or next link.",
+  "see": "ch60"
+ },
+ "Async": {
+  "d": "Asynchronous code: a style (async/await in Python) where a program starts many slow operations, such as network calls, and waits for them together instead of one by one.",
+  "see": "ch60"
+ }
+}

@@ -1,0 +1,305 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What version control is, and the difference between Git (the tool) and GitHub (the website)</li>
+<li>How to set Git up once, then create a <a class="gl" href="#g-repository">repository</a> and save your work as commits</li>
+<li>The three places a change can be (working folder, staging area, repository) and how <code>git status</code> tells you which</li>
+<li>How branches and merges work, including what a merge conflict looks like and how to fix one</li>
+<li>How to keep secrets and generated files out of Git with <code>.gitignore</code></li>
+<li>How remotes work: clone, push, pull, and what "rejected" means</li>
+<li>GitHub basics: repositories, pull requests, and signing in with HTTPS tokens or SSH keys</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch53">Chapter 53</a> (files, folders and paths) and <a href="#ch54">Chapter 54</a> (your first commands). You need a terminal (Terminal on macOS, any terminal on Linux, or WSL or Git Bash on Windows). A GitHub account is optional: the main lab works entirely on your own computer.</div>
+
+<div class="bigidea"><p>Git keeps a complete history of a folder. Each time you reach a sensible point, you take a snapshot called a <a class="gl" href="#g-commit">commit</a>, with a short message saying what changed and why. You can look back at any snapshot, compare two of them, and work on a separate <a class="gl" href="#g-branch">branch</a> without disturbing the main version. GitHub is a website that stores a copy of your repository online so a team can share it, discuss changes in <a class="gl" href="#g-pull-request">pull requests</a> and run automated checks. Every output in this chapter was produced by really running the commands, so you can compare your screen with the page.</p></div>
+
+<h3 id="ch61-1"><span class="num">61.1</span>What version control is</h3>
+<p>Most people have a folder somewhere that looks like this: <code>test-plan.docx</code>, <code>test-plan-v2.docx</code>, <code>test-plan-v2-FINAL.docx</code>, <code>test-plan-v2-FINAL-really.docx</code>. That is version control done by hand. It works badly: nobody knows which file is current, what changed between versions, or who changed it.</p>
+<p>A <strong>version control system</strong> does the same job properly. It keeps one copy of each file in your folder, plus a hidden history of every saved version. <a class="gl" href="#g-git">Git</a> is by far the most widely used one. It was written by Linus Torvalds in 2005 to manage the Linux kernel, and it is free and open source.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a video game with save points. You play, reach a safe spot, and save. If things go badly later, you load the save and try again. A commit is a save point for a folder, with a label you write yourself ("Add login test cases"). Unlike most games, Git keeps every save forever, and you can open two save files side by side to see exactly what changed.</p></div>
+<h4>Git and GitHub are different things</h4>
+<div class="tbl"><table>
+<tr><th></th><th>Git</th><th>GitHub</th></tr>
+<tr><td>What it is</td><td>A program on your computer</td><td>A website and service (owned by Microsoft)</td></tr>
+<tr><td>What it does</td><td>Records history, branches and merges, entirely offline</td><td>Hosts copies of repositories online, plus pull requests, issues, code review and automation (GitHub Actions)</td></tr>
+<tr><td>Do you need an account?</td><td>No</td><td>Yes</td></tr>
+<tr><td>Alternatives</td><td>Few in practice; Git dominates</td><td>GitLab, Bitbucket, Azure DevOps and others host Git repositories too</td></tr>
+</table></div>
+<p>You can use Git without GitHub (the lab in this chapter does). You can't really use GitHub without Git, because the repositories it stores are Git repositories.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>Your team's Playwright tests live in a Git repository on GitHub. When a test starts failing on Tuesday, you can ask Git "what changed in the tests folder since Monday, and who changed it?" and get an exact answer in seconds. Without version control, you would be comparing folders by eye.</p></div>
+
+<h3 id="ch61-2"><span class="num">61.2</span>Install Git and set it up once</h3>
+<p>First check whether Git is already installed:</p>
+<div class="code"><span class="cap">Terminal</span><pre>git --version</pre></div>
+<div class="code"><span class="cap">Output (macOS)</span><pre>git version 2.54.0 (Apple Git-157)</pre></div>
+<p>Any recent version is fine; your number will differ. If you see <code>command not found</code> instead (<a href="#ch62">Chapter 62</a> explains that message), install it:</p>
+<ul>
+<li><strong>macOS:</strong> run <code>xcode-select --install</code> to get Apple's command-line tools, which include Git. On some Macs, typing <code>git</code> alone pops up the same installer. If you use Homebrew (<a href="#ch58">Chapter 58</a>), <code>brew install git</code> also works.</li>
+<li><strong>Linux (Debian or Ubuntu):</strong> <code>sudo apt install git</code>. Other distributions use their own package manager.</li>
+<li><strong>Windows:</strong> install "Git for Windows" from <a href="https://git-scm.com/downloads" target="_blank" rel="noopener">git-scm.com</a>. It includes Git Bash, a terminal where every command in this chapter works. Inside WSL, use the Linux instructions.</li>
+</ul>
+<h4>Tell Git who you are</h4>
+<p>Every commit records an author name and email. Set them once per computer. The <code>--global</code> option means "for every repository for this user":</p>
+<div class="code"><span class="cap">Terminal (once per computer)</span><pre>git config --global user.name "Asha Tester"
+git config --global user.email "asha@example.com"
+git config --global init.defaultBranch main   <span class="c"># call the first branch "main"</span></pre></div>
+<p>These commands print nothing when they succeed. That's normal for many terminal commands: silence means success. Check what you set with <code>git config user.name</code>, which prints the name back. Use the same email as your GitHub account if you plan to use GitHub, so your commits are linked to your profile.</p>
+<div class="box note"><span class="tag">Where this is stored</span><p>Global settings go into a text file in your home folder, <code>~/.gitconfig</code>. You can read it with <code>cat ~/.gitconfig</code>. Settings made without <code>--global</code>, inside a repository, apply to that repository only.</p></div>
+
+<h3 id="ch61-3"><span class="num">61.3</span>Repositories and the three areas</h3>
+<p>A <a class="gl" href="#g-repository">repository</a> (or "repo") is a folder whose history Git is tracking. You turn an ordinary folder into one with <code>git init</code>:</p>
+<div class="code"><span class="cap">Terminal</span><pre>mkdir -p ~/git-practice/qa-notes
+cd ~/git-practice/qa-notes
+git init -b main</pre></div>
+<div class="code"><span class="cap">Output</span><pre>Initialized empty Git repository in /Users/asha/git-practice/qa-notes/.git/</pre></div>
+<p><code>-b main</code> names the first branch <code>main</code>. The message tells you Git created a hidden folder called <code>.git</code>. That folder <em>is</em> the repository: the whole history lives there. Never edit it by hand, and never delete it unless you want to throw the history away. (<code>ls -a</code> shows it; <a href="#ch53">Chapter 53</a> explains hidden files.)</p>
+<p>The command you will run most is <code>git status</code>. It answers "what's going on here?"</p>
+<div class="code"><span class="cap">Output of git status in a brand-new repository</span><pre>On branch main
+
+No commits yet
+
+nothing to commit (create/copy files and use "git add" to track)</pre></div>
+<h4>The three areas</h4>
+<p>A change moves through three places before it is part of the history. This is the single most important idea in Git:</p>
+<div class="flow"><div><b>Working folder</b>The files you see and edit. Changes here are not saved in Git yet.</div><div class="hl"><b>Staging area</b><code>git add</code> puts chosen changes here: "these go in the next snapshot".</div><div><b>Repository</b><code>git commit</code> saves everything staged as one permanent snapshot.</div></div>
+<p>The middle step, the <a class="gl" href="#g-staging-area">staging area</a>, exists so you can choose. If you fixed a test and also changed a config file for your own experiments, you can stage only the test and commit it, leaving the config change out.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Packing a parcel. Your desk is the working folder: things everywhere. The open box is the staging area: you put in only what belongs in this delivery. Taping the box shut and writing the label is the commit. Once sent, that parcel and its label are on record for good.</p></div>
+
+<h3 id="ch61-4"><span class="num">61.4</span>Your first commits</h3>
+<p>Create a file and ask Git what it thinks:</p>
+<div class="code"><span class="cap">Terminal</span><pre>printf '# QA notes\n\nTest notes for the login page.\n' &gt; README.md
+git status</pre></div>
+<div class="code"><span class="cap">Output</span><pre>On branch main
+
+No commits yet
+
+Untracked files:
+  (use "git add &lt;file&gt;..." to include in what will be committed)
+	README.md
+
+nothing added to commit but untracked files present (use "git add" to track)</pre></div>
+<p><strong>Untracked</strong> means Git can see the file but has never saved it. Git's messages usually tell you the next command to run, in brackets. Stage the file, then check again:</p>
+<div class="code"><span class="cap">Terminal</span><pre>git add README.md
+git status</pre></div>
+<div class="code"><span class="cap">Output</span><pre>On branch main
+
+No commits yet
+
+Changes to be committed:
+  (use "git rm --cached &lt;file&gt;..." to unstage)
+	new file:   README.md</pre></div>
+<p>"Changes to be committed" is the staging area. Now take the snapshot. <code>-m</code> gives the commit message:</p>
+<div class="code"><span class="cap">Terminal</span><pre>git commit -m "Add README with project purpose"</pre></div>
+<div class="code"><span class="cap">Output</span><pre>[main (root-commit) 4194538] Add README with project purpose
+ 1 file changed, 3 insertions(+)
+ create mode 100644 README.md</pre></div>
+<p>Reading that output piece by piece: <code>main</code> is the branch; <code>root-commit</code> means it's the very first commit; <code>4194538</code> is the start of the commit's ID (a unique code Git calculates from the contents, so yours will differ); then a summary: one file, three lines added, and a new file created (<code>100644</code> just means "an ordinary, non-executable file").</p>
+<h4>Looking at history</h4>
+<div class="code"><span class="cap">Terminal</span><pre>git log</pre></div>
+<div class="code"><span class="cap">Output</span><pre>commit 4194538e5bd53d8031cc6305f5ed1c533aac4c36
+Author: Asha Tester &lt;asha@example.com&gt;
+Date:   Mon Nov 9 14:48:01 2026 +0530
+
+    Add README with project purpose</pre></div>
+<p>The full ID is 40 characters; Git accepts the first seven or so when you refer to a commit. For a compact view, use <code>git log --oneline</code>, which prints <code>4194538 Add README with project purpose</code>. If <code>git log</code> fills the screen and shows a <code>:</code> at the bottom, you are in a pager: press <kbd>q</kbd> to get back to the prompt.</p>
+<h4>Seeing what changed with git diff</h4>
+<p>Now edit the file and ask Git what is different from the last commit:</p>
+<div class="code"><span class="cap">Terminal</span><pre>printf '# QA notes\n\nTest notes for the login page and the checkout page.\n' &gt; README.md
+git diff</pre></div>
+<div class="code"><span class="cap">Output</span><pre>diff --git a/README.md b/README.md
+index 3c01ebf..aa77bb8 100644
+--- a/README.md
++++ b/README.md
+@@ -1,3 +1,3 @@
+ # QA notes
+
+-Test notes for the login page.
++Test notes for the login page and the checkout page.</pre></div>
+<p>This is a <a class="gl" href="#g-diff">diff</a>. Lines starting with <code>-</code> were removed, lines with <code>+</code> were added, and lines with a space are unchanged context. <code>@@ -1,3 +1,3 @@</code> means "this piece covers lines 1 to 3 in both versions". A changed line shows as one removal plus one addition. Learning to read diffs is the most useful Git skill for a tester: it's how you review what a developer, or Claude, actually changed.</p>
+<div class="code"><span class="cap">Terminal</span><pre>git commit -am "Mention checkout page in README"</pre></div>
+<div class="code"><span class="cap">Output</span><pre>[main 761ccc2] Mention checkout page in README
+ 1 file changed, 1 insertion(+), 1 deletion(-)</pre></div>
+<p><code>-a</code> stages every change to files Git already tracks, then commits, in one step. It does <em>not</em> include brand-new (untracked) files; those always need <code>git add</code> first.</p>
+<h4>Undoing things before they're committed</h4>
+<div class="tbl"><table>
+<tr><th>You want to…</th><th>Command</th><th>What happens</th></tr>
+<tr><td>Throw away edits to a file and go back to the last commit</td><td><code>git restore README.md</code></td><td>The file returns to its committed version. The edits are gone for good, so be sure.</td></tr>
+<tr><td>Take a file out of the staging area but keep your edits</td><td><code>git restore --staged draft.txt</code></td><td>The file goes back to "not staged" (or "untracked" if it's new). Nothing is lost.</td></tr>
+<tr><td>See what you have staged</td><td><code>git diff --staged</code></td><td>Like <code>git diff</code>, but for the staging area</td></tr>
+<tr><td>See one commit in detail</td><td><code>git show 761ccc2</code></td><td>The message plus its diff</td></tr>
+</table></div>
+<div class="box note"><span class="tag">Writing good commit messages</span><p>Write the first line as a short instruction of what the commit does: "Add boundary tests for coupon expiry", not "changes" or "fixed stuff". Keep it under about 50 characters. If it needs explaining, leave a blank line and add a paragraph about <em>why</em>. Your future self, hunting for the commit that broke a test, will thank you. Small commits that each do one thing are far easier to review and undo than one giant commit at the end of the week.</p></div>
+
+<h3 id="ch61-5"><span class="num">61.5</span>Branches and merges</h3>
+<p>A <a class="gl" href="#g-branch">branch</a> is a separate line of commits. You create one to work on something without disturbing <code>main</code>, then bring the work back by <strong>merging</strong>. Technically a branch is only a movable label pointing at a commit, which is why creating one is instant.</p>
+<div class="code"><span class="cap">Terminal</span><pre>git switch -c add-login-cases          <span class="c"># create the branch and move onto it</span>
+printf 'TC-01 Valid login shows dashboard\nTC-02 Wrong password shows error\n' &gt; login-cases.txt
+git add login-cases.txt
+git commit -m "Add first login test cases"
+git branch                             <span class="c"># list branches; * marks the current one</span></pre></div>
+<div class="code"><span class="cap">Output</span><pre>Switched to a new branch 'add-login-cases'
+[add-login-cases 769903f] Add first login test cases
+ 1 file changed, 2 insertions(+)
+ create mode 100644 login-cases.txt
+* add-login-cases
+  main</pre></div>
+<p>Now switch back to <code>main</code> and look at the folder. <code>login-cases.txt</code> has disappeared, because that file only exists on the other branch. Git changes the files in your folder to match whichever branch you are on. (Older tutorials use <code>git checkout</code> for this; <code>git switch</code> is the newer, clearer command for changing branches.)</p>
+<div class="code"><span class="cap">Terminal</span><pre>git switch main
+ls
+git merge add-login-cases
+ls</pre></div>
+<div class="code"><span class="cap">Output</span><pre>Switched to branch 'main'
+README.md
+Updating 761ccc2..769903f
+Fast-forward
+ login-cases.txt | 2 ++
+ 1 file changed, 2 insertions(+)
+ create mode 100644 login-cases.txt
+README.md
+login-cases.txt</pre></div>
+<p><strong>Fast-forward</strong> means <code>main</code> had not moved since the branch started, so Git simply slid the <code>main</code> label forward to the branch's latest commit. No new commit was needed. Once merged, delete the branch label with <code>git branch -d add-login-cases</code> (output: <code>Deleted branch add-login-cases (was 769903f).</code>). The commits stay in history.</p>
+<h4>When two branches change the same line: a merge conflict</h4>
+<p>If both branches changed the same line in different ways, Git can't guess which version you want. It stops and asks you. This is a <a class="gl" href="#g-merge-conflict">merge conflict</a>. It sounds alarming, but it's routine. Here, one branch changed TC-02 to quote the exact error text while <code>main</code> changed it to describe the banner:</p>
+<div class="code"><span class="cap">Output of git merge wording</span><pre>Auto-merging login-cases.txt
+CONFLICT (content): Merge conflict in login-cases.txt
+Automatic merge failed; fix conflicts and then commit the result.</pre></div>
+<div class="code"><span class="cap">cat login-cases.txt</span><pre>TC-01 Valid login shows dashboard
+&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
+TC-02 Wrong password shows red error banner
+=======
+TC-02 Wrong password shows "Invalid password"
+&gt;&gt;&gt;&gt;&gt;&gt;&gt; wording</pre></div>
+<p>Git has written both versions into the file between <strong>conflict markers</strong>. The part between <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD</code> and <code>=======</code> is your current branch (<code>HEAD</code> means "where you are now"); the part down to <code>&gt;&gt;&gt;&gt;&gt;&gt;&gt; wording</code> is the incoming branch. To resolve it:</p>
+<div class="flow"><div><b>1. Open the file</b>Find every block of markers (search for <code>&lt;&lt;&lt;&lt;</code>)</div><div class="hl"><b>2. Decide</b>Keep one side, the other, or write a combination. Delete all three marker lines</div><div><b>3. Stage</b><code>git add login-cases.txt</code></div><div><b>4. Commit</b><code>git commit -m "Merge wording: keep banner and exact text"</code></div></div>
+<p>Changed your mind? <code>git merge --abort</code> puts everything back as it was before the merge. After resolving, <code>git log --oneline --graph</code> draws the history, showing the two lines of work joining:</p>
+<div class="code"><span class="cap">Output</span><pre>*   76bd7dc Merge wording: keep banner and exact text
+|\
+| * edbe4f7 Exact error text in TC-02
+* | c625ac0 Describe error banner in TC-02
+|/
+* 769903f Add first login test cases
+* 761ccc2 Mention checkout page in README
+* 4194538 Add README with project purpose</pre></div>
+<div class="box warn"><span class="tag">The decision is yours</span><p>Resolving a conflict is a judgement about what the code or document <em>should</em> say. Git can't make it, and an AI tool can only propose it. Read the result before committing, and run the tests afterwards. <a href="#ch71">Chapter 71</a> shows how to let Claude Code propose resolutions safely.</p></div>
+
+<h3 id="ch61-6"><span class="num">61.6</span>Keeping files out: .gitignore</h3>
+<p>Some files must never go into a repository: secrets such as <code>.env</code> files with API tokens, generated test reports, downloaded dependencies like <code>node_modules/</code>, and logs. A file called <a class="gl" href="#g-gitignore"><code>.gitignore</code></a> in the top folder lists patterns Git should pretend not to see.</p>
+<div class="code"><span class="cap">git status --short (before .gitignore)</span><pre>?? .env
+?? reports/</pre></div>
+<p><code>--short</code> gives one line per file; <code>??</code> means untracked. Create the ignore file:</p>
+<div class="code"><span class="cap">Terminal</span><pre>printf '.env\nreports/\n*.log\nnode_modules/\n' &gt; .gitignore
+git status --short</pre></div>
+<div class="code"><span class="cap">Output</span><pre>?? .gitignore</pre></div>
+<p><code>.env</code> and <code>reports/</code> have vanished from Git's view; only the new <code>.gitignore</code> shows, and you commit that like any file. A trailing <code>/</code> means "a folder"; <code>*.log</code> means "any file ending in .log".</p>
+<div class="box warn"><span class="tag">Ignoring is not un-committing</span><p><code>.gitignore</code> only affects files Git isn't already tracking. If a secret was committed even once, it's in the history, and anyone with a copy of the repository can find it. Removing it in a new commit doesn't erase the old snapshot. Treat the secret as leaked: revoke it and create a new one (<a href="#ch98">Chapter 98</a>). To stop tracking a file while keeping it on disk, use <code>git rm --cached .env</code>, then commit.</p></div>
+
+<h3 id="ch61-7"><span class="num">61.7</span>Remotes: clone, push and pull</h3>
+<p>So far everything has happened in one folder on one computer. To share work you need a <a class="gl" href="#g-remote-repository">remote repository</a>: another copy of the repository, usually on GitHub, that everyone sends their commits to and fetches others' commits from. By convention the main remote is called <code>origin</code>.</p>
+<div class="tbl"><table>
+<tr><th>Command</th><th>What it does</th><th>Everyday meaning</th></tr>
+<tr><td><code>git clone &lt;url&gt;</code></td><td>Copies a whole remote repository, with full history, into a new folder</td><td>"Get me my own copy of the project"</td></tr>
+<tr><td><code>git remote -v</code></td><td>Lists the remotes this repository knows about</td><td>"Where do I push to?"</td></tr>
+<tr><td><code>git push</code></td><td>Sends your new commits to the remote</td><td>"Upload my work"</td></tr>
+<tr><td><code>git fetch</code></td><td>Downloads others' new commits but doesn't change your files</td><td>"What's new? Don't touch my work yet"</td></tr>
+<tr><td><code>git pull</code></td><td>Fetch, then merge the remote's commits into your current branch</td><td>"Bring me up to date"</td></tr>
+</table></div>
+<p>A remote doesn't have to be on the internet. In the lab you will make one in a local folder, which behaves exactly like GitHub for these commands. Connecting and pushing for the first time looks like this:</p>
+<div class="code"><span class="cap">Terminal</span><pre>git remote add origin ../remote.git
+git push -u origin main</pre></div>
+<div class="code"><span class="cap">Output</span><pre>To ../remote.git
+ * [new branch]      main -&gt; main
+branch 'main' set up to track 'origin/main'.</pre></div>
+<p><code>-u</code> (short for <code>--set-upstream</code>) links your local <code>main</code> to <code>origin/main</code>, so from now on plain <code>git push</code> and <code>git pull</code> know where to go.</p>
+<h4>"Rejected": when someone pushed first</h4>
+<p>If a colleague pushed commits you don't have yet, Git refuses your push rather than overwrite their work:</p>
+<div class="code"><span class="cap">Output of git push</span><pre>To ../remote.git
+ ! [rejected]        main -&gt; main (fetch first)
+error: failed to push some refs to '../remote.git'
+hint: Updates were rejected because the remote contains work that you do not
+hint: have locally. This is usually caused by another repository pushing to
+hint: the same ref. If you want to integrate the remote changes, use
+hint: 'git pull' before pushing again.</pre></div>
+<p>This is Git protecting the team, not an error in your work. The fix is in the hint: <code>git pull</code>, resolve any conflict as in 61.5, then <code>git push</code> again.</p>
+<div class="box warn"><span class="tag">Never "force" your way past it</span><p>You will see advice online to use <code>git push --force</code>. On a shared branch that deletes your colleagues' commits from the remote. Don't use it unless you fully understand it and the branch is yours alone.</p></div>
+
+<h3 id="ch61-8"><span class="num">61.8</span>GitHub basics</h3>
+<p>GitHub adds a team workflow on top of Git. The pieces a tester meets every week:</p>
+<div class="tbl"><table>
+<tr><th>GitHub feature</th><th>What it is</th><th>Why a tester cares</th></tr>
+<tr><td>Repository page</td><td>The project's files, history and README, in a browser</td><td>Browse tests and code without cloning anything</td></tr>
+<tr><td><a class="gl" href="#g-pull-request">Pull request</a> (PR)</td><td>A request to merge one branch into another, with the diff, a discussion thread and review approvals</td><td>Where changes are reviewed, and where you can comment on testability before code reaches <code>main</code></td></tr>
+<tr><td>Issues</td><td>A simple tracker for bugs and tasks</td><td>Some teams use these instead of Jira</td></tr>
+<tr><td>Actions</td><td>Automation that runs on events such as "a PR was opened"</td><td>Runs your test suite on every PR; a red cross means something failed</td></tr>
+<tr><td>Branch protection</td><td>Rules such as "main needs an approved PR and passing checks"</td><td>The reason you can't push straight to <code>main</code> at work</td></tr>
+</table></div>
+<h4>The pull request workflow</h4>
+<div class="flow"><div><b>Branch</b><code>git switch -c fix/login-timeout</code></div><div><b>Commit</b>Small commits with clear messages</div><div><b>Push</b><code>git push -u origin fix/login-timeout</code></div><div class="hl"><b>Open PR</b>On GitHub, describe what and why; CI runs the tests</div><div><b>Review</b>Colleagues comment and approve</div><div><b>Merge</b>The branch joins <code>main</code></div></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A developer opens a PR titled "Fix session timeout on checkout" linked to Jira story SHOP-412. The GitHub Actions check shows two Playwright tests failing. You open the "Files changed" tab, read the diff, and spot that the timeout moved from 30 to 3 minutes rather than to 30 minutes. You leave a review comment on that exact line. The bug is caught before it is merged, which is the cheapest possible moment to catch it.</p></div>
+<h4>Signing in from the terminal: HTTPS or SSH</h4>
+<p>When you push to GitHub, Git has to prove who you are. GitHub does not accept your account password for this. There are two common ways:</p>
+<div class="cols2">
+<div><h4>HTTPS with a token</h4><p>URLs look like <code>https://github.com/your-name/qa-notes.git</code>. When Git asks for a password, you give a <a class="gl" href="#g-personal-access-token">personal access token</a> instead, or let a credential helper handle it. The easiest route is the <a class="gl" href="#g-github-cli">GitHub CLI</a>: run <code>gh auth login</code> and follow the prompts, which sign you in through the browser and set Git up to use it. Works through most corporate firewalls.</p></div>
+<div><h4>SSH with a key pair</h4><p>URLs look like <code>git@github.com:your-name/qa-notes.git</code>. You create an <a class="gl" href="#g-ssh-key">SSH key</a> pair on your computer: a private key that never leaves it, and a public key you paste into GitHub (Settings → SSH and GPG keys). No passwords or tokens to type afterwards. Some company networks block the SSH port.</p></div>
+</div>
+<div class="code"><span class="cap">Terminal (SSH setup, if you choose it)</span><pre>ssh-keygen -t ed25519 -C "asha@example.com"   <span class="c"># press Enter to accept the default file; set a passphrase</span>
+cat ~/.ssh/id_ed25519.pub                     <span class="c"># the PUBLIC key: this is what you paste into GitHub</span>
+ssh -T git@github.com                         <span class="c"># test the connection</span></pre></div>
+<p>The first time, SSH shows GitHub's key fingerprint and asks <code>Are you sure you want to continue connecting (yes/no)?</code>; check the fingerprint against GitHub's published one, then type <code>yes</code>. When the key is set up, the test prints <code>Hi your-name! You've successfully authenticated, but GitHub does not provide shell access.</code> That's success: the "no shell access" part is normal. Never share or paste the file without <code>.pub</code>: that is the private key. Tokens and keys are both <a class="gl" href="#g-secret">secrets</a>; <a href="#ch98">Chapter 98</a> covers how to create, scope and store them safely.</p>
+<details class="deep"><summary>Under the hood: what a commit really is</summary><div class="body">
+<p>Git stores <strong>snapshots</strong>, not lists of changes. Each commit records the full state of every tracked file (efficiently: unchanged files are shared between commits), plus the author, date, message and the ID of its parent commit. A merge commit has two parents, which is why <code>--graph</code> draws a join.</p>
+<p>The commit ID is a hash: a fingerprint calculated from all of that content. Change one character anywhere in the history and every later ID changes. That's what makes Git history trustworthy, and why "rewriting history" (with commands such as <code>rebase</code> or <code>commit --amend</code>) is a big deal on shared branches: it creates new commits with new IDs, and everyone else's copy disagrees.</p>
+<p>A diff isn't stored; Git calculates it on demand by comparing two snapshots. A branch is a tiny file holding one commit ID. <code>HEAD</code> records which branch you are on.</p>
+</div></details>
+
+<div class="lab"><div class="lab-h"><b>Build a small test-case repository, branch, merge, resolve a conflict and share it</b><span>45 min · macOS, Linux, WSL or Git Bash · no account needed</span></div><ol>
+<li>Set your identity if you haven't: <code>git config --global user.name "Your Name"</code> and <code>git config --global user.email "you@example.com"</code>. Check with <code>git config user.name</code>.<span class="expect">Your name is printed back.</span></li>
+<li>Create the repository: <code>mkdir -p ~/git-practice/qa-notes &amp;&amp; cd ~/git-practice/qa-notes &amp;&amp; git init -b main</code>.<span class="expect"><code>Initialized empty Git repository in …/qa-notes/.git/</code></span></li>
+<li>Create <code>README.md</code> with any text (for example with <code>nano README.md</code>), run <code>git status</code>, then <code>git add README.md</code> and <code>git status</code> again.<span class="expect">First "Untracked files", then "Changes to be committed: new file: README.md".</span></li>
+<li>Commit: <code>git commit -m "Add README"</code>, then <code>git log --oneline</code>.<span class="expect"><code>[main (root-commit) xxxxxxx] Add README</code>, and one line of history.</span></li>
+<li>Edit one line of <code>README.md</code> and run <code>git diff</code>. Then <code>git commit -am "Reword README"</code>.<span class="expect">A diff with one <code>-</code> line and one <code>+</code> line; then "1 file changed, 1 insertion(+), 1 deletion(-)".</span></li>
+<li>Branch: <code>git switch -c add-login-cases</code>. Create <code>login-cases.txt</code> with two lines, TC-01 and TC-02. Add and commit it. Run <code>git switch main</code> and <code>ls</code>.<span class="expect">On <code>main</code>, <code>login-cases.txt</code> is not listed.</span></li>
+<li>Merge: <code>git merge add-login-cases</code>, then <code>ls</code> and <code>git branch -d add-login-cases</code>.<span class="expect">"Fast-forward", the file appears, and "Deleted branch add-login-cases".</span></li>
+<li>Make a conflict on purpose: <code>git switch -c wording</code>, change the TC-02 line one way, commit; <code>git switch main</code>, change the same line another way, commit; then <code>git merge wording</code>.<span class="expect"><code>CONFLICT (content): Merge conflict in login-cases.txt</code>. <code>git status</code> shows "both modified".</span></li>
+<li>Open <code>login-cases.txt</code>, write the line you want, delete the three marker lines, then <code>git add login-cases.txt</code> and <code>git commit -m "Resolve TC-02 wording"</code>. Run <code>git log --oneline --graph</code>.<span class="expect">A graph where two lines of commits join at your merge commit.</span></li>
+<li>Ignore files: <code>echo "API_TOKEN=fake" &gt; .env</code> and <code>git status --short</code>. Then create <code>.gitignore</code> containing <code>.env</code>, run <code>git status --short</code> again, and commit <code>.gitignore</code>.<span class="expect">First <code>?? .env</code>; afterwards only <code>?? .gitignore</code>.</span></li>
+<li>Create a local "remote" and push: <code>cd .. &amp;&amp; git init --bare remote.git &amp;&amp; cd qa-notes</code>, then <code>git remote add origin ../remote.git</code> and <code>git push -u origin main</code>.<span class="expect"><code>* [new branch] main -&gt; main</code> and "set up to track 'origin/main'".</span></li>
+<li>Play the colleague: <code>cd .. &amp;&amp; git clone remote.git colleague-copy &amp;&amp; cd colleague-copy</code>. Add a TC-03 line to <code>login-cases.txt</code>, commit, and <code>git push</code>.<span class="expect">"Cloning into 'colleague-copy'… done." then a push line like <code>abc1234..def5678 main -&gt; main</code>.</span></li>
+<li>Back in your copy (<code>cd ../qa-notes</code>), add a TC-04 line, commit and <code>git push</code>.<span class="expect"><code>! [rejected] main -&gt; main (fetch first)</code>, because the colleague pushed first.</span></li>
+<li>Run <code>git pull</code>. If it reports a conflict (both of you added a line at the end of the file), keep both lines, then <code>git add</code>, <code>git commit</code>, and <code>git push</code>. (If Git asks how to reconcile divergent branches, run <code>git pull --no-rebase</code>.)<span class="expect">The push now succeeds, and <code>git log --oneline</code> shows TC-03 and TC-04 commits.</span></li>
+<li>Optional, with a GitHub account: create an empty repository on github.com (no README), run <code>gh auth login</code> (or set up SSH), then <code>git remote set-url origin &lt;your repo URL&gt;</code> and <code>git push -u origin main</code>.<span class="expect">Your files and history appear on the repository page.</span></li>
+</ol>
+<p><b>Troubleshooting.</b> <em>"Author identity unknown"</em>: you skipped step 1. <em>"not a git repository"</em>: you're in the wrong folder; <code>pwd</code>, then <code>cd</code> into <code>qa-notes</code>. <em>A strange full-screen editor opened</em> (often Vim, after <code>git commit</code> without <code>-m</code> or during a pull): type <code>:wq</code> and press Enter to save and close. <em>"Permission denied (publickey)"</em> on GitHub: your SSH key isn't added to your account, or use the HTTPS URL with <code>gh auth login</code>. <a href="#ch62">Chapter 62</a> covers reading errors in general.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Git and GitHub are the same thing."</dt><dd>Git is the program on your computer; GitHub is one website that hosts Git repositories and adds pull requests, issues and Actions.</dd>
+<dt>"Saving the file saves it in Git."</dt><dd>Saving only changes the working folder. Nothing is in Git's history until you <code>git add</code> and <code>git commit</code>.</dd>
+<dt>"Commit means upload."</dt><dd>A commit is local. Nobody else sees it until you <code>git push</code>.</dd>
+<dt>"A merge conflict means I broke something."</dt><dd>It means two people changed the same lines and Git needs a human decision. It's normal and fixable, and <code>git merge --abort</code> is always an escape hatch.</dd>
+<dt>"I deleted the secret in a later commit, so it's gone."</dt><dd>It's still in history. Revoke and replace it.</dd>
+<dt>"<code>git push --force</code> fixes a rejected push."</dt><dd>It can delete teammates' work. Pull first instead.</dd>
+</dl></div>
+
+<h3 id="ch61-r"><span class="num">61.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Git records a folder's history as commits; GitHub hosts repositories online and adds pull requests, issues and Actions.</li>
+<li>A change goes working folder → staging area (<code>git add</code>) → repository (<code>git commit</code>). <code>git status</code> always tells you where things are.</li>
+<li><code>git diff</code> shows changes line by line: <code>-</code> removed, <code>+</code> added. Reading diffs is a core review skill.</li>
+<li>Branches let work happen in parallel; <code>git merge</code> joins it. A conflict shows both versions between markers; you choose, remove the markers, add and commit.</li>
+<li><code>.gitignore</code> keeps secrets and generated files out, but can't remove something already committed.</li>
+<li><code>clone</code>, <code>push</code>, <code>fetch</code> and <code>pull</code> move commits between copies. A rejected push means "pull first", never "force".</li>
+<li>GitHub sign-in from the terminal uses a token over HTTPS (easiest via <code>gh auth login</code>) or an SSH key pair, never your password.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">You edited <code>tests/login.spec.ts</code> and ran <code>git commit -m "Fix login test"</code>, but Git says "no changes added to commit". Why?</p><div class="opts"><button>The commit message is too short</button><button data-ok>The change was never staged with git add</button><button>You need to push first</button></div><p class="why" hidden>Commits contain only staged changes. Run <code>git add tests/login.spec.ts</code> (or use <code>git commit -am</code> for already-tracked files).</p></div>
+<div class="qz"><p class="q">In a diff, what does a line starting with <code>+</code> mean?</p><div class="opts"><button>A line that was removed</button><button>A line that is unchanged</button><button data-ok>A line that was added</button></div><p class="why" hidden><code>-</code> is removed, <code>+</code> is added, and a leading space marks unchanged context.</p></div>
+<div class="qz"><p class="q">Your push is rejected with "(fetch first)". What should you do?</p><div class="opts"><button>Run git push --force</button><button data-ok>Run git pull, resolve any conflict, then push again</button><button>Delete your local repository and clone again</button></div><p class="why" hidden>Someone pushed commits you don't have. Pulling merges them into your work; forcing would delete theirs.</p></div>
+<div class="qz"><p class="q">You accidentally committed a <code>.env</code> file containing an API token, then added <code>.env</code> to <code>.gitignore</code>. Is the token safe?</p><div class="opts"><button>Yes, .gitignore hides it from everyone</button><button>Yes, as long as you haven't pushed in the last hour</button><button data-ok>No: it's still in the history, so revoke and replace the token</button></div><p class="why" hidden>Ignoring affects only untracked files. Anything ever committed stays in history; a pushed secret must be treated as leaked.</p></div>
+<div class="qz"><p class="q">Which statement about Git and GitHub is true?</p><div class="opts"><button>You need a GitHub account to make commits</button><button data-ok>Git works entirely offline; GitHub hosts copies online and adds pull requests</button><button>GitHub is the only place Git repositories can be hosted</button></div><p class="why" hidden>Git runs locally with no account. GitHub is one of several hosts, alongside GitLab, Bitbucket and others.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Clone a repository your team uses (or any public one, such as a small open-source project). Using only the terminal, answer: Who made the last five commits, and what did they change (<code>git log --oneline -5</code>, <code>git show</code>)? Which branches exist (<code>git branch -a</code>)? Is there a <code>.gitignore</code>, and does it cover secrets and test reports? Then pick one recent pull request on GitHub, read its "Files changed" diff, and write one review comment a tester would add (a missing test, an unclear assertion, an untested edge case).</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Git is save points for a folder. You edit files, choose which changes go in with git add, and save a snapshot with git commit and a clear message. git status tells you where everything is and git diff shows exactly what changed. Branches let you work without disturbing main, and a merge brings the work back; if two people changed the same line, Git asks you to choose. GitHub is the shared copy online: you push your commits there, open a pull request, and the team reviews the diff and the test results before it's merged. Never commit secrets, and never force-push a shared branch."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Scott Chacon and Ben Straub, <a href="https://git-scm.com/book/en/v2" target="_blank" rel="noopener">Pro Git</a> (free official book), especially chapters 1–3 on basics and branching.</li>
+<li>Git documentation: <a href="https://git-scm.com/docs/git-status" target="_blank" rel="noopener">git status</a>, <a href="https://git-scm.com/docs/git-switch" target="_blank" rel="noopener">git switch</a>, <a href="https://git-scm.com/docs/git-restore" target="_blank" rel="noopener">git restore</a>, <a href="https://git-scm.com/docs/gitignore" target="_blank" rel="noopener">gitignore</a> and <a href="https://git-scm.com/downloads" target="_blank" rel="noopener">downloads</a>.</li>
+<li>GitHub Docs, <a href="https://docs.github.com/en/get-started/git-basics/set-up-git" target="_blank" rel="noopener">Set up Git</a> and <a href="https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests" target="_blank" rel="noopener">About pull requests</a>.</li>
+<li>GitHub Docs, <a href="https://docs.github.com/en/authentication/connecting-to-github-with-ssh" target="_blank" rel="noopener">Connecting to GitHub with SSH</a> and <a href="https://docs.github.com/en/get-started/git-basics/about-remote-repositories" target="_blank" rel="noopener">About remote repositories</a> (HTTPS vs SSH URLs).</li>
+<li>GitHub CLI manual, <a href="https://cli.github.com/manual/gh_auth_login" target="_blank" rel="noopener">gh auth login</a>.</li>
+</ol><p class="verified">Verified 9 November 2026. All command output reproduced from git 2.54.0 (Apple Git-157) on macOS; commit IDs, names and dates will differ on your machine.</p></div>

@@ -1,0 +1,18 @@
+{
+ "Model family": {
+  "d": "A set of models from one maker that share a name, design lineage and usually an API, such as Claude or GPT. A family contains tiers (large, medium, small) and versions.",
+  "see": "ch34"
+ },
+ "Model routing": {
+  "d": "Sending each request to the cheapest model likely to handle it, and escalating to a more capable model only when a check fails or the case looks hard.",
+  "see": "ch35"
+ },
+ "Decision record": {
+  "d": "A short dated document that states what was decided, which options were considered, the evidence and the risks, so the decision can be challenged or revisited later.",
+  "see": "ch36"
+ },
+ "Test harness": {
+  "d": "The code that feeds test cases to the system under test, collects the results and reports them. In model comparisons it sends identical prompts to each model and grades the answers.",
+  "see": "ch36"
+ }
+}

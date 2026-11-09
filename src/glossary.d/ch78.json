@@ -1,0 +1,26 @@
+{
+ "Permission rule": {
+  "d": "A line in a Claude Code settings file, such as Bash(npm run test *) or Read(./.env), placed in an allow, ask or deny list. Claude Code checks deny, then ask, then allow before any tool runs.",
+  "see": "ch78"
+ },
+ "Settings precedence": {
+  "d": "The order that decides which Claude Code settings file wins when they disagree: managed, then command line, then project local, then shared project, then user. Lists of rules are combined rather than replaced.",
+  "see": "ch78"
+ },
+ "Workspace trust": {
+  "d": "The dialog Claude Code shows the first time you open a folder. A project's allow rules and extra directories only take effect after you accept it.",
+  "see": "ch78"
+ },
+ "Sandbox": {
+  "d": "In Claude Code, a boundary enforced by the operating system around the shell commands Claude runs, limiting which files they can write and which network hosts they can reach.",
+  "see": "ch79"
+ },
+ "Frontmatter": {
+  "d": "A block of settings in YAML between two --- lines at the very top of a Markdown file, such as a SKILL.md. It holds fields like name and description.",
+  "see": "ch80"
+ },
+ "Dynamic context injection": {
+  "d": "In a Claude Code skill, a line such as !`git diff HEAD` that runs a command before Claude reads the skill and replaces the line with the command's output.",
+  "see": "ch80"
+ }
+}

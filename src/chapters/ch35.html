@@ -1,0 +1,163 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>A five-question method for choosing a model for any job</li>
+<li>Twelve realistic workplace scenarios, from bulk ticket triage to on-premises requirements, each with a shortlist, the reasoning and the trade-offs</li>
+<li>How to do a quick cost estimate before you commit</li>
+<li>When to use two models together (routing and escalation) instead of one</li>
+<li>How to write the choice down so it can be challenged and revisited</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch31">Chapter 31</a> (tiers, fast versus reasoning models), <a href="#ch32">Chapter 32</a> (open-weight versus proprietary) and <a href="#ch34">Chapter 34</a> (the families compared, with prices). <a href="#ch40">Chapter 40</a> goes deeper on choosing between Claude models.</div>
+
+<div class="bigidea"><p>Choosing a model is a trade-off between quality, speed, cost and control. Most jobs don't need the most capable model, and paying for it can turn a cheap nightly job into an expensive one. Start from the hard limits (where data may go, what the budget is, how fast the answer must arrive), shortlist two or three models that fit, and then test them on your real work. This chapter walks through twelve common scenarios so you can see that reasoning applied. The shortlists are starting points to test, not verdicts.</p></div>
+
+<h3 id="ch35-1"><span class="num">35.1</span>Five questions before you pick</h3>
+<p>Most bad model choices come from starting with "which model is best?" Start with these questions instead, in this order. The early ones rule models out; the later ones rank what's left.</p>
+<div class="flow">
+<div><b>1. Where may the data go?</b>Vendor API, your cloud contract, or only your own servers</div>
+<div><b>2. How fast must it answer?</b>A person waiting, or a job that runs overnight</div>
+<div><b>3. How many times will it run?</b>Ten a day or a million</div>
+<div class="hl"><b>4. How hard is the thinking?</b>Sorting into labels, or reasoning across a codebase</div>
+<div><b>5. What does a mistake cost?</b>A mislabelled ticket, or a missed contract clause</div>
+</div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Hiring for a job works the same way. You wouldn't hire a senior architect to sort the post, and you wouldn't ask a new starter to sign off the building's fire safety. First you check the hard rules (right to work, security clearance), then the hours and the budget, and only then do you compare skills. And before anyone's hired for good, there's a trial period.</p></div>
+<p>The answers map onto three broad tiers, which every big family offers in some form (<a href="#ch31">Chapter 31</a>):</p>
+<div class="tbl"><table>
+<tr><th>Tier</th><th>Examples (9 Nov 2026)</th><th>Typical jobs</th></tr>
+<tr><td>Fast and cheap</td><td>Claude Haiku 5.5, GPT-6 Luna, GPT-6.1 Terra, Gemini 3.8 Flash</td><td>Classification, extraction, routing, short chat replies, very high volume</td></tr>
+<tr><td>Balanced</td><td>Claude Sonnet 5.5, GPT-6.1 Sol, Grok 4.7, Mistral Large 4</td><td>Most everyday writing, summarising, test design and code review</td></tr>
+<tr><td>Most capable</td><td>Claude Opus 5.5 and Fable 5.1, GPT-6 Astra, Gemini 4 Argon</td><td>Long agentic coding, hard reasoning, high-stakes analysis</td></tr>
+</table></div>
+<div class="box note"><span class="tag">Anthropic's own advice</span><p>Anthropic's model documentation recommends starting with Claude Opus 5.5 "for most workloads" and moving up to Fable 5.1 only when your evaluations on Opus 5.5 at a higher <a class="gl" href="#g-effort-level">effort level</a> still fall short. For very high-volume, latency-sensitive tasks it points to Haiku 5.5. That's a sensible default for Claude users, and the scenarios below show when to move away from it.</p></div>
+
+<h3 id="ch35-2"><span class="num">35.2</span>A quick cost estimate</h3>
+<p>Before any scenario, learn this sum. It takes two minutes and stops most budget surprises.</p>
+<div class="code"><span class="cap">The cost formula</span><pre>cost per run = (input tokens  × input price  ÷ 1,000,000)
+             + (output tokens × output price ÷ 1,000,000)
+
+daily cost   = cost per run × runs per day</pre></div>
+<p>A rough rule for English is that one token is about three-quarters of a word, but tokenizers differ between families (<a href="#ch34">Chapter 34</a>), so measure real prompts when the number matters. Remember that "thinking" tokens from <a class="gl" href="#g-reasoning-model">reasoning models</a> are billed as output.</p>
+<div class="box example"><span class="tag">Worked example (illustrative numbers)</span><p>A support team triages 50,000 tickets a day. Each prompt is about 800 tokens (instructions plus the ticket) and each answer about 20 tokens (a label and a priority). That's 40 million input tokens and 1 million output tokens a day.</p>
+<p>On Claude Haiku 5.5 ($0.10 / $0.50): 40 × $0.10 + 1 × $0.50 = <strong>$4.50 a day</strong>.<br>On Claude Opus 5.5 ($4 / $20): 40 × $4 + 1 × $20 = <strong>$180 a day</strong>.<br>Using the Batch API (50% off at Anthropic) halves either figure, if the answers can wait.</p>
+<p>The token counts are illustrative; the prices are Anthropic's list prices on 9 November 2026. If Haiku labels the tickets well enough, the difference is about $64,000 a year.</p></div>
+
+<h3 id="ch35-3"><span class="num">35.3</span>Scenarios 1–4: volume, length, code and control</h3>
+
+<h4>Scenario 1 · Bulk ticket triage</h4>
+<p><strong>Situation.</strong> 50,000 support tickets a day must be labelled (bug, question, feature request), given a component and sent to the right queue. <strong>Constraints:</strong> very high volume, simple decisions, a wrong label costs a few minutes of a person's time.</p>
+<p><strong>Shortlist to test:</strong> Claude Haiku 5.5, GPT-6 Luna, Gemini 3.8 Flash. <strong>Why:</strong> the task is classification, which fast models handle well, and volume makes price dominant. Use structured output (JSON with a fixed list of labels) and batch processing if same-day is fast enough. <strong>Trade-off:</strong> small models struggle more with vague or angry tickets. Send tickets the model marks "unsure" to a person or a bigger model (scenario 12).</p>
+
+<h4>Scenario 2 · Long contract or specification review</h4>
+<p><strong>Situation.</strong> Legal and QA want every requirement in a 300-page supplier contract checked against the system specification. <strong>Constraints:</strong> long documents, low volume, a missed clause is expensive.</p>
+<p><strong>Shortlist:</strong> Claude Opus 5.5, GPT-6 Astra, Gemini 4 Argon. <strong>Why:</strong> all accept about a million tokens, so both documents fit in one request, and the work needs careful reasoning. Volume is tiny, so the price of the top tier hardly matters. <strong>Trade-off:</strong> a model can skim the middle of a very long input (<a href="#ch20">Chapter 20</a>). Ask for a quote and page reference for every finding, then spot-check them. For hundreds of contracts, switch to <a class="gl" href="#g-rag">RAG</a> or per-section prompts.</p>
+
+<h4>Scenario 3 · A coding agent in your test repository</h4>
+<p><strong>Situation.</strong> A QA team wants an agent that writes and fixes Playwright tests across a large repository, runs them and opens pull requests. <strong>Constraints:</strong> long, multi-step sessions; mistakes are caught by review and CI.</p>
+<p><strong>Shortlist:</strong> Claude Opus 5.5 in Claude Code (<a href="#ch121">Chapter 121</a>), GPT-6 Astra or Sol in Codex, Gemini in Antigravity. <strong>Why:</strong> agentic coding rewards the most capable models, and the agent tool around the model matters as much as the model. Anthropic positions Opus 5.5 for "long-running agentic coding". <strong>Trade-off:</strong> cost per session can be high. Try Sonnet 5.5 for routine edits, and keep Fable 5.1 for problems where Opus 5.5 at higher effort still fails.</p>
+
+<h4>Scenario 4 · Data must stay on-premises</h4>
+<p><strong>Situation.</strong> A bank's QA team wants AI help with production incident logs, but policy says the data can't leave company servers. <strong>Constraints:</strong> no external API calls at all.</p>
+<p><strong>Shortlist:</strong> open-weight models you can host: Mistral Large 4, DeepSeek V4 (MIT licence), Qwen3.8-27B (Apache 2.0), Meta's Muse Glimmer 30B (Apache 2.0), OpenAI's gpt-oss. <strong>Why:</strong> the hard rule removes every API-only model before quality is considered. <strong>Trade-off:</strong> you now run the hardware and the updates. The largest models (Mistral Large 4 is about 1T parameters) need serious GPU servers; a 27B–30B model runs on far less but is weaker. Check each <a class="gl" href="#g-model-licence">licence</a> with legal (<a href="#ch32">Chapter 32</a>).</p>
+<div class="box note"><span class="tag">A middle path</span><p>"Can't use a public API" doesn't always mean "must self-host". Some companies are allowed to use models through their existing cloud contract and region. Claude is available on Amazon Bedrock, Google Cloud and Microsoft Foundry. Ask your security team which rule actually applies before you buy GPUs.</p></div>
+
+<h3 id="ch35-4"><span class="num">35.4</span>Scenarios 5–8: speed, budget, images and data</h3>
+
+<h4>Scenario 5 · A low-latency help chat</h4>
+<p><strong>Situation.</strong> An in-app help widget answers testers' questions about the test environment. <strong>Constraints:</strong> a person is waiting; the first words should appear in under a second or two.</p>
+<p><strong>Shortlist:</strong> Claude Haiku 5.5 (Anthropic lists it as the fastest Claude), GPT-6.1 Terra, Gemini 3.8 Flash. <strong>Why:</strong> what users feel is <a class="gl" href="#g-time-to-first-token">time to first token</a>, and fast models with streaming give the best experience. Large reasoning models think before they answer, which feels slow in chat. <strong>Trade-off:</strong> harder questions get weaker answers. Ground the bot in your own documentation so it doesn't need to "know" things.</p>
+
+<h4>Scenario 6 · A cost-capped CI job</h4>
+<p><strong>Situation.</strong> Every pull request triggers an AI review of changed test files, with a hard budget of $300 a month. <strong>Constraints:</strong> about 2,000 pull requests a month (illustrative), each sending 20,000 tokens and getting 1,500 back.</p>
+<p><strong>Estimate:</strong> 40M input and 3M output tokens a month. Sonnet 5.5 ($2 / $10): $80 + $30 = $110. Opus 5.5 ($4 / $20): $160 + $60 = $220. Both fit; Opus leaves little room for growth. <strong>Shortlist:</strong> Claude Sonnet 5.5 or GPT-6.1 Sol, with <a class="gl" href="#g-prompt-caching">prompt caching</a> for the fixed review instructions. <strong>Trade-off:</strong> set a maximum output length and a token cap in the job, and alert when spending passes 80% of budget (<a href="#ch90">Chapter 90</a>).</p>
+
+<h4>Scenario 7 · Vision on screenshots</h4>
+<p><strong>Situation.</strong> Testers attach screenshots to bug reports. The team wants the model to describe the visual defect and suggest a title and severity. <strong>Constraints:</strong> image input; medium volume.</p>
+<p><strong>Shortlist:</strong> Claude Sonnet 5.5, GPT-6.1 Sol, Gemini 4 Argon or 3.8 Flash. <strong>Why:</strong> all these families accept images. For screen recordings, Gemini 4 Argon documents video input directly; with others, extract key frames first. <strong>Trade-off:</strong> models can miss small details such as a one-pixel misalignment, and they guess what a screen "should" look like. Pair this with real <a class="gl" href="#g-visual-regression">visual regression</a> tooling (<a href="#ch123">Chapter 123</a>) rather than replacing it.</p>
+
+<h4>Scenario 8 · Generating test data</h4>
+<p><strong>Situation.</strong> The team needs 5,000 realistic but fake customer records with edge cases (long names, accented characters, unusual addresses). <strong>Constraints:</strong> no real personal data; output must match a schema.</p>
+<p><strong>Shortlist:</strong> Claude Sonnet 5.5 or Haiku 5.5, GPT-6.1 Terra, using structured outputs against a <a class="gl" href="#g-json-schema">JSON Schema</a>. <strong>Why:</strong> generating <a class="gl" href="#g-synthetic-data">synthetic data</a> is creative but not deep reasoning, and the schema catches format errors. <strong>Trade-off:</strong> models repeat themselves at scale. Ask for edge cases explicitly, generate in batches with different seeds or instructions, and check for duplicates with code (<a href="#ch122">Chapter 122</a>).</p>
+
+<h3 id="ch35-5"><span class="num">35.5</span>Scenarios 9–12: regulation, logs, everyday work and routing</h3>
+
+<h4>Scenario 9 · Regulated data and data residency</h4>
+<p><strong>Situation.</strong> A European healthcare client requires that patient-adjacent data is processed in a named region under a signed agreement. <strong>Constraints:</strong> legal, not technical.</p>
+<p><strong>Approach:</strong> the decision belongs to your legal and security teams, not to the benchmark tables. Options include a cloud platform contract in the required region (Claude on Bedrock, Google Cloud or Foundry; Gemini on Google Cloud; GPT on Azure), Anthropic's Enterprise options, or a European open-weight model such as Mistral Large 4 self-hosted. Regions and certifications change, so get the current list from the provider in writing. <strong>Trade-off:</strong> the newest model is sometimes available on the vendor's own API before every cloud region.</p>
+
+<h4>Scenario 10 · Analysing huge CI logs for flaky tests</h4>
+<p><strong>Situation.</strong> A nightly run produces 600,000 tokens of logs, and the team wants a summary of which failures look flaky and which look real. <strong>Constraints:</strong> long input, runs every night.</p>
+<p><strong>Shortlist:</strong> pre-filter first, then Claude Sonnet 5.5 or Opus 5.5, GPT-6.1 Sol. <strong>Why:</strong> it fits a 1M window, but price tiers bite: Haiku 5.5 rises from $0.10 to $0.50 per million input tokens above 100K tokens, and Grok 4.7 doubles above 200K. A grep step that keeps only failing tests and their stack traces might cut the input by 95% (illustrative), making every option cheap. <strong>Trade-off:</strong> filtering can remove the clue. Keep the filter simple and log what it dropped (<a href="#ch122">Chapter 122</a>).</p>
+
+<h4>Scenario 11 · Everyday knowledge work in the app</h4>
+<p><strong>Situation.</strong> A test manager wants help drafting release notes, summarising meetings and turning requirements into test ideas. <strong>Constraints:</strong> no code; low volume; uses the Claude app, not the API.</p>
+<p><strong>Approach:</strong> this is a plan and settings choice more than a model choice. In the Claude apps, the model picker and plan decide what's available (<a href="#ch43">Chapter 43</a>, <a href="#ch42">Chapter 42</a>). The default model is fine for drafting; switch to a more capable one for hard analysis. <strong>Trade-off:</strong> usage limits depend on the model and the length of chats, so very long conversations with the biggest model use up allowance fastest.</p>
+
+<h4>Scenario 12 · Routing: use two models together</h4>
+<p><strong>Situation.</strong> Scenarios 1 and 5 both had a cheap model that's good enough most of the time. <strong>Approach:</strong> <a class="gl" href="#g-model-routing">model routing</a>. A cheap model handles every request first and reports its confidence or flags "unsure"; only those cases go to a more capable model. Another form escalates on failure: if the generated test doesn't compile, retry with the bigger model.</p>
+<div class="flow"><div><b>Request</b>Ticket, question or task</div><div class="hl"><b>Fast model</b>Answers most cases cheaply</div><div><b>Check</b>Confident? Valid JSON? Tests pass?</div><div><b>Escalate</b>Only failures go to the capable model</div></div>
+<p><strong>Trade-off:</strong> more moving parts to build, monitor and test. The "unsure" signal itself must be tested: a small model that's confidently wrong never escalates.</p>
+<details class="deep"><summary>Why a model's "confidence" is a weak signal on its own</summary><div class="body">
+<p>Asking a model "how sure are you, 1 to 10?" gives a number, but that number is generated text, not a measured probability. Models can be confidently wrong, especially on questions where the input lacks the answer (<a href="#ch22">Chapter 22</a>). Stronger escalation signals are ones code can check: did the output parse as valid JSON, is the label in the allowed list, does the test compile and run, do two cheap attempts agree? Use self-reported confidence only alongside such checks, and measure how often escalation catches real errors.</p>
+</div></details>
+
+<h3 id="ch35-6"><span class="num">35.6</span>The scenarios in one table, and writing the choice down</h3>
+<div class="tbl"><table>
+<tr><th>#</th><th>Scenario</th><th>Deciding factor</th><th>Start testing with</th></tr>
+<tr><td>1</td><td>Bulk ticket triage</td><td>Volume and price</td><td>Fast tier, batch</td></tr>
+<tr><td>2</td><td>Long contract review</td><td>Long input, high stakes</td><td>Most capable, 1M context</td></tr>
+<tr><td>3</td><td>Coding agent</td><td>Multi-step reasoning, tool quality</td><td>Opus 5.5 or peer in a good agent tool</td></tr>
+<tr><td>4</td><td>On-premises only</td><td>Data may not leave</td><td>Open weights</td></tr>
+<tr><td>5</td><td>Low-latency chat</td><td>Time to first token</td><td>Fast tier, streaming</td></tr>
+<tr><td>6</td><td>Cost-capped CI</td><td>Monthly budget</td><td>Balanced tier, caching, caps</td></tr>
+<tr><td>7</td><td>Screenshots</td><td>Image input</td><td>Balanced multimodal</td></tr>
+<tr><td>8</td><td>Test data</td><td>Schema and variety</td><td>Balanced or fast, structured output</td></tr>
+<tr><td>9</td><td>Regulated data</td><td>Legal agreement and region</td><td>Whatever legal approves</td></tr>
+<tr><td>10</td><td>Huge logs</td><td>Long-prompt price tiers</td><td>Pre-filter, then balanced</td></tr>
+<tr><td>11</td><td>Everyday app use</td><td>Plan and limits</td><td>App default, switch up when needed</td></tr>
+<tr><td>12</td><td>Routing</td><td>Mix of easy and hard cases</td><td>Fast first, escalate on checks</td></tr>
+</table></div>
+<p>Whatever you choose, write a short <a class="gl" href="#g-decision-record">decision record</a>: what you chose, what else you considered, the evidence, the costs and when you'll review it. <a href="#ch36">Chapter 36</a> gives a template and the testing method that supplies the evidence.</p>
+<div class="box opinion"><span class="tag">Opinion · this textbook's authors</span><p>Teams more often overspend by defaulting to the biggest model than lose quality by choosing a smaller one, because nobody measures whether the smaller one would have been enough. Our suggestion: for any job that runs more than a few hundred times a day, test at least one model a tier below your first choice. That's advice from experience, not a measured rule.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Write and pressure-test a scenario card for your team</b><span>30 min · Claude app (any plan) or any chat assistant</span></div><ol>
+<li>Pick one real, repeated AI task in your team, for example "label incoming Jira bugs by component".<span class="expect">One sentence describing the task.</span></li>
+<li>Answer the five questions from 35.1 in writing: where data may go, speed needed, runs per day, difficulty, cost of a mistake.<span class="expect">Five short answers. At least one of them rules some models out.</span></li>
+<li>Estimate the tokens per run: paste one typical input into a word counter and divide words by 0.75. Do the cost sum from 35.2 for one fast and one capable model from <a href="#ch34">Chapter 34</a>.<span class="expect">Two daily cost figures, often 10–40 times apart.</span></li>
+<li>Collect five real, anonymised examples with the answer you'd accept. In the Claude app, run all five with a fast model, then with a more capable one, using the same prompt.<span class="expect">A small table: example, expected answer, fast model right or wrong, capable model right or wrong.</span></li>
+<li>Write your shortlist of two with one sentence of reasoning each, and one risk to watch.<span class="expect">A one-page scenario card, ready to be tested properly with the harness in <a href="#ch36">Chapter 36</a>.</span></li>
+</ol>
+<p><strong>Troubleshooting.</strong> If you can't paste real data into a public tool, rewrite the examples with fake names and numbers first. If both models get all five right, your examples are too easy: add the awkward cases that cause arguments in your team.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Always use the best model; quality is worth it."</dt><dd>For high-volume, simple jobs the most capable model can cost 40 times more for no measurable gain.</dd>
+<dt>"Always use the cheapest model; AI is AI."</dt><dd>Cheap models make more mistakes on hard reasoning and long inputs. Match the tier to the task.</dd>
+<dt>"Five examples proved Model A is better."</dt><dd>Five examples are a sanity check, not evidence. Use a proper dataset and repeat runs (<a href="#ch36">Chapter 36</a>).</dd>
+<dt>"We can't use AI because data can't leave the building."</dt><dd>Open-weight models can run in-house, and cloud contracts may already be approved. Ask which rule actually applies.</dd>
+<dt>"Once chosen, the model is settled."</dt><dd>Prices, versions and retirements change every few months. Put a review date in the decision record.</dd>
+</dl></div>
+
+<h3 id="ch35-r"><span class="num">35.7</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Ask five questions in order: data location, speed, volume, difficulty, cost of a mistake.</li>
+<li>Hard limits (data residency, budget) rule models out before quality is considered.</li>
+<li>Do the cost sum before committing: tokens × price × runs. Batch and caching discounts can halve it or more.</li>
+<li>Fast models suit classification, extraction and chat; the most capable suit long agentic coding and high-stakes analysis.</li>
+<li>Routing (cheap first, escalate on code-checked failures) often beats any single model.</li>
+<li>Write a decision record with evidence and a review date.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What should you settle first when choosing a model?</p><div class="opts"><button>Which model tops the leaderboards</button><button data-ok>Where the data is allowed to go</button><button>Which model has the largest context window</button></div><p class="why" hidden>Hard rules like data residency remove options before any quality comparison matters.</p></div>
+<div class="qz"><p class="q">A job sends 40M input and 1M output tokens a day. At $0.10 / $0.50 per million, what does it cost per day?</p><div class="opts"><button>$0.60</button><button data-ok>$4.50</button><button>$40.50</button></div><p class="why" hidden>40 × $0.10 = $4.00, plus 1 × $0.50 = $0.50.</p></div>
+<div class="qz"><p class="q">Which is the strongest signal for escalating a request to a bigger model?</p><div class="opts"><button>The small model says it is 6 out of 10 confident</button><button data-ok>The small model's JSON fails schema validation</button><button>The request is long</button></div><p class="why" hidden>Code-checked failures are reliable; self-reported confidence is just generated text.</p></div>
+<div class="qz"><p class="q">A nightly job sends 600K tokens of logs. Why might pre-filtering matter beyond the obvious saving?</p><div class="opts"><button>Models refuse inputs over 500K tokens</button><button data-ok>Some prices rise for prompts above a threshold, such as 100K or 200K tokens</button><button>Logs can't be tokenised</button></div><p class="why" hidden>Haiku 5.5 and Grok 4.7 both have higher rates for long prompts.</p></div>
+<div class="qz"><p class="q">Your policy forbids sending data to any external service. Which is a valid shortlist?</p><div class="opts"><button>Claude Opus 5.5 and GPT-6 Astra</button><button>Gemini 4 Argon and Grok 4.7</button><button data-ok>Mistral Large 4 and Qwen3.8-27B, self-hosted</button></div><p class="why" hidden>Only open-weight models can run entirely on your own servers.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Take the scenario card from the lab and turn it into a one-page proposal for your manager: the task, the five answers, the cost estimates for two models, the five-example results, your recommended shortlist and the risks. End with the question you need answered before testing properly (often a data-handling question for security).</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Don't ask which model is best. Ask five things: where can the data go, how fast does it need to answer, how often will it run, how hard is the thinking, and what does a mistake cost. The first answers knock models out. Then do the sum: tokens times price times runs per day. A fast model can be forty times cheaper and good enough for labelling tickets, while contract review or a coding agent deserves the top tier. If it's mixed, run the cheap model first and escalate when a check fails. Then test properly and write the decision down."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/models/overview" target="_blank" rel="noopener">Models overview</a> ("start with Opus 5.5", positioning, latency) and <a href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Pricing</a> (list prices, Haiku 5.5 long-prompt rate, Batch API discount).</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/batch-processing" target="_blank" rel="noopener">Batch processing</a> and <a href="https://platform.claude.com/docs/en/build-with-claude/prompt-caching" target="_blank" rel="noopener">Prompt caching</a>.</li>
+<li>OpenAI, <a href="https://developers.openai.com/api/docs/models" target="_blank" rel="noopener">Models</a> (GPT-6 family prices and limits).</li>
+<li>Google, <a href="https://aistudio.google.com/docs/models" target="_blank" rel="noopener">Gemini models</a> (Argon inputs and context).</li>
+<li>xAI / SpaceXSI, <a href="https://docs.x.ai/developers/models" target="_blank" rel="noopener">Models and pricing</a> (Grok 4.7 long-context rate).</li>
+<li>Mistral AI, <a href="https://docs.mistral.ai/models/mistral-large-4-0" target="_blank" rel="noopener">Mistral Large 4 model card</a>.</li>
+<li>Meta, <a href="https://about.fb.com/news/2026/04/introducing-muse-spark-meta-superintelligence-labs/" target="_blank" rel="noopener">Introducing Muse Spark</a>; <a href="https://en.wikipedia.org/wiki/Qwen" target="_blank" rel="noopener">Wikipedia: Qwen</a>; <a href="https://en.wikipedia.org/wiki/DeepSeek" target="_blank" rel="noopener">Wikipedia: DeepSeek</a> (open-weight licences).</li>
+</ol><p class="verified">Verified 9 November 2026 against the pages listed. Token counts in the worked examples are illustrative; prices are list prices on that date.</p></div>

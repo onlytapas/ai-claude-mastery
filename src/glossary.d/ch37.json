@@ -1,0 +1,46 @@
+{
+ "Long-Term Benefit Trust": {
+  "d": "An independent body of trustees, announced by Anthropic in September 2023, with no financial stake in the company. It elects a growing share of Anthropic's Board and can request external review of its safety risk reports, but does not run the company day to day.",
+  "see": "ch37"
+ },
+ "Valuation": {
+  "d": "The price investors agree a whole company is worth during a funding round. 'Post-money' valuation includes the new money just invested. It is not the amount of cash the company holds.",
+  "see": "ch37"
+ },
+ "Responsible Scaling Policy": {
+  "d": "Anthropic's published policy (first version September 2023) for testing new models for dangerous capabilities and requiring stronger safeguards before deploying models that cross set thresholds.",
+  "see": "ch38"
+ },
+ "AI Safety Level": {
+  "d": "A level (ASL-1, ASL-2, ASL-3 and above) in Anthropic's Responsible Scaling Policy describing how much protection a model needs, loosely modelled on biosafety levels for laboratories. ASL-3 protections were activated in May 2025.",
+  "see": "ch38"
+ },
+ "Interpretability": {
+  "d": "The research field that tries to explain what happens inside a neural network: which internal patterns represent which ideas, and how they combine to produce an answer.",
+  "see": "ch38"
+ },
+ "Dictionary learning": {
+  "d": "A technique that separates a model's tangled neuron activity into 'features', each linked to a more understandable concept. Anthropic used it to find millions of features inside Claude 3 Sonnet in 2024.",
+  "see": "ch38"
+ },
+ "Alignment": {
+  "d": "How reliably an AI system pursues the goals and values its developers and users intend, including in situations nobody planned for.",
+  "see": "ch38"
+ },
+ "Red teaming": {
+  "d": "Deliberately attacking or stress-testing a system to find ways it can fail or be misused, before real attackers or users do. For AI models it includes trying to provoke harmful or unintended behaviour.",
+  "see": "ch38"
+ },
+ "Model welfare": {
+  "d": "A research area asking whether, and when, the possible experiences or preferences of AI systems should matter morally. Anthropic researches it while stating deep uncertainty; it does not claim its models are conscious.",
+  "see": "ch38"
+ },
+ "Hybrid reasoning model": {
+  "d": "One model that can either answer immediately or think step by step before answering. Anthropic described Claude 3.7 Sonnet (February 2025) as the first on the market.",
+  "see": "ch39"
+ },
+ "Model retirement": {
+  "d": "The date after which a model no longer answers API requests. It follows deprecation, which is the advance warning. Anthropic publishes retirement dates on its model deprecations page.",
+  "see": "ch39"
+ }
+}

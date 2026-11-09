@@ -1,0 +1,118 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>Why "intelligence" is surprisingly hard to define, even for people</li>
+<li>What makes intelligence "artificial", and what today's AI can and can't do</li>
+<li>The difference between narrow AI, general AI and the idea of superintelligence</li>
+<li>Why AI is good at some things people find hard, and bad at things a child finds easy</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> nothing. This is the first chapter.</div>
+
+<div class="bigidea"><p>Before we can talk about artificial intelligence, we need to ask a harder question: what is intelligence in the first place? Nobody has a perfect answer. That's why arguments about whether AI "really" thinks never end. In practice, AI means computer systems that do tasks we'd normally say need intelligence, such as understanding language, recognising faces or solving problems. Today's AI is very good at some of these tasks and surprisingly poor at others.</p></div>
+
+<h3 id="ch1-1"><span class="num">1.1</span>What do we mean by intelligence?</h3>
+<p>Ask ten people to define intelligence and you'll get ten answers. Most include some of these abilities:</p>
+<div class="tbl"><table>
+<tr><th>Ability</th><th>Everyday example</th></tr>
+<tr><td>Learning from experience</td><td>After touching a hot stove once, a child avoids it</td></tr>
+<tr><td>Reasoning and problem-solving</td><td>Working out why your car won't start</td></tr>
+<tr><td>Understanding language</td><td>Getting the joke, not just the words</td></tr>
+<tr><td>Adapting to new situations</td><td>Finding your way in a city you've never visited</td></tr>
+<tr><td>Planning</td><td>Organising a wedding, or a release schedule</td></tr>
+<tr><td>Perceiving the world</td><td>Recognising a friend's face in a crowd</td></tr>
+<tr><td>Common sense</td><td>Knowing that if you turn a full cup upside down, the water falls out</td></tr>
+</table></div>
+<p>Psychologists have argued for over a century about whether intelligence is one general ability or many separate ones. In 1983 the psychologist Howard Gardner proposed "multiple intelligences" (linguistic, logical, musical, spatial, social and others). Whatever the right answer is for people, it matters for AI: a machine can be brilliant at one kind of intelligence and have none of the others.</p>
+
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a calculator. It does arithmetic far faster and more accurately than any person. Is it intelligent? Most people say no, because it can only do that one thing and doesn't understand what the numbers mean. Now think of a modern AI that can write an essay, explain a joke and fix computer code. It's much harder to say no, yet it still has gaps no person would have. The line between "clever tool" and "intelligent" is blurry, and that blurriness is the heart of this chapter.</p></div>
+
+<h3 id="ch1-2"><span class="num">1.2</span>What makes intelligence "artificial"?</h3>
+<p><a class="gl" href="#g-artificial-intelligence">Artificial intelligence</a> (AI) simply means intelligence shown by machines rather than by people or animals. The word "artificial" means "made by people", not "fake".</p>
+<p>In practice, people use "AI" in three different ways, and mixing them up causes a lot of confusion:</p>
+<ol>
+<li><strong>The goal:</strong> machines that can think or act intelligently.</li>
+<li><strong>The field of study:</strong> the science and engineering of building such machines, started formally in 1956 (Chapter 3).</li>
+<li><strong>The products:</strong> specific systems such as Claude, ChatGPT, a spam filter or a self-driving car.</li>
+</ol>
+<p>A useful working definition, and the one this book uses:</p>
+<div class="box note"><span class="tag">Definition</span><p><strong>Artificial intelligence</strong> is the field of building computer systems that perform tasks which would normally require human intelligence, such as understanding language, recognising images, making decisions or solving problems.</p></div>
+<p>Notice the definition is about <em>what a system does</em>, not about whether it "really" understands. That keeps the discussion practical. Whether machines can truly understand is a deep question for philosophers (see 1.5); whether a system can reliably do a task is a question you can test.</p>
+
+<div class="box example"><span class="tag">Real-world example</span><p>You probably use a dozen AI systems every day without noticing: the spam filter in your email, face unlock on your phone, the route your map app suggests, product recommendations in online shops, the autocorrect on your keyboard, voice assistants, and the system that flags unusual card payments as possible fraud. Claude and ChatGPT are simply the most visible kind.</p></div>
+
+<h3 id="ch1-3"><span class="num">1.3</span>Narrow AI, general AI and superintelligence</h3>
+<p>People sort AI into three broad categories. Only the first definitely exists today.</p>
+<div class="tbl"><table>
+<tr><th>Category</th><th>What it means</th><th>Does it exist?</th></tr>
+<tr><td><b>Narrow AI</b> (also "weak AI")</td><td>Good at a specific task or range of tasks: playing chess, translating, recognising faces</td><td>Yes. All AI products today are narrow in some sense.</td></tr>
+<tr><td><b><a class="gl" href="#g-agi">Artificial general intelligence</a></b> (AGI)</td><td>Able to learn and perform almost any intellectual task a person can, at a human level or better</td><td>Disputed. There's no agreed definition or test, and experts disagree sharply on how close current systems are.</td></tr>
+<tr><td><b>Superintelligence</b></td><td>Far smarter than the best humans in practically every area</td><td>No. It's a hypothetical future possibility.</td></tr>
+</table></div>
+<p>Modern language models such as Claude complicate this neat picture. They aren't narrow in the old sense: the same system can write poetry, analyse a spreadsheet, explain chemistry and debug software. But they also make mistakes no expert would make, can't learn permanently from a conversation, and lack a body and direct experience of the world. Many researchers describe them as "broadly capable but not general" in the full sense.</p>
+<div class="box opinion"><span class="tag">Opinion · not settled fact</span><p>Whether and when AGI will arrive is one of the most argued-about questions in technology. Some AI company leaders have said publicly they expect very capable general systems within years; many academic researchers expect it to take much longer or doubt current methods will get there. This book doesn't take a side. When you hear a confident prediction, treat it as an opinion and ask what evidence it rests on.</p></div>
+
+<h3 id="ch1-4"><span class="num">1.4</span>Easy for us, hard for machines</h3>
+<p>In the 1980s, the roboticist Hans Moravec and others noticed something surprising. Tasks that feel hard to people, like chess or advanced maths, turned out to be relatively easy to program. Tasks that feel effortless, like walking across a cluttered room, folding laundry or recognising sarcasm, turned out to be extremely hard. This is known as <strong>Moravec's paradox</strong>.</p>
+<p>The usual explanation is evolution. Humans have been refining perception and movement for hundreds of millions of years, so we do them without noticing. Abstract reasoning is a recent skill, so it feels hard to us even though it can be simpler underneath.</p>
+<div class="cols2">
+<div><h4>Things AI does well today</h4><ul><li>Writing and summarising text</li><li>Translating languages</li><li>Writing and explaining code</li><li>Spotting patterns in huge amounts of data</li><li>Playing games with clear rules</li><li>Recognising objects in photos</li></ul></div>
+<div><h4>Things AI still finds hard</h4><ul><li>Reliable common sense in unusual situations</li><li>Knowing when it doesn't know something</li><li>Physical tasks in messy real-world settings</li><li>Learning permanently from a single experience</li><li>Long, multi-step tasks without supervision</li><li>Exact facts it hasn't seen, such as recent events</li></ul></div>
+</div>
+<div class="box example"><span class="tag">Real-world example: a QA view</span><p>If you test software, Moravec's paradox will feel familiar. An AI can write fifty well-structured test cases in seconds, yet it may miss an obvious real-world scenario that any experienced tester would think of immediately, such as a user double-clicking "Pay". That's why AI works best with an experienced person reviewing its work.</p></div>
+
+<h3 id="ch1-5"><span class="num">1.5</span>Can a machine really understand?</h3>
+<p>This is one of the oldest debates in AI. Two famous ideas frame it.</p>
+<p><strong>The Turing Test (1950).</strong> Alan Turing suggested we stop arguing about the word "think" and use a practical test instead: if a judge chatting by text can't reliably tell a machine from a person, we should accept that the machine is doing something like thinking. You'll meet Turing properly in Chapter 3.</p>
+<p><strong>The Chinese Room (1980).</strong> The philosopher John Searle replied with a thought experiment. Imagine a person who speaks no Chinese, locked in a room with a huge rule book. Notes in Chinese are pushed under the door. By following the rules exactly, the person writes back perfect Chinese answers. People outside believe someone in the room understands Chinese. But the person inside understands nothing. They are only matching symbols. Searle argued that computers are like the person in the room: following rules is not the same as understanding.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a student who memorises answers for an exam without understanding the subject. They might score well on familiar questions but fall apart when a question is phrased differently. Critics say AI is like that student; supporters say modern AI handles new phrasings too well for that to be the full story. Both sides have a point, which is why the debate continues.</p></div>
+<p>For practical purposes, this book takes a simple position: <strong>judge AI by what it reliably does, test it carefully, and don't assume it understands things the way a person does.</strong> That attitude will serve you well whatever the philosophers eventually decide.</p>
+
+<details class="deep"><summary>The "AI effect": why AI keeps disappearing</summary><div class="body">
+<p>There's a well-known pattern: as soon as a computer can do something, people stop calling it intelligence. Chess was once seen as the peak of human intellect; when Deep Blue beat the world champion in 1997, many said it was "just search". Recognising handwriting, translating, and transcribing speech followed the same path. A remark often attributed to the computer scientist Larry Tesler sums it up: "AI is whatever hasn't been done yet."</p>
+<p>This matters because it distorts how we judge progress. Each success gets reclassified as "not real intelligence", while the remaining unsolved problems get labelled as the real test. Keep this in mind when reading confident claims either way.</p>
+</div></details>
+
+<h3 id="ch1-6"><span class="num">1.6</span>Why this matters for you</h3>
+<p>You don't need to settle these debates to use AI well. But understanding them protects you from two opposite mistakes:</p>
+<ul>
+<li><strong>Over-trusting AI</strong> because it sounds fluent and confident. Fluent language isn't proof of understanding or accuracy.</li>
+<li><strong>Dismissing AI</strong> as "just autocomplete". Modern systems can do genuinely useful reasoning, and ignoring that means missing real benefits.</li>
+</ul>
+<p>The skilled position sits between them: use AI for what it does well, check its work where it's weak, and keep learning, because the boundary moves every year.</p>
+
+<div class="lab"><div class="lab-h"><b>Find the AI around you</b><span>15 min · no tools needed</span></div><ol>
+<li>List every piece of software you've used today. For each, ask: does it learn from data, or follow fixed rules?<span class="expect">at least five AI systems you hadn't thought of as AI (spam filter, recommendations, map routing, autocorrect, fraud checks).</span></li>
+<li>Ask Claude: "Give me three tasks that are easy for a five-year-old but hard for AI, and explain why."<span class="expect">examples like physical tasks, common sense or learning from one experience, each with a reason.</span></li>
+<li>Ask Claude: "Do you understand what you're saying? Give the strongest argument for and against."<span class="expect">a balanced answer that doesn't claim certainty either way. Notice how it handles the question.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"AI means robots."</dt><dd>Most AI has no body at all. It's software running on computers in data centres.</dd>
+<dt>"AI thinks like a person."</dt><dd>AI systems work very differently from brains, even when the results look similar. Chapter 11 shows how.</dd>
+<dt>"If it sounds confident, it's correct."</dt><dd>Confidence and accuracy are separate in AI. A model can be fluent and wrong at the same time (Chapter 22).</dd>
+<dt>"AGI is already here" or "AGI is impossible."</dt><dd>Both are opinions. Experts disagree, and there's no agreed test.</dd>
+</dl></div>
+
+<h3 id="ch1-r"><span class="num">1.7</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Intelligence has no single agreed definition; it covers learning, reasoning, language, perception, planning and common sense.</li>
+<li>Artificial intelligence means machines doing tasks that would normally need human intelligence. Judge it by what it reliably does.</li>
+<li>All AI today is narrow to some degree. AGI is disputed; superintelligence is hypothetical.</li>
+<li>Moravec's paradox: what's hard for people can be easy for machines, and the reverse.</li>
+<li>Whether AI truly "understands" is unresolved. Use it, test it, and don't assume human-like understanding.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Which statement best matches this book's working definition of AI?</p><div class="opts"><button>Machines that are conscious</button><button data-ok>Computer systems that perform tasks normally needing human intelligence</button><button>Robots that look like people</button></div><p class="why" hidden>The definition is about what systems do, not whether they're conscious or have bodies.</p></div>
+<div class="qz"><p class="q">A face-unlock feature on a phone is an example of…</p><div class="opts"><button data-ok>Narrow AI</button><button>Artificial general intelligence</button><button>Superintelligence</button></div><p class="why" hidden>It does one specific task well, which is the definition of narrow AI.</p></div>
+<div class="qz"><p class="q">Moravec's paradox says that…</p><div class="opts"><button>AI will always be worse than people</button><button data-ok>Tasks that are easy for people can be hard for machines, and the reverse</button><button>AI gets smarter every year</button></div><p class="why" hidden>Chess turned out easier to automate than folding laundry.</p></div>
+<div class="qz"><p class="q">What was Searle's Chinese Room meant to show?</p><div class="opts"><button>Computers can learn Chinese</button><button data-ok>Following rules to produce correct answers isn't necessarily the same as understanding</button><button>The Turing Test is easy to pass</button></div><p class="why" hidden>The person in the room produces perfect answers without understanding a word.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Write a one-page note titled "What I mean when I say AI". Include your own definition, three AI systems you use at work, one task you'd trust AI with and one you wouldn't, and why. Keep it: you'll revisit it at the end of the book and see how your view has changed.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Intelligence is hard to define even for people. AI means computers doing tasks that normally need human intelligence. Everything today is narrow to some degree. AI is great at some things we find hard and bad at things a child finds easy. Whether it truly understands is still debated, so the practical approach is to use it and test it."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>A. M. Turing, "Computing Machinery and Intelligence", <i>Mind</i> 59 (1950): 433–460.</li>
+<li>J. R. Searle, "Minds, Brains, and Programs", <i>Behavioral and Brain Sciences</i> 3 (1980): 417–457.</li>
+<li>H. Gardner, <i>Frames of Mind: The Theory of Multiple Intelligences</i> (1983).</li>
+<li>H. Moravec, <i>Mind Children</i> (1988), on what is now called Moravec's paradox.</li>
+<li>S. Russell and P. Norvig, <i>Artificial Intelligence: A Modern Approach</i>, 4th ed. (2020), chapter 1: the standard university textbook's discussion of defining AI.</li>
+</ol><p class="verified">Content type: established history and ideas · Last reviewed 9 November 2026</p></div>

@@ -1,0 +1,22 @@
+{
+ "Check catalogue": {
+  "d": "A fixed list of automated checks that people have written and reviewed. An AI assistant may choose which ones to run, but cannot write or change the code that runs.",
+  "see": "ch143"
+ },
+ "Evidence report": {
+  "d": "A test report that ties every result to its proof: which requirement was checked, by which check, with what result, and where the screenshot, trace or log is.",
+  "see": "ch143"
+ },
+ "STAR method": {
+  "d": "A way to structure interview stories: Situation, Task, Action, Result. It keeps answers short, concrete and focused on what you did.",
+  "see": "ch144"
+ },
+ "Learning objective": {
+  "d": "A specific, observable thing learners will be able to do after a lesson, such as 'rewrite a vague prompt into a structured one'. Used to plan and to test teaching.",
+  "see": "ch145"
+ },
+ "Kirkpatrick Model": {
+  "d": "A widely used way to evaluate training at four levels: reaction, learning, behaviour on the job, and results for the organisation.",
+  "see": "ch145"
+ }
+}

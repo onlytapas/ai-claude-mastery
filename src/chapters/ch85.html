@@ -1,0 +1,257 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What an API is, using an everyday analogy, and why almost all modern software depends on them</li>
+<li>How an HTTP request and response are built: URL, method, headers, body and status code</li>
+<li>How to read and write JSON, and the mistakes that break it</li>
+<li>How APIs check who you are (API keys, bearer tokens, OAuth) and limit how much you use them</li>
+<li>How to use <code>curl</code> flag by flag, and how it relates to tools like Postman</li>
+<li>How to think about testing an API as a QA engineer</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 54 (your first terminal commands) helps for the exercises. No programming knowledge is needed.</div>
+
+<div class="bigidea"><p>An <a class="gl" href="#g-api">API</a> is how one program asks another program to do something. On the web, that conversation happens over <a class="gl" href="#g-http">HTTP</a>: your program sends a <em>request</em> (where to go, what to do, who you are, and any data), and the other side sends back a <em>response</em> (a status code saying how it went, plus data, usually written in <a class="gl" href="#g-json">JSON</a>). Every time you talk to Claude through code, connect a tool to Jira, or run an automated test against a backend, this is what's happening underneath. Once you can read a request and a response, nothing in the later chapters will feel like magic.</p></div>
+
+<h3 id="ch85-1"><span class="num">85.1</span>What an API is</h3>
+<p>API stands for <strong>application programming interface</strong>. That sounds technical, but the idea is simple: it's a menu of things a program offers to other programs, plus rules for how to ask.</p>
+<div class="box analogy"><span class="tag">In everyday life: the restaurant</span><p>You sit in a restaurant. You don't walk into the kitchen and cook; you read the <strong>menu</strong>, tell the <strong>waiter</strong> what you want, and the waiter brings back your food, or comes back to say "sorry, we're out of fish". The kitchen is the other program. The menu is the API's documentation: the list of things you're allowed to ask for. The waiter is the API: the go-between that takes your request in a set format and returns a result. You never need to know how the kitchen works inside.</p></div>
+<p>APIs are everywhere, often invisibly:</p>
+<div class="tbl"><table>
+<tr><th>When you…</th><th>An API call that happens</th></tr>
+<tr><td>Check the weather on your phone</td><td>The app asks a weather service's API for the forecast at your location</td></tr>
+<tr><td>Pay online with a card</td><td>The shop's website calls a payment provider's API to charge the card</td></tr>
+<tr><td>Log in with "Sign in with Google"</td><td>The site calls Google's API to confirm who you are</td></tr>
+<tr><td>Move a Jira ticket to "Done"</td><td>The Jira web page calls Jira's own API to update the ticket</td></tr>
+<tr><td>Ask Claude something in claude.ai</td><td>The app calls Anthropic's API, which runs the model and returns the reply</td></tr>
+</table></div>
+<p>Two words you'll see constantly: the <strong>client</strong> is the program asking (your browser, your test script, Claude Code); the <strong>server</strong> is the program answering (Jira, a payment service, Anthropic's API).</p>
+
+<h3 id="ch85-2"><span class="num">85.2</span>The shape of a conversation: request and response</h3>
+<div class="flow">
+<div><b>1 · Client builds a request</b>Where (URL), what (method), who and how (headers), and any data (body)</div>
+<div><b>2 · Request travels</b>Over the internet using HTTP, normally encrypted (HTTPS)</div>
+<div class="hl"><b>3 · Server does the work</b>Checks who you are, does the job, prepares a result</div>
+<div><b>4 · Response comes back</b>A status code (how it went), headers, and usually a JSON body</div>
+</div>
+<p>Every API call, however complex, follows this pattern. A web API never "calls you" in the middle; it waits for a request and answers it. (Webhooks, in 82.10, are the one twist on this.)</p>
+
+<h3 id="ch85-3"><span class="num">85.3</span>Reading a URL</h3>
+<p>The URL says <em>where</em> the request goes. A single address packs in several parts:</p>
+<div class="code"><span class="cap">Anatomy of a URL</span><pre>https://api.example.com/v2/orders/1042/items?status=shipped&amp;limit=20
+└─┬──┘   └──────┬──────┘ └───────┬───────────┘ └─────────┬──────────┘
+scheme        host          path                    query string
+(protocol)  (which server) (which resource)       (extra options)</pre></div>
+<div class="tbl"><table>
+<tr><th>Part</th><th>Example</th><th>Meaning</th></tr>
+<tr><td>Scheme</td><td><code>https</code></td><td>How to talk. HTTPS is HTTP with encryption, so nobody in between can read it. Always expect HTTPS for real APIs.</td></tr>
+<tr><td>Host</td><td><code>api.example.com</code></td><td>Which server to contact</td></tr>
+<tr><td>Path</td><td><code>/v2/orders/1042/items</code></td><td>Which thing on that server. Here: version 2 of the API, order number 1042, its items.</td></tr>
+<tr><td>Query string</td><td><code>?status=shipped&amp;limit=20</code></td><td>Options as <code>name=value</code> pairs after a <code>?</code>, joined with <code>&amp;</code>: "only shipped items, at most 20"</td></tr>
+</table></div>
+<p>The combination of a method and a path, such as <code>POST /v1/messages</code>, is called an <a class="gl" href="#g-endpoint">endpoint</a>. API documentation is mostly a list of endpoints and what each one expects.</p>
+
+<h3 id="ch85-4"><span class="num">85.4</span>Methods: what you want done</h3>
+<p>The <strong>method</strong> (also called the HTTP verb) tells the server what kind of action you want.</p>
+<div class="tbl"><table>
+<tr><th>Method</th><th>Plain meaning</th><th>Example</th><th>Changes data?</th></tr>
+<tr><td><code>GET</code></td><td>Give me something</td><td>Get order 1042</td><td>No</td></tr>
+<tr><td><code>POST</code></td><td>Create something, or run an action</td><td>Create a new order; send a message to Claude</td><td>Yes</td></tr>
+<tr><td><code>PUT</code></td><td>Replace something entirely</td><td>Replace order 1042 with this new version</td><td>Yes</td></tr>
+<tr><td><code>PATCH</code></td><td>Change part of something</td><td>Change only the delivery address of order 1042</td><td>Yes</td></tr>
+<tr><td><code>DELETE</code></td><td>Remove something</td><td>Cancel order 1042</td><td>Yes</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example: a QA view</span><p>Two properties of methods matter a lot in testing. A <code>GET</code> should be <em>safe</em>: calling it should never change anything, so you can call it a thousand times. <code>PUT</code> and <code>DELETE</code> should be <em>idempotent</em>: doing the same call twice has the same effect as doing it once (deleting an already-deleted order shouldn't delete a different one). <code>POST</code> usually isn't: sending "create order" twice may create two orders. That's exactly the "user double-clicks Pay" bug from Chapter 1, at the API level.</p></div>
+
+<h3 id="ch85-5"><span class="num">85.5</span>Headers: the envelope</h3>
+<p>If the body is the letter, <a class="gl" href="#g-header">headers</a> are what's written on the envelope: short <code>Name: value</code> lines that describe the request or response. You'll meet these all the time:</p>
+<div class="tbl"><table>
+<tr><th>Header</th><th>Direction</th><th>What it says</th></tr>
+<tr><td><code>Content-Type: application/json</code></td><td>Both</td><td>"The body is JSON." Without it, many servers can't read your data.</td></tr>
+<tr><td><code>Accept: application/json</code></td><td>Request</td><td>"Please answer in JSON."</td></tr>
+<tr><td><code>Authorization: Bearer &lt;token&gt;</code></td><td>Request</td><td>"Here's my proof of who I am." (82.8)</td></tr>
+<tr><td><code>User-Agent</code></td><td>Request</td><td>Which program is calling (for example, curl or a browser)</td></tr>
+<tr><td><code>Retry-After</code></td><td>Response</td><td>"Try again after this many seconds", often sent with a 429 or 503</td></tr>
+<tr><td><code>request-id</code> (name varies)</td><td>Response</td><td>A unique ID for this call. Put it in bug reports so the API team can find the exact request in their logs.</td></tr>
+</table></div>
+<p>Header names aren't case-sensitive: <code>content-type</code> and <code>Content-Type</code> are the same. Many APIs also define their own headers. Anthropic's API, for instance, requires <code>anthropic-version</code> (Chapter 86).</p>
+
+<h3 id="ch85-6"><span class="num">85.6</span>Status codes: how it went</h3>
+<p>Every response starts with a three-digit <a class="gl" href="#g-status-code">status code</a>. The first digit tells you the family:</p>
+<div class="flow">
+<div><b>2xx · Success</b>It worked</div>
+<div><b>3xx · Redirect</b>Look somewhere else</div>
+<div class="hl"><b>4xx · Your mistake</b>Something about the request is wrong</div>
+<div><b>5xx · Their problem</b>The server failed</div>
+</div>
+<div class="tbl"><table>
+<tr><th>Code</th><th>Name</th><th>Plain meaning</th><th>What a tester checks</th></tr>
+<tr><td><code>200</code></td><td>OK</td><td>Worked; here's the result</td><td>Body matches what was asked</td></tr>
+<tr><td><code>201</code></td><td>Created</td><td>A new thing was created</td><td>It really exists afterwards (GET it back)</td></tr>
+<tr><td><code>204</code></td><td>No Content</td><td>Worked; nothing to return</td><td>Common after DELETE</td></tr>
+<tr><td><code>301</code>/<code>302</code></td><td>Moved</td><td>The resource is at another URL</td><td>Redirect points somewhere sensible</td></tr>
+<tr><td><code>400</code></td><td>Bad Request</td><td>The request is malformed or invalid</td><td>Error message says <em>what</em> was wrong</td></tr>
+<tr><td><code>401</code></td><td>Unauthorized</td><td>"I don't know who you are": missing or bad credentials</td><td>No data leaks without a valid key</td></tr>
+<tr><td><code>403</code></td><td>Forbidden</td><td>"I know who you are, but you're not allowed"</td><td>Users can't reach other users' data</td></tr>
+<tr><td><code>404</code></td><td>Not Found</td><td>That resource doesn't exist</td><td>Asking for order 99999 fails cleanly</td></tr>
+<tr><td><code>409</code></td><td>Conflict</td><td>Clashes with the current state (for example, a duplicate)</td><td>Creating the same user twice</td></tr>
+<tr><td><code>422</code></td><td>Unprocessable</td><td>Well-formed but fails validation (used by some APIs instead of 400)</td><td>Field-level error messages</td></tr>
+<tr><td><code>429</code></td><td>Too Many Requests</td><td>You've hit a rate limit (82.9)</td><td>A <code>Retry-After</code> header, and recovery later</td></tr>
+<tr><td><code>500</code></td><td>Internal Server Error</td><td>The server crashed handling this</td><td>Always worth a bug report with the request ID</td></tr>
+<tr><td><code>502</code>/<code>503</code>/<code>504</code></td><td>Gateway / unavailable / timeout</td><td>A server in the chain is down or too slow</td><td>Retries and timeouts in the client</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life: 401 versus 403</span><p>At an office building, <strong>401</strong> is the security guard saying "I need to see your badge"; <strong>403</strong> is the guard saying "I see your badge, but it doesn't open this floor." Mixing these up is a very common bug, and a common interview question.</p></div>
+
+<h3 id="ch85-7"><span class="num">85.7</span>JSON: the language of the body</h3>
+<p><a class="gl" href="#g-json">JSON</a> (JavaScript Object Notation, said "jay-son") is a plain-text way to write structured data. Despite the name, every programming language reads it. Here's a real-shaped example: a support ticket.</p>
+<div class="code"><span class="cap">A JSON object</span><pre>{
+  <span class="k">"id"</span>: <span class="s">"QA-1042"</span>,
+  <span class="k">"title"</span>: <span class="s">"Coupon total ignores discount"</span>,
+  <span class="k">"priority"</span>: 2,
+  <span class="k">"reproducible"</span>: true,
+  <span class="k">"assignee"</span>: null,
+  <span class="k">"labels"</span>: [<span class="s">"checkout"</span>, <span class="s">"regression"</span>],
+  <span class="k">"reporter"</span>: {
+    <span class="k">"name"</span>: <span class="s">"Priya"</span>,
+    <span class="k">"team"</span>: <span class="s">"QA"</span>
+  }
+}</pre></div>
+<div class="tbl"><table>
+<tr><th>JSON piece</th><th>Looks like</th><th>In the example</th></tr>
+<tr><td>Object</td><td><code>{ "key": value, … }</code></td><td>The whole ticket; also <code>reporter</code></td></tr>
+<tr><td>Array (list)</td><td><code>[ value, value ]</code></td><td><code>labels</code></td></tr>
+<tr><td>String (text)</td><td>In double quotes</td><td><code>"QA-1042"</code></td></tr>
+<tr><td>Number</td><td>No quotes</td><td><code>2</code></td></tr>
+<tr><td>Boolean</td><td><code>true</code> or <code>false</code></td><td><code>reproducible</code></td></tr>
+<tr><td>Null</td><td><code>null</code> means "no value"</td><td><code>assignee</code></td></tr>
+</table></div>
+<p>Objects and arrays can be nested inside each other as deeply as needed. People describe positions with a path: <code>reporter.name</code> is "Priya"; <code>labels[0]</code> is "checkout" (counting starts at 0).</p>
+<div class="box mistakes"><span class="tag">JSON mistakes that break requests</span><dl>
+<dt>Single quotes</dt><dd><code>{'id': 'QA-1'}</code> is invalid. JSON needs double quotes.</dd>
+<dt>Trailing commas</dt><dd><code>["a", "b",]</code>: the last comma is an error.</dd>
+<dt>Comments</dt><dd>JSON has no comments. <code>// like this</code> breaks it.</dd>
+<dt>Numbers as text</dt><dd><code>"priority": "2"</code> is a string, not a number. The API may reject it or, worse, accept it and behave oddly.</dd>
+<dt>Unquoted keys</dt><dd><code>{id: 1}</code> is JavaScript, not JSON.</dd>
+</dl></div>
+
+<h3 id="ch85-8"><span class="num">85.8</span>Proving who you are: keys and tokens</h3>
+<p>Most APIs need to know who is calling, both to protect data and to bill for usage. The common methods:</p>
+<div class="tbl"><table>
+<tr><th>Method</th><th>How it's sent</th><th>Typical use</th></tr>
+<tr><td><b>API key</b></td><td>A long secret string in a header, such as <code>x-api-key: sk-…</code> or <code>Authorization: Bearer sk-…</code></td><td>Server-to-server calls; the Claude API</td></tr>
+<tr><td><b>Bearer token</b></td><td><code>Authorization: Bearer &lt;token&gt;</code>. "Bearer" means "whoever holds this token gets access".</td><td>Most modern APIs</td></tr>
+<tr><td><b>Personal access token (PAT)</b></td><td>Like an API key, but tied to your user account and its permissions</td><td>GitHub, Jira/Atlassian, GitLab</td></tr>
+<tr><td><b>OAuth</b></td><td>You sign in on the provider's page, and the app receives a short-lived token on your behalf</td><td>"Sign in with…", MCP connectors to Jira or Google</td></tr>
+<tr><td><b>Basic auth</b></td><td>Username and password (or email and token) encoded in a header</td><td>Older APIs; some Jira setups</td></tr>
+</table></div>
+<div class="warn box"><span class="tag">Treat keys like passwords</span><p>Anyone who has your API key can act as you and spend your money. Never paste keys into chat messages, tickets, screenshots or code that gets committed to git. Store them in environment variables or a secrets manager. Chapter 98 covers keys, tokens and secrets in depth, including the confusing fact that "token" means two different things in AI.</p></div>
+
+<h3 id="ch85-9"><span class="num">85.9</span>Rate limits</h3>
+<p>A <a class="gl" href="#g-rate-limit">rate limit</a> caps how much you can use an API in a period of time, such as 50 requests a minute or a number of tokens per minute. Limits protect the service from overload and stop one customer crowding out others. When you exceed one, you get <code>429 Too Many Requests</code>, often with a <code>Retry-After</code> header saying how long to wait.</p>
+<p>Well-behaved clients slow down and retry after a short, growing wait. This is called <strong>exponential backoff</strong>: wait 1 second, then 2, then 4, and so on. Official SDKs, like Anthropic's (Chapter 86), do this for you.</p>
+
+<h3 id="ch85-10"><span class="num">85.10</span>Webhooks: when the server calls you</h3>
+<p>Normally the client asks and the server answers. But what if you want to know <em>when</em> something happens, such as a build finishing or a ticket changing? Asking every ten seconds ("polling") is wasteful. A <a class="gl" href="#g-webhook">webhook</a> flips the direction: you give the service a URL of yours, and it sends a request to that URL when the event happens.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>GitHub can send a webhook to your CI server whenever someone opens a pull request; the CI server then starts the test run. Jira can send a webhook to a Slack integration whenever a P1 bug is created.</p></div>
+
+<h3 id="ch85-11"><span class="num">85.11</span>curl, flag by flag</h3>
+<p><a class="gl" href="#g-curl">curl</a> is a command-line program that sends HTTP requests. It's installed on macOS, Linux and modern Windows, and nearly every API's documentation shows examples in it. If you can read a curl command, you can read any API example.</p>
+<div class="code"><span class="cap">A typical POST request in curl</span><pre>curl https://api.example.com/v2/tickets \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $EXAMPLE_TOKEN" \
+  -d '{"title": "Coupon total ignores discount", "priority": 2}'</pre></div>
+<div class="tbl"><table>
+<tr><th>Piece</th><th>Meaning</th></tr>
+<tr><td><code>curl URL</code></td><td>Send a request to this URL. With no other options, it's a GET.</td></tr>
+<tr><td><code>\</code> at line end</td><td>"The command continues on the next line." Just for readability.</td></tr>
+<tr><td><code>-X POST</code></td><td>Use this method. (curl switches to POST automatically when you use <code>-d</code>, so <code>-X POST</code> is often left out.)</td></tr>
+<tr><td><code>-H "Name: value"</code></td><td>Add a header. Repeat for each header.</td></tr>
+<tr><td><code>-d '…'</code></td><td>Send this body (data). Single quotes stop the terminal from changing what's inside.</td></tr>
+<tr><td><code>$EXAMPLE_TOKEN</code></td><td>An environment variable: the terminal swaps in its value, so the secret never appears in the command (Chapter 56).</td></tr>
+<tr><td><code>-i</code></td><td>Show the response status line and headers as well as the body</td></tr>
+<tr><td><code>-s</code></td><td>Silent: hide the progress meter</td></tr>
+<tr><td><code>-v</code></td><td>Verbose: show everything sent and received. Great for debugging (careful: it prints your auth header).</td></tr>
+<tr><td><code>-o file</code></td><td>Save the response body to a file</td></tr>
+<tr><td><code>-w "%{http_code}"</code></td><td>Print just the status code after the response: handy in scripts</td></tr>
+</table></div>
+<details class="deep"><summary>What actually travels over the wire</summary><div class="body">
+<p>Underneath, an HTTP request is just structured text (HTTP/2 and HTTP/3 pack it more efficiently, but the content is the same). Running curl with <code>-v</code> shows a version of it:</p>
+<div class="code"><pre>POST /v2/tickets HTTP/1.1          <span class="c">← method, path, protocol version</span>
+Host: api.example.com              <span class="c">← headers, one per line</span>
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOi...
+Content-Length: 58
+                                   <span class="c">← a blank line ends the headers</span>
+{"title": "Coupon total ignores discount", "priority": 2}
+
+HTTP/1.1 201 Created               <span class="c">← the response: status line</span>
+Content-Type: application/json
+Location: /v2/tickets/QA-1043
+
+{"id": "QA-1043", "title": "Coupon total ignores discount", ...}</pre></div>
+<p>HTTPS wraps this whole exchange in encryption (TLS), so anyone watching the network sees only that you contacted <code>api.example.com</code>, not the path, headers or body. That's why sending an API key over HTTPS is reasonable, but over plain HTTP it isn't.</p>
+</div></details>
+
+<h3 id="ch85-12"><span class="num">85.12</span>Postman, Bruno and friends</h3>
+<p>Graphical API clients such as Postman, Insomnia and Bruno do exactly what curl does, with forms instead of flags: choose a method, type a URL, add headers and a body, press Send, and read the response. They add collections, environments (for keeping keys out of requests) and test scripts. Most can import and export curl commands, so you can paste an example from documentation straight in. Which you use is a team choice; the concepts are identical.</p>
+<div class="box note"><span class="tag">Why curl still matters</span><p>Claude Code runs commands in a terminal. When it tests an API for you, it will usually use curl or a small script. Being able to read its curl commands is how you check what it's actually sending before you approve it (Chapter 67).</p></div>
+
+<h3 id="ch85-13"><span class="num">85.13</span>Thinking like an API tester</h3>
+<div class="tbl"><table>
+<tr><th>Kind of test</th><th>Examples for <code>POST /v2/tickets</code></th></tr>
+<tr><td>Positive</td><td>Valid ticket returns 201 and the ticket can be fetched back with GET</td></tr>
+<tr><td>Validation (negative)</td><td>Missing title, wrong type (<code>"priority": "high"</code>), unknown fields, invalid JSON → 400 or 422 with a clear message</td></tr>
+<tr><td>Boundary</td><td>Empty string, one character, maximum length, maximum + 1; priority 0, 1, 5, 6</td></tr>
+<tr><td>Authentication</td><td>No token → 401; expired or revoked token → 401; token without permission → 403</td></tr>
+<tr><td>Authorisation</td><td>User A cannot read or edit user B's tickets by changing the ID in the URL</td></tr>
+<tr><td>Idempotency and duplicates</td><td>The same POST twice: two tickets, or a 409?</td></tr>
+<tr><td>Rate limits</td><td>Burst of requests → 429 with Retry-After, then recovery</td></tr>
+<tr><td>Contract</td><td>Response fields, types and status codes match the documentation (for example an OpenAPI file)</td></tr>
+<tr><td>Security</td><td>Error messages don't leak stack traces, internal paths or other users' data</td></tr>
+</table></div>
+<p>Claude is very good at generating this kind of list from an API description, and Claude Code can then turn it into automated tests (Chapter 121). You still decide which risks matter.</p>
+
+<div class="lab"><div class="lab-h"><b>Talk to a real API</b><span>25 min · terminal</span></div><ol>
+<li>Open a terminal and run <code>curl https://jsonplaceholder.typicode.com/todos/1</code><span class="expect">a small JSON object with <code>userId</code>, <code>id</code>, <code>title</code> and <code>completed</code>. JSONPlaceholder is a free fake API made for practice.</span></li>
+<li>Add <code>-i</code> to see the status and headers: <code>curl -i https://jsonplaceholder.typicode.com/todos/1</code><span class="expect">a first line containing <code>200</code>, then headers such as <code>content-type: application/json; charset=utf-8</code>, then the JSON.</span></li>
+<li>Ask for something that doesn't exist: <code>curl -i https://jsonplaceholder.typicode.com/posts/99999</code><span class="expect">status <code>404</code> and an empty JSON object <code>{}</code>.</span></li>
+<li>Send data with POST:<div class="code"><pre>curl -i https://jsonplaceholder.typicode.com/posts \
+  -H "Content-Type: application/json" \
+  -d '{"title": "My first API test", "body": "Hello", "userId": 1}'</pre></div><span class="expect">status <code>201</code> and your data echoed back with a new <code>id</code> (the fake API doesn't really save it).</span></li>
+<li>See your own request reflected back by a test service: <code>curl -s https://httpbin.org/headers</code><span class="expect">JSON listing the headers curl sent, including <code>User-Agent</code>.</span></li>
+<li>Paste the curl command from step 4 into Claude and ask: "Explain every part of this command, then list ten tests you'd run against this endpoint."<span class="expect">a breakdown matching 82.11 and a list covering positive, negative, boundary and auth cases.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"An API is a website."</dt><dd>A website is for people; an API is for programs. Many websites are themselves built on top of APIs.</dd>
+<dt>"200 means the test passed."</dt><dd>Only that the server didn't report an error. Check the body: some APIs return 200 with an error message inside.</dd>
+<dt>"401 and 403 are the same."</dt><dd>401 means "who are you?"; 403 means "you're not allowed".</dd>
+<dt>"JSON and JavaScript objects are the same."</dt><dd>Close, but JSON is stricter: double quotes, no comments, no trailing commas.</dd>
+<dt>"It's fine to share an API key with a colleague in chat."</dt><dd>Keys are passwords. Each person or system should have its own, stored securely, so it can be revoked without breaking everyone.</dd>
+</dl></div>
+
+<h3 id="ch85-r"><span class="num">85.14</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>An API is a defined way for programs to ask each other for things; the client asks, the server answers.</li>
+<li>An HTTP request has a URL, a method, headers and an optional body; a response has a status code, headers and usually a JSON body.</li>
+<li>Status code families: 2xx success, 3xx redirect, 4xx your request's problem, 5xx the server's problem. 401 = not identified, 403 = not allowed, 429 = slow down.</li>
+<li>JSON uses objects, arrays, strings, numbers, booleans and null, with strict rules (double quotes, no trailing commas or comments).</li>
+<li>APIs identify callers with API keys, bearer tokens, personal access tokens or OAuth; all are secrets.</li>
+<li>curl and tools like Postman build the same requests; reading curl lets you check what an AI agent is about to send.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Which HTTP method should be used to fetch an order without changing anything?</p><div class="opts"><button>POST</button><button data-ok>GET</button><button>PATCH</button><button>DELETE</button></div><p class="why" hidden>GET is for reading. It should be safe to repeat with no side effects.</p></div>
+<div class="qz"><p class="q">Your test calls an endpoint with a valid token, but for a resource that belongs to another user. What's the correct status?</p><div class="opts"><button>401 Unauthorized</button><button data-ok>403 Forbidden</button><button>404 Not Found</button><button>500 Internal Server Error</button></div><p class="why" hidden>The server knows who you are (the token is valid) but you aren't allowed. Some APIs deliberately return 404 instead to avoid revealing that the resource exists; either way, it must not be 200.</p></div>
+<div class="qz"><p class="q">Which of these is valid JSON?</p><div class="opts"><button>{'name': 'Priya'}</button><button>{"tags": ["a", "b",]}</button><button data-ok>{"name": "Priya", "active": true}</button><button>{name: "Priya"}</button></div><p class="why" hidden>JSON needs double-quoted keys and strings, and no trailing commas.</p></div>
+<div class="qz"><p class="q">In <code>curl -H "Authorization: Bearer $TOKEN" …</code>, what is <code>$TOKEN</code>?</p><div class="opts"><button>A literal password typed into the command</button><button data-ok>An environment variable whose value the terminal inserts</button><button>A curl option</button></div><p class="why" hidden>Using a variable keeps the secret out of the command history and out of screenshots.</p></div>
+<div class="qz"><p class="q">What does a 429 response tell your client to do?</p><div class="opts"><button>Fix the JSON</button><button>Log in again</button><button data-ok>Slow down and retry later, ideally after the Retry-After time</button><button>Report a server crash</button></div><p class="why" hidden>429 is a rate limit. Back off and retry; don't hammer the API.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick one API your team tests (or JSONPlaceholder's <code>/posts</code> endpoint). Write a one-page test charter: the endpoints in scope, at least five positive, five negative, three boundary and three authentication tests, and how you'd record request IDs in bug reports. Then ask Claude to review your charter for missing risks, and add the ones you agree with.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"An API is a waiter between programs. You send a request with a URL for where, a method for what, headers for who and how, and a JSON body for data. You get back a status code: 2xx is fine, 4xx is your mistake, 5xx is theirs. You prove who you are with a key or token, which is a secret. curl and Postman build the same requests, and reading curl lets you check exactly what an AI agent is about to send."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>MDN Web Docs, <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Overview" target="_blank" rel="noopener">An overview of HTTP</a>, <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods" target="_blank" rel="noopener">HTTP request methods</a> and <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Status" target="_blank" rel="noopener">HTTP response status codes</a>.</li>
+<li>IETF, RFC 9110 <i>HTTP Semantics</i> (2022): the formal definition of methods, headers and status codes.</li>
+<li>IETF, RFC 8259 <i>The JavaScript Object Notation (JSON) Data Interchange Format</i> (2017); <a href="https://www.json.org" target="_blank" rel="noopener">json.org</a>.</li>
+<li><a href="https://curl.se/docs/manpage.html" target="_blank" rel="noopener">curl manual</a>.</li>
+<li><a href="https://jsonplaceholder.typicode.com" target="_blank" rel="noopener">JSONPlaceholder</a> and <a href="https://httpbin.org" target="_blank" rel="noopener">httpbin</a>: free practice APIs (both checked working on 9 November 2026).</li>
+</ol><p class="verified">Content type: established web standards · Practice APIs verified 9 November 2026</p></div>

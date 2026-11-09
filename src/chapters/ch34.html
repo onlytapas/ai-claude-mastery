@@ -1,0 +1,181 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What a "model family" is, and which dimensions are worth comparing</li>
+<li>Where Claude, GPT, Gemini, Grok, Muse/Llama, DeepSeek, Mistral and Qwen stand on context size, modalities, tool use, openness and price, as of 9 November 2026</li>
+<li>Why a price per million tokens is not directly comparable between vendors</li>
+<li>What can and cannot honestly be said about "best at coding" or "best at agents"</li>
+<li>How to keep your own comparison card up to date, because this chapter will age</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch31">Chapter 31</a> (why there are so many models), <a href="#ch32">Chapter 32</a> (open-weight versus proprietary) and <a href="#ch33">Chapter 33</a> (reading model cards and benchmarks critically). The company stories behind each family are in <a href="#ch27">Chapters 27</a> to <a href="#ch30">30</a>.</div>
+
+<div class="bigidea"><p>Eight families of models dominate most conversations at work: Anthropic's Claude, OpenAI's GPT, Google's Gemini, xAI's Grok, Meta's Muse (and the older Llama), DeepSeek, Mistral and Alibaba's Qwen. On paper they look more alike every year. Several flagship models now accept around a million tokens of input, most read images, and most can call tools. They differ more in price, in openness, and in where you're allowed to run them. This chapter lines them up side by side using only facts we checked on 9 November 2026. It doesn't declare a winner, because the right model depends on your task, and only your own tests (<a href="#ch36">Chapter 36</a>) can settle that.</p></div>
+
+<h3 id="ch34-1"><span class="num">34.1</span>Comparing families fairly</h3>
+<p>A <a class="gl" href="#g-model-family">model family</a> is a set of models from one maker that share a name, a design lineage and usually an API. "Claude" is a family. Inside it are tiers (Fable, Opus, Sonnet, Haiku) and versions (5.1, 5.5). When someone says "Claude is better than GPT", they're comparing families. That's usually too vague to be useful. A small, cheap model from one family can lose to the top model of another and still be the right choice for a high-volume job.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Comparing car makers is like this. "Is Toyota better than Volvo?" has no answer until you say which models and what for. A city runabout and a seven-seat estate from the same maker are built for different jobs. You compare a specific car against a specific need: price, boot space, running costs, where you can get it serviced.</p></div>
+<p>These are the dimensions this chapter uses. Each one is something you can check on a vendor's page, not a matter of taste:</p>
+<div class="tbl"><table>
+<tr><th>Dimension</th><th>Plain meaning</th><th>Why a tester cares</th></tr>
+<tr><td><a class="gl" href="#g-context-window">Context window</a></td><td>How much text (in <a class="gl" href="#g-token">tokens</a>) the model can take in at once</td><td>Can it read the whole log, spec or test suite in one go?</td></tr>
+<tr><td>Max output</td><td>The longest answer it can write in one reply</td><td>Can it produce a full test file or report without stopping?</td></tr>
+<tr><td>Modalities</td><td>What kinds of input it accepts: text, images, audio, video, PDF</td><td>Can it look at a screenshot of a broken layout?</td></tr>
+<tr><td><a class="gl" href="#g-tool-use">Tool use</a></td><td>Whether it can ask your program to run a function and use the result</td><td>Needed for agents that run tests or query Jira</td></tr>
+<tr><td>Openness</td><td>Proprietary (API only) or <a class="gl" href="#g-open-weight-model">open weights</a> you can download</td><td>Decides whether you can run it inside your own network</td></tr>
+<tr><td>Price band</td><td>Cost per million input and output tokens</td><td>Decides whether a nightly job costs pennies or hundreds</td></tr>
+<tr><td>Where it runs</td><td>Vendor API, big cloud platforms, your own servers</td><td>Procurement, data residency and security reviews</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">This chapter has a shelf life</span><p>Every row below is a snapshot taken on 9 November 2026 from the vendor's own pages (or a named secondary source where no official page was found). New versions come out every few weeks. Before you quote a figure in a decision document, open the source link at the end of the chapter and check it again.</p></div>
+
+<h3 id="ch34-2"><span class="num">34.2</span>The eight families at a glance</h3>
+<p>Start with who makes what, what the current top model is, and whether you can download it. Type in the box to filter the table, for example "open" or "Meta".</p>
+<input class="filter" data-filter="#ch34Families" data-empty="#ch34FamiliesEmpty" type="search" placeholder="Filter families…" aria-label="Filter model families">
+<div class="tbl"><table id="ch34Families">
+<tr><th>Family</th><th>Maker</th><th>Current models (9 Nov 2026)</th><th>Open or closed</th></tr>
+<tr class="group"><td colspan="4">US frontier labs</td></tr>
+<tr><td>Claude</td><td>Anthropic</td><td>Fable 5.1 (most capable generally available), Opus 5.5 (Anthropic's recommended starting point), Sonnet 5.5, Haiku 5.5. Mythos 5.1 is restricted to verified organisations.</td><td>Proprietary</td></tr>
+<tr><td>GPT</td><td>OpenAI</td><td>GPT-6 Astra (most capable), GPT-6.1 Sol, GPT-6.1 Terra, GPT-6 Luna</td><td>Proprietary; older open-weight gpt-oss-120b and gpt-oss-20b (Apache 2.0, Aug 2025)</td></tr>
+<tr><td>Gemini</td><td>Google DeepMind</td><td>Gemini 4 Argon (frontier, GA in the API 13 Oct 2026), Gemini 3.8 Flash</td><td>Proprietary; Gemma is Google's separate open-weight family</td></tr>
+<tr><td>Grok</td><td>xAI, now SpaceX Super Intelligence</td><td>Grok 4.7 (Sep 2026)</td><td>Proprietary; Grok-1 and Grok 2.5 weights were released earlier</td></tr>
+<tr><td>Muse (and Llama)</td><td>Meta</td><td>Muse Spark 1.3 (Sep 2026); Muse Glimmer, a 30B open-weight model (Apache 2.0, Aug 2026). Llama 4 (Apr 2025) was the last Llama.</td><td>Mostly proprietary since April 2026; Llama and Glimmer are open weights</td></tr>
+<tr class="group"><td colspan="4">Open-weight leaders</td></tr>
+<tr><td>DeepSeek</td><td>DeepSeek (Hangzhou)</td><td>DeepSeek-V4-Pro (1.6T total parameters), DeepSeek-V4.1-Flash, served as <code>deepseek-v4-pro</code> and <code>deepseek-flash</code></td><td>Open weights, MIT licence</td></tr>
+<tr><td>Mistral</td><td>Mistral AI (Paris)</td><td>Mistral Large 4 (about 1T-parameter <a class="gl" href="#g-mixture-of-experts">mixture of experts</a>, 52B active; weights released 29 Oct 2026)</td><td>Open weights under the Mistral Ecosystem Open Weight License</td></tr>
+<tr><td>Qwen</td><td>Alibaba Cloud</td><td>Qwen3.8-Max (cloud), Qwen3.8-2.4T-A95B and Qwen3.8-27B (open), Qwen3.8-Flash</td><td>Mixed: Max is proprietary; many models are open weights, often Apache 2.0</td></tr>
+</table></div>
+<p id="ch34FamiliesEmpty" hidden>No families match.</p>
+<p>Two changes from 2026 matter for anyone using an older comparison. Meta moved from open Llama to the mostly proprietary Muse family in April 2026, so "Meta is the open-weights company" is no longer true. And xAI now belongs to SpaceX and has been renamed twice; the API documentation now says "SpaceXSI". The model is still called Grok.</p>
+
+<h3 id="ch34-3"><span class="num">34.3</span>Context windows and output limits</h3>
+<p>A year or two ago, context size separated the families sharply. By late 2026 several flagships sit at around one million tokens, which is roughly 750,000 English words, or several thick novels. The numbers below come from each vendor's model page.</p>
+<div class="tbl"><table>
+<tr><th>Model</th><th>Context window</th><th>Max output per reply</th><th>Source</th></tr>
+<tr><td>Claude Fable 5.1, Opus 5.5, Sonnet 5.5, Haiku 5.5</td><td>1M tokens</td><td>128K (up to 300K on the Batch API with a beta header, Opus/Sonnet/Haiku)</td><td>Anthropic models overview</td></tr>
+<tr><td>GPT-6 Astra, 6.1 Sol, 6.1 Terra, 6 Luna</td><td>1.05M tokens</td><td>128K</td><td>OpenAI models docs</td></tr>
+<tr><td>Gemini 4 Argon</td><td>1M tokens (shared)</td><td>Page lists "65K / 1M" without saying which applies when</td><td>Google AI Studio models page</td></tr>
+<tr><td>Grok 4.7</td><td>500K tokens</td><td>Not stated on the models page</td><td>xAI models page</td></tr>
+<tr><td>Mistral Large 4</td><td>1M tokens</td><td>Not stated on the model card</td><td>Mistral model card</td></tr>
+<tr><td>DeepSeek V4-Pro / V4.1-Flash</td><td colspan="2">Not stated on the pages we could check; see DeepSeek's "Models &amp; Pricing" page</td><td>DeepSeek API docs</td></tr>
+<tr><td>Muse Spark, Qwen3.8</td><td colspan="2">Not verified for this chapter</td><td>—</td></tr>
+</table></div>
+<div class="box note"><span class="tag">Big is not the same as good</span><p>A million-token window means the model <em>accepts</em> that much text. It doesn't promise it will use every part equally well, and every token you send is billed. <a href="#ch20">Chapter 20</a> explains why answers can get worse as the context fills up. For a 200 MB log file, a cheap filtering step (grep, or <a class="gl" href="#g-rag">RAG</a>) before the model usually beats pasting everything in.</p></div>
+<details class="deep"><summary>Why a "token" is a different size in each family</summary><div class="body">
+<p>Each family uses its own <a class="gl" href="#g-tokenizer">tokenizer</a>, the component that cuts text into pieces before the model reads it. The same paragraph can become 100 tokens for one model and 130 for another. Anthropic states that Claude models from 4.7 onwards use a newer tokenizer that produces "approximately 30% more tokens for the same text" than the older one. So "1M tokens" in two families is not exactly the same amount of English, and a price per million tokens isn't directly comparable either (section 34.5). The only fair comparison is to send the same real input to both and read the token counts each API reports. The harness in <a href="#ch36">Chapter 36</a> does exactly that.</p>
+</div></details>
+
+<h3 id="ch34-4"><span class="num">34.4</span>Modalities and tool use</h3>
+<p>Every family here reads text and writes text. The differences are in what else they take in, and in how mature their tool calling is. A <a class="gl" href="#g-multimodal">multimodal</a> model accepts more than one kind of input, such as text plus images (<a href="#ch21">Chapter 21</a>).</p>
+<div class="tbl"><table>
+<tr><th>Family</th><th>Inputs (as documented)</th><th>Tool use / function calling</th></tr>
+<tr><td>Claude</td><td>Text and images in, text out. Image input has been part of Claude since the Claude 3 family (2024).</td><td>Yes: your own tools, Anthropic-defined tools such as bash and text editor, and server tools (web search, web fetch, code execution)</td></tr>
+<tr><td>GPT</td><td>OpenAI: "All latest OpenAI models support text and image input, text output"</td><td>Yes (documented in the OpenAI API)</td></tr>
+<tr><td>Gemini 4 Argon</td><td>Text, image, audio, video and PDF</td><td>Long documented in the Gemini API; not re-checked on the Argon page for this chapter</td></tr>
+<tr><td>Grok 4.7</td><td>Text; image input (jpg/png) is described in general terms, without saying which models</td><td>Not stated on the models page we checked</td></tr>
+<tr><td>Mistral Large 4</td><td>Described as "multimodal", with a vision encoder</td><td>Yes: "Function Calling" listed on the model card</td></tr>
+<tr><td>DeepSeek, Qwen, Muse</td><td colspan="2">Not verified for this chapter. DeepSeek lists a retired "vision-exp" model name, so check the current docs before assuming image input.</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A QA team wants an assistant that watches a 40-second screen recording of a failed checkout and writes the bug report. Of the documented inputs above, only Gemini 4 Argon lists video directly. A team using Claude or GPT could still do it, by pulling key frames out of the recording as images first. That's an extra step, not a blocker. The table tells you what's possible without workarounds; it doesn't tell you which model will write the better bug report.</p></div>
+
+<h3 id="ch34-5"><span class="num">34.5</span>Price bands</h3>
+<p>Prices are quoted in US dollars per million tokens (MTok), with separate rates for input (what you send) and output (what the model writes). Output is always the expensive part. The chart shows the published output price of the current models whose prices we could verify.</p>
+<div class="figure" role="img" aria-label="Bar chart of output prices per million tokens: Claude Fable 5.1 and GPT-6 Astra 50 dollars, Claude Opus 5.5 20, Gemini 4 Argon 10 introductory then 20, Claude Sonnet 5.5 and GPT-6.1 Sol 10, Grok 4.7 6, GPT-6.1 Terra 5, Mistral Large 4 2.10, Claude Haiku 5.5 and GPT-6 Luna 0.50"><div class="bars"><div class="bt">Output price, US$ per million tokens (list prices, 9 Nov 2026)</div>
+<div class="bar-row"><span>Claude Fable 5.1</span><span class="track"><span class="fill" style="width:100%">$50</span></span></div>
+<div class="bar-row"><span>GPT-6 Astra</span><span class="track"><span class="fill" style="width:100%">$50</span></span></div>
+<div class="bar-row"><span>Claude Opus 5.5</span><span class="track"><span class="fill hl" style="width:40%">$20</span></span></div>
+<div class="bar-row"><span>Gemini 4 Argon</span><span class="track"><span class="fill" style="width:20%">$10 intro, then $20</span></span></div>
+<div class="bar-row"><span>Claude Sonnet 5.5</span><span class="track"><span class="fill" style="width:20%">$10</span></span></div>
+<div class="bar-row"><span>GPT-6.1 Sol</span><span class="track"><span class="fill" style="width:20%">$10</span></span></div>
+<div class="bar-row"><span>Grok 4.7 (under 200K)</span><span class="track"><span class="fill" style="width:12%">$6</span></span></div>
+<div class="bar-row"><span>GPT-6.1 Terra</span><span class="track"><span class="fill" style="width:10%">$5</span></span></div>
+<div class="bar-row"><span>Mistral Large 4</span><span class="track"><span class="fill" style="width:5%">$2.10</span></span></div>
+<div class="bar-row"><span>Claude Haiku 5.5</span><span class="track"><span class="fill" style="width:2%">$0.50</span></span></div>
+<div class="bar-row"><span>GPT-6 Luna</span><span class="track"><span class="fill" style="width:2%">$0.50</span></span></div>
+</div><div class="cap">Sources: Anthropic pricing, OpenAI models docs, Google blog (Gemini 4 Argon), xAI models page, Mistral model card. Haiku 5.5 is $0.50 for prompts up to 100K tokens and $2.50 above. Grok 4.7 is $12 for prompts of 200K tokens or more.</div></div>
+<p>The full input/output pairs:</p>
+<div class="tbl"><table>
+<tr><th>Band</th><th>Models (input / output per MTok)</th></tr>
+<tr><td>Premium</td><td>Claude Fable 5.1 $10 / $50 · GPT-6 Astra $10 / $50</td></tr>
+<tr><td>Upper-mid</td><td>Claude Opus 5.5 $4 / $20 · Gemini 4 Argon $2 / $10 introductory, then $4 / $20</td></tr>
+<tr><td>Mid</td><td>Claude Sonnet 5.5 $2 / $10 · GPT-6.1 Sol $2 / $10 · Grok 4.7 $2 / $6 (under 200K), $4 / $12 (200K and over)</td></tr>
+<tr><td>Low</td><td>GPT-6.1 Terra $1 / $5 · Mistral Large 4 $0.70 / $2.10</td></tr>
+<tr><td>Bulk</td><td>Claude Haiku 5.5 $0.10 / $0.50 (prompts up to 100K) · GPT-6 Luna $0.10 / $0.50</td></tr>
+<tr><td>Not verified here</td><td>DeepSeek, Qwen, Muse: check their pricing pages</td></tr>
+</table></div>
+<p>Three things change the real bill more than the list price:</p>
+<ol>
+<li><strong>Tokens per task.</strong> Different tokenizers, plus <a class="gl" href="#g-reasoning-model">reasoning</a> ("thinking") tokens that are billed as output, mean two models can use very different numbers of tokens for the same job.</li>
+<li><strong>Discounts.</strong> Anthropic's Batch API is 50% off, and <a class="gl" href="#g-prompt-caching">prompt caching</a> makes repeated input much cheaper (an Opus 5.5 cache read is $0.20 per MTok instead of $4). Other vendors have similar schemes with different rules.</li>
+<li><strong>Long-prompt tiers.</strong> Some prices jump above a threshold (Haiku 5.5 above 100K tokens, Grok above 200K). A log-analysis job can quietly cross that line.</li>
+</ol>
+<div class="box warn"><span class="tag">Cloud prices can differ</span><p>The same Claude model is available on Amazon Bedrock, Google Cloud and Microsoft Foundry, and Anthropic notes that these platforms set their own prices. If your company buys through a cloud contract, the price list that matters is the one in that contract.</p></div>
+
+<h3 id="ch34-6"><span class="num">34.6</span>Agentic and coding strength: what can honestly be said</h3>
+<p>This is the comparison everyone wants and the one that's hardest to make honestly. Every launch post claims top scores on some <a class="gl" href="#g-benchmark">benchmark</a>. Those claims are self-reported, picked by the vendor, and often measured with different settings (<a href="#ch33">Chapter 33</a>). One widely used coding benchmark, SWE-bench Verified, was dropped by OpenAI in February 2026, which cited contamination and flawed tasks. So instead of a league table, here's what each family offers as a coding and agent <em>platform</em>, which you can check.</p>
+<div class="tbl"><table>
+<tr><th>Family</th><th>How the maker positions it</th><th>Maker's own coding agent</th></tr>
+<tr><td>Claude</td><td>Opus 5.5: "long-running agentic coding and knowledge work". Fable 5.1: "demanding reasoning and long-horizon agentic work".</td><td>Claude Code (terminal, IDEs, desktop, web)</td></tr>
+<tr><td>GPT</td><td>Astra as "most capable"; strong push into agents that use a computer and write code</td><td>Codex (CLI, IDE extension, cloud)</td></tr>
+<tr><td>Gemini</td><td>Frontier model built into Google products; agentic coding through Antigravity</td><td>Antigravity and Antigravity CLI (Gemini CLI retired for individuals on 18 June 2026), Jules</td></tr>
+<tr><td>Grok</td><td>Frontier model on very large self-built compute</td><td>Grok Build (Apache-licensed CLI, July 2026)</td></tr>
+<tr><td>Muse</td><td>"Personal superintelligence" inside Meta's apps</td><td>Muse Code (terminal agent, Aug 2026)</td></tr>
+<tr><td>Mistral</td><td>Large 4 coverage reports Mistral claiming the top open model for agentic coding</td><td>Devstral and Mistral's coding tools</td></tr>
+<tr><td>DeepSeek, Qwen</td><td>Efficient open-weight models; many community coding tools build on them</td><td>None verified as a flagship agent product</td></tr>
+</table></div>
+<div class="box opinion"><span class="tag">Opinion · this textbook's authors</span><p>For coding and agent work, the harness around the model (how it reads files, runs tests, asks permission and recovers from errors) often matters as much as the model itself. A strong model in a weak harness can lose to a slightly weaker model in a good one. That's one reason to compare complete set-ups on your own repository rather than models on a leaderboard. This is a judgement, not a measured fact.</p></div>
+<details class="deep"><summary>Why independent leaderboards still disagree</summary><div class="body">
+<p>Even independent leaderboards differ, for three reasons. First, <strong>settings</strong>: a model run at a high effort level with a long time budget can score very differently from the same model on default settings. Second, <strong>scaffolding</strong>: agent benchmarks such as Terminal-Bench test a model inside a particular harness, and changing the harness changes the score. Third, <strong>task mix</strong>: a benchmark of Python bug fixes says little about writing Playwright tests in TypeScript against your company's design system. A leaderboard is a decent way to build a shortlist. It's a poor way to make the final choice.</p>
+</div></details>
+
+<h3 id="ch34-7"><span class="num">34.7</span>Openness and where each family can run</h3>
+<p>For many companies this column decides everything else. If security policy says no customer data leaves the building, only open-weight models are in scope, whatever the benchmarks say (<a href="#ch32">Chapter 32</a>).</p>
+<div class="cols2">
+<div><h4>API only (proprietary)</h4><p>Claude, GPT, Gemini, Grok and Muse Spark. You send data to the vendor or to a cloud platform that hosts the model. Claude is offered through Anthropic's API and also on Amazon Bedrock, Google Cloud and Microsoft Foundry, which lets a company use an existing cloud contract and region. Gemini runs on Google's own cloud. GPT is served by OpenAI and Microsoft Azure.</p></div>
+<div><h4>Downloadable (open weights)</h4><p>DeepSeek V4 (MIT), Mistral Large 4 (custom open-weight licence), many Qwen3.8 models (often Apache 2.0), Meta's Muse Glimmer (Apache 2.0) and Llama, and OpenAI's gpt-oss. You can run them on your own hardware. Read each <a class="gl" href="#g-model-licence">licence</a>: "open weights" doesn't always mean "use however you like". The largest ones (V4-Pro at 1.6T parameters) need serious server hardware.</p></div>
+</div>
+<div class="flow"><div><b>Must data stay in-house?</b>Yes: open weights only</div><div class="hl"><b>Shortlist 2–3 models</b>From the tables in this chapter</div><div><b>Check the live pages</b>Prices and limits change</div><div><b>Test on your tasks</b><a href="#ch36">Chapter 36</a></div></div>
+
+<div class="lab"><div class="lab-h"><b>Build and verify your own comparison card</b><span>30 min · web browser, spreadsheet</span></div><ol>
+<li>Open a spreadsheet. Make columns: Model, Context, Max output, Inputs, Tool use, Open?, Input $/MTok, Output $/MTok, Source URL, Date checked.<span class="expect">An empty card with ten columns.</span></li>
+<li>Pick three models your team could realistically use, for example Claude Sonnet 5.5, GPT-6.1 Sol and Mistral Large 4.<span class="expect">Three rows with only the model name filled in.</span></li>
+<li>For each, open the vendor's own model or pricing page (links in the sources below) and fill in every column. Write "not stated" if the page doesn't say.<span class="expect">At least one cell per row says "not stated". That's normal, and it's honest.</span></li>
+<li>Compare your figures with this chapter's tables.<span class="expect">If a figure differs, the vendor has changed it since 9 November 2026. Trust the live page and note the date.</span></li>
+<li>Add one row: "Tokens for our sample prompt". Paste the same 300-word bug report into each vendor's token counter or playground, if available, and record the count.<span class="expect">The counts differ between families for identical text, which shows why price per token isn't the whole story.</span></li>
+<li>Save the card where your team can find it, and add a reminder to re-check it every quarter.<span class="expect">A dated, sourced card you can attach to a model decision.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"The model with the biggest context window is the most capable."</dt><dd>Context size is how much it can read, not how well it reasons. Several flagships share the same 1M figure.</dd>
+<dt>"Cheaper per token means cheaper per task."</dt><dd>Tokenizers differ and reasoning tokens are billed as output. Measure the cost of a real task.</dd>
+<dt>"Meta is the open-weights company."</dt><dd>That was true in the Llama era. Since April 2026 Meta's main Muse models are proprietary, with some open releases such as Muse Glimmer.</dd>
+<dt>"Open weights means open source."</dt><dd>You get the trained numbers, not necessarily the training data or code, and the licence can restrict use (<a href="#ch32">Chapter 32</a>).</dd>
+<dt>"The launch post says it's best at coding, so it is."</dt><dd>Launch benchmarks are self-reported and chosen by the vendor. Use them to build a shortlist, then test.</dd>
+</dl></div>
+
+<h3 id="ch34-r"><span class="num">34.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Compare specific models against a specific need, not families in general.</li>
+<li>As of 9 November 2026, Claude, GPT, Gemini 4 Argon and Mistral Large 4 all list context windows of about 1M tokens; Grok 4.7 lists 500K.</li>
+<li>Gemini 4 Argon documents the widest set of inputs (text, image, audio, video, PDF).</li>
+<li>Prices range from $0.50 to $50 per million output tokens. Tokenizers, thinking tokens, caching, batch discounts and long-prompt tiers change the real bill.</li>
+<li>Openness often decides first: DeepSeek, Mistral, many Qwen models, Muse Glimmer, Llama and gpt-oss can run in-house; Claude, GPT, Gemini, Grok and Muse Spark can't.</li>
+<li>No family is "the best". Shortlist from tables like these, then test on your own tasks.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Your security policy says production logs must never leave company servers. Which of these is in scope?</p><div class="opts"><button>Claude Opus 5.5 through the Anthropic API</button><button data-ok>Mistral Large 4 running on your own hardware</button><button>Grok 4.7 through the xAI API</button></div><p class="why" hidden>Mistral Large 4's weights can be downloaded and run in-house, subject to its licence. The others are API-only.</p></div>
+<div class="qz"><p class="q">Two models both cost $10 per million output tokens. Why might one still cost more for the same task?</p><div class="opts"><button>Because output is free on one of them</button><button data-ok>It may produce more tokens for the same text and use more thinking tokens</button><button>Because the context windows are different sizes</button></div><p class="why" hidden>Tokenizers differ between families, and reasoning tokens are billed as output. Measure real tasks.</p></div>
+<div class="qz"><p class="q">Which model in this chapter documents video as a direct input?</p><div class="opts"><button>Grok 4.7</button><button>GPT-6.1 Terra</button><button data-ok>Gemini 4 Argon</button></div><p class="why" hidden>Google's model page lists text, image, audio, video and PDF for Gemini 4 Argon.</p></div>
+<div class="qz"><p class="q">What's the best use of a vendor's launch-day benchmark table?</p><div class="opts"><button>Choose the model with the highest number</button><button data-ok>Help build a shortlist to test on your own tasks</button><button>Ignore it completely</button></div><p class="why" hidden>Self-reported scores carry some information, but settings and task mix differ from your work.</p></div>
+<div class="qz"><p class="q">Since April 2026, Meta's main Muse Spark models are:</p><div class="opts"><button>Open weights under Apache 2.0</button><button data-ok>Proprietary, offered through Meta's apps and a private-preview API</button><button>Retired in favour of Llama 5</button></div><p class="why" hidden>Meta moved to the mostly proprietary Muse family; Muse Glimmer is one open-weight exception.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Write a one-page "model landscape" note for your team. Include your verified comparison card from the lab for three or four models, one paragraph on which constraints rule models in or out for your company (data residency, budget, cloud contract), and a shortlist of two models to test in <a href="#ch36">Chapter 36</a>. Date every figure and link its source.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"There are about eight big model families: Claude, GPT, Gemini, Grok, Meta's Muse, DeepSeek, Mistral and Qwen. On paper the top ones look alike: about a million tokens of context, images in, tools supported. The real differences are price, which runs from fifty cents to fifty dollars per million output tokens, and whether you can download the model and run it yourself. Benchmarks are self-reported, so use them for a shortlist and then test on our own tickets and tests. And re-check the numbers, because they change every few weeks."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/models/overview" target="_blank" rel="noopener">Models overview</a> and <a href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Pricing</a> (context, output, prices, positioning, tokenizer note, cloud platforms).</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview" target="_blank" rel="noopener">Tool use overview</a>.</li>
+<li>OpenAI, <a href="https://developers.openai.com/api/docs/models" target="_blank" rel="noopener">Models</a> (GPT-6 Astra, 6.1 Sol, 6.1 Terra, 6 Luna: context, output, prices, modalities) and <a href="https://openai.com/index/introducing-gpt-oss/" target="_blank" rel="noopener">Introducing gpt-oss</a>.</li>
+<li>OpenAI, <a href="https://openai.com/index/why-we-no-longer-evaluate-swe-bench-verified/" target="_blank" rel="noopener">Why we no longer evaluate SWE-bench Verified</a>.</li>
+<li>Google, <a href="https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-4-argon/" target="_blank" rel="noopener">Gemini 4 Argon announcement</a> (pricing) and <a href="https://aistudio.google.com/docs/models" target="_blank" rel="noopener">Gemini models</a> (context, inputs).</li>
+<li>xAI / SpaceXSI, <a href="https://docs.x.ai/developers/models" target="_blank" rel="noopener">Models and pricing</a> and <a href="https://docs.x.ai/developers/release-notes" target="_blank" rel="noopener">release notes</a>.</li>
+<li>Meta, <a href="https://about.fb.com/news/2026/04/introducing-muse-spark-meta-superintelligence-labs/" target="_blank" rel="noopener">Introducing Muse Spark</a>; <a href="https://en.wikipedia.org/wiki/Muse_Spark" target="_blank" rel="noopener">Wikipedia: Muse</a> (later versions, Muse Glimmer).</li>
+<li>DeepSeek, <a href="https://api-docs.deepseek.com/news/news" target="_blank" rel="noopener">API news</a> (current model names); <a href="https://en.wikipedia.org/wiki/DeepSeek" target="_blank" rel="noopener">Wikipedia: DeepSeek</a> (V4 sizes, licence).</li>
+<li>Mistral AI, <a href="https://docs.mistral.ai/models/mistral-large-4-0" target="_blank" rel="noopener">Mistral Large 4 model card</a> (context, function calling, licence, price).</li>
+<li><a href="https://en.wikipedia.org/wiki/Qwen" target="_blank" rel="noopener">Wikipedia: Qwen</a> and <a href="https://www.scmp.com/tech/article/3362738/alibabas-ai-model-qwen38-max-made-widely-accessible-ahead-open-weights-release" target="_blank" rel="noopener">SCMP on Qwen3.8-Max</a>.</li>
+</ol><p class="verified">Verified 9 November 2026 against the vendor pages listed. DeepSeek, Qwen and Muse context sizes and prices, and Gemini and Grok tool-use details, were not confirmed and are marked as such.</p></div>

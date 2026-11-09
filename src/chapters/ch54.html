@@ -1,0 +1,380 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How every command is built: command name, options and arguments</li>
+<li>How to look around: <code>pwd</code>, <code>ls</code> (and its most useful options) and <code>cd</code></li>
+<li>How to create, copy, move, rename and delete files and folders: <code>mkdir</code>, <code>touch</code>, <code>cp</code>, <code>mv</code>, <code>rm</code>, safely</li>
+<li>How to read files: <code>cat</code>, <code>less</code>, <code>head</code>, <code>tail</code> (including following a live log)</li>
+<li>Everyday helpers: <code>open</code>, <code>nano</code>, <code>clear</code>, <code>history</code></li>
+<li>How to teach yourself any command with <code>man</code> and <code>--help</code>, and why <code>--help</code> fails on a Mac</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch52">Chapter 52</a> (opening a terminal, reading the prompt, <kbd>Ctrl</kbd>+<kbd>C</kbd>) and <a href="#ch53">Chapter 53</a> (paths, <code>~</code>, <code>.</code> and <code>..</code>, quoting names with spaces). Allow 40 minutes to read and 40 for the lab.</div>
+
+<div class="bigidea"><p>About twenty short commands cover most of what you'll do in a terminal: find out where you are, look at what's there, move around, make and organise files, read them, and get help. They all follow one pattern: the command's name, then options that change how it behaves, then arguments that say what to work on. Learn the pattern once and every new command, including the ones Claude Code proposes, becomes readable. The one command to treat with real care is <code>rm</code>, because it deletes immediately with no Bin to rescue you.</p></div>
+
+<h3 id="ch54-1"><span class="num">54.1</span>The shape of every command</h3>
+<p>Here is a typical command, taken apart:</p>
+<div class="code"><span class="cap">Anatomy</span><pre>ls  -l  -a  ~/Documents
+│   └──┬──┘ └────┬────┘
+│      │         └── argument: what to work on
+│      └── options: how to do it
+└── command name: which program to run</pre></div>
+<div class="tbl"><table>
+<tr><th>Part</th><th>What it is</th><th>Examples</th></tr>
+<tr><td><b><a class="gl" href="#g-command">Command</a> name</b></td><td>Always first. The program (or shell built-in) to run.</td><td><code>ls</code>, <code>cp</code>, <code>git</code>, <code>claude</code></td></tr>
+<tr><td><b><a class="gl" href="#g-flag">Options</a></b> (also called flags or switches)</td><td>Change <em>how</em> the command behaves. Start with a dash.</td><td><code>-l</code>, <code>-a</code>, <code>--version</code></td></tr>
+<tr><td><b>Option values</b></td><td>Some options need a value straight after them.</td><td><code>head -n 5</code>: the option <code>-n</code> takes the value <code>5</code></td></tr>
+<tr><td><b><a class="gl" href="#g-argument">Arguments</a></b> (also called operands)</td><td>Say <em>what</em> to work on: usually file or folder names.</td><td><code>notes.txt</code>, <code>~/Documents</code></td></tr>
+</table></div>
+<p>Rules of thumb that hold for nearly every command in this chapter:</p>
+<ul>
+<li><strong>Spaces separate the parts.</strong> That's why names with spaces need quotes (<a href="#ch53">Chapter 53</a>).</li>
+<li><strong>Short options</strong> are one dash and one letter (<code>-l</code>). They can usually be <em>combined</em>: <code>ls -la</code> is the same as <code>ls -l -a</code>.</li>
+<li><strong>Long options</strong> are two dashes and a word (<code>--version</code>). They're easier to read but can't be combined. Many Mac commands support few or no long options (54.10).</li>
+<li><strong>Options normally come before arguments.</strong> <code>ls -l reports</code>, not <code>ls reports -l</code>. (Linux tools often accept either order; Mac tools often don't.)</li>
+<li><strong>Everything is case-sensitive.</strong> <code>-a</code> and <code>-A</code> are different options; <code>LS</code> is not a command.</li>
+<li><strong>Square brackets in help text mean "optional".</strong> <code>ls [file ...]</code> means you may give zero or more file names. Don't type the brackets.</li>
+</ul>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A command is like an order at a coffee shop: "Latte (the command), large, oat milk (the options), for Sam (the argument)". The barista knows what a latte is; the options adjust it; the argument says who it's for. Give the parts in the wrong place or misspell the drink and you get a puzzled reply, which in a terminal is an error message.</p></div>
+
+<h3 id="ch54-2"><span class="num">54.2</span>Where am I and what's here: <code>pwd</code> and <code>ls</code></h3>
+<p><code>pwd</code> (print working directory) has no options you need. It prints the absolute path of the folder you're in. In this chapter's examples, <code>alex</code> stands for your user name, and all output is real, captured on a Mac while writing.</p>
+<div class="code"><span class="cap">Terminal</span><pre>pwd
+/Users/alex/terminal-practice</pre></div>
+<p><code>ls</code> (list) shows what's in a folder. With no argument it lists the current folder; give it a path to list somewhere else.</p>
+<div class="code"><span class="cap">Terminal</span><pre>ls
+logs
+notes.txt
+reports
+sprint-42
+ls -F                   <span class="c"># -F: mark folders with a trailing /</span>
+logs/
+notes.txt
+reports/
+sprint-42/
+ls sprint-42            <span class="c"># argument: list a different folder</span>
+day-1</pre></div>
+<p>(In a real terminal, <code>ls</code> fits names into columns across the window, and usually colours folders differently. The output here is one per line because it was captured, not shown on screen.)</p>
+<h4>The long listing: <code>ls -l</code></h4>
+<p><code>-l</code> ("long") shows one line of details per item. This is the format you'll see most in documentation and in Claude Code's output:</p>
+<div class="code"><span class="cap">Terminal</span><pre>ls -l
+total 8
+drwxr-xr-x@ 3 alex  staff   96 Nov  9 14:48 logs
+-rw-r--r--@ 1 alex  staff   18 Nov  9 14:48 notes.txt
+drwxr-xr-x@ 3 alex  staff   96 Nov  9 14:48 reports
+drwxr-xr-x@ 3 alex  staff   96 Nov  9 14:48 sprint-42</pre></div>
+<div class="tbl"><table>
+<tr><th>Column</th><th>Example</th><th>Meaning</th></tr>
+<tr><td>1st character</td><td><code>d</code> or <code>-</code></td><td><code>d</code> = directory, <code>-</code> = ordinary file (<code>l</code> = a link/shortcut)</td></tr>
+<tr><td>Next 9 characters</td><td><code>rw-r--r--</code></td><td>Permissions: who may read (<code>r</code>), write (<code>w</code>) and execute/enter (<code>x</code>), for the owner, the group and everyone else. Explained in <a href="#ch56">Chapter 56</a></td></tr>
+<tr><td><code>@</code> (macOS only)</td><td><code>@</code></td><td>The item has extra macOS metadata ("extended attributes"), such as "downloaded from the internet". Usually ignore it</td></tr>
+<tr><td>Number</td><td><code>1</code>, <code>3</code></td><td>Link count; safe to ignore for now</td></tr>
+<tr><td>Owner</td><td><code>alex</code></td><td>The user who owns it</td></tr>
+<tr><td>Group</td><td><code>staff</code></td><td>The group that owns it (<code>staff</code> is the normal group for Mac users)</td></tr>
+<tr><td>Size</td><td><code>18</code></td><td>Size in bytes. <code>notes.txt</code> holds "Login test passed" plus an invisible end-of-line: 18 characters. For folders, the number is bookkeeping, not the total of their contents</td></tr>
+<tr><td>Date and time</td><td><code>Nov  9 14:48</code></td><td>When it was last modified. Older items show the year instead of the time</td></tr>
+<tr><td>Name</td><td><code>notes.txt</code></td><td>The file or folder name</td></tr>
+</table></div>
+<p><code>total 8</code> on the first line is the disk space used, in blocks. You can ignore it.</p>
+<h4>The <code>ls</code> options worth knowing</h4>
+<div class="tbl"><table>
+<tr><th>Option</th><th>Meaning</th><th>Typical use</th></tr>
+<tr><td><code>-l</code></td><td>Long format (above)</td><td>See sizes, dates, owners</td></tr>
+<tr><td><code>-a</code></td><td>All, including hidden dot-files and <code>.</code> / <code>..</code></td><td>Find <code>.env</code>, <code>.gitignore</code>, <code>.claude</code></td></tr>
+<tr><td><code>-A</code></td><td>Almost all: hidden files but not <code>.</code> and <code>..</code></td><td>Tidier than <code>-a</code></td></tr>
+<tr><td><code>-h</code></td><td>Human-readable sizes (<code>2.2K</code>, <code>15M</code>); use with <code>-l</code></td><td>Spot huge log or video files</td></tr>
+<tr><td><code>-t</code></td><td>Sort by time modified, newest first</td><td>"Which report was written last?"</td></tr>
+<tr><td><code>-r</code></td><td>Reverse the order</td><td><code>-ltr</code>: newest at the bottom, next to your prompt</td></tr>
+<tr><td><code>-R</code></td><td>Recursive: list every folder inside, too</td><td>See a whole small tree</td></tr>
+<tr><td><code>-F</code></td><td>Add <code>/</code> after folders (and <code>*</code> after programs)</td><td>Tell files from folders without colour</td></tr>
+<tr><td><code>-1</code> (the digit one)</td><td>One name per line</td><td>Easier to read or copy</td></tr>
+</table></div>
+<div class="code"><span class="cap">Terminal</span><pre>ls -lh logs             <span class="c"># long + human sizes, for the logs folder</span>
+total 8
+-rw-r--r--@ 1 alex  staff   2.2K Nov  9 14:48 app.log
+ls -la reports          <span class="c"># long + all (note . and ..)</span>
+total 8
+drwxr-xr-x@ 3 alex  staff   96 Nov  9 14:48 .
+drwxr-xr-x@ 6 alex  staff  192 Nov  9 14:48 ..
+-rw-r--r--@ 1 alex  staff   18 Nov  9 14:48 notes-backup.txt</pre></div>
+<div class="box note"><span class="tag">Linux and Windows</span><p>On Linux, the same options work, and the GNU version of <code>ls</code> also accepts long forms such as <code>--all</code> and <code>--human-readable</code>. On macOS those long forms fail: real output is <code>ls: unrecognized option `--all'</code>. In Windows PowerShell, <code>ls</code> and <code>dir</code> are aliases for <code>Get-ChildItem</code>, which uses different options: <code>ls -la</code> won't work; use <code>Get-ChildItem -Force</code> to include hidden items.</p></div>
+
+<h3 id="ch54-3"><span class="num">54.3</span>Moving around: <code>cd</code></h3>
+<p><code>cd</code> (change directory) takes one argument: where to go. It prints nothing on success; the prompt changes instead.</p>
+<div class="tbl"><table>
+<tr><th>You type</th><th>Where you go</th></tr>
+<tr><td><code>cd reports</code></td><td>Into <code>reports</code>, inside the current folder (relative path)</td></tr>
+<tr><td><code>cd ~/projects/shop-tests</code></td><td>Straight to that folder from anywhere (absolute, via <code>~</code>)</td></tr>
+<tr><td><code>cd ..</code></td><td>Up one level</td></tr>
+<tr><td><code>cd</code> or <code>cd ~</code></td><td>Home</td></tr>
+<tr><td><code>cd -</code></td><td>Back to the previous folder (it prints that folder's path so you know where you landed)</td></tr>
+<tr><td><code>cd "My Reports"</code></td><td>Into a folder whose name contains a space</td></tr>
+</table></div>
+<div class="code"><span class="cap">Terminal</span><pre>cd reports
+pwd
+/Users/alex/terminal-practice/reports
+cd ..
+cd nowhere
+cd: no such file or directory: nowhere</pre></div>
+<p>The last line is zsh's error: <em>who</em> (<code>cd</code>), <em>what</em> (no such file or directory) and <em>which</em> (<code>nowhere</code>). Press <kbd>Tab</kbd> while typing a folder name and the shell completes it, which avoids most of these errors.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>Before starting Claude Code on a test project, a tester types <code>cd ~/projects/shop-tests</code>, checks with <code>pwd</code> and <code>ls</code> that <code>package.json</code> and <code>tests/</code> are there, and only then types <code>claude</code>. Two seconds of checking means Claude starts in the right project, with the right <code>CLAUDE.md</code> and settings (<a href="#ch65">Chapter 65</a>).</p></div>
+
+<h3 id="ch54-4"><span class="num">54.4</span>Making things: <code>mkdir</code> and <code>touch</code></h3>
+<p><code>mkdir</code> (make directory) creates one or more folders. Each argument is a folder to create.</p>
+<div class="code"><span class="cap">Terminal</span><pre>mkdir reports logs              <span class="c"># two arguments, two folders</span>
+mkdir sprint-42/day-1           <span class="c"># parent sprint-42 doesn't exist yet...</span>
+mkdir: sprint-42: No such file or directory
+mkdir -p sprint-42/day-1        <span class="c"># -p: create any missing parents too</span>
+ls sprint-42
+day-1</pre></div>
+<p>The error says <code>mkdir</code> couldn't find <code>sprint-42</code> to put <code>day-1</code> inside. <code>-p</code> ("parents") creates the whole chain, and also doesn't complain if the folder already exists, which makes it safe in scripts.</p>
+<p><code>touch</code> creates an empty file if the name doesn't exist. If it does exist, it only updates the file's "last modified" time and leaves the content alone.</p>
+<div class="code"><span class="cap">Terminal</span><pre>touch notes.txt
+ls -l notes.txt
+-rw-r--r--@ 1 alex  staff  0 Nov  9 14:48 notes.txt</pre></div>
+<p>Size <code>0</code>: the file exists but is empty. To put a line of text into it quickly:</p>
+<div class="code"><span class="cap">Terminal</span><pre>echo "Login test passed" &gt; notes.txt     <span class="c"># &gt; sends echo's output into the file</span>
+ls -l notes.txt
+-rw-r--r--@ 1 alex  staff  18 Nov  9 14:48 notes.txt</pre></div>
+<div class="box warn"><span class="tag">&gt; replaces the whole file</span><p><code>&gt;</code> ("redirect") overwrites the file's existing content without asking. <code>&gt;&gt;</code> adds to the end instead. Both are covered properly in <a href="#ch55">Chapter 55</a>; for now, use <code>&gt;</code> only on files you've just created.</p></div>
+
+<h3 id="ch54-5"><span class="num">54.5</span>Copying, moving and renaming: <code>cp</code> and <code>mv</code></h3>
+<p>Both take the same shape: <strong>source first, destination last</strong>.</p>
+<div class="code"><span class="cap">Syntax</span><pre>cp  [options]  source  destination
+cp  [options]  source1 source2 ...  destination-folder
+mv  [options]  source  destination</pre></div>
+<h4><code>cp</code>: copy</h4>
+<div class="code"><span class="cap">Terminal</span><pre>cp notes.txt notes-backup.txt          <span class="c"># copy a file to a new name</span>
+cp -i notes.txt notes-backup.txt       <span class="c"># -i: ask before overwriting</span>
+overwrite notes-backup.txt? (y/n [n]) n
+not overwritten
+cp logs reports                        <span class="c"># try to copy a folder...</span>
+cp: logs is a directory (not copied).
+cp -r logs logs-copy                   <span class="c"># -r: copy a folder and everything in it</span></pre></div>
+<ul>
+<li>If the destination is an existing <strong>folder</strong>, the copy goes inside it with the same name. If it's a <strong>new name</strong>, the copy gets that name.</li>
+<li>If the destination is an existing <strong>file</strong>, <code>cp</code> overwrites it silently. <code>-i</code> (interactive) makes it ask first; the <code>[n]</code> in the question means pressing Enter alone answers "no".</li>
+<li>Folders need <code>-r</code> or <code>-R</code> ("recursive": go into every folder inside). On a Mac, <code>man cp</code> documents <code>-R</code>; <code>-r</code> also works in practice and is what you'll see in most Linux documentation.</li>
+</ul>
+<h4><code>mv</code>: move and rename</h4>
+<p>There's no separate rename command. Renaming is moving a file to a new name in the same folder.</p>
+<div class="code"><span class="cap">Terminal</span><pre>mv notes-backup.txt reports/           <span class="c"># move into a folder (trailing / makes the intent clear)</span>
+ls reports
+notes-backup.txt
+mv logs-copy old-logs                  <span class="c"># rename a folder (no -r needed for mv)</span>
+mv -i reports/notes-backup.txt notes.txt
+overwrite notes.txt? (y/n [n]) n
+not overwritten</pre></div>
+<p>Like <code>cp</code>, <code>mv</code> silently replaces an existing file at the destination unless you add <code>-i</code>. Unlike <code>cp</code>, it moves folders without needing <code>-r</code>.</p>
+<div class="box note"><span class="tag">Habit worth forming</span><p>Use <code>-i</code> with <code>cp</code>, <code>mv</code> and <code>rm</code> until you're confident. It costs one keystroke and prevents the most common accidental overwrite.</p></div>
+
+<h3 id="ch54-6"><span class="num">54.6</span>Deleting: <code>rm</code> and <code>rmdir</code>, with care</h3>
+<p><code>rm</code> (remove) deletes files. <strong>There is no Bin.</strong> The file doesn't go to the Trash or Recycle Bin, and there is no undo. Recovering it, if possible at all, means backups (Time Machine, Git, a cloud copy).</p>
+<div class="code"><span class="cap">Terminal</span><pre>rm -i notes.txt          <span class="c"># -i: ask first</span>
+remove notes.txt? n
+rmdir old-logs           <span class="c"># rmdir only removes EMPTY folders</span>
+rmdir: old-logs: Directory not empty
+rm -r old-logs           <span class="c"># -r: remove a folder and everything in it</span></pre></div>
+<div class="tbl"><table>
+<tr><th>Command</th><th>What it deletes</th><th>Asks first?</th><th>Risk</th></tr>
+<tr><td><code>rm file.txt</code></td><td>One file</td><td>No (unless the file is write-protected)</td><td>Medium</td></tr>
+<tr><td><code>rm -i file.txt</code></td><td>One file</td><td>Yes</td><td>Low</td></tr>
+<tr><td><code>rmdir folder</code></td><td>An empty folder only</td><td>No; refuses if not empty</td><td>Very low</td></tr>
+<tr><td><code>rm -r folder</code></td><td>A folder and everything inside it</td><td>No (may ask for protected files)</td><td>High</td></tr>
+<tr><td><code>rm -rf folder</code></td><td>Same, and <code>-f</code> ("force") suppresses all questions and errors</td><td>Never</td><td>Very high</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Read every rm before pressing Enter</span><p>Before running or approving any <code>rm</code>, especially <code>rm -rf</code>, check three things: <strong>what</strong> path it names, <strong>where</strong> you are (<code>pwd</code>), and whether there's a stray space. <code>rm -rf ./build</code> deletes a build folder; <code>rm -rf . /build</code> (one extra space) would delete the current folder's contents. Never run <code>rm -rf</code> on <code>/</code>, <code>~</code> or a path you didn't type yourself. If a command uses a pattern such as <code>rm *.log</code>, run <code>ls *.log</code> first to see exactly what it matches (patterns are covered in <a href="#ch55">Chapter 55</a>). When Claude Code asks permission for an <code>rm</code>, apply the same three checks (<a href="#ch78">Chapter 78</a>).</p></div>
+<div class="box note"><span class="tag">A safer delete on recent Macs</span><p>macOS 15 and later include a <code>trash</code> command (its manual page says it "first appeared in macOS 15.0"). <code>trash notes.txt</code> moves the file to the Trash, where you can still recover it. On many Linux desktops, <code>gio trash notes.txt</code> does the same. On Windows PowerShell, <code>Remove-Item</code> (alias <code>rm</code>) deletes permanently, like <code>rm</code>.</p></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Deleting in Finder is putting paper in the recycling bin by your desk: you can fish it out until it's emptied. <code>rm</code> is feeding it through a shredder. Both are useful, but you check what's in your hand before you shred.</p></div>
+
+<h3 id="ch54-7"><span class="num">54.7</span>Reading files: <code>cat</code>, <code>less</code>, <code>head</code> and <code>tail</code></h3>
+<p>The practice log used below has 40 lines, written in a common log format: date, time, level (<code>INFO</code>, <code>WARN</code>, <code>ERROR</code>) and message. The content is illustrative, generated for this lab; the commands and output are real.</p>
+<h4><code>cat</code>: print the whole file</h4>
+<div class="code"><span class="cap">Terminal</span><pre>cat notes.txt
+Login test passed
+cat -n notes.txt          <span class="c"># -n: number the lines</span>
+     1	Login test passed</pre></div>
+<p><code>cat</code> (from "concatenate", because given several files it prints them one after another) is perfect for short files. For a 50,000-line log it floods your screen; use <code>less</code>, <code>head</code> or <code>tail</code> instead. <code>cat</code> on a folder gives <code>cat: reports: Is a directory</code>.</p>
+<h4><code>head</code> and <code>tail</code>: the beginning and the end</h4>
+<div class="code"><span class="cap">Terminal</span><pre>head -n 3 logs/app.log         <span class="c"># first 3 lines (default is 10)</span>
+2026-11-09 10:00:00 INFO  GET /api/orders 200 in 195ms
+2026-11-09 10:00:17 INFO  GET /api/orders 200 in 285ms
+2026-11-09 10:00:34 INFO  GET /api/orders 200 in 74ms
+tail -n 3 logs/app.log         <span class="c"># last 3 lines (default is 10)</span>
+2026-11-09 10:10:29 INFO  GET /api/orders 200 in 267ms
+2026-11-09 10:10:46 INFO  GET /api/orders 200 in 168ms
+2026-11-09 10:11:03 INFO  GET /api/orders 200 in 209ms</pre></div>
+<p><code>-n 3</code> is an option with a value: "n lines = 3". Without it you get 10 lines. The newest entries in a log are at the end, which makes <code>tail</code> the tester's favourite.</p>
+<h4><code>tail -f</code>: watch a log live</h4>
+<div class="code"><span class="cap">Terminal</span><pre>tail -f logs/app.log           <span class="c"># -f: follow; keep printing new lines as they arrive</span></pre></div>
+<p><code>-f</code> ("follow") prints the last lines and then waits, showing every new line the application writes. Run a test in another window and watch the server react in real time. It never finishes on its own: press <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop watching (the log itself is unaffected).</p>
+<div class="box example"><span class="tag">Real-world example</span><p>A checkout test fails intermittently. The tester opens two terminal tabs: one runs <code>tail -f</code> on the test environment's server log, the other runs the failing test. At the moment of failure the log shows <code>POST /api/checkout 500 Internal Server Error</code>. They copy the surrounding lines with timestamps straight into the Jira bug, which turns "sometimes fails" into an actionable report for the developer.</p></div>
+<h4><code>less</code>: read a long file page by page</h4>
+<p><code>less logs/app.log</code> opens the file in a full-screen viewer. Nothing is printed into your terminal history and the file can't be changed from here. The keys:</p>
+<div class="tbl"><table>
+<tr><th>Key</th><th>Action</th></tr>
+<tr><td><kbd>Space</kbd> / <kbd>b</kbd></td><td>Next page / back a page</td></tr>
+<tr><td><kbd>↓</kbd> / <kbd>↑</kbd></td><td>One line down / up</td></tr>
+<tr><td><kbd>g</kbd> / <kbd>G</kbd></td><td>Jump to the start / end</td></tr>
+<tr><td><kbd>/</kbd><code>ERROR</code> then Enter</td><td>Search forward for "ERROR"; <kbd>n</kbd> for the next match, <kbd>N</kbd> for the previous</td></tr>
+<tr><td><kbd>q</kbd></td><td><strong>Quit</strong> and return to your prompt</td></tr>
+</table></div>
+<p>The same keys work inside <code>man</code> pages (54.10), because <code>man</code> uses <code>less</code> to display them. If you're ever "stuck" in a screen of text with a <code>:</code> at the bottom, press <kbd>q</kbd>.</p>
+<div class="box note"><span class="tag">Windows PowerShell</span><p><code>cat</code> is an alias for <code>Get-Content</code>. For the first or last lines: <code>Get-Content logs\app.log -TotalCount 3</code> and <code>Get-Content logs\app.log -Tail 3</code>; add <code>-Wait</code> to follow like <code>tail -f</code>. In WSL or Git Bash, the Unix commands above work as shown.</p></div>
+
+<h3 id="ch54-8"><span class="num">54.8</span>Opening and editing: <code>open</code> and <code>nano</code></h3>
+<h4><code>open</code> (macOS)</h4>
+<p><code>open</code> does from the terminal what double-clicking does in Finder.</p>
+<div class="code"><span class="cap">Terminal (macOS)</span><pre>open .                              <span class="c"># open the current folder in Finder</span>
+open notes.txt                      <span class="c"># open with the default app (often TextEdit)</span>
+open -a "Visual Studio Code" .      <span class="c"># -a: choose the application</span>
+open https://playwright.dev         <span class="c"># open a web address in your browser</span></pre></div>
+<p>On Linux the equivalent is usually <code>xdg-open</code> (for example <code>xdg-open .</code>). On Windows, <code>start .</code> (Command Prompt) or <code>Invoke-Item .</code> / <code>explorer .</code> (PowerShell) opens the folder in File Explorer; in WSL, <code>explorer.exe .</code> does the same.</p>
+<h4><code>nano</code>: a simple editor inside the terminal</h4>
+<p>Sometimes you need to change a file without leaving the terminal, for example on a remote server or when a guide says "edit <code>~/.zshrc</code>". <code>nano</code> is the friendliest terminal editor:</p>
+<div class="code"><span class="cap">Terminal</span><pre>nano notes.txt</pre></div>
+<p>The file opens full-screen. Type normally and move with the arrow keys; the mouse mostly won't work. The bottom two lines list the shortcuts, where <code>^</code> means the Control key:</p>
+<div class="code"><span class="cap">Bottom of the screen (macOS, real)</span><pre>^G Get Help  ^O WriteOut  ^R Read File ^Y Prev Pg   ^K Cut Text  ^C Cur Pos
+^X Exit      ^J Justify   ^W Where is  ^V Next Pg   ^U UnCut Text^T To Spell</pre></div>
+<div class="flow"><div><b>Edit</b>type your changes</div><div class="hl"><b>Ctrl+O</b>"WriteOut" = save; press Enter to confirm the name</div><div><b>Ctrl+X</b>exit; if unsaved, answer Y or N</div></div>
+<div class="box note"><span class="tag">On a Mac, nano is actually pico</span><p>On the Mac used for this chapter (macOS 26), <code>/usr/bin/nano</code> is a shortcut to <code>pico</code>, an older editor nano was modelled on; its title bar says <code>UW PICO 5.09</code>. The keys above work the same. Linux distributions ship GNU nano with the same basic keys. If you end up in a different editor by accident (a screen full of <code>~</code> characters is <code>vim</code>), press <kbd>Esc</kbd>, type <code>:q!</code> and press Enter to leave without saving. On Windows, <code>notepad notes.txt</code> opens the file in Notepad.</p></div>
+
+<h3 id="ch54-9"><span class="num">54.9</span>Tidying and remembering: <code>clear</code> and <code>history</code></h3>
+<p><code>clear</code> wipes the screen so you can start fresh. It doesn't undo anything or delete history; scroll up and the old output may still be there. <kbd>Ctrl</kbd>+<kbd>L</kbd> does the same; on macOS Terminal, <kbd>Cmd</kbd>+<kbd>K</kbd> also clears the scrollback.</p>
+<p><code>history</code> lists the commands you've typed, numbered. Real output from a short zsh session:</p>
+<div class="code"><span class="cap">Terminal (zsh)</span><pre>history
+    1  pwd
+    2  ls
+    3  cat notes.txt
+    4  head -n 3 logs/app.log</pre></div>
+<ul>
+<li>In zsh, plain <code>history</code> shows only the most recent 16 commands; <code>history 1</code> shows everything from command 1. In bash, <code>history</code> shows the whole list.</li>
+<li><code>!4</code> reruns command number 4. <kbd>↑</kbd> walks back one at a time.</li>
+<li><kbd>Ctrl</kbd>+<kbd>R</kbd> then a few letters <strong>searches</strong> your history: type <code>Ctrl+R</code>, then <code>tail</code>, and the last <code>tail</code> command appears; press Enter to run it or <kbd>Ctrl</kbd>+<kbd>C</kbd> to cancel. This is the biggest time-saver in the chapter.</li>
+</ul>
+<div class="box warn"><span class="tag">History is saved to disk</span><p>Your history is written to a file in your home folder (for zsh on a Mac, usually <code>~/.zsh_history</code>). If you ever type a password or API key directly into a command, it's now stored there in plain text. Put secrets in environment variables or a secrets manager instead (<a href="#ch98">Chapter 98</a>), and never paste your history into a chat or ticket without reading it.</p></div>
+<p>In PowerShell, <code>Get-History</code> (alias <code>history</code>) lists the current session, <code>clear</code> is an alias for <code>Clear-Host</code>, and <kbd>Ctrl</kbd>+<kbd>R</kbd> also searches.</p>
+
+<h3 id="ch54-10"><span class="num">54.10</span>Teaching yourself any command: <code>man</code> and <code>--help</code></h3>
+<p>No one memorises every option. Experienced people look them up constantly. Two built-in ways:</p>
+<h4><code>man</code>: the manual</h4>
+<div class="code"><span class="cap">Terminal (macOS, real output, first lines)</span><pre>man ls
+LS(1)                     General Commands Manual                    LS(1)
+
+NAME
+     ls – list directory contents
+
+SYNOPSIS
+     ls [-@ABCFGHILOPRSTUWabcdefghiklmnopqrstuvwxy1%,] [--color=when]
+        [-D format] [file ...]
+
+DESCRIPTION
+     For each operand that names a file of a type other than directory, ls
+     displays its name as well as any requested, associated information.
+     ...</pre></div>
+<p>How to read it:</p>
+<div class="tbl"><table>
+<tr><th>Part</th><th>What it tells you</th></tr>
+<tr><td><code>LS(1)</code></td><td>The page for <code>ls</code> in section 1 of the manual (user commands)</td></tr>
+<tr><td>NAME</td><td>One-line summary</td></tr>
+<tr><td>SYNOPSIS</td><td>The syntax. Everything in <code>[ ]</code> is optional. <code>[-@ABC…]</code> is every single-letter option <code>ls</code> accepts. <code>[file ...]</code> means zero or more file arguments</td></tr>
+<tr><td>DESCRIPTION</td><td>What it does, then each option explained, one by one</td></tr>
+<tr><td>EXAMPLES (on many pages)</td><td>Worked examples: often the fastest part to read</td></tr>
+</table></div>
+<p>Navigate with the <code>less</code> keys from 54.7: <kbd>Space</kbd> for the next page, <kbd>/</kbd> to search (try <code>/-h</code> to find the <code>-h</code> option), <kbd>q</kbd> to quit.</p>
+<h4><code>--help</code>: the quick summary</h4>
+<p>Many programs print a short usage summary when given <code>--help</code> (sometimes <code>-h</code>). Modern tools like <code>git</code>, <code>npm</code>, <code>python3</code>, <code>npx playwright</code> and <code>claude</code> all do, and some have no <code>man</code> page at all, so <code>--help</code> is their only built-in guide. But on a Mac, the basic file commands come from the BSD family of Unix tools and many don't know <code>--help</code>:</p>
+<div class="code"><span class="cap">Terminal (macOS, real output)</span><pre>ls --help
+ls: unrecognized option `--help'
+usage: ls [-@ABCFGHILOPRSTUWXabcdefghiklmnopqrstuvwxy1%,] [--color=when] [-D format] [file ...]
+cp --help
+cp: illegal option -- -
+usage: cp [-R [-H | -L | -P]] [-fi | -n] [-aclpSsvXx] source_file target_file
+       cp [-R [-H | -L | -P]] [-fi | -n] [-aclpSsvXx] source_file ... target_directory</pre></div>
+<p>This isn't a failure to worry about: the error is followed by a one-line <code>usage:</code> summary, which is often all you needed. Read <code>cp</code>'s: source then target, or several sources then a target directory; <code>-R</code> for recursive; <code>-f</code>, <code>-i</code> or <code>-n</code> for what to do about overwriting. For the full explanation, use <code>man cp</code>. On Linux, the GNU versions of these commands do support <code>--help</code>. In PowerShell, use <code>Get-Help Copy-Item</code> (or <code>help</code>, which also answers to <code>man</code>).</p>
+<div class="box example"><span class="tag">Real-world example</span><p>A teammate's script uses <code>ls -ltr</code> and you've never seen <code>-t</code> or <code>-r</code>. Instead of guessing, you run <code>man ls</code>, type <code>/-t</code> and Enter, read "Sort by descending time modified", then <code>/-r</code>: "Reverse the order of the sort". Thirty seconds, and you now know the command shows the newest file last. You can also ask Claude to explain an unfamiliar command, and then confirm the key parts in <code>man</code>: the manual on your own machine describes the version you actually have.</p></div>
+
+<h3 id="ch54-11"><span class="num">54.11</span>The whole set on one page</h3>
+<input class="filter" data-filter="#ch54cmds" data-empty="#ch54empty" type="search" placeholder="Filter commands…" aria-label="Filter commands">
+<div class="tbl"><table id="ch54cmds">
+<tr><th>macOS / Linux</th><th>What it does</th><th>Key options</th><th>Windows PowerShell</th></tr>
+<tr class="group"><td colspan="4">Looking around</td></tr>
+<tr><td><code>pwd</code></td><td>Show current folder</td><td>(<code>-P</code>: real path)</td><td><code>pwd</code> / <code>Get-Location</code></td></tr>
+<tr><td><code>ls [path]</code></td><td>List contents</td><td><code>-l -a -h -t -r -R -F</code></td><td><code>ls</code>, <code>dir</code> / <code>Get-ChildItem -Force</code></td></tr>
+<tr><td><code>cd path</code></td><td>Change folder</td><td><code>cd ..</code>, <code>cd -</code>, <code>cd</code></td><td><code>cd</code> / <code>Set-Location</code></td></tr>
+<tr class="group"><td colspan="4">Creating and organising</td></tr>
+<tr><td><code>mkdir name</code></td><td>Make a folder</td><td><code>-p</code>: with parents</td><td><code>mkdir</code> (creates parents too)</td></tr>
+<tr><td><code>touch file</code></td><td>Make an empty file / update its time</td><td></td><td><code>New-Item file</code></td></tr>
+<tr><td><code>cp src dest</code></td><td>Copy</td><td><code>-r</code>/<code>-R</code> folders, <code>-i</code> ask</td><td><code>cp</code> / <code>Copy-Item -Recurse</code></td></tr>
+<tr><td><code>mv src dest</code></td><td>Move or rename</td><td><code>-i</code> ask</td><td><code>mv</code> / <code>Move-Item</code></td></tr>
+<tr><td><code>rm file</code></td><td>Delete permanently</td><td><code>-i</code> ask, <code>-r</code> folders, <code>-f</code> force</td><td><code>rm</code> / <code>Remove-Item -Recurse</code></td></tr>
+<tr><td><code>rmdir folder</code></td><td>Delete an empty folder</td><td></td><td><code>rmdir</code> / <code>Remove-Item</code></td></tr>
+<tr class="group"><td colspan="4">Reading</td></tr>
+<tr><td><code>cat file</code></td><td>Print whole file</td><td><code>-n</code> line numbers</td><td><code>cat</code> / <code>Get-Content</code></td></tr>
+<tr><td><code>less file</code></td><td>Page through a file</td><td>keys: Space, b, /, n, q</td><td><code>Get-Content file | more</code></td></tr>
+<tr><td><code>head file</code></td><td>First lines</td><td><code>-n 20</code></td><td><code>Get-Content -TotalCount 20</code></td></tr>
+<tr><td><code>tail file</code></td><td>Last lines</td><td><code>-n 20</code>, <code>-f</code> follow</td><td><code>Get-Content -Tail 20 -Wait</code></td></tr>
+<tr class="group"><td colspan="4">Helpers</td></tr>
+<tr><td><code>open target</code> (mac) / <code>xdg-open</code> (Linux)</td><td>Open in the default app</td><td><code>-a App</code> (mac)</td><td><code>Invoke-Item</code>, <code>start</code></td></tr>
+<tr><td><code>nano file</code></td><td>Edit text in the terminal</td><td>Ctrl+O save, Ctrl+X exit</td><td><code>notepad file</code></td></tr>
+<tr><td><code>clear</code></td><td>Clear the screen</td><td>Ctrl+L</td><td><code>clear</code> / <code>Clear-Host</code></td></tr>
+<tr><td><code>history</code></td><td>List past commands</td><td>Ctrl+R search, <code>!n</code> rerun</td><td><code>Get-History</code></td></tr>
+<tr><td><code>man cmd</code>, <code>cmd --help</code></td><td>Help</td><td>in <code>man</code>: / search, q quit</td><td><code>Get-Help cmd</code></td></tr>
+</table></div>
+<p id="ch54empty" hidden>No commands match.</p>
+
+<div class="lab"><div class="lab-h"><b>Build, explore and tidy a practice project</b><span>40 min · macOS Terminal (Linux, WSL or Git Bash also work)</span></div><ol>
+<li>Go home and make a practice folder: <code>cd</code>, then <code>mkdir terminal-practice</code>, then <code>cd terminal-practice</code>, then <code>pwd</code>.<span class="expect"><code>/Users/yourname/terminal-practice</code>; the prompt ends with <code>terminal-practice %</code>.</span></li>
+<li>Run <code>ls</code>.<span class="expect">nothing at all, just a new prompt: the folder is empty, and silence means success.</span></li>
+<li>Create structure: <code>mkdir reports logs</code>, then <code>mkdir sprint-42/day-1</code>.<span class="expect">the second command fails: <code>mkdir: sprint-42: No such file or directory</code>.</span></li>
+<li>Fix it with <code>mkdir -p sprint-42/day-1</code>, then run <code>ls -F</code>.<span class="expect"><code>logs/  reports/  sprint-42/</code> (with trailing slashes marking folders).</span></li>
+<li>Create a file: <code>touch notes.txt</code>, then <code>ls -l notes.txt</code>.<span class="expect">a line starting <code>-rw-r--r--</code> with size <code>0</code>.</span></li>
+<li>Write into it: <code>echo "Login test passed" &gt; notes.txt</code>, then <code>cat notes.txt</code> and <code>ls -l notes.txt</code>.<span class="expect"><code>Login test passed</code>; size now <code>18</code>.</span></li>
+<li>Make a 40-line log to practise on. Copy this one line exactly (it uses a small loop; loops are taught in <a href="#ch57">Chapter 57</a>):<br><code>for i in $(seq 1 40); do echo "2026-11-09 10:$((i+10)) INFO request $i ok" &gt;&gt; logs/app.log; done; echo "2026-11-09 10:51 ERROR checkout failed" &gt;&gt; logs/app.log</code><span class="expect">no output. <code>ls -lh logs</code> shows <code>app.log</code> at roughly 1.4K.</span></li>
+<li>Read it in pieces: <code>head -n 3 logs/app.log</code>, then <code>tail -n 2 logs/app.log</code>.<span class="expect"><code>2026-11-09 10:11 INFO request 1 ok</code> and the next two requests; then <code>2026-11-09 10:50 INFO request 40 ok</code> and <code>2026-11-09 10:51 ERROR checkout failed</code>.</span></li>
+<li>Open it in <code>less logs/app.log</code>. Press <kbd>Space</kbd>, then <kbd>g</kbd>, then type <code>/ERROR</code> and Enter, then <kbd>q</kbd>.<span class="expect">a page down, back to the top, a jump to the highlighted ERROR line, then your prompt again.</span></li>
+<li>Back up and organise: <code>cp notes.txt notes-backup.txt</code>, then <code>mv notes-backup.txt reports/</code>, then <code>ls reports</code>.<span class="expect"><code>notes-backup.txt</code> is now inside <code>reports</code>.</span></li>
+<li>Test the safety net: <code>cp -i notes.txt reports/notes-backup.txt</code> and answer <code>n</code>.<span class="expect"><code>overwrite reports/notes-backup.txt? (y/n [n])</code>, then <code>not overwritten</code>.</span></li>
+<li>Copy and rename a folder: <code>cp logs old-logs</code> (it fails), then <code>cp -r logs old-logs</code>, then <code>mv old-logs archive</code>, then <code>ls -F</code>.<span class="expect">first <code>cp: logs is a directory (not copied).</code>; finally <code>archive/</code> appears alongside the other folders.</span></li>
+<li>Edit with nano: <code>nano notes.txt</code>, add a second line <code>Checkout test failed</code>, press <kbd>Ctrl</kbd>+<kbd>O</kbd>, Enter, then <kbd>Ctrl</kbd>+<kbd>X</kbd>. Then <code>cat -n notes.txt</code>.<span class="expect">two numbered lines.</span></li>
+<li>Delete carefully: <code>rmdir archive</code> (fails: not empty), then <code>ls archive</code> to see what's inside, then <code>rm -ri archive</code> and answer <code>y</code> to each question.<span class="expect"><code>rmdir: archive: Directory not empty</code>; then a question per item (<code>examine files in directory archive?</code>, <code>remove archive/app.log?</code>, <code>remove archive?</code>); then <code>archive</code> is gone from <code>ls</code>.</span></li>
+<li>Look things up: <code>man ls</code>, type <code>/-t</code> and Enter, read the line, press <kbd>q</kbd>. Then try <code>ls --help</code>.<span class="expect">the description of <code>-t</code>; then on a Mac <code>ls: unrecognized option `--help'</code> plus a usage line (on Linux, a full help page).</span></li>
+<li>Review your work: <code>history</code>, then <kbd>Ctrl</kbd>+<kbd>R</kbd> and type <code>tail</code>, then Enter.<span class="expect">your numbered commands; then your earlier <code>tail</code> command found and run again.</span></li>
+<li>See it the other way: <code>open .</code> (Linux: <code>xdg-open .</code>; WSL: <code>explorer.exe .</code>).<span class="expect">a Finder window showing the same folders and files you built.</span></li>
+<li>Clean up when finished: <code>cd</code>, then <code>ls terminal-practice</code> to confirm what will go, then <code>rm -r terminal-practice</code>.<span class="expect">no output; <code>ls</code> no longer lists <code>terminal-practice</code>.</span></li>
+</ol>
+<p><b>Troubleshooting:</b> <code>command not found</code> → check spelling and case (<code>ls</code>, not <code>LS</code>). <code>No such file or directory</code> → run <code>pwd</code> and <code>ls</code>: you're probably in a different folder from the one you think. A <code>&gt;</code> or <code>dquote&gt;</code> prompt appeared → you left a quote open; press <kbd>Ctrl</kbd>+<kbd>C</kbd> and retype. Stuck in a full-screen view → <kbd>q</kbd> (less, man), <kbd>Ctrl</kbd>+<kbd>X</kbd> (nano), <kbd>Ctrl</kbd>+<kbd>C</kbd> (anything running). Step 7 prints <code>seq: command not found</code> → you're in a minimal shell; in PowerShell use <code>1..40 | ForEach-Object { "2026-11-09 10:00 INFO request $_ ok" } | Add-Content logs\app.log</code>.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"<code>rm</code> sends files to the Bin."</dt><dd>It deletes permanently. Use <code>-i</code>, use <code>trash</code> on recent Macs, and keep work in Git or backed-up folders.</dd>
+<dt>"<code>cp</code> and <code>mv</code> warn me before overwriting."</dt><dd>By default they replace the destination silently. Add <code>-i</code> to be asked.</dd>
+<dt>"<code>clear</code> undoes what I did."</dt><dd>It only tidies the screen. Files you changed stay changed.</dd>
+<dt>"If <code>--help</code> fails, the command is broken."</dt><dd>Many macOS commands simply don't support long options. Read the <code>usage:</code> line they print, or use <code>man</code>.</dd>
+<dt>"I need to memorise every option."</dt><dd>Nobody does. Learn the pattern (command, options, arguments) and look up the rest in <code>man</code>, <code>--help</code> or by asking Claude, then verify.</dd>
+</dl></div>
+
+<h3 id="ch54-r"><span class="num">54.12</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Every command is <em>name, options, arguments</em>. Short options combine (<code>-la</code>); some take values (<code>-n 5</code>); brackets in help mean optional.</li>
+<li><code>pwd</code>, <code>ls</code> and <code>cd</code> tell you where you are, what's there and let you move. <code>ls -l</code> shows type, permissions, owner, size, date and name.</li>
+<li><code>mkdir -p</code>, <code>touch</code>, <code>cp</code> (<code>-r</code> for folders), <code>mv</code> (move and rename) organise files; source comes first, destination last.</li>
+<li><code>rm</code> is permanent. Use <code>-i</code>, check <code>pwd</code> and the path, preview patterns with <code>ls</code>, and treat <code>rm -rf</code> with great care.</li>
+<li><code>cat</code> for short files, <code>head</code>/<code>tail</code> for ends, <code>tail -f</code> for live logs, <code>less</code> for long files (<kbd>q</kbd> to quit).</li>
+<li><code>man</code> and <code>--help</code> teach you any command; on a Mac many basic commands only support <code>man</code> and a usage line.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">In <code>head -n 20 logs/app.log</code>, what is <code>20</code>?</p><div class="opts"><button>An argument naming a file</button><button data-ok>The value for the <code>-n</code> option (how many lines)</button><button>A second command</button></div><p class="why" hidden><code>-n</code> takes a value straight after it. <code>logs/app.log</code> is the argument.</p></div>
+<div class="qz"><p class="q">You run <code>cp reports archive</code> and get "reports is a directory (not copied)". What do you add?</p><div class="opts"><button><code>-i</code></button><button data-ok><code>-r</code> (or <code>-R</code>)</button><button><code>-f</code></button></div><p class="why" hidden>Copying a folder and its contents needs the recursive option.</p></div>
+<div class="qz"><p class="q">Which command renames <code>draft.md</code> to <code>test-plan.md</code>?</p><div class="opts"><button><code>rename draft.md test-plan.md</code></button><button><code>cp -r draft.md test-plan.md</code></button><button data-ok><code>mv draft.md test-plan.md</code></button></div><p class="why" hidden>Renaming is moving to a new name. <code>cp</code> would leave the original behind.</p></div>
+<div class="qz"><p class="q">Claude Code asks to run <code>rm -rf test-results</code>. Which statement is true?</p><div class="opts"><button>The files go to the Trash and can be restored</button><button data-ok>It deletes the test-results folder and everything inside, permanently and without asking</button><button>It only deletes empty folders</button></div><p class="why" hidden><code>-r</code> is recursive and <code>-f</code> suppresses questions. Check the path and your working directory before approving.</p></div>
+<div class="qz"><p class="q">You want to watch a server log while a test runs. Which command?</p><div class="opts"><button><code>cat app.log</code></button><button><code>head -f app.log</code></button><button data-ok><code>tail -f app.log</code></button></div><p class="why" hidden><code>tail -f</code> keeps printing new lines as they're written; stop it with Ctrl+C.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Take a real test run from your team: a folder of Playwright, JUnit or Allure results, or a log from your test environment (a copy, not the original). Using only commands from this chapter: list the folder sorted with the newest last, find the largest file with <code>ls -lh</code>, show the last 30 lines of the main log, page through it in <code>less</code> and search for <code>ERROR</code> or <code>FAIL</code>, and copy the most important file into a new <code>evidence</code> folder. Write down each command you used and one line on what it showed. If you have no test output at work, use your practice log from the lab.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Every terminal command has the same shape: the command, then options with dashes that change how it works, then what to work on. pwd says where you are, ls lists what's there, cd moves you. mkdir makes folders, cp copies, mv moves or renames, and rm deletes for good, so add -i and read it twice. cat prints a file, head and tail show the start and end, tail -f follows a live log, and less pages through big files; q gets you out. When you don't know an option, man shows the manual."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>macOS manual pages on the test machine: <code>man ls</code>, <code>man cp</code>, <code>man mv</code>, <code>man rm</code>, <code>man mkdir</code>, <code>man head</code>, <code>man tail</code>, <code>man less</code>, <code>man open</code>, <code>man trash</code>, <code>man pico</code>.</li>
+<li>GNU, <a href="https://www.gnu.org/software/coreutils/manual/coreutils.html" target="_blank" rel="noopener">GNU Coreutils manual</a> (the Linux versions of <code>ls</code>, <code>cp</code>, <code>mv</code>, <code>rm</code>, <code>head</code>, <code>tail</code>).</li>
+<li>GNU, <a href="https://www.nano-editor.org/docs.php" target="_blank" rel="noopener">GNU nano documentation</a>.</li>
+<li>Zsh, <a href="https://zsh.sourceforge.io/Doc/Release/Shell-Builtin-Commands.html" target="_blank" rel="noopener">Shell builtin commands</a> (<code>history</code> and <code>fc</code>).</li>
+<li>Apple, <a href="https://support.apple.com/guide/terminal/welcome/mac" target="_blank" rel="noopener">Terminal User Guide for Mac</a>.</li>
+<li>Microsoft, <a href="https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/get-childitem" target="_blank" rel="noopener">Get-ChildItem</a>, <a href="https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/get-content" target="_blank" rel="noopener">Get-Content</a> and <a href="https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_aliases" target="_blank" rel="noopener">about_Aliases</a>.</li>
+</ol>
+<p class="verified">Verified 9 November 2026: every command and output run on macOS 26.6.2 with zsh 5.9 (user name changed; log content illustrative); Linux and PowerShell notes from GNU and Microsoft documentation.</p></div>

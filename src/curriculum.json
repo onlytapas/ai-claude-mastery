@@ -1,0 +1,1244 @@
+{
+ "title": "AI & Claude Mastery",
+ "verified": "2026-11-09",
+ "parts": [
+  {
+   "id": "p1",
+   "num": "I",
+   "title": "The Story of AI",
+   "sub": "From the first computers to ChatGPT and Claude",
+   "level": "Beginner",
+   "intro": "Where AI came from, why it failed several times, and what finally made today's AI possible. No technical knowledge needed.",
+   "chapters": [
+    [
+     "ch1",
+     "What is intelligence, and what makes it artificial?",
+     "beginner",
+     25,
+     15
+    ],
+    [
+     "ch2",
+     "Before AI: a short history of computing",
+     "beginner",
+     30,
+     15
+    ],
+    [
+     "ch3",
+     "The birth of AI: Turing, Dartmouth and the first thinking machines",
+     "beginner",
+     30,
+     15
+    ],
+    [
+     "ch4",
+     "Expert systems and the AI winters",
+     "beginner",
+     25,
+     15
+    ],
+    [
+     "ch5",
+     "The rise of machine learning and deep learning",
+     "beginner",
+     30,
+     20
+    ],
+    [
+     "ch6",
+     "Teaching computers language: from ELIZA to the Transformer",
+     "beginner",
+     35,
+     20
+    ],
+    [
+     "ch7",
+     "The generative AI explosion: GPT, ChatGPT, Claude and Gemini",
+     "beginner",
+     35,
+     25
+    ],
+    [
+     "ch8",
+     "Where AI is today and where it may be going",
+     "beginner",
+     25,
+     20
+    ]
+   ],
+   "outcome": "understand"
+  },
+  {
+   "id": "p2",
+   "num": "II",
+   "title": "How AI Actually Works",
+   "sub": "The machinery inside, explained step by step",
+   "level": "Beginner → Advanced",
+   "intro": "How neural networks learn, how language models read and write, and why they sometimes get things wrong. Every chapter starts simple; the deeper material is in optional \"Under the hood\" sections.",
+   "chapters": [
+    [
+     "ch9",
+     "The map: AI, machine learning and deep learning",
+     "beginner",
+     25,
+     15
+    ],
+    [
+     "ch10",
+     "Three ways machines learn: supervised, unsupervised and reinforcement",
+     "beginner",
+     30,
+     20
+    ],
+    [
+     "ch11",
+     "Neural networks: neurons, weights and layers",
+     "intermediate",
+     40,
+     25
+    ],
+    [
+     "ch12",
+     "How a network learns: loss, gradient descent and backpropagation",
+     "intermediate",
+     40,
+     25
+    ],
+    [
+     "ch13",
+     "Data: the fuel of AI",
+     "beginner",
+     30,
+     20
+    ],
+    [
+     "ch14",
+     "Tokens and tokenisation",
+     "beginner",
+     30,
+     20
+    ],
+    [
+     "ch15",
+     "Embeddings: turning meaning into numbers",
+     "intermediate",
+     35,
+     20
+    ],
+    [
+     "ch16",
+     "The Transformer, step by step",
+     "advanced",
+     55,
+     30
+    ],
+    [
+     "ch17",
+     "Pre-training: how a language model learns from the internet",
+     "intermediate",
+     40,
+     20
+    ],
+    [
+     "ch18",
+     "Post-training: fine-tuning, RLHF and Constitutional AI",
+     "intermediate",
+     40,
+     20
+    ],
+    [
+     "ch19",
+     "Reasoning models and thinking time",
+     "intermediate",
+     35,
+     20
+    ],
+    [
+     "ch20",
+     "Context windows and memory",
+     "beginner",
+     30,
+     20
+    ],
+    [
+     "ch21",
+     "Multimodal AI: images, audio and video",
+     "intermediate",
+     30,
+     20
+    ],
+    [
+     "ch22",
+     "Why AI makes things up: hallucinations",
+     "beginner",
+     30,
+     25
+    ],
+    [
+     "ch23",
+     "Retrieval, RAG and vector databases",
+     "intermediate",
+     40,
+     30
+    ],
+    [
+     "ch24",
+     "Measuring AI: evaluations and benchmarks",
+     "intermediate",
+     35,
+     25
+    ],
+    [
+     "ch25",
+     "Serving AI: chips, data centres and the cost of an answer",
+     "intermediate",
+     35,
+     15
+    ]
+   ],
+   "outcome": "understand"
+  },
+  {
+   "id": "p3",
+   "num": "III",
+   "title": "The AI Industry",
+   "sub": "Who builds AI, and how they compete",
+   "level": "Intermediate",
+   "intro": "The companies behind modern AI: what they build, how they make money, and how the pieces of the industry fit together.",
+   "chapters": [
+    [
+     "ch26",
+     "How the AI industry fits together",
+     "beginner",
+     30,
+     15
+    ],
+    [
+     "ch27",
+     "OpenAI",
+     "intermediate",
+     30,
+     15
+    ],
+    [
+     "ch28",
+     "Google DeepMind and Microsoft",
+     "intermediate",
+     35,
+     15
+    ],
+    [
+     "ch29",
+     "Meta, NVIDIA and Amazon",
+     "intermediate",
+     35,
+     15
+    ],
+    [
+     "ch30",
+     "xAI, DeepSeek, Mistral, Qwen and the wider field",
+     "intermediate",
+     35,
+     15
+    ]
+   ],
+   "outcome": "understand"
+  },
+  {
+   "id": "p4",
+   "num": "IV",
+   "title": "Understanding and Comparing Models",
+   "sub": "Choosing the right AI for the job",
+   "level": "Intermediate",
+   "intro": "Why there are so many models, how to read claims about them, and how to pick one for a real task.",
+   "chapters": [
+    [
+     "ch31",
+     "Why there are so many models",
+     "beginner",
+     30,
+     15
+    ],
+    [
+     "ch32",
+     "Open-weight versus proprietary models",
+     "intermediate",
+     30,
+     15
+    ],
+    [
+     "ch33",
+     "Reading model cards and benchmarks critically",
+     "intermediate",
+     35,
+     25
+    ],
+    [
+     "ch34",
+     "The major model families compared",
+     "intermediate",
+     40,
+     25
+    ],
+    [
+     "ch35",
+     "Choosing a model: real scenarios",
+     "intermediate",
+     30,
+     30
+    ],
+    [
+     "ch36",
+     "Testing and comparing models yourself: a repeatable framework",
+     "intermediate",
+     40,
+     60
+    ]
+   ],
+   "outcome": "understand"
+  },
+  {
+   "id": "p5",
+   "num": "V",
+   "title": "Anthropic and the Claude Ecosystem",
+   "sub": "The company, its research and its products",
+   "level": "Beginner → Intermediate",
+   "intro": "Anthropic's story and safety approach, every Claude generation, and how the model, the apps, Claude Code and the API relate to each other.",
+   "chapters": [
+    [
+     "ch37",
+     "Anthropic: history, people and mission",
+     "beginner",
+     30,
+     15
+    ],
+    [
+     "ch38",
+     "Safety research: Constitutional AI, scaling policy and interpretability",
+     "intermediate",
+     40,
+     20
+    ],
+    [
+     "ch39",
+     "Claude through the generations",
+     "beginner",
+     30,
+     15
+    ],
+    [
+     "ch40",
+     "The Claude models today and how to choose",
+     "beginner",
+     30,
+     20
+    ],
+    [
+     "ch41",
+     "Model, app, Claude Code, API: how the pieces fit",
+     "beginner",
+     30,
+     20
+    ],
+    [
+     "ch42",
+     "Claude for organisations: plans, administration and security",
+     "intermediate",
+     30,
+     15
+    ]
+   ],
+   "outcome": "understand"
+  },
+  {
+   "id": "p6",
+   "num": "VI",
+   "title": "Mastering the Claude Apps",
+   "sub": "Web, desktop, mobile and beyond",
+   "level": "Beginner",
+   "intro": "Every important feature of Claude's apps: where it is, how to use it, when it helps and where it falls short.",
+   "chapters": [
+    [
+     "ch43",
+     "Getting started with Claude",
+     "beginner",
+     25,
+     20
+    ],
+    [
+     "ch44",
+     "Prompting well: the fundamentals",
+     "beginner",
+     40,
+     30
+    ],
+    [
+     "ch45",
+     "Prompting well: advanced techniques",
+     "intermediate",
+     40,
+     30
+    ],
+    [
+     "ch46",
+     "Working with files, images, PDFs and spreadsheets",
+     "beginner",
+     30,
+     25
+    ],
+    [
+     "ch47",
+     "Projects",
+     "beginner",
+     30,
+     30
+    ],
+    [
+     "ch48",
+     "Artifacts",
+     "beginner",
+     30,
+     30
+    ],
+    [
+     "ch49",
+     "Research, web search and connectors",
+     "beginner",
+     30,
+     25
+    ],
+    [
+     "ch50",
+     "Memory, styles and personalisation",
+     "beginner",
+     25,
+     15
+    ],
+    [
+     "ch51",
+     "Desktop, mobile, browser and other apps",
+     "beginner",
+     30,
+     20
+    ]
+   ],
+   "outcome": "use"
+  },
+  {
+   "id": "p7",
+   "num": "VII",
+   "title": "The Terminal from Zero",
+   "sub": "Command lines for people who have never used one",
+   "level": "Beginner → Intermediate",
+   "intro": "Everything you need to read and understand what Claude Code does on your computer. Assumes no prior experience.",
+   "chapters": [
+    [
+     "ch52",
+     "Operating systems, terminals and shells",
+     "beginner",
+     30,
+     20
+    ],
+    [
+     "ch53",
+     "Files, folders and paths",
+     "beginner",
+     30,
+     25
+    ],
+    [
+     "ch54",
+     "Your first commands",
+     "beginner",
+     40,
+     40
+    ],
+    [
+     "ch55",
+     "Searching, pipes and redirection",
+     "intermediate",
+     40,
+     35
+    ],
+    [
+     "ch56",
+     "Environment variables, processes and permissions",
+     "intermediate",
+     40,
+     30
+    ],
+    [
+     "ch57",
+     "Shell scripting basics",
+     "intermediate",
+     40,
+     40
+    ],
+    [
+     "ch58",
+     "Package managers, Node.js and Python",
+     "intermediate",
+     35,
+     30
+    ],
+    [
+     "ch59",
+     "Python fundamentals for AI work",
+     "beginner",
+     50,
+     60
+    ],
+    [
+     "ch60",
+     "Python for APIs: HTTP requests, JSON, errors and async",
+     "intermediate",
+     45,
+     60
+    ],
+    [
+     "ch61",
+     "Git and GitHub from zero",
+     "beginner",
+     50,
+     45
+    ],
+    [
+     "ch62",
+     "Reading errors and fixing problems",
+     "intermediate",
+     30,
+     30
+    ]
+   ],
+   "outcome": "use"
+  },
+  {
+   "id": "p8",
+   "num": "VIII",
+   "title": "Claude Code Mastery",
+   "sub": "From installation to professional use",
+   "level": "Intermediate",
+   "intro": "Claude Code in depth: how it works inside, how to drive it, and how to use it on real projects.",
+   "chapters": [
+    [
+     "ch63",
+     "What Claude Code is",
+     "beginner",
+     25,
+     15
+    ],
+    [
+     "ch64",
+     "Installing and signing in",
+     "beginner",
+     30,
+     30
+    ],
+    [
+     "ch65",
+     "Your first session",
+     "beginner",
+     35,
+     40
+    ],
+    [
+     "ch66",
+     "Inside Claude Code: the life of a task",
+     "intermediate",
+     40,
+     20
+    ],
+    [
+     "ch67",
+     "Planning, permission modes and checkpoints",
+     "intermediate",
+     40,
+     35
+    ],
+    [
+     "ch68",
+     "Context, models, effort and sessions",
+     "intermediate",
+     40,
+     30
+    ],
+    [
+     "ch69",
+     "Background sessions, worktrees and parallel work",
+     "advanced",
+     35,
+     30
+    ],
+    [
+     "ch70",
+     "Claude Code in VS Code, JetBrains, desktop and the web",
+     "intermediate",
+     30,
+     25
+    ],
+    [
+     "ch71",
+     "Git and GitHub workflows with Claude Code",
+     "intermediate",
+     35,
+     35
+    ],
+    [
+     "ch72",
+     "Troubleshooting Claude Code",
+     "intermediate",
+     30,
+     25
+    ]
+   ],
+   "outcome": "use"
+  },
+  {
+   "id": "p9",
+   "num": "IX",
+   "title": "The Command Reference",
+   "sub": "Every command, flag and shortcut, verified",
+   "level": "Reference",
+   "intro": "A searchable, verified reference for Claude Code's slash commands, CLI, flags, environment variables and keyboard shortcuts.",
+   "chapters": [
+    [
+     "ch73",
+     "Five kinds of command: knowing which is which",
+     "beginner",
+     25,
+     15
+    ],
+    [
+     "ch74",
+     "Slash command encyclopedia",
+     "reference",
+     60,
+     30
+    ],
+    [
+     "ch75",
+     "CLI reference: commands, flags and environment variables",
+     "reference",
+     50,
+     30
+    ],
+    [
+     "ch76",
+     "Keyboard shortcuts and input symbols",
+     "reference",
+     25,
+     20
+    ]
+   ],
+   "outcome": "use"
+  },
+  {
+   "id": "p10",
+   "num": "X",
+   "title": "Configuring and Extending Claude Code",
+   "sub": "Make Claude work the way your team works",
+   "level": "Advanced",
+   "intro": "Memory, settings, permissions, sandboxing, skills, subagents, hooks, MCP and plugins: what each is for and how to set it up.",
+   "chapters": [
+    [
+     "ch77",
+     "CLAUDE.md and memory",
+     "intermediate",
+     35,
+     35
+    ],
+    [
+     "ch78",
+     "Settings and permissions",
+     "advanced",
+     40,
+     35
+    ],
+    [
+     "ch79",
+     "Sandboxing",
+     "advanced",
+     30,
+     20
+    ],
+    [
+     "ch80",
+     "Skills and custom commands",
+     "advanced",
+     40,
+     40
+    ],
+    [
+     "ch81",
+     "Subagents",
+     "advanced",
+     35,
+     35
+    ],
+    [
+     "ch82",
+     "Hooks",
+     "advanced",
+     40,
+     35
+    ],
+    [
+     "ch83",
+     "MCP in Claude Code",
+     "advanced",
+     40,
+     40
+    ],
+    [
+     "ch84",
+     "Plugins, team setup and choosing the right tool",
+     "advanced",
+     40,
+     30
+    ]
+   ],
+   "outcome": "use"
+  },
+  {
+   "id": "p11",
+   "num": "XI",
+   "title": "Building with AI APIs",
+   "sub": "Putting AI inside real software",
+   "level": "Intermediate → Advanced",
+   "intro": "How programs talk to AI models, from your first API call to a working application.",
+   "chapters": [
+    [
+     "ch85",
+     "APIs, HTTP and JSON for beginners",
+     "beginner",
+     40,
+     30
+    ],
+    [
+     "ch86",
+     "Your first Claude API call",
+     "intermediate",
+     40,
+     40
+    ],
+    [
+     "ch87",
+     "Conversations, system prompts and streaming",
+     "intermediate",
+     35,
+     30
+    ],
+    [
+     "ch88",
+     "Context engineering for AI applications",
+     "advanced",
+     45,
+     40
+    ],
+    [
+     "ch89",
+     "Tool use and structured outputs",
+     "advanced",
+     45,
+     40
+    ],
+    [
+     "ch90",
+     "Caching, rate limits, errors and cost",
+     "advanced",
+     35,
+     25
+    ],
+    [
+     "ch91",
+     "The OpenAI and Gemini APIs compared",
+     "intermediate",
+     30,
+     25
+    ],
+    [
+     "ch92",
+     "Production RAG: ingestion, chunking, search and evaluation",
+     "advanced",
+     55,
+     60
+    ],
+    [
+     "ch93",
+     "Project: build a RAG assistant",
+     "advanced",
+     50,
+     90
+    ],
+    [
+     "ch94",
+     "Project: build a QA helper app",
+     "advanced",
+     45,
+     90
+    ],
+    [
+     "ch95",
+     "LLMOps: monitoring, versioning and incidents",
+     "advanced",
+     40,
+     30
+    ],
+    [
+     "ch96",
+     "From prototype to production: deploying an AI application",
+     "advanced",
+     50,
+     90
+    ]
+   ],
+   "outcome": "build"
+  },
+  {
+   "id": "p12",
+   "num": "XII",
+   "title": "MCP, Tokens and Connected Automation",
+   "sub": "Connecting AI to Jira, Playwright, GitHub, databases and your own tools",
+   "level": "Intermediate → Advanced",
+   "intro": "How AI connects to the tools a QA team uses every day: what MCP is, how it works inside, the two meanings of \"token\", API keys and secrets, step-by-step connections to Jira, Confluence, Playwright, GitHub and databases, building your own server, and keeping it all secure.",
+   "chapters": [
+    [
+     "ch97",
+     "What MCP is and why QA teams need it",
+     "intermediate",
+     35,
+     25
+    ],
+    [
+     "ch98",
+     "Keys, tokens and secrets: how AI tools sign in",
+     "intermediate",
+     40,
+     30
+    ],
+    [
+     "ch99",
+     "How MCP works inside",
+     "advanced",
+     45,
+     25
+    ],
+    [
+     "ch100",
+     "MCP across Claude: Claude Code, connectors and the desktop app",
+     "intermediate",
+     35,
+     35
+    ],
+    [
+     "ch101",
+     "Connecting Jira and Confluence",
+     "intermediate",
+     40,
+     45
+    ],
+    [
+     "ch102",
+     "Connecting Playwright for browser testing",
+     "intermediate",
+     45,
+     60
+    ],
+    [
+     "ch103",
+     "GitHub, databases and other servers for QA",
+     "intermediate",
+     40,
+     45
+    ],
+    [
+     "ch104",
+     "Build your own MCP server",
+     "advanced",
+     50,
+     90
+    ],
+    [
+     "ch105",
+     "Securing and troubleshooting MCP",
+     "advanced",
+     40,
+     35
+    ],
+    [
+     "ch106",
+     "Project: an end-to-end QA workflow with MCP",
+     "advanced",
+     40,
+     120
+    ]
+   ],
+   "outcome": "build"
+  },
+  {
+   "id": "p13",
+   "num": "XIII",
+   "title": "Agentic AI",
+   "sub": "AI that plans, acts and checks its work",
+   "level": "Advanced",
+   "intro": "What agents are, how they're designed, and how to build and supervise them safely.",
+   "chapters": [
+    [
+     "ch107",
+     "What makes an agent",
+     "intermediate",
+     30,
+     20
+    ],
+    [
+     "ch108",
+     "Agent design patterns",
+     "advanced",
+     40,
+     25
+    ],
+    [
+     "ch109",
+     "Production agents: state, retries, approvals, observability and cost",
+     "advanced",
+     45,
+     45
+    ],
+    [
+     "ch110",
+     "Building agents with the Claude Agent SDK",
+     "advanced",
+     45,
+     60
+    ],
+    [
+     "ch111",
+     "Multi-agent systems",
+     "advanced",
+     35,
+     30
+    ],
+    [
+     "ch112",
+     "Browser automation and computer use",
+     "advanced",
+     35,
+     40
+    ],
+    [
+     "ch113",
+     "Supervising agents: oversight, evaluation and safety",
+     "advanced",
+     35,
+     25
+    ]
+   ],
+   "outcome": "build"
+  },
+  {
+   "id": "p14",
+   "num": "XIV",
+   "title": "AI at Work: Software and Business",
+   "sub": "AI across the software lifecycle and everyday business work",
+   "level": "Intermediate → Advanced",
+   "intro": "How AI changes software development and business work outside testing: the development lifecycle, debugging and code review, and analysis, reporting, documents and research.",
+   "chapters": [
+    [
+     "ch114",
+     "AI across the software lifecycle",
+     "intermediate",
+     30,
+     20
+    ],
+    [
+     "ch115",
+     "Debugging, root-cause analysis and code review",
+     "intermediate",
+     40,
+     40
+    ],
+    [
+     "ch116",
+     "AI for business: analysis, reporting, documents and research",
+     "beginner",
+     35,
+     30
+    ],
+    [
+     "ch117",
+     "Enterprise AI adoption: vendors, architecture and build versus buy",
+     "intermediate",
+     40,
+     25
+    ]
+   ],
+   "outcome": "use"
+  },
+  {
+   "id": "p15",
+   "num": "XV",
+   "title": "AI-Powered QA",
+   "sub": "Taking quality engineering to the next level",
+   "level": "Intermediate → Advanced",
+   "intro": "Where everything earlier in the book turns into action for QA engineers: how the role changes, a large catalogue of ideas, AI across test design, automation, data, exploratory and non-functional testing, testing AI itself, how to measure the value, building your own QA tools, and a roadmap for doing more with the same team.",
+   "chapters": [
+    [
+     "ch118",
+     "The AI-powered QA engineer",
+     "beginner",
+     30,
+     20
+    ],
+    [
+     "ch119",
+     "Brainstorm: ways AI can take QA to the next level",
+     "intermediate",
+     45,
+     45
+    ],
+    [
+     "ch120",
+     "Requirements and test design with AI",
+     "intermediate",
+     40,
+     45
+    ],
+    [
+     "ch121",
+     "Test automation with Claude Code",
+     "intermediate",
+     45,
+     60
+    ],
+    [
+     "ch122",
+     "Test data, environments and flaky tests",
+     "intermediate",
+     40,
+     45
+    ],
+    [
+     "ch123",
+     "Visual, performance and accessibility testing",
+     "advanced",
+     35,
+     40
+    ],
+    [
+     "ch124",
+     "Exploratory testing and bug hunting with AI",
+     "intermediate",
+     40,
+     45
+    ],
+    [
+     "ch125",
+     "Testing AI applications: evals",
+     "advanced",
+     45,
+     60
+    ],
+    [
+     "ch126",
+     "Measuring the value: effort saved, coverage gained and ROI",
+     "intermediate",
+     40,
+     40
+    ],
+    [
+     "ch127",
+     "Building your own QA tools with Claude",
+     "advanced",
+     45,
+     90
+    ],
+    [
+     "ch128",
+     "Doing more with the same team: a QA adoption roadmap",
+     "intermediate",
+     40,
+     30
+    ],
+    [
+     "ch129",
+     "Before and after: QA work transformed",
+     "beginner",
+     35,
+     30
+    ]
+   ],
+   "outcome": "use"
+  },
+  {
+   "id": "p16",
+   "num": "XVI",
+   "title": "Security, Privacy and Governance",
+   "sub": "Using AI responsibly",
+   "level": "Intermediate → Advanced",
+   "intro": "The risks that come with AI, and the habits, controls and policies that manage them.",
+   "chapters": [
+    [
+     "ch130",
+     "The AI threat landscape",
+     "intermediate",
+     35,
+     20
+    ],
+    [
+     "ch131",
+     "Prompt injection and jailbreaks",
+     "advanced",
+     40,
+     40
+    ],
+    [
+     "ch132",
+     "Privacy, data and compliance",
+     "intermediate",
+     35,
+     20
+    ],
+    [
+     "ch133",
+     "AI law and standards: EU AI Act, GDPR, India's DPDP, NIST and ISO 42001",
+     "intermediate",
+     45,
+     25
+    ],
+    [
+     "ch134",
+     "Securing agents, tools and plugins",
+     "advanced",
+     35,
+     30
+    ],
+    [
+     "ch135",
+     "Responsible AI and governance",
+     "intermediate",
+     30,
+     20
+    ]
+   ],
+   "outcome": "understand"
+  },
+  {
+   "id": "p17",
+   "num": "XVII",
+   "title": "Advanced AI Engineering",
+   "sub": "How models are built, run and improved",
+   "level": "Expert",
+   "intro": "For readers who want to understand the engineering behind the industry: training, fine-tuning, local models and infrastructure.",
+   "chapters": [
+    [
+     "ch136",
+     "Fine-tuning and custom models",
+     "expert",
+     40,
+     30
+    ],
+    [
+     "ch137",
+     "Running models on your own computer",
+     "advanced",
+     35,
+     45
+    ],
+    [
+     "ch138",
+     "Training at scale: GPUs, clusters and scaling laws",
+     "expert",
+     40,
+     15
+    ],
+    [
+     "ch139",
+     "Deploying and optimising models",
+     "expert",
+     35,
+     20
+    ],
+    [
+     "ch140",
+     "Research frontiers and the future of AI",
+     "advanced",
+     30,
+     15
+    ]
+   ],
+   "outcome": "understand"
+  },
+  {
+   "id": "p18",
+   "num": "XVIII",
+   "title": "Practice and Projects",
+   "sub": "Exams, projects, interview practice and teaching",
+   "level": "All levels",
+   "intro": "Put what you've read into practice: self-check exams, graded projects including the AI QA assistant capstone, interview practice, and how to teach the material to others.",
+   "chapters": [
+    [
+     "ch141",
+     "Examinations",
+     "all",
+     30,
+     120
+    ],
+    [
+     "ch142",
+     "Projects and capstones",
+     "all",
+     30,
+     600
+    ],
+    [
+     "ch143",
+     "Capstone: build an AI QA assistant end to end",
+     "advanced",
+     40,
+     900
+    ],
+    [
+     "ch144",
+     "Interview preparation",
+     "all",
+     40,
+     60
+    ],
+    [
+     "ch145",
+     "Teaching others",
+     "all",
+     30,
+     45
+    ]
+   ],
+   "outcome": "build"
+  }
+ ],
+ "optional": [
+  "ch74",
+  "ch75",
+  "ch76",
+  "ch103",
+  "ch136",
+  "ch138",
+  "ch139",
+  "ch144"
+ ],
+ "outcomeOverride": {
+  "ch99": "understand",
+  "ch104": "build",
+  "ch106": "build",
+  "ch127": "build",
+  "ch93": "build",
+  "ch94": "build",
+  "ch96": "build"
+ },
+ "author": {
+  "name": "Tapas Saha",
+  "year": "2026",
+  "github": "https://github.com/onlytapas",
+  "site": "https://onlytapas.github.io/"
+ }
+}

@@ -1,0 +1,626 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What LLMOps is, and why AI features need operating differently from ordinary software</li>
+<li>What to log for every AI call, what never to log, and how the OpenTelemetry GenAI conventions name it</li>
+<li>How to version prompts and pin models so every answer can be traced to the exact prompt and model that produced it</li>
+<li>How to add an evaluation gate to CI that blocks a prompt or model change that makes quality worse</li>
+<li>How to monitor quality drift and cost, and how to handle Anthropic's model deprecation schedule</li>
+<li>How to run an incident for an AI feature, with a runbook template you can copy</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch86">Chapter 86</a> (API calls, stop reasons, error codes) and <a href="#ch125">Chapter 125</a> (evals). <a href="#ch90">Chapter 90</a> covers rate limits, retries and cost in detail; <a href="#ch93">Chapters 93</a> and <a href="#ch94">94</a> give you AI features worth operating. Agent-specific observability is in <a href="#ch109">Chapter 109</a>.</div>
+
+<div class="bigidea"><p>Shipping an AI feature is the start, not the end. Unlike ordinary code, an AI feature can get worse without anyone changing a line: users ask new kinds of questions, documents change, or the model you depend on is retired. <strong>LLMOps</strong> is the set of habits that keeps such features healthy: log every call with its prompt version, model, tokens, cost and outcome; keep prompts in version control; let an evaluation gate in CI block changes that lower quality; watch quality and cost signals in production; plan model migrations before retirement dates; and have a runbook ready for when something goes wrong. None of it needs expensive tools to start. This chapter builds a working version in about 270 lines of Python.</p></div>
+
+<h3 id="ch95-1"><span class="num">95.1</span>Why AI features need their own operations</h3>
+<p><a class="gl" href="#g-llmops">LLMOps</a> (large language model operations) applies the ideas of DevOps (automation, monitoring, fast and safe change) to features built on language models. The ideas are familiar to any tester; what changes is <em>what can go wrong</em>.</p>
+<div class="tbl"><table>
+<tr><th></th><th>Ordinary software</th><th>AI feature</th></tr>
+<tr><td>Same input, same output?</td><td>Yes, so a passing test stays passing</td><td>Not guaranteed; answers vary in wording and sometimes in substance</td></tr>
+<tr><td>How it fails</td><td>Errors, crashes, wrong values: usually loud</td><td>Fluent, confident, wrong answers: often silent</td></tr>
+<tr><td>What "a change" means</td><td>A code commit</td><td>A code commit, a prompt edit, a model switch, new documents in the index, or different user behaviour</td></tr>
+<tr><td>Dependencies retire?</td><td>Libraries age slowly</td><td>Models are deprecated and retired on a published schedule</td></tr>
+<tr><td>Cost per request</td><td>Roughly fixed</td><td>Varies with input and output tokens, including thinking</td></tr>
+<tr><td>Main quality tool</td><td>Tests with exact expected results</td><td>Tests <em>plus</em> evals that score samples against a bar</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Running an AI feature is less like maintaining a vending machine and more like managing a capable new colleague. The vending machine either works or jams. The colleague works well most days, but you still review their work, notice if they start cutting corners, keep a record of what was asked and answered, and plan for the day they move to another team.</p></div>
+<div class="flow">
+<div><b>Build</b>Prompt and code in git, with versions</div>
+<div class="hl"><b>Gate</b>Tests and evals in CI block regressions</div>
+<div><b>Release</b>Pinned model, feature flag, small rollout</div>
+<div><b>Observe</b>Logs and traces: tokens, cost, latency, stop reasons</div>
+<div><b>Monitor</b>Quality samples, drift, budgets, deprecations</div>
+<div><b>Respond</b>Runbook, kill switch, fix, new eval case</div>
+</div>
+
+<h3 id="ch95-2"><span class="num">95.2</span>Logging and tracing AI calls</h3>
+<p>Every call to the model should leave one structured record. "Structured" means fields with names, as JSON, so you can filter and count, rather than free-text log lines.</p>
+<div class="tbl"><table>
+<tr><th>Log this</th><th>Why</th></tr>
+<tr><td>Timestamp, feature name, a trace ID</td><td>To find the call and connect it to the user action that caused it</td></tr>
+<tr><td>Prompt name and version (or a hash of the prompt text)</td><td>To know exactly which instructions produced an answer</td></tr>
+<tr><td>Requested model and the model in the response</td><td>To confirm what actually ran</td></tr>
+<tr><td>Input and output tokens, and the cost they imply</td><td>Cost per feature, per day; spotting runaway prompts</td></tr>
+<tr><td>Latency in milliseconds</td><td>Users notice slow answers before wrong ones</td></tr>
+<tr><td><code>stop_reason</code></td><td>A rise in <code>max_tokens</code> or <code>refusal</code> is an early warning</td></tr>
+<tr><td>Status and error type</td><td>Error rates by type: 429 rate limits, 529 overloaded, 401 keys</td></tr>
+<tr><td>Anthropic's request ID</td><td>Support needs it to investigate a specific call (<a href="#ch86">Chapter 86</a>)</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">What never to log</span><p>API keys or any part of an <code>Authorization</code> header. Personal data such as customer names, emails and account numbers, unless your privacy team has approved where logs go and how long they're kept. Full prompts and answers are very useful for debugging, but they often contain exactly that data. A common pattern is: metadata for every call, full content for a small sample, kept in a restricted store with short retention (<a href="#ch132">Chapter 132</a>).</p></div>
+
+<h4>A shared vocabulary: the OpenTelemetry GenAI conventions</h4>
+<p><a class="gl" href="#g-opentelemetry">OpenTelemetry</a> (OTel) is an open standard, run by the Cloud Native Computing Foundation, for collecting traces, metrics and logs from software. A <em>trace</em> follows one request through a system; each step inside it is a <a class="gl" href="#g-span">span</a>, with a start time, a duration and named attributes. OTel's <strong>GenAI semantic conventions</strong> define standard attribute names for AI calls, so any OTel-compatible tool can understand them. They are still marked <em>Development</em> (not yet stable), so names can change. <span class="vchip">Verified 9 Nov 2026</span></p>
+<div class="tbl"><table>
+<tr><th>Attribute</th><th>Meaning</th><th>Example</th></tr>
+<tr><td><code>gen_ai.operation.name</code></td><td>Kind of operation (required)</td><td><code>chat</code></td></tr>
+<tr><td><code>gen_ai.provider.name</code></td><td>Who provides the model (required); the Anthropic page says it must be <code>anthropic</code></td><td><code>anthropic</code></td></tr>
+<tr><td><code>gen_ai.request.model</code> / <code>gen_ai.response.model</code></td><td>Model asked for / model that answered</td><td><code>claude-haiku-5-5</code></td></tr>
+<tr><td><code>gen_ai.request.max_tokens</code></td><td>The output cap</td><td><code>50</code></td></tr>
+<tr><td><code>gen_ai.usage.input_tokens</code> / <code>gen_ai.usage.output_tokens</code></td><td>Tokens used</td><td><code>77</code> / <code>3</code></td></tr>
+<tr><td><code>gen_ai.response.finish_reasons</code></td><td>Why generation stopped (a list)</td><td><code>["end_turn"]</code></td></tr>
+<tr><td><code>gen_ai.response.id</code></td><td>The response's ID</td><td><code>msg_...</code></td></tr>
+<tr><td><code>gen_ai.prompt.name</code> / <code>gen_ai.prompt.version</code></td><td>Named prompt template and its version, when you use one</td><td><code>triage</code> / <code>2</code></td></tr>
+</table></div>
+<p>The conventions recommend the span name <code>{operation} {model}</code>, for example <code>chat claude-haiku-5-5</code>.</p>
+<details class="deep"><summary>Under the hood: tracing built into Anthropic's SDKs</summary><div class="body">
+<p>Anthropic's documentation describes OpenTelemetry support in two halves, currently in <strong>beta</strong>. <strong>SDK tracing</strong>: the official SDKs (Python, TypeScript and others) emit spans from your own process, sent by your application's OpenTelemetry exporter, once you register a tracer provider (for Python, install <code>opentelemetry-sdk</code>). <strong>API tracing</strong>: an organisation admin adds a destination (an OTLP/HTTP endpoint) in the Claude Console or through the Admin API, and Anthropic's servers send spans for API requests there, with no code change. Both default to <em>metadata only</em> (IDs, timing, status, token counts); exporting full prompts and responses is a separate content mode you switch on deliberately. Because the feature is in beta and its option names may change, follow the current docs page (sources) rather than copying settings from memory. Both halves need a backend that receives OTLP, such as the open-source Jaeger or a commercial observability service your company already uses.</p>
+</div></details>
+
+<h3 id="ch95-3"><span class="num">95.3</span>Build it: a call logger and a report</h3>
+<p>Before adopting any platform, it helps to see the moving parts in plain code. This small project wraps every Claude call, writes one JSON line per call using the GenAI attribute names, and summarises the log. A fake client lets it run with no API key.</p>
+<div class="code"><span class="cap">Terminal: setup</span><pre>mkdir llmops &amp;&amp; cd llmops &amp;&amp; mkdir prompts eval
+python3 -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install anthropic pytest</pre></div>
+<div class="code"><span class="cap">prompts/triage-v2.txt</span><pre>You are a QA triage assistant. Classify the test failure as one of:
+product-bug, test-bug, environment, flaky. Reply with the label only.</pre></div>
+<div class="code"><span class="cap">tracing.py</span><pre>"""Wrap every Claude call: time it, count tokens and cost, log one JSON line.
+Attribute names follow the OpenTelemetry GenAI semantic conventions (gen_ai.*)."""
+import hashlib
+import json
+import os
+import time
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+
+LOG_FILE = os.environ.get("LLM_LOG", "llm_calls.jsonl")
+# USD per million tokens (input, output). Verified 9 Nov 2026; check the pricing page.
+PRICES = {"claude-opus-5-5": (4.0, 20.0), "claude-sonnet-5-5": (2.0, 10.0),
+          "claude-haiku-5-5": (0.10, 0.50), "claude-fable-5-1": (10.0, 50.0)}
+
+
+def load_prompt(name):
+    """Prompts live in files named &lt;name&gt;-v&lt;N&gt;.txt so every change is a new version."""
+    text = Path("prompts", f"{name}.txt").read_text(encoding="utf-8")
+    return text, hashlib.sha256(text.encode()).hexdigest()[:12]
+
+
+def cost_usd(model, tokens_in, tokens_out):
+    p_in, p_out = PRICES.get(model, (0.0, 0.0))
+    return round((tokens_in * p_in + tokens_out * p_out) / 1_000_000, 6)
+
+
+class FakeClient:
+    """Stands in for anthropic.Anthropic() when there is no API key (--fake)."""
+    class _Usage:
+        def __init__(self, i, o):
+            self.input_tokens, self.output_tokens = i, o
+
+    class _Block:
+        type = "text"
+
+        def __init__(self, text):
+            self.text = text
+
+    class _Msg:
+        def __init__(self, model, text, i, o):
+            self.id, self.model, self.stop_reason = "msg_fake_" + uuid.uuid4().hex[:8], model, "end_turn"
+            self.content, self.usage, self._request_id = [FakeClient._Block(text)], FakeClient._Usage(i, o), "req_fake"
+
+    def __init__(self):
+        self.messages = self
+
+    def create(self, model, max_tokens, system, messages):
+        text = messages[-1]["content"].lower()
+        label = "environment" if "timeout" in text or "502" in text else (
+            "flaky" if "retry" in text else "product-bug")
+        time.sleep(0.05)
+        return FakeClient._Msg(model, label, 60 + len(text) // 4, 3)
+
+
+def traced_call(client, *, feature, prompt_name, user_text, model, max_tokens=1000):
+    system, prompt_hash = load_prompt(prompt_name)
+    record = {
+        "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "trace_id": uuid.uuid4().hex,
+        "feature": feature,
+        "prompt.name": prompt_name,
+        "prompt.sha256": prompt_hash,
+        "gen_ai.operation.name": "chat",
+        "gen_ai.provider.name": "anthropic",
+        "gen_ai.request.model": model,
+        "gen_ai.request.max_tokens": max_tokens,
+    }
+    start = time.perf_counter()
+    try:
+        msg = client.messages.create(model=model, max_tokens=max_tokens, system=system,
+                                     messages=[{"role": "user", "content": user_text}])
+        text = "".join(b.text for b in msg.content if b.type == "text")
+        record.update({
+            "status": "ok",
+            "gen_ai.response.id": msg.id,
+            "gen_ai.response.model": msg.model,
+            "gen_ai.response.finish_reasons": [msg.stop_reason],
+            "gen_ai.usage.input_tokens": msg.usage.input_tokens,
+            "gen_ai.usage.output_tokens": msg.usage.output_tokens,
+            "request_id": getattr(msg, "_request_id", None),
+            "cost_usd": cost_usd(model, msg.usage.input_tokens, msg.usage.output_tokens),
+            "output_preview": text[:80],      # keep previews short; never log secrets or personal data
+        })
+        return text
+    except Exception as e:                    # log the failure, then let the caller handle it
+        record.update({"status": "error", "error.type": type(e).__name__})
+        raise
+    finally:
+        record["latency_ms"] = round((time.perf_counter() - start) * 1000)
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record) + "\n")</pre></div>
+<p>Three design choices worth copying. The record is written in a <code>finally</code> block, so failed calls are logged too, with their error type, before the error continues to the caller. The prompt is loaded from a file and its SHA-256 hash is logged, so even an unnoticed one-word edit shows up as a new hash. And the output preview is cut to 80 characters, enough to eyeball, too short to hold much sensitive data.</p>
+<div class="code"><span class="cap">triage.py</span><pre>"""Usage: python triage.py [--fake]   Classifies sample failures and logs every call."""
+import argparse
+import tracing
+
+FAILURES = [
+    "checkout.spec.ts: expected 'Order placed' but got 'Payment declined'",
+    "login.spec.ts: page.goto timeout 30000ms exceeded",
+    "search.spec.ts: passed on retry 2 after element detached",
+    "api/orders: 502 Bad Gateway from staging",
+    "profile.spec.ts: expected avatar to be visible",
+]
+
+p = argparse.ArgumentParser()
+p.add_argument("--fake", action="store_true", help="no API call; use the fake client")
+p.add_argument("--model", default="claude-haiku-5-5")
+args = p.parse_args()
+
+if args.fake:
+    client = tracing.FakeClient()
+else:
+    import anthropic
+    client = anthropic.Anthropic()
+
+for failure in FAILURES:
+    label = tracing.traced_call(client, feature="failure-triage", prompt_name="triage-v2",
+                                user_text=failure, model=args.model, max_tokens=50)
+    print(f"{label:&lt;12} {failure}")
+print(f"\nLogged {len(FAILURES)} calls to {tracing.LOG_FILE}")</pre></div>
+<div class="code"><span class="cap">report.py</span><pre>"""Usage: python report.py [llm_calls.jsonl]   Summarises the call log for a dashboard or stand-up."""
+import json
+import sys
+from collections import Counter, defaultdict
+
+RETIRING = {"claude-sonnet-4-5-20250929": "2026-11-30"}   # from Anthropic's deprecations page
+
+path = sys.argv[1] if len(sys.argv) &gt; 1 else "llm_calls.jsonl"
+rows = [json.loads(line) for line in open(path, encoding="utf-8") if line.strip()]
+if not rows:
+    sys.exit("No calls logged yet.")
+
+
+def pct(values, q):
+    values = sorted(values)
+    return values[min(len(values) - 1, int(q * len(values)))]
+
+
+by_feature = defaultdict(list)
+for r in rows:
+    by_feature[r["feature"]].append(r)
+
+print(f"{len(rows)} calls in {path}\n")
+print(f"{'feature':&lt;16}{'calls':&gt;6}{'errors':&gt;8}{'p50 ms':&gt;8}{'p95 ms':&gt;8}{'cost $':&gt;10}")
+for feature, rs in sorted(by_feature.items()):
+    lat = [r["latency_ms"] for r in rs]
+    errors = sum(r["status"] == "error" for r in rs)
+    cost = sum(r.get("cost_usd", 0) for r in rs)
+    print(f"{feature:&lt;16}{len(rs):&gt;6}{errors:&gt;8}{pct(lat, .5):&gt;8}{pct(lat, .95):&gt;8}{cost:&gt;10.5f}")
+
+print("\nStop reasons:", dict(Counter(r["gen_ai.response.finish_reasons"][0]
+                                      for r in rows if r["status"] == "ok")))
+print("Prompt versions:", dict(Counter(f"{r['prompt.name']} ({r['prompt.sha256']})" for r in rows)))
+for model in {r["gen_ai.request.model"] for r in rows}:
+    if model in RETIRING:
+        print(f"WARNING: {model} retires on {RETIRING[model]}. Plan the migration now.")</pre></div>
+<div class="code"><span class="cap">Terminal</span><pre>python triage.py --fake
+python report.py</pre></div>
+<div class="code"><span class="cap">Expected output (latencies will differ slightly)</span><pre>product-bug  checkout.spec.ts: expected 'Order placed' but got 'Payment declined'
+environment  login.spec.ts: page.goto timeout 30000ms exceeded
+flaky        search.spec.ts: passed on retry 2 after element detached
+environment  api/orders: 502 Bad Gateway from staging
+product-bug  profile.spec.ts: expected avatar to be visible
+
+Logged 5 calls to llm_calls.jsonl
+5 calls in llm_calls.jsonl
+
+feature          calls  errors  p50 ms  p95 ms    cost $
+failure-triage       5       0      55      55   0.00004
+
+Stop reasons: {'end_turn': 5}
+Prompt versions: {'triage-v2 (31c01a21e671)': 5}</pre></div>
+<div class="code"><span class="cap">One record from llm_calls.jsonl, pretty-printed (IDs and times will differ)</span><pre>{
+  "timestamp": "2026-11-09T09:33:44+00:00",
+  "trace_id": "ec9ebea3ae774f9e9398b428ac046001",
+  "feature": "failure-triage",
+  "prompt.name": "triage-v2",
+  "prompt.sha256": "31c01a21e671",
+  "gen_ai.operation.name": "chat",
+  "gen_ai.provider.name": "anthropic",
+  "gen_ai.request.model": "claude-haiku-5-5",
+  "gen_ai.request.max_tokens": 50,
+  "status": "ok",
+  "gen_ai.response.id": "msg_fake_8f112b5b",
+  "gen_ai.response.model": "claude-haiku-5-5",
+  "gen_ai.response.finish_reasons": [
+    "end_turn"
+  ],
+  "gen_ai.usage.input_tokens": 77,
+  "gen_ai.usage.output_tokens": 3,
+  "request_id": "req_fake",
+  "cost_usd": 9e-06,
+  "output_preview": "product-bug",
+  "latency_ms": 52
+}</pre></div>
+<p>With a real key, run <code>python triage.py</code> (no <code>--fake</code>). The records then carry real message IDs, request IDs, token counts and latencies. If the key is wrong, each call raises <code>AuthenticationError</code> and the log gains a record with <code>"status": "error"</code> and <code>"error.type": "AuthenticationError"</code>; we tested exactly that path, and the report counts it in the errors column.</p>
+<div class="box example"><span class="tag">Real-world example: the log answers questions</span><p>A product owner asks, "Why did our AI costs double last week?" With this log, it's one filter: cost by feature by day. In one illustrative case the answer is a new "summarise whole test run" button that sends 40,000-token logs. Without the log, the team would have argued about it for a week.</p></div>
+
+<h3 id="ch95-4"><span class="num">95.4</span>Versioning prompts and models</h3>
+<p>A prompt is code. It changes behaviour, so it needs the same care: version control, review and a record of what was live when.</p>
+<ul>
+<li><strong>Prompts live in files in git</strong>, not pasted inside functions or edited in a web console. A pull request that changes a prompt gets reviewed like any other change.</li>
+<li><strong>Every prompt has a name and version</strong> (<code>triage-v2</code>), and every call logs it, plus a hash of the exact text. When someone reports a bad answer, you know which prompt produced it.</li>
+<li><strong>Pin the model ID.</strong> From the 4.6 generation onwards, Claude model IDs such as <code>claude-opus-5-5</code> are pinned snapshots with no date suffix: the model behind that ID doesn't silently change. Put the ID in configuration, not scattered through code, so a migration is a one-line change that goes through the gate.</li>
+<li><strong>Pin the API version and SDK version.</strong> The <code>anthropic-version</code> header (currently <code>2026-10-21</code>) and your SDK version both change behaviour; the 2026-10-21 version, for example, removed <code>temperature</code> (<a href="#ch86">Chapter 86</a>). Upgrade them on purpose, not by accident.</li>
+<li><strong>Keep a short change log</strong>: date, what changed (prompt, model, retrieval, documents), eval score before and after, who approved.</li>
+</ul>
+<div class="box note"><span class="tag">Versioning the data too</span><p>For RAG features (<a href="#ch93">Chapter 93</a>), the document index is part of the behaviour. Log which index build answered a question (a build date or ID), and re-run the eval after re-indexing, just as after a prompt change.</p></div>
+
+<h3 id="ch95-5"><span class="num">95.5</span>Evaluation gates in CI</h3>
+<p>An <a class="gl" href="#g-eval-gate">eval gate</a> is a CI step that runs your evaluation and fails the build if scores drop below the last approved baseline by more than an agreed margin. It's the AI version of "no merge with failing tests". The baseline is a small JSON file in git, updated only when a reviewer approves a new level.</p>
+<div class="code"><span class="cap">eval/triage_cases.json</span><pre>[
+  {"failure": "checkout.spec.ts: expected 'Order placed' but got 'Payment declined'", "label": "product-bug"},
+  {"failure": "login.spec.ts: page.goto timeout 30000ms exceeded", "label": "environment"},
+  {"failure": "search.spec.ts: passed on retry 2 after element detached", "label": "flaky"},
+  {"failure": "api/orders: 502 Bad Gateway from staging", "label": "environment"},
+  {"failure": "profile.spec.ts: expected avatar to be visible", "label": "product-bug"},
+  {"failure": "cart.spec.ts: locator '#old-add-button' not found after the UI redesign", "label": "test-bug"},
+  {"failure": "reports.spec.ts: passed on retry 1, failed first run with stale element", "label": "flaky"},
+  {"failure": "api/users: expected status 201 but got 500 with NullPointerException", "label": "product-bug"}
+]</pre></div>
+<div class="code"><span class="cap">eval_triage.py</span><pre>"""Usage: python eval_triage.py --out candidate.json [--fake] [--model M] [--prompt triage-v2]
+Runs the labelled failures through the triage prompt and writes scores for gate.py."""
+import argparse
+import json
+import tracing
+
+LABELS = {"product-bug", "test-bug", "environment", "flaky"}
+
+p = argparse.ArgumentParser()
+p.add_argument("--out", required=True)
+p.add_argument("--fake", action="store_true")
+p.add_argument("--model", default="claude-haiku-5-5")
+p.add_argument("--prompt", default="triage-v2")
+args = p.parse_args()
+
+if args.fake:
+    client = tracing.FakeClient()
+else:
+    import anthropic
+    client = anthropic.Anthropic()
+
+cases = json.load(open("eval/triage_cases.json", encoding="utf-8"))
+correct = valid = flaky_total = flaky_found = 0
+for c in cases:
+    label = tracing.traced_call(client, feature="eval-triage", prompt_name=args.prompt,
+                                user_text=c["failure"], model=args.model, max_tokens=50).strip()
+    correct += label == c["label"]
+    valid += label in LABELS
+    if c["label"] == "flaky":
+        flaky_total += 1
+        flaky_found += label == "flaky"
+    print(f"{'ok  ' if label == c['label'] else 'MISS'} expected {c['label']:&lt;12} got {label}")
+
+scores = {"label_accuracy": round(correct / len(cases), 2),
+          "valid_label_rate": round(valid / len(cases), 2),
+          "flaky_recall": round(flaky_found / flaky_total, 2)}
+with open(args.out, "w", encoding="utf-8") as f:
+    json.dump({"label": f"{args.prompt} on {args.model}", "scores": scores}, f, indent=1)
+print(scores, "-&gt;", args.out)</pre></div>
+<div class="code"><span class="cap">gate.py</span><pre>"""Usage: python gate.py baseline.json candidate.json [--max-drop 0.02]
+CI eval gate: fail the build if the candidate's eval score drops too far."""
+import argparse
+import json
+import sys
+
+p = argparse.ArgumentParser()
+p.add_argument("baseline")
+p.add_argument("candidate")
+p.add_argument("--max-drop", type=float, default=0.02, help="allowed drop, e.g. 0.02 = 2 points")
+args = p.parse_args()
+
+base = json.load(open(args.baseline))
+cand = json.load(open(args.candidate))
+failed = False
+for metric, old in base["scores"].items():
+    new = cand["scores"].get(metric)
+    if new is None:
+        print(f"FAIL {metric}: missing from candidate")
+        failed = True
+        continue
+    drop = old - new
+    status = "FAIL" if drop &gt; args.max_drop else "ok  "
+    failed |= drop &gt; args.max_drop
+    print(f"{status} {metric:&lt;22} {old:.2f} -&gt; {new:.2f}")
+print(f"\n{base['label']} -&gt; {cand['label']}: {'BLOCKED' if failed else 'PASSED'}")
+sys.exit(1 if failed else 0)</pre></div>
+<div class="code"><span class="cap">baseline.json (the last approved scores)</span><pre>{"label": "triage-v2 on claude-haiku-5-5",
+ "scores": {"label_accuracy": 0.88, "valid_label_rate": 1.0, "flaky_recall": 1.0}}</pre></div>
+<div class="code"><span class="cap">candidate-example.json (a worse prompt, for practice)</span><pre>{"label": "triage-v3 on claude-haiku-5-5",
+ "scores": {"label_accuracy": 0.75, "valid_label_rate": 1.0, "flaky_recall": 1.0}}</pre></div>
+<div class="code"><span class="cap">Terminal</span><pre>python eval_triage.py --fake --out candidate.json
+python gate.py baseline.json candidate.json; echo "exit code: $?"
+python gate.py baseline.json candidate-example.json; echo "exit code: $?"</pre></div>
+<div class="code"><span class="cap">Expected output</span><pre>ok   expected product-bug  got product-bug
+ok   expected environment  got environment
+ok   expected flaky        got flaky
+ok   expected environment  got environment
+ok   expected product-bug  got product-bug
+MISS expected test-bug     got product-bug
+ok   expected flaky        got flaky
+ok   expected product-bug  got product-bug
+{'label_accuracy': 0.88, 'valid_label_rate': 1.0, 'flaky_recall': 1.0} -&gt; candidate.json
+ok   label_accuracy         0.88 -&gt; 0.88
+ok   valid_label_rate       1.00 -&gt; 1.00
+ok   flaky_recall           1.00 -&gt; 1.00
+
+triage-v2 on claude-haiku-5-5 -&gt; triage-v2 on claude-haiku-5-5: PASSED
+exit code: 0
+FAIL label_accuracy         0.88 -&gt; 0.75
+ok   valid_label_rate       1.00 -&gt; 1.00
+ok   flaky_recall           1.00 -&gt; 1.00
+
+triage-v2 on claude-haiku-5-5 -&gt; triage-v3 on claude-haiku-5-5: BLOCKED
+exit code: 1</pre></div>
+<p>The exit code is what CI cares about: 0 lets the pipeline continue, 1 stops it. Note that the gate checks every metric separately. An average would let a big drop in one metric hide behind small gains in others.</p>
+<div class="code"><span class="cap">test_llmops.py</span><pre>import json
+import subprocess
+import sys
+
+import pytest
+import tracing
+
+
+def test_cost_uses_price_table():
+    assert tracing.cost_usd("claude-opus-5-5", 1000, 2000) == 0.044
+    assert tracing.cost_usd("unknown-model", 1000, 2000) == 0.0
+
+
+def test_successful_call_is_logged(tmp_path, monkeypatch):
+    monkeypatch.setattr(tracing, "LOG_FILE", str(tmp_path / "log.jsonl"))
+    label = tracing.traced_call(tracing.FakeClient(), feature="t", prompt_name="triage-v2",
+                                user_text="502 Bad Gateway", model="claude-haiku-5-5")
+    record = json.loads((tmp_path / "log.jsonl").read_text())
+    assert label == "environment"
+    assert record["status"] == "ok"
+    assert record["gen_ai.provider.name"] == "anthropic"
+    assert record["gen_ai.usage.output_tokens"] == 3
+    assert len(record["prompt.sha256"]) == 12
+
+
+def test_failed_call_is_logged_and_reraised(tmp_path, monkeypatch):
+    monkeypatch.setattr(tracing, "LOG_FILE", str(tmp_path / "log.jsonl"))
+
+    class Broken:
+        class messages:
+            @staticmethod
+            def create(**kwargs):
+                raise TimeoutError("simulated")
+
+    with pytest.raises(TimeoutError):
+        tracing.traced_call(Broken(), feature="t", prompt_name="triage-v2",
+                            user_text="x", model="claude-haiku-5-5")
+    record = json.loads((tmp_path / "log.jsonl").read_text())
+    assert record["status"] == "error" and record["error.type"] == "TimeoutError"
+
+
+def test_gate_blocks_regression():
+    blocked = subprocess.run([sys.executable, "gate.py", "baseline.json", "candidate-example.json"])
+    passed = subprocess.run([sys.executable, "gate.py", "baseline.json", "baseline.json"])
+    assert blocked.returncode == 1 and passed.returncode == 0</pre></div>
+<div class="code"><span class="cap">Terminal and expected output</span><pre>python -m pytest -q
+4 passed in 0.13s</pre></div>
+<h4>The CI workflow</h4>
+<p>This GitHub Actions workflow runs on every pull request. The <code>offline</code> job costs nothing: unit tests, then the eval harness with the fake client, which catches code changes that break the evaluation itself. The <code>live-eval</code> job calls Claude, so it runs only when a reviewer adds the label <code>run-live-eval</code>, typically on pull requests that touch prompts or the model ID. Its baseline, <code>baseline-live.json</code>, is the scores file from the first live run your team approved; commit it before enabling the job.</p>
+<div class="code"><span class="cap">.github/workflows/ai-quality.yml</span><pre>name: ai-quality
+
+on:
+  pull_request:
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python -m pytest -q
+      - run: python eval_triage.py --fake --out candidate.json
+      - run: python gate.py baseline.json candidate.json
+
+  live-eval:
+    # Costs money: runs only when a reviewer adds the label "run-live-eval"
+    if: contains(github.event.pull_request.labels.*.name, 'run-live-eval')
+    runs-on: ubuntu-latest
+    needs: offline
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Live eval against Claude
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python eval_triage.py --out candidate.json
+      - run: python gate.py baseline-live.json candidate.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-results
+          path: |
+            candidate.json
+            llm_calls.jsonl</pre></div>
+<div class="box warn"><span class="tag">CI secrets and cost</span><p>Store the key as an encrypted repository secret, never in the workflow file (<a href="#ch98">Chapter 98</a>). Use a separate API key and workspace for CI with its own spend limit, so a loop in a pull request can't use the production budget. GitHub doesn't pass repository secrets to workflows triggered from forks, which is a sensible default to keep.</p></div>
+<div class="box opinion"><span class="tag">Opinion · this textbook's authors</span><p>A gate with a 2-point margin on 8 cases is a teaching example: one case is 12.5 points. Real gates need enough cases that one unlucky answer doesn't block a good change (often 50 to a few hundred per feature), and some teams run each case more than once because answers vary. Decide the margin with the product owner, not alone.</p></div>
+
+<h3 id="ch95-6"><span class="num">95.6</span>Monitoring quality drift and cost</h3>
+<p><a class="gl" href="#g-quality-drift">Quality drift</a> means the feature's real-world quality changes over time even though its code doesn't. Typical causes: users start asking about a new product area; the documents behind a RAG feature go stale; a new team writes stories in a different style; or you migrated models and some behaviour shifted. You can't catch drift with pre-release evals alone, because the inputs are what changed.</p>
+<div class="tbl"><table>
+<tr><th>Signal</th><th>How to get it</th><th>Illustrative alert</th></tr>
+<tr><td>Error rate by type</td><td>The call log</td><td>More than 2% errors in an hour</td></tr>
+<tr><td>Latency (p50, p95)</td><td>The call log</td><td>p95 doubles against last week</td></tr>
+<tr><td>Stop reasons</td><td>The call log</td><td>Any rise in <code>max_tokens</code> or <code>refusal</code></td></tr>
+<tr><td>Output length</td><td>Output tokens in the log</td><td>Average shifts by more than 30%</td></tr>
+<tr><td>Automatic checks failing</td><td>The validators from Chapters 93 and 94 (citations, schema, unique IDs), counted in production</td><td>Citation-check failures above 1%</td></tr>
+<tr><td>User feedback</td><td>Thumbs up/down, "this was wrong" button, edits before saving</td><td>Thumbs-down share rises for 3 days</td></tr>
+<tr><td>Sampled human review</td><td>A reviewer scores, say, 20 random answers a week against the eval rubric</td><td>Weekly score below the release bar</td></tr>
+<tr><td>Fresh-sample eval</td><td>Add new real inputs (cleaned of personal data) to the eval set monthly and re-run</td><td>Score falls on the new cases only</td></tr>
+<tr><td>Cost per feature per day</td><td>The call log; the Console's Usage page</td><td>Daily cost above 150% of the 7-day average</td></tr>
+</table></div>
+<p>All thresholds in this table are illustrative starting points; set yours from a few weeks of your own data. For cost, also set a spend limit in the Claude Console (<a href="#ch86">Chapter 86</a>) as a hard backstop, use separate workspaces and keys per feature so the Console's usage export splits by feature, and see <a href="#ch90">Chapter 90</a> for caching and batch discounts.</p>
+<div class="figure" role="img" aria-label="Illustrative weekly sampled-review scores showing drift below the release bar in week 4"><div class="bars"><div class="bt">Sampled review score per week (illustrative)</div>
+<div class="bar-row"><span>Week 1</span><span class="track"><span class="fill" style="width:92%">92%</span></span></div>
+<div class="bar-row"><span>Week 2</span><span class="track"><span class="fill" style="width:91%">91%</span></span></div>
+<div class="bar-row"><span>Week 3</span><span class="track"><span class="fill" style="width:88%">88%</span></span></div>
+<div class="bar-row"><span>Week 4</span><span class="track"><span class="fill hl" style="width:79%">79%</span></span></div>
+</div><div class="cap">Illustrative numbers, not real data. No code changed between weeks; a new product line launched in week 3 and its documents weren't indexed. Release bar: 85%.</div></div>
+
+<h3 id="ch95-7"><span class="num">95.7</span>Handling model deprecations</h3>
+<p>Anthropic retires older models on a published schedule. Its documentation defines four states: <strong>Active</strong> (fully supported and recommended), <strong>Legacy</strong> (no longer receives updates and might be deprecated in future), <strong>Deprecated</strong> (still works but not recommended; a replacement and a retirement date are given) and <strong>Retired</strong> (no longer available; requests fail). For publicly released models, Anthropic gives customers with active deployments <strong>at least 60 days' notice</strong> before retirement, by email and in the documentation. <span class="vchip">Verified 9 Nov 2026</span></p>
+<div class="tbl"><table>
+<tr><th>Model ID</th><th>State on 9 Nov 2026</th><th>Retirement</th><th>Recommended replacement</th></tr>
+<tr><td><code>claude-sonnet-4-5-20250929</code></td><td>Deprecated (30 Sep 2026)</td><td>30 November 2026</td><td><code>claude-sonnet-5-5</code></td></tr>
+<tr><td><code>claude-opus-4-1-20250805</code></td><td>Retired</td><td>5 August 2026</td><td><code>claude-opus-4-8</code></td></tr>
+<tr><td><code>claude-opus-4-5-20251101</code></td><td>Active</td><td>Not sooner than 24 November 2026</td><td>-</td></tr>
+<tr><td><code>claude-opus-5-5</code></td><td>Active</td><td>Not sooner than 22 September 2027</td><td>-</td></tr>
+<tr><td><code>claude-haiku-5-5</code></td><td>Active</td><td>Not sooner than 7 October 2027</td><td>-</td></tr>
+</table></div>
+<p>The dates apply to Anthropic-operated platforms (the Claude API, Claude Platform on AWS, Claude Models on Google Cloud (Anthropic managed) and Microsoft Foundry). Amazon Bedrock and Google-managed Vertex set their own schedules, so check theirs if you use them. To find where you still use a deprecated model, Anthropic suggests exporting the Console's <strong>Usage</strong> page as CSV, which breaks usage down by API key and model.</p>
+<div class="flow">
+<div><b>1 · Watch</b>Deprecation emails go to a team inbox, not one person; check the deprecations page monthly</div>
+<div><b>2 · Find</b>Usage export by key and model; search code and config for the ID</div>
+<div class="hl"><b>3 · Evaluate</b>Run the eval on the replacement model; read the migration guide for breaking changes</div>
+<div><b>4 · Adjust</b>Fix prompts or parameters the new model handles differently; re-run until it passes the gate</div>
+<div><b>5 · Switch</b>One config change, behind a flag; watch the monitors for a week</div>
+<div><b>6 · Record</b>Change log entry with before and after scores</div>
+</div>
+<div class="box example"><span class="tag">Real-world example: why "just change the ID" fails</span><p>A team moving from an older model to Claude Opus 5.5 changes one line and deploys. The calls fail with 400 errors: their code sent <code>temperature</code>, which API version 2026-10-21 rejects, and it forced a tool call with <code>tool_choice</code>, which Opus 5.5 rejects. Their eval gate would have caught both in CI. Also, Opus 5.5's default effort is <code>medium</code>, so set effort explicitly and re-measure cost and quality rather than assuming they carry over.</p></div>
+<p>The script in 95.3 includes a <code>RETIRING</code> table so the daily report warns when logged traffic still uses a retiring model. Keep it updated from the deprecations page.</p>
+
+<h3 id="ch95-8"><span class="num">95.8</span>Incident management for AI features</h3>
+<p>An incident is anything that harms users or the business and needs a coordinated response. AI features add new kinds:</p>
+<div class="tbl"><table>
+<tr><th>Incident type</th><th>Example</th><th>First move</th></tr>
+<tr><td>Provider outage or overload</td><td>Many 529 <code>overloaded_error</code> or 500 responses</td><td>Check status.claude.com; switch the feature to its fallback (hide the button, queue requests, show "try later")</td></tr>
+<tr><td>Rate or spend limit</td><td>429 errors, or the monthly cap reached</td><td>Reduce traffic (pause batch jobs); request a limit increase; review what caused the spike</td></tr>
+<tr><td>Quality regression</td><td>Wrong answers reported after a prompt change</td><td>Roll back to the previous prompt version; add the failing cases to the eval</td></tr>
+<tr><td>Harmful or embarrassing output</td><td>An answer with confidential data, or offensive content, shown to a customer</td><td>Kill switch; preserve logs; involve security, legal or communications as your process requires</td></tr>
+<tr><td>Prompt injection exploited</td><td>A document or ticket makes the feature leak data or take an unintended action</td><td>Kill switch; remove the content; review tool permissions (<a href="#ch131">Chapter 131</a>)</td></tr>
+<tr><td>Cost runaway</td><td>A retry loop or a huge input multiplies spend</td><td>Kill switch or lower spend limit; fix the loop; add a per-request token cap</td></tr>
+<tr><td>Retired model</td><td>All calls fail with errors after a retirement date</td><td>Switch to the replacement already tested (95.7); this one should never happen</td></tr>
+</table></div>
+<p>Two controls make every incident above easier. A <strong>kill switch</strong>: a feature flag that turns the AI feature off (or to a non-AI fallback) in seconds without a deploy. And a <strong>graceful fallback</strong>: what users see when the AI part is off, such as the plain search results without a generated answer, or a message that the assistant is unavailable.</p>
+<div class="box note"><span class="tag">Learn from it</span><p>After every AI incident, add the triggering input to the eval set. That turns each incident into a permanent regression test (<a class="gl" href="#g-regression-testing">regression testing</a>), and over time the eval set fills with exactly the cases that matter.</p></div>
+
+<h3 id="ch95-9"><span class="num">95.9</span>A runbook template</h3>
+<p>A <a class="gl" href="#g-runbook">runbook</a> is a short, practical document that tells whoever is on call what to do, step by step, without needing to know the system's history. Write it before you need it. Here is a template for one AI feature; copy it into your wiki or repository and fill in every bracket.</p>
+<div class="code"><span class="cap">RUNBOOK-ai-feature.md</span><pre># Runbook: [feature name]
+
+## Facts
+- Owner: [team], on call: [rota link]. Product owner: [name].
+- Model: [model ID] via [Claude API / Bedrock / ...]; API version [2026-10-21]; SDK [package and version]
+- Prompt: [repo path], current version [name-vN]
+- Data: [index name and build date, if RAG]
+- Keys and workspace: [workspace name]; spend limit [amount] (Console → Billing)
+- Kill switch: [flag name and how to flip it]. Fallback behaviour: [what users see]
+- Dashboards: [call-log report / tracing tool link]. Status page: https://status.claude.com
+- Next model retirement date: [date], replacement tested: [yes/no]
+
+## Normal ranges (from the last 30 days)
+- Calls per hour: [x-y]   Error rate: [&lt; z%]   p95 latency: [n ms]
+- Cost per day: [amount]  Refusal / max_tokens stops: [&lt; z%]  Weekly review score: [&gt;= n%]
+
+## If error rate is high
+1. Group errors by type in the log (401, 429, 500, 529, timeout).
+2. 401/403: check the key has not expired or been revoked; rotate from the secrets manager.
+3. 429: check spend and rate limits in the Console; pause batch jobs.
+4. 500/529 or timeouts: check the status page. If degraded for more than [n] minutes, flip the kill switch.
+5. Record request IDs of failing calls for Anthropic support.
+
+## If answers are reported wrong
+1. Get the trace ID or time; find the call; note prompt version, model, index build.
+2. Reproduce with the same input. Was the right information retrieved / provided?
+3. If a recent prompt, model or index change is the cause: roll back, then investigate.
+4. If harmful or confidential output reached users: flip the kill switch, preserve logs, inform [security / legal contact].
+5. Add the input and the correct expectation to the eval set.
+
+## If cost spikes
+1. Cost by feature and by hour from the log. Look for long inputs, loops, retries.
+2. If above [threshold]: lower the spend limit or flip the kill switch.
+
+## After the incident
+- Timeline, cause, fix, new eval cases, and one improvement to this runbook.</pre></div>
+
+<div class="lab"><div class="lab-h"><b>Operate an AI feature for a day</b><span>30 min · terminal · no API key needed</span></div><ol>
+<li>Create the <code>llmops</code> project (95.3 and 95.5): save every file, then run <code>python -m pytest -q</code>.<span class="expect"><code>4 passed</code>.</span></li>
+<li>Run <code>python triage.py --fake</code> twice, then <code>python report.py</code>.<span class="expect">10 calls, 0 errors, one prompt version, all <code>end_turn</code>.</span></li>
+<li>Edit one word in <code>prompts/triage-v2.txt</code>, run <code>triage.py --fake</code> again, then the report.<span class="expect">two prompt hashes under the same name. That's why we log the hash: a "small" edit is visible.</span></li>
+<li>Simulate a key failure: <code>ANTHROPIC_API_KEY=wrong python triage.py</code> (no <code>--fake</code>), then run the report.<span class="expect">an <code>AuthenticationError</code>, and the report shows 1 error. (If you have no network at all, you'll see a connection error instead; it's logged the same way.)</span></li>
+<li>Run the gate both ways (95.5).<span class="expect">PASSED with exit code 0 for <code>candidate.json</code>; BLOCKED with exit code 1 for <code>candidate-example.json</code>.</span></li>
+<li>Fill in the runbook template for one AI feature your team uses or plans, including the next retirement date of its model from Anthropic's deprecations page.<span class="expect">a one-page runbook. If you can't fill a bracket, you've found a gap to fix before the next incident.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"If nobody changes the code, the AI feature can't get worse."</dt><dd>Inputs, documents and user behaviour change. Monitor quality in production, not just before release.</dd>
+<dt>"Log everything, including full prompts, forever."</dt><dd>Prompts often contain personal or confidential data. Log metadata always, content only in samples, with access control and retention limits.</dd>
+<dt>"Our model ID never changes, so we never need to migrate."</dt><dd>Pinned IDs don't change behaviour, but they are retired. Track the deprecations page and test the replacement early.</dd>
+<dt>"An eval gate replaces human review."</dt><dd>It catches measured regressions. Sampled human review catches what your metrics don't measure.</dd>
+<dt>"We need an observability platform before we start."</dt><dd>A JSON-lines log and a 40-line report give you most of the value on day one. Adopt OpenTelemetry tooling as you grow.</dd>
+</dl></div>
+
+<h3 id="ch95-r"><span class="num">95.10</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>AI features fail quietly and change without code changes, so they need logging, evals and monitoring designed for that.</li>
+<li>Log one structured record per call: feature, prompt version and hash, model, tokens, cost, latency, stop reason, status, request ID. Never log keys; treat content as sensitive.</li>
+<li>The OpenTelemetry GenAI conventions (<code>gen_ai.*</code>) give standard names; they're still in Development, and Anthropic's SDK and API tracing are in beta.</li>
+<li>Prompts are code: in git, versioned, reviewed. Pin model, API version and SDK version.</li>
+<li>An eval gate in CI compares each metric with an approved baseline and blocks regressions; run paid live evals only when needed.</li>
+<li>Anthropic gives at least 60 days' notice before retiring a public model; find usage with the Console's Usage export and migrate through the gate.</li>
+<li>Have a kill switch, a fallback and a runbook before the first incident; turn every incident into an eval case.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Why does the logger record a hash of the prompt text as well as its name?</p><div class="opts"><button>Hashes make the log smaller</button><button data-ok>So that any edit to the prompt, even one nobody renamed, shows up as a different value</button><button>OpenTelemetry requires a hash</button></div><p class="why" hidden>Names depend on people remembering to bump them. The hash changes with every byte of the text.</p></div>
+<div class="qz"><p class="q">Which OpenTelemetry GenAI attribute holds the number of tokens the model produced?</p><div class="opts"><button>gen_ai.response.tokens</button><button data-ok>gen_ai.usage.output_tokens</button><button>gen_ai.request.max_tokens</button></div><p class="why" hidden><code>gen_ai.request.max_tokens</code> is the cap you asked for; <code>gen_ai.usage.output_tokens</code> is what was actually used.</p></div>
+<div class="qz"><p class="q">The gate reports label_accuracy 0.88 → 0.75 and the other metrics unchanged. What happens in CI?</p><div class="opts"><button>It passes, because the average is still high</button><button data-ok>It fails with exit code 1, because one metric dropped more than the allowed margin</button><button>It passes with a warning</button></div><p class="why" hidden>The gate checks each metric separately, so a large drop in one can't hide behind the others.</p></div>
+<div class="qz"><p class="q">How much notice does Anthropic commit to before retiring a publicly released model?</p><div class="opts"><button>7 days</button><button data-ok>At least 60 days, to customers with active deployments</button><button>None; models are retired without notice</button></div><p class="why" hidden>Per Anthropic's model deprecations page: at least 60 days' notice, by email and in the documentation.</p></div>
+<div class="qz"><p class="q">Customers report confidential data appearing in your AI assistant's answers. What is the first action?</p><div class="opts"><button>Rewrite the prompt and redeploy</button><button>Switch to a bigger model</button><button data-ok>Flip the kill switch, preserve the logs, and involve the people your incident process names</button></div><p class="why" hidden>Stop the harm first, keep the evidence, then investigate. Fixes come after containment.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Add LLMOps to the QA helper from <a href="#ch94">Chapter 94</a> (or your own AI feature). (1) Move its prompt into a versioned file and route its calls through <code>traced_call</code>. (2) Make <code>eval_qahelper.py</code> write a scores JSON and add <code>gate.py</code> to a CI workflow, with a baseline file. (3) Add three monitoring signals from 95.6 to <code>report.py</code>, such as average output tokens and the share of <code>max_tokens</code> stops. (4) Fill in the runbook template for the feature. (5) Write a half-page migration plan for the day its model is deprecated: who gets the email, how you'll find usage, which eval you'll run and who approves the switch.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"LLMOps is how we keep AI features healthy after launch. They can get worse without a code change, so we log every call: which prompt version, which model, how many tokens, what it cost, how long it took and why it stopped. Prompts live in git like code. Any prompt or model change has to pass an eval gate in CI that compares scores with the last approved baseline. In production we watch errors, cost and a weekly sample of answers. Anthropic retires models with at least 60 days' notice, so we test the replacement early. And we have a kill switch and a runbook, so when something goes wrong we stop the harm first and turn the problem into a new eval case."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/model-deprecations" target="_blank" rel="noopener">Model deprecations</a>: lifecycle states, 60-day notice, usage audit, model status table, Sonnet 4.5 retirement.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/manage-claude/opentelemetry" target="_blank" rel="noopener">OpenTelemetry</a> (beta): SDK tracing, API tracing, content modes.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/api/versioning" target="_blank" rel="noopener">API versions</a> and <a href="https://platform.claude.com/docs/en/about-claude/models/migration-guide" target="_blank" rel="noopener">Migration guide</a>.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/api/errors" target="_blank" rel="noopener">Errors</a> and <a href="https://platform.claude.com/docs/en/api/rate-limits" target="_blank" rel="noopener">Rate limits</a>.</li>
+<li>Anthropic, <a href="https://status.claude.com" target="_blank" rel="noopener">Claude status page</a>: components and update subscriptions.</li>
+<li>OpenTelemetry, <a href="https://github.com/open-telemetry/semantic-conventions-genai" target="_blank" rel="noopener">GenAI semantic conventions repository</a> (client inference spans and the Anthropic page; status Development) and <a href="https://opentelemetry.io/docs/what-is-opentelemetry/" target="_blank" rel="noopener">What is OpenTelemetry?</a></li>
+<li>GitHub Docs, <a href="https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions" target="_blank" rel="noopener">Using secrets in GitHub Actions</a>.</li>
+</ol><p class="verified">Verified 9 November 2026: code run on Python 3.11.9 with anthropic 2.6.0 (fake client; live path checked to the authentication step); deprecation data from platform.claude.com; OTel GenAI attributes from the semantic-conventions-genai repository. The CI workflow was checked as valid YAML but not run on GitHub.</p></div>

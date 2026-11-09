@@ -1,0 +1,409 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How slash commands work: where you type them, how arguments work, and why some run immediately</li>
+<li>The four kinds of command (built-in, bundled skill, workflow, and ones added by you, plugins or MCP servers) and why the difference matters</li>
+<li>What every documented slash command in Claude Code 2.1.319 does, with its arguments, aliases and limits</li>
+<li>Which commands were removed or renamed, so old tutorials don't mislead you</li>
+<li>The twenty commands a QA engineer will use most, and when</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch65">Chapter 65</a> (your first session) and <a href="#ch73">Chapter 73</a> (the five kinds of command). This chapter is a reference: read sections 71.1–71.4 once, then come back to the tables whenever you need them.</div>
+
+<div class="bigidea"><p>Inside a Claude Code session, anything you type that starts with <code>/</code> is a <a class="gl" href="#g-slash-command">slash command</a>: a shortcut that tells Claude Code to do something specific, such as switch model, clear the conversation, review your code or connect a tool. Some commands are built into the program. Others are <a class="gl" href="#g-skill">skills</a>, packaged instructions that Claude follows using its normal tools. You, your team, plugins and MCP servers can add more. This chapter lists every documented command, explains each in plain words, and shows when a professional tester would reach for it.</p></div>
+
+<div class="box note"><span class="tag">Version and accuracy</span><p>Everything here was checked on 9 November 2026 against Claude Code <b>2.1.319</b>: the official commands page at code.claude.com and the installed program's own help. Claude Code changes almost every week. Your list may contain commands this chapter doesn't (from your company, plugins or a newer version) or miss some it does (because of your plan, platform or settings). <strong>Type <code>/</code> in your own session: that list is always the truth.</strong></p></div>
+
+<h3 id="ch74-1"><span class="num">74.1</span>How slash commands work</h3>
+<p>Six rules cover almost everything:</p>
+<ol>
+<li><strong>Only at the start of a message.</strong> <code>/compact</code> works; <code>please /compact</code> is just text. Anything after the command name becomes its <em>arguments</em>: <code>/compact keep the test failures</code> passes "keep the test failures" to <code>/compact</code>.</li>
+<li><strong>Angle and square brackets in this chapter.</strong> <code>&lt;path&gt;</code> means you must give a value; <code>[name]</code> means it's optional. You don't type the brackets.</li>
+<li><strong>Typing <code>/</code> opens a menu.</strong> Keep typing to filter it, use the arrow keys to choose, and press Enter. <code>/help</code> shows help and the available commands.</li>
+<li><strong>Commands wait their turn.</strong> If you send one while Claude is still working, it's queued until the turn ends. A few, including <code>/status</code>, <code>/tasks</code> and <code>/usage</code>, run immediately.</li>
+<li><strong>Not everyone sees every command.</strong> Some depend on your platform, plan or provider (for example, subscription-only or macOS-only commands). A few, such as <code>/heapdump</code>, <code>/setup-bedrock</code> and <code>/setup-vertex</code>, are hidden from the menu and run only if you type the full name.</li>
+<li><strong>Many commands have aliases</strong>, other names that do the same thing. <code>/reset</code> and <code>/new</code> both do what <code>/clear</code> does. The tables list aliases next to each command.</li>
+</ol>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Slash commands are like the buttons on a TV remote. You can always ask someone in the room "turn it up a bit" (a normal prompt), but the volume button does exactly one thing, instantly and reliably. Prompts are flexible; commands are precise.</p></div>
+<div class="code"><span class="cap">Examples of the syntax</span><pre>/help                               <span class="c"># no arguments</span>
+/model sonnet                       <span class="c"># one argument</span>
+/compact keep the failing test names and stack traces   <span class="c"># free-text argument</span>
+/code-review high --fix             <span class="c"># an argument plus a flag</span>
+/config theme=dark                  <span class="c"># key=value argument</span></pre></div>
+
+<h3 id="ch74-2"><span class="num">74.2</span>Four kinds of command</h3>
+<p>Everything in the <code>/</code> menu looks the same, but there are different kinds underneath. The difference matters when something behaves unexpectedly, and when you want to add your own.</p>
+<div class="tbl"><table>
+<tr><th>Kind</th><th>What it is</th><th>Examples</th><th>Can you turn it off or change it?</th></tr>
+<tr><td><b>Built-in command</b></td><td>Behaviour coded into Claude Code itself. Runs the same way every time.</td><td><code>/clear</code>, <code>/model</code>, <code>/compact</code>, <code>/mcp</code></td><td>No; it's part of the program</td></tr>
+<tr><td><b>Bundled skill</b></td><td>A skill that ships with Claude Code. In Anthropic's words, skills are "prompt-based": they give Claude detailed instructions, and Claude does the work with its normal tools.</td><td><code>/code-review</code>, <code>/simplify</code>, <code>/doctor</code>, <code>/loop</code>, <code>/update-config</code></td><td>Yes: the <code>disableBundledSkills</code> setting turns them off</td></tr>
+<tr><td><b>Workflow</b></td><td>A bundled "dynamic workflow" that spreads work across many subagents in the background</td><td><code>/deep-research</code> (currently the only one)</td><td>Part of Claude Code</td></tr>
+<tr><td><b>Added commands</b></td><td>Skills and commands from you, your team or a plugin, plus prompts offered by MCP servers</td><td><code>/bug-report</code> (your skill), <code>/qa-toolkit:test-plan</code> (plugin), <code>/github:pr_review (MCP)</code></td><td>Yes: you control them</td></tr>
+</table></div>
+<p>Because skills are instructions rather than code, their results can vary a little from run to run, and Claude uses tools (and asks permission) to carry them out. Built-in commands behave identically every time.</p>
+
+<h4>Where added commands come from</h4>
+<div class="tbl"><table>
+<tr><th>Source</th><th>File location</th><th>Becomes</th></tr>
+<tr><td>Your personal skill</td><td><code>~/.claude/skills/&lt;name&gt;/SKILL.md</code></td><td><code>/&lt;name&gt;</code> in every project</td></tr>
+<tr><td>Team skill in a project</td><td><code>.claude/skills/&lt;name&gt;/SKILL.md</code></td><td><code>/&lt;name&gt;</code> for everyone who clones the repo</td></tr>
+<tr><td>Older custom command file</td><td><code>.claude/commands/deploy.md</code></td><td><code>/deploy</code>. Still supported, but these have been merged into skills, and skills are preferred for new work.</td></tr>
+<tr><td>Command file in a subfolder</td><td><code>.claude/commands/frontend/component.md</code></td><td><code>/frontend:component</code></td></tr>
+<tr><td>Plugin skill</td><td><code>&lt;plugin&gt;/skills/&lt;skill&gt;/SKILL.md</code></td><td><code>/plugin-name:skill-name</code></td></tr>
+<tr><td>MCP server prompt</td><td>Offered by a connected MCP server</td><td><code>/servername:promptname (MCP)</code>; <code>/mcp__servername__promptname</code> also works, e.g. <code>/mcp__github__pr_review 456</code></td></tr>
+</table></div>
+<p>If a skill and a <code>.claude/commands/</code> file have the same name, the skill wins. You can chain up to six skills in one message, for example <code>/skill-a /skill-b do XYZ</code>. Chapter 80 shows how to write skills.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>On the machine used to write this book, the <code>/</code> menu also showed <code>/keybindings-help</code> and plugin skills such as <code>anthropic-skills:docx</code>. Neither appears in Anthropic's commands table: they come from that installation's plugins and configuration. That's normal. Your company may have its own <code>/test-plan</code> or <code>/release-check</code> too.</p></div>
+<div class="box warn"><span class="tag">Not settled · check your own version</span><p>The official commands table lists <code>/init</code>, <code>/security-review</code> and <code>/schedule</code> as ordinary commands, but in a local 2.1.319 session they appeared in Claude's skill list. Which category is "official" couldn't be confirmed, so this chapter calls them commands. In practice it makes little difference to how you use them.</p></div>
+
+<h3 id="ch74-3"><span class="num">74.3</span>The master table</h3>
+<p>Every slash command documented for Claude Code 2.1.319, grouped by purpose. Type in the box to filter: try <code>review</code>, <code>context</code>, <code>skill</code> or <code>session</code>. <span class="vchip">Verified 9 Nov 2026</span></p>
+<input class="filter" type="search" data-filter="#cmdMaster" data-empty="#cmdEmpty" placeholder="Filter commands, e.g. model, review, mcp, background" aria-label="Filter slash commands">
+<div class="tbl"><table id="cmdMaster">
+<tr><th>Command and arguments</th><th>Kind</th><th>What it does</th><th>Aliases · notes</th></tr>
+
+<tr class="group"><td colspan="4"><b>Help, status and diagnostics</b></td></tr>
+<tr><td><code>/help</code></td><td>Built-in</td><td>Shows help and the commands available to you</td><td></td></tr>
+<tr><td><code>/status</code></td><td>Built-in</td><td>Opens Settings on the Status tab: version, model, account, connectivity</td><td>Runs immediately, even mid-turn</td></tr>
+<tr><td><code>/release-notes</code></td><td>Built-in</td><td>Shows the changelog in a version picker</td><td></td></tr>
+<tr><td><code>/powerup</code></td><td>Built-in</td><td>Interactive lessons on Claude Code features</td><td></td></tr>
+<tr><td><code>/insights</code></td><td>Built-in</td><td>Writes an HTML report analysing your recent sessions</td><td></td></tr>
+<tr><td><code>/recap</code></td><td>Built-in</td><td>Generates a one-line summary of the session</td><td></td></tr>
+<tr><td><code>/doctor [prompt-audit [path]]</code></td><td>Skill</td><td>Checks your installation, settings, extensions and CLAUDE.md, and offers fixes that Claude applies after you confirm</td><td>Alias <code>/checkup</code>. A skill, despite sounding built-in</td></tr>
+<tr><td><code>/debug [description]</code></td><td>Skill</td><td>Turns on debug logging for the session and troubleshoots using the log</td><td></td></tr>
+<tr><td><code>/heapdump</code></td><td>Built-in</td><td>Writes a memory snapshot for diagnosing memory problems</td><td>Hidden from the menu. The snapshot contains credentials: never share it</td></tr>
+<tr><td><code>/skill-doctor</code></td><td>Built-in</td><td>Shows each skill's context cost and how often it's used</td><td></td></tr>
+
+<tr class="group"><td colspan="4"><b>Models, effort and speed</b></td></tr>
+<tr><td><code>/model [model]</code></td><td>Built-in</td><td>Switches model and saves it as your default. With no argument, opens a picker</td><td>In the picker, <kbd>s</kbd> = this session only; ← → adjusts effort</td></tr>
+<tr><td><code>/effort [level|auto|status|ultracode [on|off]]</code></td><td>Built-in</td><td>Sets effort (<code>low</code>, <code>medium</code>, <code>high</code>, <code>xhigh</code>, <code>max</code>), clears it (<code>auto</code>), shows it (<code>status</code>) or toggles ultracode</td><td><code>max</code> lasts for this session only</td></tr>
+<tr><td><code>/fast [on|off]</code></td><td>Built-in</td><td>Toggles fast mode</td><td></td></tr>
+<tr><td><code>/advisor [model|off]</code></td><td>Built-in</td><td>Turns on an "advisor" that consults a second model (<code>fable</code>, <code>opus</code>, <code>sonnet</code> or a full model ID) at key moments</td><td></td></tr>
+
+<tr class="group"><td colspan="4"><b>Sessions: start, name, branch, resume, leave</b></td></tr>
+<tr><td><code>/clear [name]</code></td><td>Built-in</td><td>Starts a fresh conversation with empty context; the old one stays resumable, labelled with the optional name</td><td>Aliases <code>/reset</code>, <code>/new</code></td></tr>
+<tr><td><code>/resume [session]</code></td><td>Built-in</td><td>Resumes a conversation by ID or name, or opens the picker</td><td>Alias <code>/continue</code></td></tr>
+<tr><td><code>/rename [name]</code></td><td>Built-in</td><td>Names the session (auto-generates a name if you give none)</td><td></td></tr>
+<tr><td><code>/branch [name]</code></td><td>Built-in</td><td>Copies the conversation at this point and switches you into the copy; the original stays resumable</td><td></td></tr>
+<tr><td><code>/fork [prompt]</code></td><td>Built-in</td><td>Copies the conversation into a new <em>background</em> session while you keep working here</td><td></td></tr>
+<tr><td><code>/rewind</code></td><td>Built-in</td><td>Goes back to a checkpoint, restoring conversation and/or code, or summarises from a point</td><td>Aliases <code>/checkpoint</code>, <code>/undo</code>. Also <kbd>Esc</kbd> <kbd>Esc</kbd> on an empty prompt</td></tr>
+<tr><td><code>/export [filename]</code></td><td>Built-in</td><td>Exports the conversation as plain text</td><td></td></tr>
+<tr><td><code>/copy [N]</code></td><td>Built-in</td><td>Copies the last (or Nth-latest) response; a picker lets you choose code blocks, <kbd>w</kbd> writes to a file</td><td></td></tr>
+<tr><td><code>/btw [question]</code></td><td>Built-in</td><td>Asks a side question about the session without adding it to the conversation</td><td></td></tr>
+<tr><td><code>/goal [condition|clear]</code></td><td>Built-in</td><td>Sets a goal; Claude keeps working across turns until the condition is met</td><td></td></tr>
+<tr><td><code>/plan [description]</code></td><td>Built-in</td><td>Enters plan mode (investigate and propose, no changes), optionally starting on a task</td><td>See <a href="#ch67">Chapter 67</a></td></tr>
+<tr><td><code>/cd &lt;path&gt;</code></td><td>Built-in</td><td>Moves the session to another working directory, keeping the conversation</td><td></td></tr>
+<tr><td><code>/add-dir &lt;path&gt;</code></td><td>Built-in</td><td>Lets Claude read and edit another directory this session</td><td>Most <code>.claude/</code> config is not picked up from the added directory</td></tr>
+<tr><td><code>/exit</code></td><td>Built-in</td><td>Leaves Claude Code; in an attached background session, detaches instead</td><td>Alias <code>/quit</code></td></tr>
+<tr><td><code>/restart</code></td><td>Built-in</td><td>Restarts Claude Code and resumes the session, to apply an update</td><td>Alias <code>/update</code>. Pro / Max / Ultra, native install on macOS or Linux</td></tr>
+
+<tr class="group"><td colspan="4"><b>Background work, other devices and the cloud</b></td></tr>
+<tr><td><code>/background [prompt]</code></td><td>Built-in</td><td>Detaches the session to run as a background agent and frees your terminal</td><td>Alias <code>/bg</code>. Background agents are a research preview</td></tr>
+<tr><td><code>/tasks</code></td><td>Built-in</td><td>Views and manages background work (shells, subagents)</td><td>Also <code>/bashes</code>. Runs immediately</td></tr>
+<tr><td><code>/subtask &lt;task&gt;</code></td><td>Built-in</td><td>Spawns a forked background subagent whose result comes back into this conversation</td><td></td></tr>
+<tr><td><code>/stop</code></td><td>Built-in</td><td>Stops the background session you're attached to</td><td></td></tr>
+<tr><td><code>/teleport</code></td><td>Built-in</td><td>Pulls a cloud session into this terminal</td><td>Also <code>/tp</code>. Subscription required</td></tr>
+<tr><td><code>/remote-control</code></td><td>Built-in</td><td>Lets you control this session from claude.ai or the Claude app</td><td>Alias <code>/rc</code>. Subscription required</td></tr>
+<tr><td><code>/remote-env</code></td><td>Built-in</td><td>Chooses the default cloud environment for cloud sessions</td><td></td></tr>
+<tr><td><code>/web-setup</code></td><td>Built-in</td><td>Connects GitHub for cloud sessions using your local <code>gh</code> login</td><td></td></tr>
+<tr><td><code>/desktop</code></td><td>Built-in</td><td>Continues this session in the Claude Desktop app</td><td>Alias <code>/app</code>. macOS / x64 Windows, subscription</td></tr>
+<tr><td><code>/mobile</code></td><td>Built-in</td><td>Shows a QR code to download the Claude mobile app</td><td>Aliases <code>/ios</code>, <code>/android</code></td></tr>
+
+<tr class="group"><td colspan="4"><b>Context and compaction</b></td></tr>
+<tr><td><code>/context [all]</code></td><td>Built-in</td><td>Shows how full the context window is, as a coloured grid, with suggestions</td><td></td></tr>
+<tr><td><code>/compact [instructions]</code></td><td>Built-in</td><td>Summarises the conversation so far to free space, optionally focused by your instructions</td><td></td></tr>
+<tr><td><code>/autocompact [auto|&lt;tokens&gt;]</code></td><td>Built-in</td><td>Sets how full the context gets before automatic compaction (e.g. <code>500k</code>), or <code>auto</code></td><td>Saved to your user settings</td></tr>
+
+<tr class="group"><td colspan="4"><b>Memory and project setup</b></td></tr>
+<tr><td><code>/init</code></td><td>Command</td><td>Creates a starter CLAUDE.md for the project</td><td><code>CLAUDE_CODE_NEW_INIT=1</code> gives an interactive flow. Category unsettled (see 71.2)</td></tr>
+<tr><td><code>/memory</code></td><td>Built-in</td><td>Edits your CLAUDE.md files and turns auto memory on or off</td><td>See <a href="#ch77">Chapter 77</a></td></tr>
+<tr><td><code>/team-onboarding</code></td><td>Built-in</td><td>Generates a team onboarding guide from your usage history</td><td></td></tr>
+<tr><td><code>/import [codex|gemini|cursor] [--dry-run] [--yes]</code></td><td>Built-in</td><td>Imports instructions, MCP servers, commands and skills from Codex, Gemini CLI or Cursor</td><td>Not on Bedrock, Agent Platform or Foundry</td></tr>
+
+<tr class="group"><td colspan="4"><b>Permissions and settings</b></td></tr>
+<tr><td><code>/permissions</code></td><td>Built-in</td><td>Manages allow / ask / deny rules and reviews auto-mode denials</td><td>Alias <code>/allowed-tools</code>. See <a href="#ch78">Chapter 78</a></td></tr>
+<tr><td><code>/config [key=value ...]</code></td><td>Built-in</td><td>Opens the Settings screen, or sets keys directly, e.g. <code>/config theme=dark</code></td><td>Alias <code>/settings</code>. <code>/config --help</code> lists keys</td></tr>
+<tr><td><code>/update-config [request]</code></td><td>Skill</td><td>Describe a settings change in plain words; Claude edits <code>settings.json</code></td><td></td></tr>
+<tr><td><code>/fewer-permission-prompts</code></td><td>Skill</td><td>Scans your past sessions and adds a read-only allowlist to <code>.claude/settings.json</code></td><td></td></tr>
+<tr><td><code>/sandbox</code></td><td>Built-in</td><td>Toggles sandbox mode</td><td>Supported platforms only. See <a href="#ch79">Chapter 79</a></td></tr>
+<tr><td><code>/auto-mode-setup</code></td><td>Built-in</td><td>Drafts <code>autoMode.environment</code> entries from your project and saves them after you review</td><td></td></tr>
+<tr><td><code>/privacy-settings</code></td><td>Built-in</td><td>Views and updates privacy settings</td><td>Pro / Max / Ultra only</td></tr>
+
+<tr class="group"><td colspan="4"><b>Appearance, terminal and input</b></td></tr>
+<tr><td><code>/theme</code></td><td>Built-in</td><td>Changes the colour theme (including auto, colour-blind-friendly, ANSI and custom)</td><td></td></tr>
+<tr><td><code>/color [color|default]</code></td><td>Built-in</td><td>Sets the prompt-bar colour: red, blue, green, yellow, purple, orange, pink or cyan</td><td>Handy to tell sessions apart</td></tr>
+<tr><td><code>/output-style [style]</code></td><td>Built-in</td><td>Lists or switches output styles</td><td></td></tr>
+<tr><td><code>/statusline</code></td><td>Built-in</td><td>Configures the status line under the prompt</td><td></td></tr>
+<tr><td><code>/tui [default|fullscreen]</code></td><td>Built-in</td><td>Switches the terminal renderer</td><td></td></tr>
+<tr><td><code>/focus</code></td><td>Built-in</td><td>Toggles focus view: just your last prompt, a tool summary and the final answer</td><td>Fullscreen renderer only</td></tr>
+<tr><td><code>/scroll-speed</code></td><td>Built-in</td><td>Adjusts mouse-wheel scroll speed</td><td>Fullscreen only</td></tr>
+<tr><td><code>/keybindings</code></td><td>Built-in</td><td>Opens your keyboard-shortcuts file, <code>~/.claude/keybindings.json</code></td><td>See <a href="#ch76">Chapter 76</a></td></tr>
+<tr><td><code>/terminal-setup</code></td><td>Built-in</td><td>Installs a Shift+Enter new-line binding (VS Code, Cursor, Alacritty, Zed and others) or configures Apple Terminal / iTerm2</td><td></td></tr>
+<tr><td><code>/voice [hold|tap|off]</code></td><td>Built-in</td><td>Toggles voice dictation</td><td>Needs a Claude.ai account</td></tr>
+
+<tr class="group"><td colspan="4"><b>Review, quality and verification</b></td></tr>
+<tr><td><code>/code-review [level] [--fix] [--comment] [--max-findings n|all|default] [pr#|branch|path]</code></td><td>Skill</td><td>Reviews the current changes (or a PR, branch or path) for correctness bugs. Levels: <code>low</code>, <code>medium</code>, <code>high</code>, <code>xhigh</code>, <code>max</code>, <code>ultra</code></td><td>Alias <code>/review</code>. <code>ultra</code> runs a cloud review</td></tr>
+<tr><td><code>/security-review</code></td><td>Command</td><td>Reviews your branch's changes (against origin's default branch) for security vulnerabilities</td><td>Needs an <code>origin</code> git remote. Category unsettled</td></tr>
+<tr><td><code>/ultrareview [PR or branch]</code></td><td>Built-in</td><td>Deep multi-agent code review in the cloud</td><td>Preferred form: <code>/code-review ultra</code>. 3 free runs on Pro / Max / Ultra, then usage credits</td></tr>
+<tr><td><code>/simplify [target]</code></td><td>Skill</td><td>Reviews changed code for reuse, simplification and efficiency, then applies fixes. Does <em>not</em> hunt bugs</td><td></td></tr>
+<tr><td><code>/diff</code></td><td>Built-in</td><td>Shows working-tree changes, including Claude's edits</td><td></td></tr>
+<tr><td><code>/verify</code></td><td>Skill</td><td>Builds, runs and observes your app to confirm a change works</td><td>Runs only when you call it</td></tr>
+<tr><td><code>/run</code></td><td>Skill</td><td>Launches and drives your app to see a change working</td><td></td></tr>
+<tr><td><code>/run-skill-generator</code></td><td>Skill</td><td>Writes a project skill that teaches <code>/run</code> and <code>/verify</code> how to start your app</td><td></td></tr>
+<tr><td><code>/autofix-pr [prompt]</code></td><td>Built-in</td><td>Starts a cloud session that watches the branch's PR and pushes fixes for CI failures and review comments</td><td>Needs <code>gh</code> and cloud sessions</td></tr>
+
+<tr class="group"><td colspan="4"><b>MCP, skills, plugins, agents and hooks</b></td></tr>
+<tr><td><code>/mcp [reconnect &lt;server&gt;|all] [enable|disable [&lt;server&gt;|all]]</code></td><td>Built-in</td><td>Manages MCP server connections and sign-in (OAuth)</td><td>See <a href="#ch83">Chapter 83</a> and Part XII</td></tr>
+<tr><td><code>/skills</code></td><td>Built-in</td><td>Lists skills; <kbd>t</kbd> sorts by token cost, Space/Enter cycles visibility</td><td></td></tr>
+<tr><td><code>/reload-skills</code></td><td>Built-in</td><td>Re-scans skill folders without restarting</td><td></td></tr>
+<tr><td><code>/plugin [subcommand]</code></td><td>Built-in</td><td>Opens the plugin menu, or runs <code>list</code>, <code>install</code>, <code>enable</code>, <code>disable</code> and so on</td><td>See <a href="#ch84">Chapter 84</a></td></tr>
+<tr><td><code>/reload-plugins [--force]</code></td><td>Built-in</td><td>Reloads plugins without restarting</td><td></td></tr>
+<tr><td><code>/agents</code></td><td>Built-in</td><td>Prints a reminder: ask Claude to create or manage subagents, or edit <code>.claude/agents/</code> directly</td><td>No longer opens a management screen</td></tr>
+<tr><td><code>/list-agents</code></td><td>Built-in</td><td>Lists subagents, teammates and other sessions Claude can message</td><td>Also <code>/peers</code>. Only with cross-session messaging</td></tr>
+<tr><td><code>/hooks</code></td><td>Built-in</td><td>Views your hook configuration</td><td>See <a href="#ch82">Chapter 82</a></td></tr>
+<tr><td><code>/plugin-authoring</code></td><td>Skill (built-in plugin)</td><td>Loads the reference for writing a "mod" (a change to Claude Code's own interface or behaviour)</td><td></td></tr>
+<tr><td><code>/workflow-authoring</code></td><td>Skill</td><td>Loads the reference for writing dynamic workflow scripts</td><td></td></tr>
+<tr><td><code>/workflows</code></td><td>Built-in</td><td>Opens the workflow progress view</td><td></td></tr>
+
+<tr class="group"><td colspan="4"><b>IDE, browser and other apps</b></td></tr>
+<tr><td><code>/ide</code></td><td>Built-in</td><td>Manages IDE integrations (VS Code, JetBrains) and shows their status</td><td>See <a href="#ch70">Chapter 70</a></td></tr>
+<tr><td><code>/chrome</code></td><td>Built-in</td><td>Configures Claude in Chrome</td><td></td></tr>
+<tr><td><code>/claude-in-chrome [task]</code></td><td>Skill</td><td>Has Claude carry out a task in your browser through Claude in Chrome</td><td></td></tr>
+<tr><td><code>/install-github-app</code></td><td>Built-in</td><td>Installs the Claude GitHub App and optionally sets up GitHub Actions</td><td>github.com only</td></tr>
+<tr><td><code>/install-slack-app</code></td><td>Built-in</td><td>Installs the Claude Slack app</td><td></td></tr>
+
+<tr class="group"><td colspan="4"><b>Automation and scheduling</b></td></tr>
+<tr><td><code>/loop [interval] [prompt]</code></td><td>Skill</td><td>Re-runs a prompt on an interval while the session is open, e.g. <code>/loop 5m check if the deploy finished</code>. No interval = Claude paces itself</td><td>Alias <code>/proactive</code></td></tr>
+<tr><td><code>/schedule [description]</code></td><td>Command</td><td>Creates, updates, lists or runs cloud scheduled tasks that run even when your computer is off</td><td>Alias <code>/routines</code>. Category unsettled</td></tr>
+<tr><td><code>/batch &lt;instruction&gt;</code></td><td>Skill</td><td>Plans a large change, splits it into 5–30 units and runs each in its own worktree with a background subagent</td><td>Needs a git repo</td></tr>
+<tr><td><code>/deep-research &lt;question&gt;</code></td><td>Workflow</td><td>Runs many web searches in parallel and writes a cited report</td><td></td></tr>
+
+<tr class="group"><td colspan="4"><b>Artifacts, design and the Claude API</b></td></tr>
+<tr><td><code>/artifacts</code></td><td>Built-in</td><td>Lists your artifacts, then attaches, opens or copies a link to one</td><td></td></tr>
+<tr><td><code>/artifact-capabilities</code></td><td>Skill</td><td>Loads the reference for what published artifacts can do at runtime</td><td>Only where artifacts are available</td></tr>
+<tr><td><code>/artifact-diagramming</code></td><td>Skill</td><td>Loads diagramming guidance for artifacts</td><td></td></tr>
+<tr><td><code>/dataviz [request]</code></td><td>Skill</td><td>Design guidance for charts and dashboards</td><td></td></tr>
+<tr><td><code>/slides [brief]</code></td><td>Skill</td><td>Makes a Claude Slides artifact</td><td></td></tr>
+<tr><td><code>/design [brief]</code></td><td>Skill</td><td>Drafts UI mock-ups as a Claude Design artifact</td><td>Needs artifacts; not on Bedrock, Agent Platform or Foundry</td></tr>
+<tr><td><code>/design consent</code>, <code>/design revoke</code></td><td>Built-in</td><td>Grants or withdraws Claude's access to Claude Design</td><td></td></tr>
+<tr><td><code>/design-login</code></td><td>Built-in</td><td>Authorises design-system access for <code>/design-sync</code></td><td>The standalone claude.ai/design site closes by 14 Dec 2026</td></tr>
+<tr><td><code>/design-sync [hint]</code></td><td>Skill</td><td>Converts your repo's React design system and uploads it to Claude Design</td><td></td></tr>
+<tr><td><code>/claude-api [subcommand]</code></td><td>Skill</td><td>Loads Claude API reference material for your project's language. Subcommands include <code>migrate</code>, <code>upgrade</code>, <code>api-version</code>, <code>prompt-audit</code>, <code>cost-optimize</code>, <code>build-eval</code></td><td>See Part XI</td></tr>
+
+<tr class="group"><td colspan="4"><b>Account, usage and providers</b></td></tr>
+<tr><td><code>/login</code></td><td>Built-in</td><td>Signs in to your Anthropic account</td><td></td></tr>
+<tr><td><code>/logout</code></td><td>Built-in</td><td>Signs out</td><td></td></tr>
+<tr><td><code>/usage</code></td><td>Built-in</td><td>Shows session cost, plan limits and activity statistics</td><td>Aliases <code>/cost</code>, <code>/stats</code> (opens the Stats tab). Runs immediately</td></tr>
+<tr><td><code>/usage-credits</code></td><td>Built-in</td><td>Configures or requests usage credits</td><td>Formerly <code>/extra-usage</code></td></tr>
+<tr><td><code>/rate-limit-options</code></td><td>Built-in</td><td>When a usage limit blocks you: wait, add credits or upgrade</td><td>Subscription only</td></tr>
+<tr><td><code>/upgrade</code></td><td>Built-in</td><td>Opens the plan-upgrade page</td><td>Not on Enterprise</td></tr>
+<tr><td><code>/passes</code></td><td>Built-in</td><td>Shares a free week of Claude Code</td><td>Eligible accounts only</td></tr>
+<tr><td><code>/setup-bedrock</code></td><td>Built-in</td><td>Wizard for Amazon Bedrock sign-in, region and models</td><td>Hidden until <code>CLAUDE_CODE_USE_BEDROCK=1</code></td></tr>
+<tr><td><code>/setup-vertex</code></td><td>Built-in</td><td>Wizard for Google Cloud's Agent Platform (formerly Vertex AI)</td><td>Hidden until <code>CLAUDE_CODE_USE_VERTEX=1</code></td></tr>
+
+<tr class="group"><td colspan="4"><b>Feedback and extras</b></td></tr>
+<tr><td><code>/feedback [report]</code></td><td>Built-in</td><td>Sends product feedback to Anthropic</td><td>Same dialog as <code>/bug</code></td></tr>
+<tr><td><code>/bug [report]</code></td><td>Built-in</td><td>Reports a bug or shares the conversation, after a consent screen</td><td>Alias <code>/share</code></td></tr>
+<tr><td><code>/stickers</code></td><td>Built-in</td><td>Orders Claude Code stickers</td><td></td></tr>
+<tr><td><code>/radio</code></td><td>Built-in</td><td>Opens "Claude FM" lo-fi radio</td><td></td></tr>
+</table></div>
+<p id="cmdEmpty" hidden>No command matches that filter. Try a shorter word, or type <code>/</code> in your own session.</p>
+
+<h3 id="ch74-4"><span class="num">74.4</span>Removed and renamed commands</h3>
+<p>Older blog posts, videos and even earlier versions of this book mention commands that no longer work. If a tutorial tells you to use one of these, here's what to do instead.</p>
+<div class="tbl"><table>
+<tr><th>Old command or shortcut</th><th>What happened</th><th>Use instead</th></tr>
+<tr><td><code>/vim</code></td><td>Removed in v2.1.92</td><td><code>/config</code> → Editor mode</td></tr>
+<tr><td><code>/pr-comments</code></td><td>Removed in v2.1.91</td><td>Ask Claude to read the PR comments (for example with <code>gh</code> or the GitHub MCP server, <a href="#ch103">Chapter 103</a>)</td></tr>
+<tr><td><code>/ultraplan</code></td><td>Removed</td><td>Plan mode: <code>/plan</code> or <kbd>Shift</kbd>+<kbd>Tab</kbd></td></tr>
+<tr><td><code>/review</code></td><td>Now an alias of <code>/code-review</code> (since v2.1.223)</td><td><code>/code-review</code> (both work)</td></tr>
+<tr><td><code>/extra-usage</code></td><td>Renamed</td><td><code>/usage-credits</code></td></tr>
+<tr><td><code>/agents</code> (management screen)</td><td>No longer opens a screen (since after v2.1.197); now prints a reminder</td><td>Ask Claude to create the subagent, or edit <code>.claude/agents/</code></td></tr>
+<tr><td><code>/bug</code> as an alias of <code>/feedback</code></td><td>Separate commands since v2.1.212 (same dialog)</td><td>Either</td></tr>
+<tr><td><code>/schedule</code> "routines"</td><td>Now called cloud scheduled tasks</td><td><code>/schedule</code> (alias <code>/routines</code>)</td></tr>
+<tr><td><code>#</code> at the start of a message (save a memory)</td><td>Removed in v2.0.70</td><td>Ask Claude to update CLAUDE.md, or use <code>/memory</code></td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example</span><p>The first version of this book (the Claude Field Guide) taught <code>/vim</code>, the <code>#</code> shortcut and <code>/agents</code> as a setup screen. All three were out of date. Treat any command list, including this one, as a snapshot: check <code>/help</code> and <code>/release-notes</code> after each update.</p></div>
+
+<h3 id="ch74-5"><span class="num">74.5</span>The commands that need more explanation</h3>
+<p>Most commands are self-explanatory once you've run them. These deserve a closer look. Open whichever you need.</p>
+
+<details class="deep"><summary>/code-review: reviewing changes for bugs</summary><div class="body">
+<p><b>Syntax:</b> <code>/code-review [low|medium|high|xhigh|max|ultra] [--fix] [--comment] [--max-findings n|all|default] [pr#|branch|path]</code> · <b>Kind:</b> bundled skill · <b>Alias:</b> <code>/review</code></p>
+<ul>
+<li><b>What it does:</b> reviews your current changes (or a PR number, branch or path you name) for correctness bugs and reports findings.</li>
+<li><b>Level</b> controls how hard it looks: lower levels report a few high-confidence findings; higher levels look wider and may include less certain ones. <code>ultra</code> runs a deep review in the cloud (the same thing as <code>/ultrareview</code>).</li>
+<li><b><code>--fix</code></b> applies the fixes to your files after the review. <b><code>--comment</code></b> posts findings as comments on the pull request. <b><code>--max-findings</code></b> caps how many are reported.</li>
+<li><b>Limits:</b> it's a skill, so results vary between runs, and higher levels use more of your allowance. <code>max</code> is the most expensive level.</li>
+<li><b>Related:</b> <code>/security-review</code> (security only), <code>/simplify</code> (tidiness, not bugs), <code>/diff</code>.</li>
+</ul>
+<p><b>QA use:</b> before testing a developer's PR, run <code>/code-review high 482</code> and then ask "Given these findings and the diff, what should I test manually?" You start testing with a list of the riskiest areas.</p>
+</div></details>
+
+<details class="deep"><summary>/context, /compact and /autocompact: managing the context window</summary><div class="body">
+<p>The <a class="gl" href="#g-context-window">context window</a> is everything Claude can see at once (<a href="#ch20">Chapter 20</a>). As it fills, answers get slower and less focused.</p>
+<ul>
+<li><b><code>/context [all]</code></b> shows a coloured grid of what's using space (system instructions, CLAUDE.md, tool output, conversation) plus suggestions. Check it first when answers start to drift.</li>
+<li><b><code>/compact [instructions]</code></b> replaces the conversation so far with a summary, freeing space while keeping the gist. Your instructions steer what's kept: <code>/compact keep the failing test names, the stack trace and the fix we agreed</code>.</li>
+<li><b><code>/autocompact [auto|&lt;tokens&gt;]</code></b> sets when Claude compacts automatically, e.g. <code>/autocompact 500k</code>. It's saved to your user settings.</li>
+</ul>
+<p><b>Compact or clear?</b> Use <code>/compact</code> to keep going on the <em>same</em> task. Use <code>/clear</code> when you start an <em>unrelated</em> task, since old context only distracts.</p>
+</div></details>
+
+<details class="deep"><summary>/rewind: checkpoints and undo</summary><div class="body">
+<p><b>Syntax:</b> <code>/rewind</code> · <b>Aliases:</b> <code>/checkpoint</code>, <code>/undo</code> · also <kbd>Esc</kbd> <kbd>Esc</kbd> on an empty prompt</p>
+<p>Every prompt that starts a turn creates a <a class="gl" href="#g-checkpoint">checkpoint</a> of Claude's file edits. <code>/rewind</code> lets you pick a point and choose: <b>restore code and conversation</b>, <b>restore conversation</b> only, <b>restore code</b> only, <b>summarise from here</b>, <b>summarise up to here</b>, or <b>never mind</b>.</p>
+<ul>
+<li><b>Limits:</b> files changed only by shell (Bash) commands aren't tracked; most subagent edits aren't restored; edits made outside Claude Code aren't tracked. Snapshots are kept for the 100 most recent checkpoints and cleaned up after about 30 days.</li>
+<li><b>Checkpoints are not a replacement for git.</b> Commit work you care about.</li>
+</ul>
+<p><b>QA use:</b> Claude rewrote three page objects in a direction you don't like. Rewind code and conversation to before that prompt and give clearer instructions, rather than arguing it back step by step.</p>
+</div></details>
+
+<details class="deep"><summary>/model and /effort: choosing the brain and how hard it thinks</summary><div class="body">
+<ul>
+<li><b><code>/model [model]</code></b> accepts aliases such as <code>fable</code>, <code>best</code>, <code>opus</code>, <code>sonnet</code>, <code>haiku</code>, <code>opusplan</code> (Opus in plan mode, Sonnet for doing) or a full model name like <code>claude-opus-5-5</code>. It <em>saves your choice as the default</em> for new sessions. In the picker, press <kbd>s</kbd> to switch for this session only, and use ← → to adjust effort.</li>
+<li><b><code>/effort [level|auto|status|ultracode [on|off]]</code></b> sets how much Claude thinks before acting: <code>low</code>, <code>medium</code>, <code>high</code>, <code>xhigh</code>, <code>max</code>. The current Opus, Sonnet and Haiku 5.5 models default to <code>medium</code>. <code>max</code> lasts for the current session only. <code>auto</code> clears your saved level; <code>status</code> shows it.</li>
+<li><b>Related:</b> <code>/status</code> shows the current model; <code>/fast</code> toggles fast mode; <code>/advisor</code> adds a second model as an adviser.</li>
+</ul>
+<p><b>QA use:</b> a flaky timing issue has resisted two attempts. Try <code>/effort high</code> or switch to a more capable model for that one investigation, then switch back. Chapter 68 covers model and effort choices in depth.</p>
+</div></details>
+
+<details class="deep"><summary>/clear, /resume, /branch and /fork: juggling conversations</summary><div class="body">
+<div class="tbl"><table>
+<tr><th>Command</th><th>What happens to your current conversation</th><th>Typical use</th></tr>
+<tr><td><code>/clear [name]</code></td><td>Put aside (still resumable); you start empty</td><td>Finished bug A, starting unrelated bug B</td></tr>
+<tr><td><code>/resume [session]</code></td><td>Switched to another saved conversation</td><td>Return to yesterday's test-writing session</td></tr>
+<tr><td><code>/branch [name]</code></td><td>Copied; you continue in the copy, original kept</td><td>Try a risky alternative approach without losing the current one</td></tr>
+<tr><td><code>/fork [prompt]</code></td><td>Copied into a <em>background</em> session; you stay here</td><td>"Investigate the API failures in the background while I keep writing UI tests"</td></tr>
+<tr><td><code>/rename [name]</code></td><td>Unchanged; just gets a name</td><td>Name sessions after tickets: <code>/rename CHK-412 coupon tests</code></td></tr>
+</table></div>
+</div></details>
+
+<details class="deep"><summary>/permissions, /config, /update-config and /fewer-permission-prompts</summary><div class="body">
+<ul>
+<li><b><code>/permissions</code></b> (alias <code>/allowed-tools</code>) manages allow, ask and deny rules (<a href="#ch78">Chapter 78</a>) and lets you review what auto mode has denied.</li>
+<li><b><code>/config [key=value ...]</code></b> (alias <code>/settings</code>) opens the Settings screen or sets keys directly. <code>/config --help</code> lists the keys you can set.</li>
+<li><b><code>/update-config [request]</code></b> is a skill: describe the change in plain words ("always allow <code>npx playwright test</code>", "deny reading .env") and Claude edits <code>settings.json</code> for you. Review the change before accepting.</li>
+<li><b><code>/fewer-permission-prompts</code></b> looks at what you've approved in past sessions and adds a <em>read-only</em> allowlist to the project's <code>.claude/settings.json</code>, cutting down repetitive prompts.</li>
+</ul>
+<p><b>QA use:</b> after a week of approving the same test commands, run <code>/fewer-permission-prompts</code>, then <code>/update-config always allow npx playwright test</code>.</p>
+</div></details>
+
+<details class="deep"><summary>/mcp: managing connected tools</summary><div class="body">
+<p><b>Syntax:</b> <code>/mcp</code>, <code>/mcp reconnect &lt;server&gt;</code> or <code>/mcp reconnect all</code>, <code>/mcp enable [&lt;server&gt;|all]</code>, <code>/mcp disable [&lt;server&gt;|all]</code></p>
+<p>Shows every connected MCP server and its status, lets you sign in (OAuth) to servers like Atlassian or GitHub, lists each server's tools, and reconnects, enables or disables servers. Servers are <em>added</em> with the terminal command <code>claude mcp add</code>, not from inside a session: that's covered in <a href="#ch83">Chapter 83</a>, and the whole of Part XII (<a href="#ch97">Chapters 97–106</a>) goes deeper.</p>
+</div></details>
+
+<details class="deep"><summary>/init and /memory: teaching Claude about your project</summary><div class="body">
+<ul>
+<li><b><code>/init</code></b> scans the project and writes a starter <a class="gl" href="#g-claude-md">CLAUDE.md</a>: build and test commands, structure, conventions. Setting the environment variable <code>CLAUDE_CODE_NEW_INIT=1</code> gives an interactive flow instead.</li>
+<li><b><code>/memory</code></b> opens your CLAUDE.md files for editing and turns auto memory on or off.</li>
+</ul>
+<p><b>QA use:</b> run <code>/init</code> in a test repository, then trim the result and add your rules ("use data-testid selectors", "never weaken a failing assertion without asking"). <a href="#ch77">Chapter 77</a> shows how.</p>
+</div></details>
+
+<details class="deep"><summary>/plan and /goal: thinking first, and working until done</summary><div class="body">
+<ul>
+<li><b><code>/plan [description]</code></b> enters plan mode: Claude investigates and proposes a plan but makes no changes until you approve. You can also reach it with <kbd>Shift</kbd>+<kbd>Tab</kbd> (<a href="#ch67">Chapter 67</a>).</li>
+<li><b><code>/goal [condition|clear]</code></b> sets a goal; Claude keeps working across turns until the condition is met. Example: <code>/goal all tests in tests/checkout pass</code>. Use <code>/goal clear</code> to remove it. Give it a condition that can actually be checked.</li>
+</ul>
+</div></details>
+
+<details class="deep"><summary>/loop, /schedule, /batch and /deep-research: automation</summary><div class="body">
+<div class="tbl"><table>
+<tr><th>Command</th><th>Runs where</th><th>Runs when</th><th>Example</th></tr>
+<tr><td><code>/loop [interval] [prompt]</code></td><td>Your session</td><td>Repeatedly, while the session is open</td><td><code>/loop 10m check whether the staging deploy has finished</code></td></tr>
+<tr><td><code>/schedule [description]</code></td><td>The cloud</td><td>On a timetable, even with your laptop closed</td><td>"Every weekday at 8am, summarise last night's failed tests"</td></tr>
+<tr><td><code>/batch &lt;instruction&gt;</code></td><td>Background subagents in separate worktrees</td><td>Once, split into 5–30 parallel pieces</td><td><code>/batch migrate every test in tests/legacy to the new page objects</code></td></tr>
+<tr><td><code>/deep-research &lt;question&gt;</code></td><td>Many background subagents</td><td>Once</td><td><code>/deep-research compare current visual-regression tools for Playwright</code></td></tr>
+</table></div>
+<p>All four can use a lot of your allowance. Start small, and check <code>/usage</code>.</p>
+</div></details>
+
+<details class="deep"><summary>/doctor, /debug and /heapdump: when something's wrong</summary><div class="body">
+<ul>
+<li><b><code>/doctor</code></b> (alias <code>/checkup</code>) checks installation, settings, extensions and CLAUDE.md, and offers fixes that Claude applies after you confirm. <code>/doctor prompt-audit [path]</code> audits prompt files. Outside a session, the terminal command <code>claude doctor</code> gives a lighter read-only check (<a href="#ch75">Chapter 75</a>).</li>
+<li><b><code>/debug [description]</code></b> turns on debug logging for the session and investigates using the log. Describe the problem as the argument.</li>
+<li><b><code>/heapdump</code></b> writes a memory snapshot for diagnosing crashes. It's hidden from the menu and the file <strong>contains credentials</strong>: never attach it to a ticket or share it.</li>
+</ul>
+</div></details>
+
+<details class="deep"><summary>/btw, /usage and /status: checking without disturbing</summary><div class="body">
+<ul>
+<li><b><code>/btw [question]</code></b> asks a side question ("what does that regex do?") without adding it to the conversation, so your main thread stays clean.</li>
+<li><b><code>/usage</code></b> (aliases <code>/cost</code>, <code>/stats</code>) shows session cost, plan limits and activity. It runs immediately, even while Claude is working.</li>
+<li><b><code>/status</code></b> shows version, model, account and connectivity: the first thing to check when helping a colleague whose setup behaves differently.</li>
+</ul>
+</div></details>
+
+<h3 id="ch74-6"><span class="num">74.6</span>The top 20 for QA engineers</h3>
+<p>If you learn only twenty commands, learn these. They're ordered roughly by how often a tester uses them.</p>
+<div class="tbl"><table>
+<tr><th>#</th><th>Command</th><th>When a tester reaches for it</th></tr>
+<tr><td>1</td><td><code>/clear</code></td><td>Moving from one ticket to an unrelated one</td></tr>
+<tr><td>2</td><td><code>/plan</code></td><td>Before any significant change: "plan the tests for CHK-412"</td></tr>
+<tr><td>3</td><td><code>/context</code></td><td>Answers are drifting during a long investigation</td></tr>
+<tr><td>4</td><td><code>/compact</code></td><td>Long debugging session on one problem, context filling up</td></tr>
+<tr><td>5</td><td><code>/rewind</code></td><td>Claude went the wrong way; undo code and conversation</td></tr>
+<tr><td>6</td><td><code>/code-review</code></td><td>Reviewing a PR before testing it</td></tr>
+<tr><td>7</td><td><code>/diff</code></td><td>Checking exactly what Claude changed</td></tr>
+<tr><td>8</td><td><code>/model</code></td><td>Switching to a stronger model for a hard problem, or a faster one for simple work</td></tr>
+<tr><td>9</td><td><code>/resume</code></td><td>Picking up yesterday's work</td></tr>
+<tr><td>10</td><td><code>/rename</code></td><td>Naming sessions after Jira tickets so you can find them</td></tr>
+<tr><td>11</td><td><code>/mcp</code></td><td>Checking or signing in to Jira, Playwright and GitHub connections</td></tr>
+<tr><td>12</td><td><code>/init</code></td><td>First session in a new test repository</td></tr>
+<tr><td>13</td><td><code>/memory</code></td><td>Adding a team rule to CLAUDE.md</td></tr>
+<tr><td>14</td><td><code>/permissions</code></td><td>Allowing test commands, denying secrets</td></tr>
+<tr><td>15</td><td><code>/fewer-permission-prompts</code></td><td>Too many repetitive approval prompts</td></tr>
+<tr><td>16</td><td><code>/security-review</code></td><td>A security pass on a branch before release</td></tr>
+<tr><td>17</td><td><code>/verify</code> or <code>/run</code></td><td>Confirming a fix works in the running app</td></tr>
+<tr><td>18</td><td><code>/loop</code></td><td>Watching a deployment or a long test run</td></tr>
+<tr><td>19</td><td><code>/usage</code></td><td>Checking how much allowance is left</td></tr>
+<tr><td>20</td><td><code>/export</code></td><td>Attaching an investigation transcript to a bug ticket</td></tr>
+</table></div>
+
+<div class="lab"><div class="lab-h"><b>A guided command tour</b><span>40 min · any small git repository</span></div><ol>
+<li>Start Claude Code in a practice repository (the <code>~/claude-lab</code> folder from Chapter 61 works) and type <code>/</code>. Scroll the whole menu.<span class="expect">a list longer than this chapter's top 20, possibly including skills from your company or plugins. Note any that aren't in the master table.</span></li>
+<li>Run <code>/status</code>, then <code>/help</code>.<span class="expect">your version, model and account, then the help screen. Compare the version with 2.1.319.</span></li>
+<li>Ask Claude to explain the repository, then run <code>/context</code>.<span class="expect">a coloured grid showing what's using the context window.</span></li>
+<li>Run <code>/rename lab command tour</code>, then <code>/btw what is a checkpoint in Claude Code?</code><span class="expect">a short answer that isn't added to the main conversation.</span></li>
+<li>Ask Claude to add a comment to any file, then run <code>/diff</code>, then <code>/rewind</code> and choose "Restore code".<span class="expect">the diff shows the change, and after rewinding it's gone.</span></li>
+<li>Make a small real change, commit it on a branch, and run <code>/code-review low</code>.<span class="expect">a short review of your change, with any findings.</span></li>
+<li>Run <code>/compact keep only what we learned about the repository structure</code>, then <code>/context</code> again.<span class="expect">less context used than before.</span></li>
+<li>Run <code>/clear</code>, then <code>/resume</code> and find "lab command tour".<span class="expect">your earlier conversation, restored.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Slash commands work anywhere in a message."</dt><dd>Only at the very start. Text before the slash turns the whole thing into an ordinary prompt.</dd>
+<dt>"/compact and /clear do the same thing."</dt><dd><code>/compact</code> keeps a summary and continues the same conversation; <code>/clear</code> starts fresh (the old one stays resumable).</dd>
+<dt>"/rewind is my backup."</dt><dd>It doesn't track changes made by shell commands, most subagent edits, or edits outside Claude Code. Use git for anything important.</dd>
+<dt>"/model only changes this session."</dt><dd>It saves your choice as the default for new sessions. Press <kbd>s</kbd> in the picker for this session only.</dd>
+<dt>"If a command is in a tutorial, it exists."</dt><dd><code>/vim</code>, <code>/pr-comments</code>, <code>/ultraplan</code> and the <code>#</code> shortcut have all been removed. Check <code>/help</code>.</dd>
+<dt>"Skills behave exactly like built-in commands."</dt><dd>Skills are instructions Claude follows with its tools, so results can vary and may ask for permission. Built-in commands behave identically every time.</dd>
+</dl></div>
+
+<h3 id="ch74-r"><span class="num">74.7</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Slash commands only work at the start of a message; text after the name is the argument.</li>
+<li>There are built-in commands, bundled skills, one workflow (<code>/deep-research</code>), and commands added by you, plugins and MCP servers.</li>
+<li>Custom commands come from <code>.claude/skills/</code> (preferred) or <code>.claude/commands/</code>; plugin skills appear as <code>/plugin:skill</code>; MCP prompts as <code>/server:prompt (MCP)</code>.</li>
+<li>The everyday core: <code>/clear</code>, <code>/plan</code>, <code>/context</code>, <code>/compact</code>, <code>/rewind</code>, <code>/code-review</code>, <code>/diff</code>, <code>/model</code>, <code>/resume</code>, <code>/mcp</code>.</li>
+<li>Several commands were removed or renamed; your own <code>/</code> menu and <code>/help</code> are always the source of truth.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">You type <code>please /compact now</code>. What happens?</p><div class="opts"><button>The conversation is compacted</button><button data-ok>It's sent as an ordinary prompt, because commands only work at the start of a message</button><button>Claude Code shows an error</button></div><p class="why" hidden>Commands are recognised only at the start of a message.</p></div>
+<div class="qz"><p class="q">You want to try a risky alternative approach but keep the current conversation exactly as it is. Which command?</p><div class="opts"><button>/clear</button><button data-ok>/branch</button><button>/compact</button></div><p class="why" hidden><code>/branch</code> copies the conversation and switches you into the copy; the original stays resumable.</p></div>
+<div class="qz"><p class="q">Which of these is a bundled skill rather than a built-in command?</p><div class="opts"><button>/clear</button><button>/model</button><button data-ok>/code-review</button></div><p class="why" hidden><code>/code-review</code> (alias <code>/review</code>) is a skill: instructions Claude carries out with its tools.</p></div>
+<div class="qz"><p class="q">An old tutorial says to type <code>/vim</code>. What should you do in Claude Code 2.1.319?</p><div class="opts"><button>Install a vim plugin</button><button data-ok>Use /config and set Editor mode</button><button>Use /keybindings</button></div><p class="why" hidden><code>/vim</code> was removed in v2.1.92; Editor mode lives in <code>/config</code>.</p></div>
+<div class="qz"><p class="q">You need a summary of failed nightly tests every morning, even when your laptop is off. Which command fits?</p><div class="opts"><button>/loop</button><button data-ok>/schedule</button><button>/batch</button></div><p class="why" hidden><code>/schedule</code> creates cloud scheduled tasks; <code>/loop</code> only runs while your session is open.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Build your team's own one-page command card. Run <code>/</code> in your work setup and list every command your team actually has, including company skills and plugins. Mark the ten your team should know on day one, and add one real example from your project for each (for instance <code>/code-review high 1234</code>). Check every entry against <code>/help</code>, and date the card. Revisit it after the next Claude Code update using <code>/release-notes</code>.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Anything starting with a slash at the beginning of a message is a command. Some are built in, like <code>/clear</code> and <code>/model</code>; some are skills, like <code>/code-review</code>, which Claude carries out with its tools; and your team can add its own. The daily ones are <code>/clear</code> between tasks, <code>/plan</code> before changes, <code>/context</code> and <code>/compact</code> for long sessions, <code>/rewind</code> to undo, and <code>/code-review</code> before testing a PR. When in doubt, type a slash and look."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/commands" target="_blank" rel="noopener">Claude Code commands reference</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/skills" target="_blank" rel="noopener">Skills</a> (bundled skills, custom commands merged into skills).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/checkpointing" target="_blank" rel="noopener">Checkpointing</a>, <a href="https://code.claude.com/docs/en/sessions" target="_blank" rel="noopener">Sessions</a> and <a href="https://code.claude.com/docs/en/model-config" target="_blank" rel="noopener">Model configuration</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/mcp" target="_blank" rel="noopener">MCP in Claude Code</a> (MCP prompts as commands).</li>
+<li>Anthropic, Claude Code changelog (removals of <code>/vim</code>, <code>/pr-comments</code>, the <code>#</code> shortcut).</li>
+<li>Locally installed Claude Code 2.1.319: <code>claude --help</code> output and the in-session <code>/</code> menu.</li>
+</ol><p class="verified">Verified 9 November 2026 against Claude Code 2.1.319</p></div>

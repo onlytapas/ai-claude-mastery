@@ -1,0 +1,255 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>Which everyday business tasks AI helps with most, and where it quietly goes wrong</li>
+<li>A safe routine for analysing spreadsheets and data with Claude, and checking the numbers yourself</li>
+<li>How to turn analysis into reports, documents and slides that people actually read</li>
+<li>How to use Claude for research, meeting notes and team knowledge without spreading errors</li>
+<li>Which claude.ai features fit which job, and what data you should never paste in</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> You should be comfortable chatting with Claude (<a href="#ch43">Chapter 43</a>) and writing clear prompts (<a href="#ch44">Chapter 44</a>). This chapter builds on the feature chapters rather than repeating them: files and spreadsheets (<a href="#ch46">Chapter 46</a>), Projects (<a href="#ch47">Chapter 47</a>), Artifacts (<a href="#ch48">Chapter 48</a>), Research and connectors (<a href="#ch49">Chapter 49</a>) and the Office add-ins (<a href="#ch51">Chapter 51</a>).</div>
+
+<div class="bigidea"><p>Most office work follows the same chain: gather information, make sense of it, write it up, and share it with people who need to decide something. Claude can help with every link in that chain, and it is fastest where the work is reading, summarising, restructuring and drafting. It is weakest where a single wrong number or invented fact does real damage. So the skill is not "ask AI to do the report". It is: give Claude the right material, ask for work you can check, check the parts that matter, and stay the author of anything you send.</p></div>
+
+<h3 id="ch116-1"><span class="num">116.1</span>The business work chain</h3>
+<p>Whether you are a tester writing a release report, an analyst preparing a monthly pack or a manager preparing for a steering meeting, the work has four stages. AI helps differently at each one.</p>
+<div class="flow">
+<div><b>Gather</b>Find and collect: exports, documents, notes, web sources</div>
+<div><b>Analyse</b>Count, compare, spot patterns and outliers</div>
+<div class="hl"><b>Write</b>Turn findings into a report, email, document or slides</div>
+<div><b>Share and decide</b>Present, answer questions, record decisions</div>
+</div>
+<div class="tbl"><table>
+<tr><th>Stage</th><th>Where Claude helps most</th><th>Where to be careful</th></tr>
+<tr><td>Gather</td><td>Searching the web with citations, reading long PDFs, pulling notes together</td><td>Sources it summarises badly, or sources that don't say what the summary claims</td></tr>
+<tr><td>Analyse</td><td>Cleaning messy data, writing formulas, grouping, charting, suggesting what to look at</td><td>Arithmetic done "in its head" rather than with code; quietly dropped rows</td></tr>
+<tr><td>Write</td><td>First drafts, restructuring, tone, shortening, tailoring for different readers</td><td>Confident wording that overstates what the data shows</td></tr>
+<tr><td>Share and decide</td><td>Slides, speaker notes, likely questions, action lists from meetings</td><td>Action items assigned to the wrong person; decisions recorded that were never made</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of Claude as a very fast, well-read new colleague in their first week. They can draft the report by lunchtime and it will read beautifully. But they don't yet know which numbers your director always questions, which system's export is unreliable, or that "Payments" was renamed last quarter. You would read their work before it went to the board. Do the same here.</p></div>
+
+<h3 id="ch116-2"><span class="num">116.2</span>Analysing data and spreadsheets</h3>
+<p>The most common business request is "here's a spreadsheet, what does it tell me?" <a href="#ch46">Chapter 46</a> covers what you can upload and the file limits. Here we focus on doing the analysis well.</p>
+<p>When you upload a CSV or Excel file and <a class="gl" href="#g-code-execution">code execution</a> is switched on, Claude usually writes and runs a short program to read the file, rather than reading the numbers like text. That matters: a program counts every row exactly, while a language model "reading" a long table can lose its place, just as you might if you tried to add up 2,000 numbers by eye.</p>
+<h4>A five-step routine</h4>
+<ol>
+<li><b>Describe the data first.</b> Ask: "Before analysing, describe this file: columns, row count, date range, blanks and anything odd." This catches the wrong file, a header row in the middle, or dates stored as text.</li>
+<li><b>State the question and the reader.</b> "Our release manager needs to know whether open defects are trending down and which component is riskiest."</li>
+<li><b>Ask for the method, not just the answer.</b> "Show the calculation you used and the code." You can then see whether "open" meant status Open, or status Open plus Reopened.</li>
+<li><b>Check the headline numbers independently.</b> A pivot table, a filter in Excel, or a ten-line script (the lab below has one). Check the two or three figures that will drive a decision, not every number.</li>
+<li><b>Ask what the data can't tell you.</b> "What would make this conclusion wrong? What's missing?" Good analysts always state limits.</li>
+</ol>
+<div class="box example"><span class="tag">Real-world example: the vanishing defects</span><p>A test lead asked an AI assistant to summarise a 600-row defect export. The summary said "37 critical defects open". The real number was 41. Four rows had "critical" in lower case and the analysis grouped by exact text. Nothing was invented; the method was just slightly wrong. Asking for the code would have shown the grouping, and a quick filter in the spreadsheet caught it. This kind of quiet error is far more common than wild hallucination.</p></div>
+<details class="deep"><summary>Under the hood: why "show your code" is the single best habit</summary><div class="body">
+<p>A language model produces text one <a class="gl" href="#g-token">token</a> at a time. When it states "the average is 3.4" without running code, it is predicting what a plausible answer looks like, which is often right for small tables and unreliable for large ones (<a href="#ch22">Chapter 22</a>). When it runs code, the arithmetic is done by an ordinary program and is exact, so the remaining risk moves to the <em>method</em>: which rows, which columns, which definition. Methods are written in the code, so you can read them. That shifts your checking job from "redo all the maths" to "is this the right recipe?", which is much quicker and something a non-programmer can learn to do by reading the comments.</p>
+</div></details>
+<div class="box note"><span class="tag">Working inside Excel</span><p>If your organisation uses Microsoft 365 and has the Claude add-ins (paid plans; Excel launched in beta in November 2025), you can work on a workbook in place rather than uploading a copy. The same routine applies: ask it to explain formulas it writes, and check the key cells. Availability and features vary by plan and admin settings; see <a href="#ch51">Chapter 51</a>.</p></div>
+
+<h3 id="ch116-3"><span class="num">116.3</span>Reports that people read</h3>
+<p>Most business reports fail not because the numbers are wrong but because nobody can find the point. Claude is very good at restructuring, so use it to make reports answer the reader's question first.</p>
+<h4>The shape of a useful status report</h4>
+<div class="tbl"><table>
+<tr><th>Part</th><th>What goes in it</th><th>QA example</th></tr>
+<tr><td>Headline</td><td>One sentence: the decision or status</td><td>"Release 4.2 is ready to ship, with one known risk in Checkout."</td></tr>
+<tr><td>Why</td><td>Three to five facts that support it</td><td>Pass rate, open criticals, coverage of changed areas</td></tr>
+<tr><td>Risks</td><td>What could go wrong, how likely, what we're doing</td><td>BUG-105 workaround documented; monitoring added</td></tr>
+<tr><td>Asks</td><td>Decisions or help needed, with a date</td><td>"Product to accept BUG-105 risk by Thursday."</td></tr>
+<tr><td>Detail</td><td>Tables and charts, for those who want them</td><td>Defects by component and severity</td></tr>
+</table></div>
+<div class="code"><span class="cap">Prompt: from analysis to a one-page report</span><pre>Using the defect analysis above, write a one-page release-readiness
+report for our release manager and product owner.
+
+Structure: headline (one sentence), why (3-5 bullet facts with numbers),
+risks (table: risk, likelihood, impact, mitigation), asks (who, what, by when),
+then the detail tables.
+
+Rules:
+- Use only numbers from the analysis. If a number isn't there, write [CHECK].
+- Don't use words like "significant" unless you give the number.
+- Plain English, no jargon, British spelling.
+- End with a short "Limits of this data" paragraph.</pre></div>
+<p>Two rules in that prompt do most of the work. "Use only numbers from the analysis… write [CHECK]" stops Claude filling gaps with plausible figures. "Don't use words like significant unless you give the number" stops vague, confident wording that a director might act on.</p>
+<div class="box warn"><span class="tag">The tone trap</span><p>AI drafts often sound more certain and more positive than the facts justify. "Quality has improved substantially" from a sample of 20 defects is overstatement. Before sending, read every adjective and adverb and ask: "Could I defend this word in the meeting?"</p></div>
+
+<h3 id="ch116-4"><span class="num">116.4</span>Documents and slides</h3>
+<p>Claude can create real Word, Excel, PowerPoint and PDF files (<a href="#ch46">Chapter 46</a> has the details), and it can build interactive pages as <a class="gl" href="#g-artifact">artifacts</a> (<a href="#ch48">Chapter 48</a>). For business documents, the useful question is which output fits the reader.</p>
+<div class="tbl"><table>
+<tr><th>You need</th><th>Good output</th><th>Tip</th></tr>
+<tr><td>Something to edit with colleagues in Word or Google Docs</td><td>A .docx file</td><td>Give it your template's headings; ask for styles, not manual bold</td></tr>
+<tr><td>A deck for a meeting</td><td>A .pptx file, or the PowerPoint add-in</td><td>Ask for one message per slide and speaker notes; keep numbers on slides few and checked</td></tr>
+<tr><td>A table others will filter or recalculate</td><td>An .xlsx file with formulas</td><td>Ask for formulas, not pasted values, so others can audit them</td></tr>
+<tr><td>A dashboard or checklist people click through</td><td>An artifact</td><td>Good for living tools; check who can see it before sharing</td></tr>
+<tr><td>A quick summary in chat or email</td><td>Plain text</td><td>Often the best option. Not everything needs a file</td></tr>
+</table></div>
+<h4>Slides: one message per slide</h4>
+<p>Ask for the storyline before the slides. "Give me the titles of eight slides, each a full sentence stating the point" produces a deck people can follow from the titles alone. Then ask for content and speaker notes. Finally, ask: "What three questions will the audience ask, and which slide answers each?" It is a cheap rehearsal.</p>
+<div class="box example"><span class="tag">Real-world example: the steering committee deck</span><p>A QA manager needs five slides for a quarterly steering committee on test automation. She uploads last quarter's deck, the automation dashboard export and her rough notes, and asks for a storyline first. Claude proposes titles such as "Automated regression now runs in 40 minutes, down from 3 hours (illustrative)". She corrects two titles that misread the dashboard, then asks for the .pptx in the old deck's structure. Total time: under an hour instead of an afternoon, and she checked every number on the slides against the dashboard herself.</p></div>
+
+<h3 id="ch116-5"><span class="num">116.5</span>Research with sources</h3>
+<p>Business research means answering questions such as "What are competitors doing about accessibility?" or "What does the new regulation require of us?" Claude has two modes for this (<a href="#ch49">Chapter 49</a>): <a class="gl" href="#g-web-search">web search</a>, which runs a few searches and answers with citations, and <a class="gl" href="#g-research-mode">Research mode</a> (paid plans), which runs many connected searches and writes a longer report.</p>
+<div class="flow">
+<div><b>Frame</b>Question, scope, time window, what "good evidence" means</div>
+<div><b>Search</b>Web search or Research mode, with citations</div>
+<div class="hl"><b>Verify</b>Open the cited sources for any claim you'll repeat</div>
+<div><b>Synthesise</b>Your conclusions, separated from the evidence</div>
+</div>
+<p>The weak point is the third box. A citation shows where Claude looked, not that the source says exactly what the summary says. For any claim that will appear in a decision document, open the source and find the sentence. This is the same discipline as checking a test's evidence before closing a bug.</p>
+<div class="box warn"><span class="tag">Regulation and legal questions</span><p>Claude can help you read and summarise a regulation and draft questions for your legal team. It is not legal advice, and summaries of laws can miss exceptions that matter. Chapter 133 covers AI law; for your organisation's obligations, ask your legal or compliance team.</p></div>
+<div class="code"><span class="cap">Prompt: a research brief that is easy to check</span><pre>Research question: How are large retailers testing website accessibility
+against WCAG 2.2? Time window: publications from 2025 onwards.
+
+Give me:
+1. A summary of no more than 200 words.
+2. A table: claim | source title | URL | date | how strong the evidence is
+   (official standard, company statement, news report, opinion).
+3. A list of what you could NOT find or verify.
+Keep your opinions in a separate section labelled "Interpretation".</pre></div>
+
+<h3 id="ch116-6"><span class="num">116.6</span>Meeting notes and actions</h3>
+<p>Turning a meeting transcript or rough notes into decisions and actions is one of the highest-value, lowest-risk uses of AI, as long as someone who attended checks the result.</p>
+<div class="code"><span class="cap">Prompt: from transcript to actions</span><pre>Here is the transcript of today's defect triage meeting.
+
+Produce:
+- Decisions made (only if explicitly agreed; quote the line that shows it)
+- Actions: owner | action | due date (write "no owner stated" if none)
+- Open questions nobody answered
+- A 3-sentence summary for people who missed it
+
+Do not invent owners or dates. If something is unclear, say so.</pre></div>
+<p>"Quote the line that shows it" is the key instruction. It forces each decision to be tied to evidence in the transcript, so the person checking can confirm it in seconds.</p>
+<div class="box warn"><span class="tag">Consent and recording</span><p>Recording and transcribing people may need their consent, and your organisation may have rules about which tools may process meeting content. Check before you upload a recording or transcript, especially with external participants or HR topics.</p></div>
+
+<h3 id="ch116-7"><span class="num">116.7</span>Team knowledge</h3>
+<p>Every team has knowledge scattered across wikis, chat threads and people's heads. Claude can help in three ways.</p>
+<div class="cols2">
+<div><h4>Answering from your documents</h4><p>A <a class="gl" href="#g-project-knowledge">Project</a> holding your test strategy, environments guide and glossary lets colleagues ask "Which environment has production-like data?" and get an answer grounded in your documents (<a href="#ch47">Chapter 47</a>). <a class="gl" href="#g-connector">Connectors</a> can reach live sources such as Google Drive or Confluence where your admin allows (<a href="#ch49">Chapter 49</a>).</p></div>
+<div><h4>Writing the knowledge down</h4><p>Ask Claude to interview you: "Ask me one question at a time to document how we run regression on release day." Then turn the answers into a how-to page. This captures knowledge that otherwise leaves when a person does.</p></div>
+</div>
+<p>The third way is maintenance: "Here are our onboarding guide and last month's chat thread about the new VPN. What in the guide is now out of date?" Stale documentation is a quality problem, and spotting contradictions between two texts is something AI does well.</p>
+<div class="box opinion"><span class="tag">Opinion · common among knowledge-management practitioners</span><p>Many practitioners argue that AI makes good documentation more valuable, not less: an assistant answering from a messy, contradictory wiki will confidently repeat the mess. Their advice is to tidy and date the core documents before pointing an assistant at them. This is practitioner experience, not a measured finding.</p></div>
+
+<h3 id="ch116-8"><span class="num">116.8</span>Choosing the right Claude feature</h3>
+<p>Features and plan availability change often; the table reflects the research for this book (verified 9 November 2026) and <a href="#ch42">Chapter 42</a> has the plan details.</p>
+<input class="filter" data-filter="#ch115Features" data-empty="#ch115FeaturesEmpty" type="search" placeholder="Filter tasks or features…" aria-label="Filter tasks or features">
+<div class="tbl"><table id="ch115Features">
+<tr><th>Task</th><th>Feature</th><th>Notes</th></tr>
+<tr class="group"><td colspan="3">Analyse</td></tr>
+<tr><td>Analyse a CSV or Excel export</td><td>File upload with code execution</td><td>Ask for the code; see Chapter 46</td></tr>
+<tr><td>Work inside a live workbook</td><td>Claude for Excel add-in</td><td>Paid plans; admin may need to enable</td></tr>
+<tr class="group"><td colspan="3">Write and present</td></tr>
+<tr><td>Draft a Word report or PDF</td><td>File creation</td><td>.docx, .xlsx, .pptx and PDF</td></tr>
+<tr><td>Build or edit a deck</td><td>File creation, or the PowerPoint add-in</td><td>Storyline first, then slides</td></tr>
+<tr><td>Interactive checklist or dashboard</td><td>Artifacts</td><td>Check sharing settings first</td></tr>
+<tr class="group"><td colspan="3">Research and knowledge</td></tr>
+<tr><td>Quick factual question with sources</td><td>Web search</td><td>All plans; on Team and Enterprise an owner must enable it</td></tr>
+<tr><td>Longer, multi-source report</td><td>Research mode</td><td>Paid plans</td></tr>
+<tr><td>Answer from team documents</td><td>Projects; connectors</td><td>Project sharing on Team and Enterprise</td></tr>
+<tr><td>Multi-step work across files on your computer</td><td>Claude Cowork</td><td>Paid plans; see Chapter 51</td></tr>
+<tr><td>Questions in team chat</td><td>Claude in Slack</td><td>Beta for Team and Enterprise</td></tr>
+</table></div>
+<p id="ch115FeaturesEmpty" hidden>No rows match.</p>
+
+<h3 id="ch116-9"><span class="num">116.9</span>Data privacy: what never goes in</h3>
+<p>Business data is often sensitive. The rules for what Claude keeps and whether it trains on your data depend on whether you use a consumer plan (Free, Pro, Max, Ultra) or a commercial one (Team, Enterprise, API). <a href="#ch42">Chapter 42</a> sets out the current policies and <a href="#ch132">Chapter 132</a> goes deeper. Whatever the plan, your organisation's policy comes first.</p>
+<div class="tbl"><table>
+<tr><th>Usually fine (on an approved tool)</th><th>Needs care or masking</th><th>Never, unless explicitly approved</th></tr>
+<tr><td>Public information; your own drafts; anonymised defect counts; test data you created</td><td>Internal plans and roadmaps; meeting transcripts; customer feedback with names removed</td><td>Customer personal data; passwords, API keys and other <a class="gl" href="#g-secret">secrets</a>; health or financial records; unreleased financial results; anything under a confidentiality agreement</td></tr>
+</table></div>
+<p>Two habits remove most of the risk. First, <a class="gl" href="#g-data-masking">mask</a> before you paste: replace names, emails and account numbers with placeholders such as CUSTOMER_1. Second, use the organisation's approved account, never a personal one, for work material.</p>
+<div class="box note"><span class="tag">Personal accounts for work</span><p>Using a personal Free or Pro account for work documents is one of the most common ways company data ends up somewhere it shouldn't. Even if the content seems harmless, it bypasses your organisation's retention settings, audit logs and contracts.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Lab: from raw defect export to a checked release pack</b><span>30 min · claude.ai (any plan with file upload) and Python 3</span></div>
+<p>You will ask Claude to analyse a small defect export, check its numbers with an independent script, then turn the result into a one-page report and three slides. The data is illustrative and invented for this exercise.</p><ol>
+<li>Make a folder called <code>release-pack</code>. Create <code>defects.csv</code> in it with this content:
+<div class="code"><span class="cap">defects.csv (illustrative data)</span><pre>id,component,severity,status,opened,closed
+BUG-101,Checkout,Critical,Closed,2026-10-01,2026-10-03
+BUG-102,Checkout,Major,Open,2026-10-02,
+BUG-103,Login,Minor,Closed,2026-10-02,2026-10-06
+BUG-104,Search,Major,Closed,2026-10-05,2026-10-09
+BUG-105,Checkout,Critical,Open,2026-10-07,
+BUG-106,Profile,Minor,Open,2026-10-08,
+BUG-107,Search,Minor,Closed,2026-10-08,2026-10-10
+BUG-108,Login,Major,Closed,2026-10-09,2026-10-15
+BUG-109,Checkout,Major,Closed,2026-10-12,2026-10-14
+BUG-110,Payments,Critical,Closed,2026-10-13,2026-10-14
+BUG-111,Payments,Major,Open,2026-10-14,
+BUG-112,Search,Minor,Open,2026-10-15,
+BUG-113,Profile,Major,Closed,2026-10-16,2026-10-22
+BUG-114,Checkout,Minor,Closed,2026-10-19,2026-10-20
+BUG-115,Payments,Major,Closed,2026-10-20,2026-10-27
+BUG-116,Login,Critical,Closed,2026-10-21,2026-10-22
+BUG-117,Checkout,Major,Open,2026-10-23,
+BUG-118,Search,Major,Closed,2026-10-26,2026-10-30
+BUG-119,Payments,Minor,Open,2026-10-28,
+BUG-120,Checkout,Minor,Open,2026-10-30,</pre></div><span class="expect">A file with a header line and 20 defect rows.</span></li>
+<li>Create <code>check_defects.py</code> in the same folder:
+<div class="code"><span class="cap">check_defects.py</span><pre>"""Recalculate the defect figures so you can check Claude's analysis."""
+import csv
+import sys
+from collections import Counter
+from datetime import date
+
+path = sys.argv[1] if len(sys.argv) &gt; 1 else "defects.csv"
+with open(path, newline="", encoding="utf-8") as f:
+    rows = list(csv.DictReader(f))
+
+print(f"Total defects: {len(rows)}")
+status = Counter(r["status"] for r in rows)
+print("By status:", dict(sorted(status.items())))
+
+open_rows = [r for r in rows if r["status"] == "Open"]
+print("Open by severity:", dict(sorted(Counter(r["severity"] for r in open_rows).items())))
+print("Open by component:", dict(Counter(r["component"] for r in open_rows).most_common()))
+
+days = []
+for r in rows:
+    if r["closed"]:
+        d = date.fromisoformat(r["closed"]) - date.fromisoformat(r["opened"])
+        days.append(d.days)
+print(f"Closed defects: {len(days)}, average days to close: {sum(days) / len(days):.1f}")</pre></div><span class="expect">A 25-line Python file with no third-party imports.</span></li>
+<li>In claude.ai, start a new chat, upload <code>defects.csv</code> and send: <code>Before analysing, describe this file: columns, row count, date range and anything odd.</code><span class="expect">Six columns, 20 rows, dates from 1 to 30 October 2026, and a note that <code>closed</code> is blank for open defects.</span></li>
+<li>Send: <code>For a release-readiness review: how many defects are open, broken down by severity and by component? What is the average number of days to close a defect? Which component looks riskiest and why? Show the code you used.</code><span class="expect">8 open (1 Critical, 3 Major, 4 Minor), Checkout with 4 open including the only open Critical, and an average of about 3.3 days to close, with the code shown.</span></li>
+<li>In a terminal, run <code>cd release-pack</code> then <code>python3 check_defects.py</code>.<span class="expect"><code>Total defects: 20</code>, <code>By status: {'Closed': 12, 'Open': 8}</code>, <code>Open by severity: {'Critical': 1, 'Major': 3, 'Minor': 4}</code>, <code>Open by component: {'Checkout': 4, 'Payments': 2, 'Profile': 1, 'Search': 1}</code>, <code>Closed defects: 12, average days to close: 3.3</code>. Compare each line with Claude's answer and note any difference.</span></li>
+<li>Back in Claude, paste the release-report prompt from section 115.3 and send it.<span class="expect">A one-page report with a one-sentence headline, supporting facts, a risk table and asks. Any number not in the analysis is marked [CHECK].</span></li>
+<li>Read the report and underline every adjective that judges quality ("good", "significant", "stable"). Ask Claude to replace each with a number or remove it.<span class="expect">A plainer, more defensible report.</span></li>
+<li>Ask: <code>Now create a three-slide PowerPoint: slide titles must each state the point as a full sentence. Add speaker notes.</code><span class="expect">A downloadable .pptx file. Open it and check that every number on the slides matches your script's output.</span></li>
+</ol>
+<p><b>Troubleshooting:</b> If Claude answers without showing code, code execution may be off; ask it to "use code to calculate this", or check the setting described in <a href="#ch46">Chapter 46</a>. If <code>python3</code> isn't found, see <a href="#ch58">Chapter 58</a>; on Windows try <code>py check_defects.py</code>. A <code>KeyError: 'status'</code> means the CSV header was changed or saved with extra spaces; copy it again. If file creation isn't offered, your plan or admin settings may not include it: ask for the slide content as text instead. <b>No Python?</b> Open the CSV in Excel or Google Sheets and use a pivot table on <code>status</code>, <code>severity</code> and <code>component</code>.</p>
+</div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"If Claude gives a number, it calculated it."</dt><dd>Only if it ran code. Otherwise it predicted a plausible number. Ask to see the method.</dd>
+<dt>"A citation means the source supports the claim."</dt><dd>It means the source was consulted. Open it and find the sentence before you repeat a claim in a decision document.</dd>
+<dt>"The polished report is the finished report."</dt><dd>Polish and correctness are different things. AI writing tends to sound certain; your job is to check numbers, wording and decisions.</dd>
+<dt>"It's only a summary, so privacy doesn't matter."</dt><dd>The full content you uploaded was processed, not just the summary. Mask sensitive data and use your organisation's approved account.</dd>
+<dt>"Meeting notes from AI are neutral."</dt><dd>They can record a discussion as a decision or assign an action to the wrong person. Ask for supporting quotes and have an attendee check.</dd>
+</dl></div>
+
+<h3 id="ch116-r"><span class="num">116.10</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Business work is a chain: gather, analyse, write, share and decide. Claude helps at every stage, most of all with reading, restructuring and drafting.</li>
+<li>For data, describe the file first, ask for the method and code, and independently check the two or three numbers that drive a decision.</li>
+<li>Good reports answer the reader's question first: headline, why, risks, asks, then detail. Tell Claude to mark missing numbers rather than fill them.</li>
+<li>Choose the output that fits the reader: plain text, .docx, .pptx, .xlsx with formulas, or an artifact.</li>
+<li>Citations show where Claude looked; verify any claim you will repeat.</li>
+<li>Meeting notes need supporting quotes and a human check.</li>
+<li>Mask sensitive data, use approved accounts, and follow your organisation's policy over any general advice.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">You upload a 2,000-row export and Claude gives an average. What most increases your confidence in that number?</p><div class="opts"><button>Asking Claude whether it is sure</button><button data-ok>Seeing the code it ran and checking the method and one key figure yourself</button><button>Asking it to repeat the answer</button></div><p class="why" hidden>Code makes the arithmetic exact; the remaining risk is the method, which you can read and spot-check.</p></div>
+<div class="qz"><p class="q">Which prompt instruction best prevents invented figures in a report?</p><div class="opts"><button>"Be accurate."</button><button>"Write like a senior analyst."</button><button data-ok>"Use only numbers from the analysis; if a number isn't there, write [CHECK]."</button></div><p class="why" hidden>It gives Claude a safe alternative to guessing and makes gaps visible to you.</p></div>
+<div class="qz"><p class="q">Research mode returns a report with ten citations. Before quoting one claim to your director, you should:</p><div class="opts"><button>Trust it, because it has a citation</button><button data-ok>Open the source and find the sentence that supports the claim</button><button>Ask Claude to add more citations</button></div><p class="why" hidden>A citation shows where Claude looked, not that the source says exactly what the summary says.</p></div>
+<div class="qz"><p class="q">What is the main purpose of asking for a quote alongside each decision in meeting notes?</p><div class="opts"><button>To make the notes longer</button><button data-ok>So an attendee can quickly confirm each decision was really agreed</button><button>To train the model</button></div><p class="why" hidden>It ties every recorded decision to evidence in the transcript.</p></div>
+<div class="qz"><p class="q">A colleague wants to analyse a customer complaint export in their personal Pro account. What is the best advice?</p><div class="opts"><button>Fine, Pro is a paid plan</button><button>Fine, if they delete the chat afterwards</button><button data-ok>Use the organisation's approved account and mask customer details first, following company policy</button></div><p class="why" hidden>Personal accounts bypass the organisation's contracts, retention settings and audit logs.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick one recurring report you or your team produce (a weekly test status, a sprint quality summary, a monthly defect pack). Time how long it takes today. Next time, use the routine from this chapter: describe the data, ask for the method, check the key numbers, draft with the [CHECK] rule, and remove unsupported adjectives. Record the time taken, every correction you made, and which corrections would have mattered if missed. Write a half-page note for your manager on whether to adopt the routine. (To turn this into a measured business case, use <a href="#ch126">Chapter 126</a>.)</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Most office work is gather, analyse, write, share. Claude speeds up all four, but the risk is quiet errors, not wild ones: a filter that drops four rows, an adjective that oversells, a decision nobody actually made. So: make it describe the data first, ask it to show its code, check the two or three numbers that matter, tell it to write [CHECK] instead of guessing, and keep customer data out unless you're on an approved account with masking. You stay the author."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic Help Center, <a href="https://support.claude.com/en/articles/12111783-create-and-edit-files-with-claude" target="_blank" rel="noopener">Create and edit files with Claude</a>.</li>
+<li>Anthropic Help Center, <a href="https://support.claude.com/en/articles/11088861-use-research-on-claude" target="_blank" rel="noopener">Use Research on Claude</a> and <a href="https://support.claude.com/en/articles/10684626-enable-and-use-web-search" target="_blank" rel="noopener">Enable and use web search</a>.</li>
+<li>Anthropic Help Center, <a href="https://support.claude.com/en/articles/9517075-what-are-projects" target="_blank" rel="noopener">What are projects?</a> and <a href="https://support.claude.com/en/articles/11176164-use-connectors-to-extend-claude-s-capabilities" target="_blank" rel="noopener">Use connectors to extend Claude's capabilities</a>.</li>
+<li>Anthropic, <a href="https://claude.com/claude-for-microsoft-365" target="_blank" rel="noopener">Claude for Microsoft 365</a> (Excel, PowerPoint and Word add-ins).</li>
+<li>Anthropic, <a href="https://claude.com/product/cowork" target="_blank" rel="noopener">Claude Cowork</a> and <a href="https://claude.com/pricing" target="_blank" rel="noopener">Plans and pricing</a>.</li>
+<li>Anthropic Privacy Center, <a href="https://privacy.claude.com/en/articles/7996868-is-my-data-used-for-model-training" target="_blank" rel="noopener">Is my data used for model training?</a></li>
+<li>W3C, <a href="https://www.w3.org/TR/WCAG22/" target="_blank" rel="noopener">Web Content Accessibility Guidelines (WCAG) 2.2</a> (used in the research example).</li>
+</ol><p class="verified">Verified 9 November 2026 against the research fact sheets for this book and the Anthropic help and pricing pages listed. Feature availability varies by plan, region and admin settings.</p></div>

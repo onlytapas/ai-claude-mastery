@@ -1,0 +1,202 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>Why AI companies sell several models at once instead of one "best" model</li>
+<li>What model sizes and tiers mean, using the current Claude line-up as a worked example</li>
+<li>The difference between fast models and reasoning models, and between general and specialised models</li>
+<li>How model versions, snapshots, aliases and deprecation work, and why they matter to a test team</li>
+<li>How pricing tiers turn into real monthly costs, with a small calculator you can run</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> you should know what a token is (<a href="#ch14">Chapter 14</a>). It helps, but isn't required, to have read about reasoning and thinking time (<a href="#ch19">Chapter 19</a>) and the AI companies (<a href="#ch26">Chapter 26</a>).</div>
+
+<div class="bigidea"><p>No single AI model is best at everything. A bigger, slower, more expensive model is usually more capable; a smaller one is faster and far cheaper. So every major company sells a <em>family</em>: a few sizes (tiers), sometimes with a "thinking" mode, plus specialised models for jobs like coding, images or search. Each model also has a version and, eventually, a retirement date. Choosing well means matching the model to the job, the speed you need and the budget you have.</p></div>
+
+<h3 id="ch31-1"><span class="num">31.1</span>One company, many models</h3>
+<p>Open the model picker in Claude, ChatGPT or Gemini and you'll see several names. New users often ask: "Why not just give me the best one?" The answer is that "best" depends on what you're doing. Every <a class="gl" href="#g-model">model</a> is a trade-off between three things:</p>
+<div class="cols2">
+<div><h4>Capability</h4><p>How well it handles hard, unfamiliar or long tasks: reasoning through a tricky bug, reviewing a 200-page contract, running a long agentic job.</p></div>
+<div><h4>Speed and cost</h4><p>How quickly the answer arrives (latency) and how much each call costs. Both rise with model size and with how much "thinking" the model does.</p></div>
+</div>
+<p>You can't max out all of these at once. A model that thinks hard about every question is slow and expensive. A model that answers in a blink is cheap but makes more mistakes on hard problems. So companies build a range and let you choose.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A hospital has consultants, junior doctors and nurses. You don't send every patient to the most senior consultant: they're expensive, booked up, and wasted on a sprained ankle. You also wouldn't send a complex heart case to a first-week trainee. AI model tiers work the same way. Route easy, high-volume work to the fast, cheap tier; save the top tier for the cases that need it.</p></div>
+<p>There are four main reasons the menu keeps growing:</p>
+<div class="tbl"><table>
+<tr><th>Reason</th><th>What it means</th><th>Example</th></tr>
+<tr><td>Sizes and tiers</td><td>Bigger and smaller models from the same family</td><td>Claude Fable, Opus, Sonnet, Haiku</td></tr>
+<tr><td>Thinking styles</td><td>Answer immediately, or reason first</td><td>Reasoning models and "effort" settings</td></tr>
+<tr><td>Specialisation</td><td>Models built for one kind of input or output</td><td>Embedding models, coding models, image generators</td></tr>
+<tr><td>Versions over time</td><td>Old versions stay available while new ones arrive</td><td>Claude Sonnet 4.5 still runs (until 30 Nov 2026) next to Sonnet 5.5</td></tr>
+</table></div>
+
+<h3 id="ch31-2"><span class="num">31.2</span>Sizes and tiers</h3>
+<p>A model's "size" usually means its number of <a class="gl" href="#g-parameter">parameters</a>: the adjustable numbers learned during training. More parameters let a model store more knowledge and more subtle patterns, but every answer then needs more computation, which means more chips, more electricity, more time and a higher price per <a class="gl" href="#g-token">token</a>.</p>
+<p>Companies rarely publish exact parameter counts for their closed models. Instead they give each size a name: a <a class="gl" href="#g-model-tier">tier</a>. Anthropic's current tiers make a clear worked example.</p>
+<div class="tbl"><table>
+<tr><th></th><th>Claude Haiku 5.5</th><th>Claude Sonnet 5.5</th><th>Claude Opus 5.5</th><th>Claude Fable 5.1</th></tr>
+<tr><td>Anthropic's positioning</td><td>High-volume, latency-sensitive tasks (classification, extraction, routing)</td><td>Best combination of speed and intelligence</td><td>Long-running agentic coding and knowledge work; the recommended starting point</td><td>Demanding reasoning and long-horizon agentic work</td></tr>
+<tr><td>Comparative latency</td><td>Fastest</td><td>Fast</td><td>Moderate</td><td>Slower</td></tr>
+<tr><td>Input / output price per million tokens</td><td>$0.10 / $0.50 (prompts up to 100K tokens)</td><td>$2 / $10</td><td>$4 / $20</td><td>$10 / $50</td></tr>
+<tr><td>Context window</td><td>1M tokens</td><td>1M</td><td>1M</td><td>1M</td></tr>
+<tr><td>Default effort</td><td><code>medium</code></td><td><code>high</code></td><td><code>medium</code></td><td><code>high</code></td></tr>
+<tr><td>Released</td><td>7 Oct 2026</td><td>28 Sep 2026</td><td>22 Sep 2026</td><td>1 Sep 2026</td></tr>
+</table></div>
+<p>Source: Claude models overview and pricing pages, verified 9 November 2026. Fable is a newer tier <em>above</em> Opus, not a renamed Opus; <a href="#ch40">Chapter 40</a> covers it in depth. Anthropic's own advice is to start with Opus 5.5 for most workloads and move to Fable 5.1 only when your evaluations show Opus 5.5 at higher effort still falls short.</p>
+<p>Other companies follow the same pattern with different names:</p>
+<div class="tbl"><table>
+<tr><th>Company</th><th>Top of range</th><th>Cheaper / faster members</th></tr>
+<tr><td>OpenAI</td><td>GPT-6 Astra ("most capable model")</td><td>GPT-6.1 Sol (near-Astra at lower cost), GPT-6.1 Terra (fast, efficient), GPT-6 Luna (most efficient, for high volume)</td></tr>
+<tr><td>Google</td><td>Gemini 4 Argon</td><td>Gemini 3.8 Flash and other "Flash" models</td></tr>
+<tr><td>DeepSeek</td><td>DeepSeek-V4-Pro</td><td>DeepSeek-V4.1-Flash</td></tr>
+</table></div>
+<p>Snapshot as of 9 November 2026, from each company's documentation (see Sources). Names change quickly; <a href="#ch34">Chapter 34</a> compares the families in detail.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>A QA team uses AI in three places. A bot labels every incoming Jira ticket as "bug", "feature request" or "question": thousands of short, easy calls, so a Haiku-class model fits. Testers ask for test cases from a user story a few dozen times a day: a mid tier like Sonnet works well. Once a sprint, an agent investigates a flaky end-to-end suite across a large repository: that long, tricky job justifies Opus. Same company, three tiers, three jobs.</p></div>
+<details class="deep"><summary>How companies make small models good: distillation and Mixture of Experts</summary><div class="body">
+<p>Two techniques explain why today's small and mid-sized models are far better than you'd expect from their size.</p>
+<p><strong><a class="gl" href="#g-distillation">Distillation</a>.</strong> A large "teacher" model produces answers (and sometimes its full probability for each next token), and a smaller "student" model is trained to imitate them. The student learns from a cleaner, richer signal than raw internet text, so it gets much of the teacher's skill at a fraction of the running cost. This is one reason the cheapest tier of a new generation can match the middle tier of the previous one.</p>
+<p><strong><a class="gl" href="#g-mixture-of-experts">Mixture of Experts</a> (MoE).</strong> Instead of one giant block that runs fully for every token, the model contains many "expert" sub-networks and a small router that picks a few of them per token. So a model can have a huge <em>total</em> parameter count but a much smaller number of <a class="gl" href="#g-active-parameters">active parameters</a> per token. Published examples: Mistral Large 4 is described as about 1 trillion parameters with about 52 billion active; Microsoft's MAI-Thinking-1 as about 1 trillion total with about 35 billion active. Total size drives how much knowledge fits; active size drives speed and cost per token.</p>
+<p>Because of both techniques, "bigger is better" is only a rough rule. A well-distilled or MoE model can beat an older, denser model several times its size.</p>
+</div></details>
+
+<h3 id="ch31-3"><span class="num">31.3</span>Fast answers versus reasoning</h3>
+<p>The second axis is not size but <em>how long the model thinks</em>. A <a class="gl" href="#g-reasoning-model">reasoning model</a> writes out intermediate working before giving its final answer. That extra "thinking time" improves results on maths, debugging, planning and multi-step tasks, but costs more tokens and takes longer. <a href="#ch19">Chapter 19</a> explains how this works.</p>
+<p>In 2024–2025 many companies sold reasoning models as separate products (OpenAI's o1 line was the best-known early example). The trend since then has been to merge the two: one model that decides how much to think, with a setting you can turn up or down. Anthropic called Claude 3.7 Sonnet (February 2025) "the first hybrid reasoning model on the market". Today's Claude models use <strong>adaptive thinking</strong>, and you steer the amount of effort with an <a class="gl" href="#g-effort-level">effort level</a> rather than picking a different model.</p>
+<div class="flow">
+<div><b>Quick question</b>"What does HTTP 409 mean?"</div>
+<div><b>Low effort</b>Short or no thinking; fast, cheap answer</div>
+<div class="hl"><b>Hard problem</b>"Why does this test fail only on CI, only on Tuesdays?"</div>
+<div><b>High effort</b>Longer reasoning; slower, more tokens, better odds</div>
+</div>
+<div class="box note"><span class="tag">Two dials, not one</span><p>Tier and effort are separate choices. Haiku at high effort is still a small model; Opus at low effort is still a large one. For a hard task, a larger model at moderate effort often beats a small model at maximum effort. For a simple task, extra effort on a big model mostly burns money.</p></div>
+
+<h3 id="ch31-4"><span class="num">31.4</span>General versus specialised models</h3>
+<p>Chat models like Claude are <strong>general</strong>: one model writes, summarises, codes, reads images and calls tools. Alongside them sits a whole set of <strong>specialised</strong> models built for one kind of job.</p>
+<div class="tbl"><table>
+<tr><th>Kind</th><th>What it does</th><th>Examples (Nov 2026)</th><th>QA use</th></tr>
+<tr><td>General chat / agent model</td><td>Text in, text out; reads images and PDFs; uses tools</td><td>Claude, GPT, Gemini, Grok</td><td>Test design, bug report drafting, log analysis, agents</td></tr>
+<tr><td>Coding-tuned model</td><td>Tuned for code editing inside a coding tool</td><td>Cursor's Composer models; Microsoft's MAI-Code-1-Flash in GitHub Copilot</td><td>Writing and fixing test code inside an IDE</td></tr>
+<tr><td><a class="gl" href="#g-embedding">Embedding</a> model</td><td>Turns text (or images) into lists of numbers for similarity search; doesn't write text</td><td>Voyage AI's <code>voyage-4</code> family, including <code>voyage-code-4</code></td><td>Finding duplicate bugs, searching old test cases (<a href="#ch15">Chapter 15</a>, <a href="#ch23">Chapter 23</a>)</td></tr>
+<tr><td>Image / video generation</td><td>Creates pictures or video from a description</td><td>Google's Imagen and Veo; OpenAI's GPT Image</td><td>Synthetic test images, mock-ups</td></tr>
+<tr><td>Speech</td><td>Voice to text, or text to voice</td><td>Amazon Nova 2 Sonic; Microsoft MAI-Voice-1</td><td>Testing voice features, transcribing session recordings</td></tr>
+</table></div>
+<p>An important detail: Anthropic's documentation states that it "does not offer its own embedding model" and points to Voyage AI (by MongoDB) as one provider, while advising you to assess several vendors. So a Claude-based search system usually involves at least two models from two companies: an embedding model to find relevant text and Claude to read it and answer.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A good general practitioner can treat most things, but the hospital still has an X-ray machine and a blood-test lab. Those machines don't diagnose; they do one narrow job very well and hand results to the doctor. Embedding models are like the lab: fast, cheap, narrow, and feeding the general model.</p></div>
+
+<h3 id="ch31-5"><span class="num">31.5</span>Versions, snapshots, aliases and retirement</h3>
+<p>Models also multiply over time. Each generation arrives while older ones are still in use, because businesses need time to test and switch. Three ideas matter here.</p>
+<p><strong>Snapshots.</strong> A <a class="gl" href="#g-model-snapshot">model snapshot</a> is one fixed, frozen version of a model. If you call the same snapshot next month, you get the same model (though, being <a class="gl" href="#g-non-deterministic">non-deterministic</a>, not necessarily word-for-word the same answer). Older Claude IDs put the snapshot date in the name, for example <code>claude-3-5-sonnet-20240620</code>. From the Claude 4.6 generation onward, Anthropic's IDs have no date (for example <code>claude-sonnet-5-5</code>) but are still pinned snapshots.</p>
+<p><strong>Aliases.</strong> An <a class="gl" href="#g-alias">alias</a> is a friendly name that may point to whatever the vendor currently considers the latest version. For the current Claude models, Anthropic lists the API ID and the alias as the same string. Other vendors use moving aliases such as "latest". Before you rely on a name, check whether it is pinned or moving.</p>
+<p><strong><a class="gl" href="#g-deprecation">Deprecation</a> and retirement.</strong> A deprecated model still works but has a published end date; a retired model stops answering. Anthropic publishes these dates:</p>
+<ol class="timeline">
+<li><span class="yr">Nov 2024</span><span class="ev"><b>Claude 1.x and Instant 1.x retired</b> (6 Nov 2024).</span></li>
+<li><span class="yr">Jul 2025</span><span class="ev"><b>Claude 2.0, 2.1 and Claude 3 Sonnet retired</b> (21 Jul 2025).</span></li>
+<li><span class="yr">Oct 2025</span><span class="ev"><b>Claude 3.5 Sonnet retired</b>, both versions (28 Oct 2025).</span></li>
+<li><span class="yr">Feb 2026</span><span class="ev"><b>Claude 3.7 Sonnet and Claude 3.5 Haiku retired</b> (19 Feb 2026).</span></li>
+<li><span class="yr">Jun 2026</span><span class="ev"><b>Claude Opus 4 and Sonnet 4 retired</b> (15 Jun 2026).</span></li>
+<li class="key"><span class="yr">Nov 2026</span><span class="ev"><b>Claude Sonnet 4.5 retires 30 Nov 2026.</b> Deprecated now; any pipeline still calling it must move.</span></li>
+<li><span class="yr">2027</span><span class="ev"><b>Current models:</b> Anthropic states Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 5.5 will not retire before Sep–Oct 2027.</span></li>
+</ol>
+<div class="box warn"><span class="tag">Why testers should care</span><p>A model change is a dependency upgrade. When your team's test-generation script, triage bot or AI feature moves from one model to another, its behaviour changes: wording, format, what it refuses, how often it calls tools. Treat it like upgrading a library. Pin the model ID in configuration, keep a small set of <a class="gl" href="#g-golden-answer">golden answers</a>, rerun them before switching, and put the retirement date in the team calendar. <a href="#ch36">Chapter 36</a> builds a harness for exactly this, and <a href="#ch125">Chapter 125</a> covers evals.</p></div>
+<details class="deep"><summary>Why a new model can cost more for the same text</summary><div class="body">
+<p>Price per token isn't the whole story, because different models can split the same text into different numbers of tokens. Anthropic's documentation notes that Claude 4.7 and later use a newer <a class="gl" href="#g-tokenizer">tokenizer</a> that produces "approximately 30% more tokens for the same text". So when comparing an older model with a newer one, compare the cost of a real task (measured in your own test run), not just the price list. <a href="#ch14">Chapter 14</a> explains tokenizers.</p>
+</div></details>
+
+<h3 id="ch31-6"><span class="num">31.6</span>Pricing tiers in practice</h3>
+<p>API prices are quoted per million tokens (MTok), separately for input (what you send) and output (what the model writes). Output costs more, typically four to five times the input price. Here is the output price across Claude's current tiers:</p>
+<div class="figure" role="img" aria-label="Bar chart of Claude output prices per million tokens: Haiku 5.5 $0.50, Sonnet 5.5 $10, Opus 5.5 $20, Fable 5.1 $50"><div class="bars"><div class="bt">Output price per million tokens (USD)</div>
+<div class="bar-row"><span>Haiku 5.5</span><span class="track"><span class="fill" style="width:1%">$0.50</span></span></div>
+<div class="bar-row"><span>Sonnet 5.5</span><span class="track"><span class="fill" style="width:20%">$10</span></span></div>
+<div class="bar-row"><span>Opus 5.5</span><span class="track"><span class="fill hl" style="width:40%">$20</span></span></div>
+<div class="bar-row"><span>Fable 5.1</span><span class="track"><span class="fill" style="width:100%">$50</span></span></div></div>
+<div class="cap">Claude API list prices, verified 9 November 2026 (platform.claude.com pricing page). Haiku 5.5 price applies to prompts up to 100K tokens; above that it is $2.50. Cloud platforms such as Bedrock and Vertex set their own prices.</div></div>
+<p>That is a 100-fold spread between the cheapest and most expensive tier. Three more levers change the bill:</p>
+<ul>
+<li><strong>Batch processing.</strong> If you can wait (most batches finish within an hour), Anthropic's Message Batches API is 50% off. Good for overnight jobs like re-labelling a backlog.</li>
+<li><strong>Prompt caching.</strong> If many calls share the same long prefix (instructions, a style guide, a codebase summary), cached reads cost a small fraction of the normal input price (for example 0.05× on Opus 5.5). <a href="#ch89">Chapter 89</a> covers caching.</li>
+<li><strong>Subscriptions versus API.</strong> In the Claude apps you pay a monthly plan with usage limits rather than per token; which models you can pick depends on the plan. <a href="#ch42">Chapter 42</a> covers plans.</li>
+</ul>
+<div class="box example"><span class="tag">Real-world example (illustrative numbers)</span><p>A team triages 20,000 tickets a month. Each call sends about 1,500 tokens and receives about 200. That's 30 million input tokens and 4 million output tokens. At list prices: Haiku 5.5 about $5, Sonnet 5.5 about $100, Opus 5.5 about $200, Fable 5.1 about $500 a month. If Haiku labels tickets accurately enough (which you must test), the top tier would cost 100 times more for no benefit. The lab below lets you rerun this with your own numbers.</p></div>
+
+<h3 id="ch31-7"><span class="num">31.7</span>A simple way to choose</h3>
+<p>Choosing a model is covered properly in <a href="#ch35">Chapter 35</a>. For now, this flow captures the idea:</p>
+<div class="flow">
+<div><b>1. Define the job</b>Input, output, volume, how fast, how bad is a mistake</div>
+<div><b>2. Pick the kind</b>General chat, embedding, image, speech?</div>
+<div class="hl"><b>3. Start mid-to-high</b>Prove the task works at all (Anthropic suggests Opus 5.5)</div>
+<div><b>4. Try cheaper</b>Test the same cases on a smaller tier or lower effort</div>
+<div><b>5. Pin and record</b>Pin the model ID; note the retirement date; rerun tests on change</div>
+</div>
+<div class="box opinion"><span class="tag">Opinion · widely held among AI engineering practitioners</span><p>Many practitioners argue that most production systems end up using two or more tiers: a cheap model for routing, classification and extraction, and a capable model only for the steps that need it. Anthropic's own positioning of Haiku for "classification, extraction, routing" points the same way. Whether that suits your team depends on your volumes and how much a wrong answer costs.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Same task, different tiers, real costs</b><span>30 min · claude.ai (any plan) + Python 3</span></div><ol>
+<li>Prepare three tasks of rising difficulty: (a) "Classify this ticket as bug, feature request or question: <i>Login button does nothing on Safari after the last release</i>." (b) "Write six test cases, including two negative ones, for: <i>As a user I can reset my password via an emailed link that expires after 30 minutes</i>." (c) Paste a 30-line flaky test from your project (or any small Playwright test) and ask "List the three most likely reasons this could be flaky, ranked, with evidence from the code."<span class="expect">three prompts saved in a text file so you can reuse them word for word.</span></li>
+<li>In claude.ai, open the model picker and choose the smallest model available on your plan (Free plans offer Sonnet and Haiku). Run all three tasks in separate new chats.<span class="expect">quick answers. Task (a) is almost certainly right; task (c) may be shallower or miss a cause.</span></li>
+<li>Repeat with a larger model (Sonnet on Free; Opus on paid plans). Use new chats again so earlier answers don't leak in.<span class="expect">similar results on (a); usually more thorough negative cases on (b) and better-grounded reasoning on (c). Note anything that was <em>not</em> better.</span></li>
+<li>Score each answer 0–2 (wrong, partly right, right) and note how long each took. Put results in a small table.<span class="expect">a table showing where the extra capability mattered and where it didn't.</span></li>
+<li>Save the script below as <code>cost.py</code> and run <code>python3 cost.py</code>. Then change the workload numbers to match a real job in your team, and try <code>use_batch = True</code>.<span class="expect">the output shown under the script; with batch on, every figure halves.</span></li>
+</ol></div>
+<div class="code"><span class="cap">cost.py</span><pre><span class="c"># cost.py - compare monthly cost of one job across Claude tiers</span>
+<span class="c"># Prices: USD per million tokens (MTok), Claude API list prices, verified 9 Nov 2026.</span>
+PRICES = {
+    "claude-haiku-5-5":  (0.10, 0.50),   <span class="c"># prompts up to 100K tokens</span>
+    "claude-sonnet-5-5": (2.00, 10.00),
+    "claude-opus-5-5":   (4.00, 20.00),
+    "claude-fable-5-1":  (10.00, 50.00),
+}
+
+<span class="c"># Illustrative workload: edit these numbers for your own job</span>
+calls_per_month = 20_000      <span class="c"># e.g. Jira tickets triaged</span>
+input_tokens    = 1_500       <span class="c"># prompt + ticket text, per call</span>
+output_tokens   = 200         <span class="c"># the model's answer, per call</span>
+use_batch       = False       <span class="c"># Batch API is 50% off</span>
+
+total_in  = calls_per_month * input_tokens / 1_000_000
+total_out = calls_per_month * output_tokens / 1_000_000
+print(f"Workload: {calls_per_month:,} calls, {total_in:.1f} MTok in, {total_out:.1f} MTok out")
+print(f"{'model':&lt;20}{'cost/month':&gt;12}")
+for model, (p_in, p_out) in PRICES.items():
+    cost = total_in * p_in + total_out * p_out
+    if use_batch:
+        cost *= 0.5
+    print(f"{model:&lt;20}{'$' + format(cost, ',.2f'):&gt;12}")</pre></div>
+<div class="code"><span class="cap">Expected output</span><pre>Workload: 20,000 calls, 30.0 MTok in, 4.0 MTok out
+model                 cost/month
+claude-haiku-5-5           $5.00
+claude-sonnet-5-5        $100.00
+claude-opus-5-5          $200.00
+claude-fable-5-1         $500.00</pre></div>
+<p><b>Troubleshooting.</b> <code>python3: command not found</code> on Windows: try <code>py cost.py</code>. A <code>SyntaxError</code> near the f-strings means Python is older than 3.6; install a current Python 3. If you can't see Opus in the model picker, your plan doesn't include it; compare Haiku and Sonnet instead. Prices change: check the official pricing page before using the figures in a business case.</p>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"The most expensive model is always the right choice."</dt><dd>For simple, high-volume work a small model is often just as accurate and many times cheaper and faster. Test before you assume.</dd>
+<dt>"A newer version is a drop-in replacement."</dt><dd>Behaviour, output format, token counts and refusals can all change. Treat a model switch like a library upgrade and rerun your checks.</dd>
+<dt>"Reasoning models are a different product I have to switch to."</dt><dd>Current Claude models think adaptively; you adjust effort rather than change model. Some other vendors still split them, so check each one.</dd>
+<dt>"Claude can make embeddings for my search system."</dt><dd>Anthropic doesn't offer an embedding model. You pair Claude with an embedding provider such as Voyage AI.</dd>
+<dt>"Bigger parameter count means a better model."</dt><dd>Only roughly. Distillation, Mixture of Experts and training quality mean smaller or sparser models can beat older, larger ones.</dd>
+</dl></div>
+
+<h3 id="ch31-r"><span class="num">31.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Every model trades capability against speed and cost, so companies sell families of models.</li>
+<li>Tiers are sizes: Claude's current line runs Haiku 5.5, Sonnet 5.5, Opus 5.5 and Fable 5.1, with a 100-fold spread in output price.</li>
+<li>Thinking time is a second dial; current Claude models think adaptively and you set an effort level.</li>
+<li>Specialised models (embeddings, image, speech, coding-tuned) do narrow jobs; Anthropic has no embedding model of its own.</li>
+<li>Pin model IDs, watch deprecation dates (Claude Sonnet 4.5 retires 30 Nov 2026) and retest when you switch.</li>
+<li>Batch processing (50% off) and prompt caching can change the cost picture as much as the tier.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Why do AI companies offer several model tiers instead of one?</p><div class="opts"><button>Because regulators require it</button><button data-ok>Because capability, speed and cost trade off, and different jobs need different balances</button><button>Because older models are more accurate</button></div><p class="why" hidden>A bigger model is more capable but slower and pricier; a smaller one is fast and cheap. Tiers let you match the model to the job.</p></div>
+<div class="qz"><p class="q">Your team needs to label 50,000 short support tickets overnight. Which choice is most sensible to try first?</p><div class="opts"><button>Fable 5.1 at maximum effort, to be safe</button><button data-ok>A small, fast tier such as Haiku, ideally through the Batch API, after testing accuracy on a sample</button><button>Whichever model is newest</button></div><p class="why" hidden>Classification at high volume is what small tiers are for, and batch processing halves the cost when you can wait. Testing a sample tells you whether accuracy is good enough.</p></div>
+<div class="qz"><p class="q">What does it mean when a model is "deprecated"?</p><div class="opts"><button>It has stopped working</button><button data-ok>It still works but has a published date after which it will stop</button><button>It has been made cheaper</button></div><p class="why" hidden>Deprecated means "still running, end date announced". Retired means it no longer answers.</p></div>
+<div class="qz"><p class="q">You want semantic search over 10,000 old bug reports and Claude to summarise the matches. What do you need?</p><div class="opts"><button>Only Claude, because it produces embeddings</button><button data-ok>An embedding model from a provider such as Voyage AI, plus Claude to read and summarise</button><button>An image generation model</button></div><p class="why" hidden>Anthropic's docs state it does not offer its own embedding model; a separate embedding provider handles the similarity search.</p></div>
+<div class="qz"><p class="q">In a Mixture of Experts model, what are "active parameters"?</p><div class="opts"><button>All the parameters the model has</button><button>The parameters changed during fine-tuning</button><button data-ok>The subset of parameters actually used for each token</button></div><p class="why" hidden>A router picks a few experts per token, so only part of the model runs each time. That keeps cost per token down while total size stays large.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>List every place your team uses (or plans to use) an AI model: chat, test generation, triage, code review, search. For each, write the model and version used, whether the ID is pinned, the expected monthly volume, and the cheapest tier you think could do the job. Then use <code>cost.py</code> to estimate the monthly cost at the current tier and at your proposed tier. Finish with one sentence per use naming the test you would run before switching.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"There's no single best AI model, just as there's no single best vehicle. Bigger models handle harder problems but are slower and cost more; smaller ones are fast and cheap. So each company sells a range: for Claude that's Haiku, Sonnet, Opus and Fable, with about a hundred-fold price spread. On top of that you can turn thinking effort up or down, and there are specialist models for things like search and images. Models also get replaced, so we pin the exact version and retest when it changes, just like a library upgrade."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/models/overview" target="_blank" rel="noopener">Models overview</a>: tiers, positioning, latency, context, effort defaults, IDs, earliest retirement dates, tokenizer note.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Pricing</a>: per-MTok prices, batch discount, cache pricing.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/model-deprecations" target="_blank" rel="noopener">Model deprecations</a>: retirement dates.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/embeddings" target="_blank" rel="noopener">Embeddings</a>: "Anthropic does not offer its own embedding model"; Voyage AI models.</li>
+<li>Anthropic, <a href="https://www.anthropic.com/news/claude-3-7-sonnet" target="_blank" rel="noopener">Claude 3.7 Sonnet and Claude Code</a> (hybrid reasoning, Feb 2025).</li>
+<li>OpenAI, <a href="https://developers.openai.com/api/docs/models" target="_blank" rel="noopener">Models</a>; Google, <a href="https://aistudio.google.com/docs/changelog" target="_blank" rel="noopener">Gemini API changelog</a>; DeepSeek, <a href="https://api-docs.deepseek.com/news/news" target="_blank" rel="noopener">API news</a>.</li>
+<li>Microsoft AI, <a href="https://microsoft.ai/news/introducing-mai-thinking-1/" target="_blank" rel="noopener">Introducing MAI-Thinking-1</a> (MoE sizes); TechCrunch, <a href="https://techcrunch.com/2026/10/06/mistrals-new-1t-model-aims-to-leapfrog-closed-and-open-rivals/" target="_blank" rel="noopener">Mistral Large 4</a>.</li>
+<li>G. Hinton, O. Vinyals and J. Dean, "Distilling the Knowledge in a Neural Network" (2015), <a href="https://arxiv.org/abs/1503.02531" target="_blank" rel="noopener">arXiv:1503.02531</a>; N. Shazeer et al., "Outrageously Large Neural Networks: The Sparsely-Gated Mixture-of-Experts Layer" (2017), <a href="https://arxiv.org/abs/1701.06538" target="_blank" rel="noopener">arXiv:1701.06538</a>.</li>
+</ol><p class="verified">Verified 9 November 2026 against the Claude models overview, pricing, deprecations and embeddings pages, and the project's industry fact sheet. Model line-ups change often; recheck before relying on them.</p></div>

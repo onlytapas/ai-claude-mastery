@@ -1,0 +1,158 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What a Claude project is, and what it adds to an ordinary chat</li>
+<li>The two building blocks: project knowledge and project instructions, and how to write each well</li>
+<li>What happens when the knowledge gets large (retrieval on paid plans), and the limits that apply</li>
+<li>How projects handle memory, and what is and isn't shared between chats</li>
+<li>How sharing works on Team and Enterprise, including permission levels and admin controls</li>
+<li>How to set up a complete QA project for a product team, step by step</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> You should be comfortable with chats (<a href="#ch43">Chapter 43</a>), prompts (<a href="#ch44">Chapter 44</a>) and uploading files (<a href="#ch46">Chapter 46</a>). Knowing what a <a class="gl" href="#g-system-prompt">system prompt</a> is (<a href="#ch45">Chapter 45</a>) helps with instructions. The lab works on any plan; the sharing steps need Team or Enterprise.</div>
+
+<div class="bigidea"><p>A project is a folder for related chats that comes with its own reference material and its own standing instructions. Everything you put in the project's knowledge, such as your test strategy, glossary and Jira conventions, is available in every chat you start inside it, and the instructions shape how Claude answers there. You set the context up once instead of re-pasting it into every chat. On Team and Enterprise plans you can share a project, so a whole QA team works from the same material and the same rules. A project doesn't make Claude learn permanently; it just gives it the same well-chosen starting context every time.</p></div>
+
+<h3 id="ch47-1"><span class="num">47.1</span>The problem projects solve</h3>
+<p>Imagine you use Claude every day to write test cases for one product. Each new chat starts blank. So each time you paste the product overview, explain your test-case template, remind Claude that you use Gherkin, and mention that the payments module is out of scope. That is slow, and it drifts: today's paste is slightly different from yesterday's, so the output varies.</p>
+<p>Anthropic describes projects as "self-contained workspaces with their own chat histories and knowledge bases". You put the stable context in once, and every chat in the project starts with it.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A project is like the onboarding pack and desk you give a new contractor. The binder on the desk holds the reference documents (knowledge). The note taped to the monitor says how you like things done (instructions). Every morning they sit at the same desk, so you don't explain it all again. But they don't remember yesterday's conversations unless they're written down in the binder.</p></div>
+<div class="tbl"><table>
+<tr><th></th><th>Ordinary chat</th><th>Chat inside a project</th></tr>
+<tr><td>Reference material</td><td>Whatever you attach to this chat</td><td>Project knowledge, available in every chat in the project, plus anything you attach</td></tr>
+<tr><td>Standing guidance</td><td>Your profile preferences only</td><td>Profile preferences plus the project's instructions</td></tr>
+<tr><td>Memory</td><td>Account memory (if on)</td><td>The project's own memory, plus account memory unless you turn that off</td></tr>
+<tr><td>Sharing with colleagues</td><td>Snapshot link to one chat</td><td>The whole project, on Team and Enterprise</td></tr>
+</table></div>
+
+<h3 id="ch47-2"><span class="num">47.2</span>Creating a project and who can have one</h3>
+<p>Projects are available on every plan. Free accounts can create up to five; the help centre doesn't state a cap for paid plans. At the time of writing (UI liable to change):</p>
+<div class="flow"><div><b>Open</b>Projects in the left sidebar, or go to claude.ai/projects</div><div><b>Create</b>Click "+ New Project"</div><div><b>Name it</b>Enter a name and description</div><div class="hl"><b>Instructions</b>"Set project instructions", then "Save instructions"</div><div><b>Knowledge</b>Click "+" in the knowledge area and add files</div></div>
+<div class="box note"><span class="tag">Claude can't see the name or description</span><p>The help centre says the project's name and description are for people, not for Claude. If something matters to the answers, put it in the instructions or the knowledge.</p></div>
+<p>On Team and Enterprise you also choose visibility when you create it: keep it private, or share it with your broader organisation. Enterprise organisations can require tags on projects. To move an existing chat into a project, use the dropdown next to the chat's name and choose "Add to project". Projects can be archived (they move to an archived tab and keep their knowledge and sharing) or deleted; you must unarchive a project before you can delete it.</p>
+
+<h3 id="ch47-3"><span class="num">47.3</span>Project knowledge</h3>
+<p><a class="gl" href="#g-project-knowledge">Project knowledge</a> is the set of documents, text files and code you add to the project. Claude uses it in every chat in that project. Files follow the project limits from <a href="#ch46">Chapter 46</a>: up to 30 MB each, with text extracted (multimodal PDFs are the exception, so their charts and images can be read).</p>
+<h4>What makes good knowledge for a QA team</h4>
+<div class="tbl"><table>
+<tr><th>Put in</th><th>Why</th><th>Leave out</th></tr>
+<tr><td>Test strategy and definition of done</td><td>Claude can check work against your actual rules</td><td>Old strategies that contradict the current one</td></tr>
+<tr><td>Product overview and domain glossary</td><td>Fewer wrong assumptions about features and terms</td><td>Marketing copy with no testable detail</td></tr>
+<tr><td>Test-case and bug-report templates, with one good example each</td><td>Consistent output format across the team</td><td>Ten examples of varying quality</td></tr>
+<tr><td>API specification (for example an OpenAPI file)</td><td>Accurate API test ideas and payloads</td><td>Secrets, tokens, real customer data</td></tr>
+<tr><td>Known risks, out-of-scope list, environments table</td><td>Claude stops suggesting tests you can't run</td><td>Anything you'd not show every project member</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Knowledge goes stale</span><p>Claude can't tell that last quarter's environments table is out of date. Put a "last updated" date at the top of each knowledge file, keep one owner per file, and delete superseded versions instead of adding new ones next to them. Conflicting files give inconsistent answers.</p></div>
+<details class="deep"><summary>Under the hood: what happens when knowledge gets big</summary><div class="body">
+<p>When the knowledge is small, it is simply placed in Claude's <a class="gl" href="#g-context-window">context window</a> at the start of each chat, alongside the instructions. Claude can see all of it at once.</p>
+<p>On paid plans (Pro, Max, Ultra, Team, Enterprise), when the knowledge approaches the context limit, Claude automatically switches to <a class="gl" href="#g-rag">RAG</a>, retrieval-augmented generation. Instead of reading everything, it searches the knowledge for the passages most relevant to your question and reads those. The help centre says this expands capacity "by up to 10x" while aiming to keep response quality. You'll learn how retrieval works in <a href="#ch23">Chapter 23</a>.</p>
+<p>The trade-off: with retrieval, Claude sees the parts it found, not the whole. A question like "list every requirement across all specs" may miss items that the search didn't surface. For exhaustive checks on big document sets, attach the specific files to the chat, or split the work.</p>
+<p>On the Free plan there is no retrieval mode, so the whole knowledge base must fit in the context window.</p>
+</div></details>
+
+<h3 id="ch47-4"><span class="num">47.4</span>Project instructions</h3>
+<p><a class="gl" href="#g-project-instructions">Project instructions</a> are standing guidance that applies to every chat in the project. They work much like a system prompt: who Claude should act as, what format to use, what to avoid. Everything in <a href="#ch44">Chapter 44</a> and <a href="#ch45">Chapter 45</a> applies, with one difference: instructions are read for every question, so they should be about how to work, not about one task.</p>
+<div class="code"><span class="cap">Example project instructions: QA for a checkout product</span><pre>You are a senior QA engineer on the "ShopFast" checkout team.
+
+Context
+- Product, environments and scope are in the project knowledge.
+  Prefer it over general knowledge. If the knowledge doesn't cover
+  something, say so instead of assuming.
+- Payments provider internals are out of scope (see out-of-scope.md).
+
+When writing test cases
+- Use the template in test-case-template.md.
+- Write scenarios in Gherkin (Given/When/Then).
+- Cover positive, negative and boundary cases; label each.
+- Link each case to its Jira story key if one is given.
+
+When writing bug reports
+- Use bug-template.md. Severity uses the scale in test-strategy.md.
+- Only state facts I gave you or that are visible in attachments.
+
+Always
+- British English. Be concise. Use tables for lists of cases.
+- End with "Open questions" if anything was ambiguous.</pre></div>
+<div class="cols2"><div><h4>Good instructions</h4><p>Short, stable rules. Point to files by name. Say what to do when the knowledge is silent. Describe format once. Under a page.</p></div><div><h4>Weak instructions</h4><p>A specific task ("write tests for story SHOP-412"), which belongs in a chat. Long copies of documents already in knowledge. Vague style words ("be thorough and amazing"). Rules that contradict the files.</p></div></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A team's project instructions said "always produce 20 test cases". Test case quality fell for small stories, because Claude padded the list. They changed it to "produce as many cases as the risk warrants, usually 5 to 15, and explain any gaps", and reviews got faster. Instructions are rules for every chat, so a number that suits one story hurts another.</p></div>
+
+<h3 id="ch47-5"><span class="num">47.5</span>What is shared between chats, and memory</h3>
+<p>This is a common surprise. Chats inside one project do <b>not</b> automatically see each other. The help centre says context isn't shared across project chats unless it is in the project knowledge. If a chat produced a useful result, such as an agreed list of risk areas, save it as a file in the knowledge so later chats can use it.</p>
+<p>Memory adds a layer on top. Each project has its own memory, separate from your other projects. Claude uses it alongside your non-project (account) memory, but never another project's memory. To keep a project completely separate, turn off "Use account memory" in the project's Memory settings. To skip memory for a single chat, turn off "Memory" in the "+" menu before your first message. Memory is covered fully in <a href="#ch50">Chapter 50</a>.</p>
+<div class="figure" role="img" aria-label="Diagram of what a chat inside a project can see: project instructions, project knowledge, project memory and account memory, but not other chats or other projects"><div class="flow"><div><b>Instructions</b>Always applied</div><div class="hl"><b>Knowledge</b>Read directly, or searched when large</div><div><b>Project memory</b>This project only</div><div><b>Account memory</b>Unless turned off for the project</div><div><b>Not visible</b>Other chats, other projects' memory</div></div>
+<div class="cap">What a new chat in a project starts with. Based on the Claude Help Center, November 2026.</div></div>
+
+<h3 id="ch47-6"><span class="num">47.6</span>Sharing projects on Team and Enterprise</h3>
+<p>Sharing a project is a Team and Enterprise feature. Shared projects are how a QA team gets the same context and the same rules, instead of five slightly different personal copies.</p>
+<p>To share, open the project and click "Share project" next to its name, add colleagues by name or email (several at once), choose a role and click "Share". You can also make a project visible to the whole organisation. A "Shared with you" tab on the Projects page lists projects others have shared with you.</p>
+<div class="tbl"><table>
+<tr><th>Role</th><th>What they can do</th><th>Typical QA use</th></tr>
+<tr><td><b>Can view</b></td><td>See the project's contents, knowledge and instructions, and chat in it; cannot change it</td><td>Testers, developers and analysts who use the project</td></tr>
+<tr><td><b>Can edit</b></td><td>Change instructions and knowledge, manage members and their settings (and add tags on Enterprise)</td><td>The QA lead and one or two maintainers</td></tr>
+</table></div>
+<div class="box note"><span class="tag">Labels vary between help articles</span><p>The current "create and manage projects" article calls the read-only role "Can view"; an older sharing article called it "Can use". The meaning is the same. Check what your app shows.</p></div>
+<p>Each member's chats in a shared project are their own. Sharing the project shares the knowledge and instructions, not everyone's conversations. Chats are shared separately, as snapshots (<a href="#ch51">Chapter 51</a>).</p>
+<h4>Admin controls</h4>
+<ul>
+<li>Owners can turn off project sharing for the organisation. Turning off "Share projects" also turns off public (organisation-wide) projects; existing shares stay in place.</li>
+<li>Owners or Primary Owners can turn off organisation-wide visibility separately.</li>
+<li>Enterprise organisations can require tags on projects.</li>
+<li>If an artifact was made inside a project, people you share it with also need access to the project (<a href="#ch48">Chapter 48</a>).</li>
+</ul>
+<div class="box warn"><span class="tag">Sharing the knowledge shares the files</span><p>Everyone with access can see every knowledge file. Before sharing org-wide, re-read the knowledge list as if you were the newest person in the company. Remove anything with personal data, credentials or confidential customer names.</p></div>
+<div class="box opinion"><span class="tag">Opinion · this textbook's authors</span><p>For teams, the most useful pattern is one shared "source of truth" project per product, with few editors and many viewers, plus personal projects for experiments. Editing rights for everyone tends to produce duplicated and conflicting knowledge within weeks.</p></div>
+
+<h3 id="ch47-7"><span class="num">47.7</span>Projects compared with other ways to give context</h3>
+<p>Projects are one of several ways to give Claude standing context. Choosing well saves effort.</p>
+<div class="tbl"><table>
+<tr><th>Tool</th><th>Best for</th><th>Chapter</th></tr>
+<tr><td>Project</td><td>A body of documents and rules for one product or workstream, in the Claude apps</td><td>This chapter</td></tr>
+<tr><td>Profile preferences and memory</td><td>Facts about you that apply everywhere (role, language, style)</td><td><a href="#ch50">Chapter 50</a></td></tr>
+<tr><td><a class="gl" href="#g-skill">Skill</a></td><td>A reusable procedure (with optional scripts) Claude loads when relevant, across chats</td><td><a href="#ch80">Chapter 80</a></td></tr>
+<tr><td><a class="gl" href="#g-connector">Connector</a></td><td>Live data from Jira, Google Drive, GitHub and similar, instead of copies</td><td><a href="#ch49">Chapter 49</a></td></tr>
+<tr><td><a class="gl" href="#g-claude-md">CLAUDE.md</a></td><td>Project context for Claude Code in a code repository</td><td><a href="#ch77">Chapter 77</a></td></tr>
+</table></div>
+<p>Knowledge files are copies. If your test strategy lives in Confluence and changes weekly, a connector that reads the live page may suit better than uploading a copy that goes stale. Many teams combine the two: stable rules in the project, live tickets through a connector.</p>
+
+<div class="lab"><div class="lab-h"><b>Build a QA project for a product team</b><span>30 min · claude.ai (any plan; sharing needs Team or Enterprise)</span></div><ol>
+<li>Create three small text files on your computer. Use your own product if you are allowed to; otherwise use this illustrative content. <code>test-strategy.md</code>: "Last updated 9 Nov 2026. Severity scale: S1 blocks release; S2 major feature broken with no workaround; S3 workaround exists; S4 cosmetic. Every story needs positive, negative and boundary tests." <code>test-case-template.md</code>: "ID, Title, Story key, Type (positive/negative/boundary), Preconditions, Steps (Gherkin), Expected result." <code>out-of-scope.md</code>: "Payment provider internals. Load testing (done by the performance team)."<span class="expect">three files ready to upload.</span></li>
+<li>In claude.ai, open Projects and click "+ New Project". Name it "ShopFast QA (practice)".<span class="expect">an empty project page with an area for instructions and a knowledge area.</span></li>
+<li>Click the "+" in the knowledge area and upload the three files.<span class="expect">three files listed in the project knowledge, with a capacity indicator.</span></li>
+<li>Click "Set project instructions", paste the example instructions from section 47.4, and click "Save instructions".<span class="expect">the instructions saved and shown on the project page.</span></li>
+<li>Start a chat in the project and ask: "Write test cases for this story: As a shopper I can apply one discount code at checkout. Codes are 6 to 12 uppercase letters or digits. Expired codes show the message 'This code has expired'."<span class="expect">a table using your template's columns, Gherkin steps, cases labelled positive, negative and boundary (for example 5, 6, 12 and 13 characters), and an "Open questions" section (such as whether lowercase is accepted). Nothing about testing the payment provider.</span></li>
+<li>Test the boundary of the knowledge. Ask: "What is our severity for a typo on the confirmation page, and what is our policy on accessibility testing?"<span class="expect">S4 from your strategy file for the typo, and a statement that the knowledge doesn't cover accessibility policy, not an invented one.</span></li>
+<li>Start a second chat in the project and ask: "What story did we just write tests for?"<span class="expect">Claude doesn't know, because chats don't share context (unless project memory has picked it up; if so, notice that). Save the agreed test cases as a file in the knowledge if you want later chats to use them.</span></li>
+<li>Team or Enterprise only: click "Share project", add a colleague with "Can view", and ask them to run step 5.<span class="expect">their answer follows the same template and rules as yours.</span></li>
+</ol>
+<p><b>Troubleshooting.</b> <i>Claude ignores the template:</i> check the file name in your instructions matches the uploaded file exactly. <i>Answers invent policy:</i> strengthen the "if the knowledge doesn't cover something, say so" line. <i>No "Share project" button:</i> sharing is Team and Enterprise only, or your owner has turned it off. <i>"New Project" missing on Free:</i> you may already have five projects; archive or delete one.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Claude learns from my project and gets permanently better at my product."</dt><dd>The model doesn't change. Each chat is given the instructions and knowledge (and any project memory) as context. Remove a file and Claude no longer knows what was in it.</dd>
+<dt>"All chats in a project can see each other."</dt><dd>They can't, unless information is saved in the knowledge or picked up by project memory.</dd>
+<dt>"Putting the project's purpose in its description guides Claude."</dt><dd>Claude can't see the name or description. Use the instructions.</dd>
+<dt>"Sharing a project shares my chats in it."</dt><dd>It shares knowledge and instructions. Each person's chats stay their own.</dd>
+<dt>"More knowledge is always better."</dt><dd>Outdated or conflicting files make answers worse, and on large projects retrieval may surface the wrong one. Curate.</dd>
+</dl></div>
+
+<h3 id="ch47-r"><span class="num">47.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>A project bundles chats with shared knowledge and standing instructions, so you set context up once.</li>
+<li>Projects are on all plans; Free accounts can create up to five. Retrieval for large knowledge (up to about 10 times more) is on paid plans.</li>
+<li>Instructions should be short, stable rules about how to work; tasks belong in chats.</li>
+<li>Chats in a project don't share context with each other; each project has its own memory, separate from other projects.</li>
+<li>Team and Enterprise can share projects with "Can view" or "Can edit" roles; owners control whether sharing is allowed.</li>
+<li>Curate knowledge: date it, give it an owner, delete superseded files, and never include secrets or real customer data.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">You wrote "This project is for the mobile app only" in the project description. Claude keeps answering about the web app. Why?</p><div class="opts"><button>The model is too small</button><button data-ok>Claude can't see the project's name or description; put it in the instructions</button><button>Descriptions only work on paid plans</button></div><p class="why" hidden>The help centre says the name and description are for people. Instructions and knowledge reach Claude.</p></div>
+<div class="qz"><p class="q">What happens on a Pro plan when project knowledge approaches the context limit?</p><div class="opts"><button>Uploads stop working</button><button>Claude silently drops the oldest files</button><button data-ok>Claude switches to retrieval, searching the knowledge for relevant passages</button></div><p class="why" hidden>RAG mode activates automatically on paid plans and expands capacity by up to 10 times.</p></div>
+<div class="qz"><p class="q">A colleague should use the team's QA project but not change it. Which role fits?</p><div class="opts"><button data-ok>Can view</button><button>Can edit</button><button>Owner</button></div><p class="why" hidden>Viewers can see the knowledge and instructions and chat in the project, but cannot modify it.</p></div>
+<div class="qz"><p class="q">Which belongs in project instructions rather than in a chat?</p><div class="opts"><button>"Write tests for story SHOP-412"</button><button data-ok>"Use the bug template in bug-template.md and the severity scale in test-strategy.md"</button><button>"Summarise yesterday's stand-up notes"</button></div><p class="why" hidden>Instructions are standing rules for every chat. One-off tasks go in the chat itself.</p></div>
+<div class="qz"><p class="q">In a new chat you ask about the risk list agreed in another chat in the same project. Claude doesn't know it. What's the fix?</p><div class="opts"><button>Rename the project</button><button data-ok>Save the agreed list as a knowledge file</button><button>Upgrade to Enterprise</button></div><p class="why" hidden>Context isn't shared across project chats unless it is in the project knowledge.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Design your team's real QA project on paper first: list five knowledge files (with an owner and update frequency for each), write instructions under 300 words, and decide who gets "Can edit". Then build it (with masked content if needed), run three real tasks through it (test cases, a bug report, a release-notes review), and note one change to the instructions after each. Present the result to your team in ten minutes.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"A Claude project is a workspace with a binder and a rule sheet. The binder is the knowledge: our strategy, templates and specs. The rule sheet is the instructions: how to write test cases, which format, what's out of scope. Every chat in the project starts with both, so we stop re-pasting context. Chats don't see each other, so save anything worth keeping into the knowledge. On Team plans we can share the project so everyone gets the same answers, and only a few people should be editors."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Claude Help Center, "What are projects?" <a href="https://support.claude.com/en/articles/9517075-what-are-projects" target="_blank" rel="noopener">support.claude.com/en/articles/9517075</a></li>
+<li>Claude Help Center, "How can I create and manage projects?" <a href="https://support.claude.com/en/articles/9519177-how-can-i-create-and-manage-projects" target="_blank" rel="noopener">support.claude.com/en/articles/9519177</a></li>
+<li>Claude Help Center, "Project visibility and sharing". <a href="https://support.claude.com/en/articles/9519189-project-visibility-and-sharing" target="_blank" rel="noopener">support.claude.com/en/articles/9519189</a></li>
+<li>Claude Help Center, "What kinds of documents can I upload to Claude.ai?" (project file limits). <a href="https://support.claude.com/en/articles/8241126-what-kinds-of-documents-can-i-upload-to-claude-ai" target="_blank" rel="noopener">support.claude.com/en/articles/8241126</a></li>
+<li>Claude pricing and plan features. <a href="https://claude.com/pricing" target="_blank" rel="noopener">claude.com/pricing</a></li>
+</ol><p class="verified">Verified 9 November 2026 against the Claude Help Center and claude.com/pricing. Button names and menu locations are liable to change; role labels differed between help articles.</p></div>

@@ -1,0 +1,138 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How people went from counting tools to programmable computers</li>
+<li>Who Charles Babbage, Ada Lovelace, Alan Turing and Claude Shannon were, and why they matter to AI</li>
+<li>What binary, bits, transistors and chips are, in plain words</li>
+<li>Why faster chips, the internet and graphics cards made modern AI possible</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 1 is helpful but not required.</div>
+
+<div class="bigidea"><p>AI runs on computers, so its story starts with computing. Over about two hundred years, people learned to build machines that follow instructions; to turn any information into 0s and 1s; to make those machines tiny, fast and cheap; and to connect them all together. Each step was a building block. Modern AI needed all of them: <strong>clever methods, huge amounts of data and enormous computing power</strong>.</p></div>
+
+<h3 id="ch2-1"><span class="num">2.1</span>From counting to calculating machines</h3>
+<p>For most of history, "computer" was a job title: a person who did calculations by hand. Tools helped. The abacus has been used for thousands of years. In 1642 the French mathematician Blaise Pascal built a mechanical adding machine for his father's tax work, and in the 1670s Gottfried Leibniz designed one that could also multiply.</p>
+<p>These machines could calculate, but they couldn't be <em>programmed</em>: each did one fixed job. The next idea came from an unexpected place, a weaving loom.</p>
+<div class="box example"><span class="tag">Real-world example: the Jacquard loom</span><p>In 1804 Joseph-Marie Jacquard built a loom controlled by a chain of punched cards. Holes in each card decided which threads were lifted, so changing the cards changed the pattern woven into the fabric, without rebuilding the machine. That's the core idea of software: <strong>the same machine, different instructions</strong>.</p></div>
+
+<h3 id="ch2-2"><span class="num">2.2</span>Babbage and Lovelace: the first computer that was never built</h3>
+<div class="person"><span class="ini">CB</span><b>Charles Babbage (1791–1871)</b><span>English mathematician who designed the first general-purpose mechanical computer.</span></div>
+<div class="person"><span class="ini">AL</span><b>Ada Lovelace (1815–1852)</b><span>Mathematician who wrote what's often called the first computer program, and foresaw computers handling more than numbers.</span></div>
+<p>In the 1820s Babbage designed a <strong>Difference Engine</strong> to calculate mathematical tables automatically, since hand-made tables were full of errors. He then conceived something far more ambitious, the <strong>Analytical Engine</strong> (designed from 1837). It had all the parts of a modern computer: a "mill" to calculate (like today's processor), a "store" to hold numbers (like memory), and punched cards for instructions and data. It was never completed; the engineering of the time couldn't build it.</p>
+<p>In 1843 Ada Lovelace translated an article about the Analytical Engine and added her own notes, longer than the article itself. They included a step-by-step method for the engine to calculate a series of numbers called Bernoulli numbers, often described as the first published computer program. She also saw further than Babbage: the machine could work with anything that could be represented by symbols, such as music, not just numbers.</p>
+<p>She also made a famous claim that still matters to AI: the engine "has no pretensions whatever to originate anything. It can do whatever we know how to order it to perform." Turing would answer this objection a century later (Chapter 3), and people still argue about it when they ask whether AI can be creative.</p>
+
+<h3 id="ch2-3"><span class="num">2.3</span>Logic becomes arithmetic: Boole</h3>
+<p>In 1854 the English mathematician George Boole published <i>The Laws of Thought</i>. He showed that logical reasoning (AND, OR, NOT, true, false) could be written and calculated like algebra. Today this is called <strong>Boolean logic</strong>. It seemed abstract at the time. It became the basis of every digital circuit ever built.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>You use Boolean logic every time you search a shop's website for "shoes AND black NOT trainers", or set an email rule like "if the sender is my manager OR the subject contains 'urgent', flag it".</p></div>
+
+<h3 id="ch2-4"><span class="num">2.4</span>Data at scale: punched cards and the census</h3>
+<p>By the 1880s the US census was taking so long to count by hand that the next one would start before the last was finished. Herman Hollerith built electric machines that read punched cards, and the 1890 census was processed far faster. His company later became part of IBM. For the next seventy years, punched cards were how businesses stored and processed data. This is the first big example of a theme that returns in every chapter of AI history: <strong>handling large amounts of data needs machines</strong>.</p>
+
+<h3 id="ch2-5"><span class="num">2.5</span>Turing's universal machine (1936)</h3>
+<div class="person"><span class="ini">AT</span><b>Alan Turing (1912–1954)</b><span>English mathematician, founder of computer science and of the idea of machine intelligence.</span></div>
+<p>In 1936, before any electronic computer existed, Alan Turing published a paper describing an imaginary machine. It reads and writes symbols on a long tape, one at a time, following a simple table of rules. He showed two remarkable things:</p>
+<ol>
+<li>This very simple machine could carry out <em>any</em> calculation that can be done step by step.</li>
+<li>One machine, given the right instructions on its tape, could imitate any other such machine. He called it a <strong>universal machine</strong>.</li>
+</ol>
+<p>That second point is the idea behind every computer you've used: one piece of hardware that can run any program. Your phone is a universal machine. So is the data-centre computer running Claude.</p>
+<details class="deep"><summary>What the Turing machine actually looks like</summary><div class="body">
+<p>Imagine an endless paper tape divided into squares, each holding a symbol (say 0, 1 or blank). A head sits over one square. The machine has a current "state" (like a mode). At each step it reads the symbol under the head, looks up its rule table for that state and symbol, and the rule says: write this symbol, move left or right one square, switch to this state. That's all.</p>
+<p>Turing also proved that some problems can't be solved by any such machine. The famous example is the "halting problem": no general program can examine every other program and correctly predict whether it will eventually finish or run forever. This was one of the first proofs that computing has fundamental limits, a theme that returns when people ask what AI can ever do.</p>
+</div></details>
+
+<h3 id="ch2-6"><span class="num">2.6</span>Shannon: everything becomes bits</h3>
+<div class="person"><span class="ini">CS</span><b>Claude Shannon (1916–2001)</b><span>American engineer, founder of information theory. Anthropic's Claude is widely reported to be named after him.</span></div>
+<p>In 1937, as a 21-year-old student, Claude Shannon showed in his master's thesis that electrical switches could carry out Boole's logic. On and off could mean true and false, or 1 and 0, and circuits of switches could calculate. This links Boole's algebra to real machines.</p>
+<p>In 1948 he published "A Mathematical Theory of Communication", founding <strong>information theory</strong>. He showed that any information (text, sound, pictures) can be measured and sent as a series of <a class="gl" href="#g-bit">bits</a>. In the same work he experimented with predicting the next letter of English text from the letters before it. Seventy years later, predicting the next piece of text is exactly what language models do (Chapter 17).</p>
+
+<div class="box analogy"><span class="tag">In everyday life: what is binary?</span><p>Imagine a row of light switches. Each is either off (0) or on (1). With one switch you can say two things; with two switches, four (00, 01, 10, 11); with eight switches, 256. That's enough for every letter, number and punctuation mark on a keyboard. Computers store everything this way. The letter "A" is commonly stored as 01000001. A photo is millions of these patterns, one for the colour of each dot.</p></div>
+<div class="tbl"><table>
+<tr><th>Unit</th><th>Size</th><th>Roughly holds</th></tr>
+<tr><td>Bit</td><td>A single 0 or 1</td><td>Yes or no</td></tr>
+<tr><td>Byte</td><td>8 bits</td><td>One letter</td></tr>
+<tr><td>Kilobyte (KB)</td><td>About a thousand bytes</td><td>A short email</td></tr>
+<tr><td>Megabyte (MB)</td><td>About a million bytes</td><td>A photo, or a long novel as plain text</td></tr>
+<tr><td>Gigabyte (GB)</td><td>About a billion bytes</td><td>A film</td></tr>
+<tr><td>Terabyte (TB)</td><td>About a trillion bytes</td><td>A large laptop drive</td></tr>
+</table></div>
+
+<h3 id="ch2-7"><span class="num">2.7</span>War and the first electronic computers</h3>
+<p>The Second World War turned theory into machines. At Bletchley Park in Britain, codebreakers including Turing worked on breaking German codes. For the most complex German cipher, engineer Tommy Flowers built <strong>Colossus</strong> (1943–44), one of the first programmable electronic computers, using about 1,600 vacuum tubes in its first version.</p>
+<p>In the United States, <strong>ENIAC</strong> was completed in 1945 to calculate artillery tables. It filled a large room, weighed about 27 tonnes and used around 18,000 vacuum tubes. It was reprogrammed by rewiring cables by hand.</p>
+<p>In 1945 the mathematician John von Neumann described a better design in which the program is stored in the computer's memory alongside the data, so changing the program just means loading different instructions. This <strong>stored-program</strong> design, often called the von Neumann architecture, is still how almost every computer works.</p>
+<div class="flow">
+<div><b>Input</b>Keyboard, files, network</div>
+<div class="hl"><b>Processor</b>Follows instructions, one tiny step at a time</div>
+<div><b>Memory</b>Holds both the program and the data</div>
+<div><b>Output</b>Screen, files, network</div>
+</div>
+
+<h3 id="ch2-8"><span class="num">2.8</span>Smaller, faster, cheaper: transistors and chips</h3>
+<p>Vacuum tubes were large, hot and kept burning out. In 1947 John Bardeen, Walter Brattain and William Shockley at Bell Labs invented the <a class="gl" href="#g-transistor">transistor</a>, a tiny solid switch that did the same job. In 1958–59 Jack Kilby and Robert Noyce independently invented the <strong>integrated circuit</strong>: many transistors made together on one small piece of silicon, a "chip".</p>
+<p>In 1965 Gordon Moore, who later co-founded Intel, observed that the number of transistors on a chip was doubling regularly. This became known as <a class="gl" href="#g-moore-s-law">Moore's law</a>, and it held for decades at roughly every two years. In 1971 Intel released the 4004, a whole processor on one chip with about 2,300 transistors. Modern chips hold tens of billions.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Your phone has more computing power than all the computers NASA used for the Apollo moon landings combined. That's Moore's law at work: decades of doubling turns small improvements into unimaginable ones. AI depends on this. The methods behind today's AI were partly known in the 1980s, but computers weren't fast enough to make them work well.</p></div>
+
+<h3 id="ch2-9"><span class="num">2.9</span>Computers for everyone, then the internet</h3>
+<ol class="timeline">
+<li><span class="yr">1969</span><span class="ev"><b>ARPANET</b> sends its first message between two US universities: the ancestor of the internet.</span></li>
+<li><span class="yr">1977</span><span class="ev"><b>Apple II</b> and other home computers appear.</span></li>
+<li><span class="yr">1981</span><span class="ev"><b>IBM PC</b> brings personal computers into offices.</span></li>
+<li class="key"><span class="yr">1989</span><span class="ev"><b>Tim Berners-Lee</b> proposes the World Wide Web at CERN; it opens to the public in the early 1990s.</span></li>
+<li><span class="yr">1998</span><span class="ev"><b>Google</b> is founded and begins indexing the web.</span></li>
+<li><span class="yr">2000s</span><span class="ev"><b>Wikipedia</b> (2001), social media and smartphones (iPhone, 2007) produce text, photos and video on a vast scale.</span></li>
+</ol>
+<p>The internet matters to AI for one huge reason: <strong>data</strong>. Modern language models learn from enormous amounts of text, and almost all of it exists because billions of people put their writing, questions, code and conversations online.</p>
+
+<h3 id="ch2-10"><span class="num">2.10</span>The unexpected hero: graphics cards</h3>
+<p>Video games need to draw millions of coloured dots on screen many times a second. The calculations are simple but there are a huge number of them, all at once. Companies such as NVIDIA built special chips for this: <a class="gl" href="#g-gpu">graphics processing units</a> (GPUs). NVIDIA marketed its GeForce 256 in 1999 as the first GPU.</p>
+<p>A normal processor is like a few brilliant workers doing tasks one after another. A GPU is like thousands of ordinary workers all doing simple sums at the same time. In 2006–2007 NVIDIA released CUDA, which let programmers use GPUs for any kind of calculation, not just graphics. Researchers soon discovered that training <a class="gl" href="#g-neural-network">neural networks</a> is exactly the kind of work GPUs are good at. You'll see in Chapter 5 how this sparked the deep-learning revolution in 2012.</p>
+
+<h3 id="ch2-11"><span class="num">2.11</span>The three ingredients</h3>
+<div class="flow">
+<div><b>Methods</b>Ideas for how machines can learn (Chapters 3–6)</div>
+<div><b>Data</b>Huge amounts of text, images and examples, mostly from the internet</div>
+<div><b>Compute</b>Fast, cheap, parallel chips, especially GPUs</div>
+<div class="hl"><b>Modern AI</b>Possible only when all three came together, around 2012 onward</div>
+</div>
+<p>Keep these three in mind throughout the book. Almost every AI breakthrough came from improving at least one of them, and every debate about AI's future (Chapter 8) is partly a debate about how far each can keep growing.</p>
+
+<div class="lab"><div class="lab-h"><b>See binary for yourself</b><span>15 min</span></div><ol>
+<li>Ask Claude: "Show me how the word HI is stored in binary, letter by letter, and explain each step simply."<span class="expect">H and I each turned into 8 bits, with an explanation of the code table used.</span></li>
+<li>Ask: "How many transistors were in the Intel 4004, and roughly how many are in a modern high-end chip? Give sources."<span class="expect">about 2,300 for the 4004, and tens of billions today. Check that the sources look real.</span></li>
+<li>Ask: "Explain the difference between a CPU and a GPU using a restaurant kitchen analogy."<span class="expect">something like a few master chefs versus a big team doing simple prep in parallel.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Computers were invented for AI."</dt><dd>They were built for calculation, codebreaking and business data. AI came later and depends on all of that.</dd>
+<dt>"AI is new."</dt><dd>The ideas date back to the 1940s and 50s. What's new is having enough data and computing power to make them work.</dd>
+<dt>"GPUs were designed for AI."</dt><dd>They were designed for video games. AI was a fortunate second use, and has since reshaped how GPUs are built.</dd>
+</dl></div>
+
+<h3 id="ch2-r"><span class="num">2.12</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Programmable machines started with punched cards (Jacquard, 1804) and Babbage's Analytical Engine design (1837).</li>
+<li>Ada Lovelace wrote the first published program (1843) and questioned whether machines could originate anything.</li>
+<li>Boole turned logic into algebra; Shannon showed switches could compute it and that all information can be bits.</li>
+<li>Turing's 1936 universal machine is the idea behind every computer: one machine, any program.</li>
+<li>Transistors, chips and Moore's law made computers small, fast and cheap; the internet produced vast data; GPUs supplied parallel computing power.</li>
+<li>Modern AI needed all three ingredients: methods, data and compute.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Why is the Jacquard loom important to computing history?</p><div class="opts"><button>It was the first electronic computer</button><button data-ok>It showed one machine could do different jobs by changing its instructions (punched cards)</button><button>It invented binary</button></div><p class="why" hidden>Changing the cards changed the pattern without rebuilding the loom: the core idea of software.</p></div>
+<div class="qz"><p class="q">What was Turing's "universal machine"?</p><div class="opts"><button>A machine that could translate any language</button><button data-ok>One machine that could imitate any other step-by-step machine, given the right instructions</button><button>The first robot</button></div><p class="why" hidden>It's the theoretical basis of the general-purpose computer.</p></div>
+<div class="qz"><p class="q">Why did GPUs become so important for AI?</p><div class="opts"><button>They have more memory than any other chip</button><button data-ok>They do huge numbers of simple calculations at the same time, which is what training neural networks needs</button><button>They were designed by AI researchers</button></div><p class="why" hidden>Parallel arithmetic is exactly the workload of neural networks.</p></div>
+<div class="qz"><p class="q">What are the three ingredients of modern AI?</p><div class="opts"><button>Robots, sensors and batteries</button><button data-ok>Methods, data and compute</button><button>Programmers, managers and users</button></div><p class="why" hidden>Every major breakthrough improved at least one of these.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Draw a timeline (paper or digital) from 1804 to 2010 with at least ten events from this chapter. Under each, write one sentence on why it mattered for AI. Then ask Claude to review your timeline for mistakes, and check its corrections against a reliable source.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Computers grew from punched-card looms and Babbage's designs. Turing showed one machine could run any program; Shannon showed all information can be 0s and 1s. Transistors and chips made computers tiny and cheap, the internet created huge amounts of data, and graphics chips gave us parallel power. AI needed all three: methods, data and compute."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>A. A. Lovelace, "Notes by the Translator" on L. F. Menabrea's <i>Sketch of the Analytical Engine</i> (1843).</li>
+<li>G. Boole, <i>An Investigation of the Laws of Thought</i> (1854).</li>
+<li>A. M. Turing, "On Computable Numbers, with an Application to the Entscheidungsproblem", <i>Proceedings of the London Mathematical Society</i> (1936).</li>
+<li>C. E. Shannon, "A Symbolic Analysis of Relay and Switching Circuits" (1938, from his 1937 thesis) and "A Mathematical Theory of Communication", <i>Bell System Technical Journal</i> (1948).</li>
+<li>J. von Neumann, "First Draft of a Report on the EDVAC" (1945).</li>
+<li>G. E. Moore, "Cramming More Components onto Integrated Circuits", <i>Electronics</i> (1965).</li>
+<li>The National Museum of Computing (Bletchley Park) and the Computer History Museum (computerhistory.org) for Colossus, ENIAC and early machines.</li>
+</ol><p class="verified">Content type: established history · Last reviewed 9 November 2026</p></div>

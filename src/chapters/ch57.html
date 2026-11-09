@@ -1,0 +1,387 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What a shell script is, and how to write, save and run your first one</li>
+<li>What the shebang line does and why scripts need execute permission</li>
+<li>How to use variables, quoting, command substitution and simple arithmetic</li>
+<li>How to read arguments (<code>$1</code>, <code>$#</code>, <code>"$@"</code>) and give defaults</li>
+<li>How to make decisions with <code>if</code> and repeat work with <code>for</code> and <code>while</code></li>
+<li>How to organise a script with functions and finish with the right exit code</li>
+<li>How to build a small QA runner that runs tests, saves logs, writes a report and fails the build correctly</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch55">Chapter 55</a> (pipes, redirection, exit codes) and <a href="#ch56">Chapter 56</a> (variables, PATH, <code>chmod</code>). Use the <code>~/qa-practice</code> folder from Chapter 55. You need a text editor: <code>nano</code> (<a href="#ch54">Chapter 54</a>) or VS Code.</div>
+
+<div class="bigidea"><p>A shell script is a plain text file containing the commands you would otherwise type, one after another. Saving them in a file means you can run the same steps again with one command, share them with your team and run them in CI. Scripts add a few programming ideas on top of what you already know: variables to hold values, arguments to accept input, <code>if</code> to decide, loops to repeat and functions to name a group of steps. The single most important habit is to finish with the right exit code, because that's how CI knows whether your script passed or failed.</p></div>
+
+<h3 id="ch57-1"><span class="num">57.1</span>Your first script</h3>
+<p>A <a class="gl" href="#g-shell-script">shell script</a> is a text file of shell commands. By convention its name ends in <code>.sh</code>, although the shell doesn't care about the extension. Make a folder for this chapter and create a file:</p>
+<div class="code"><span class="cap">Terminal</span><pre>mkdir -p ~/qa-scripts &amp;&amp; cd ~/qa-scripts
+nano hello.sh</pre></div>
+<p>Type this in, then press Ctrl+O, Enter to save and Ctrl+X to exit:</p>
+<div class="code"><span class="cap">hello.sh</span><pre>#!/usr/bin/env bash
+# hello.sh - my first script
+echo "Hello from a script"
+echo "Today is $(date +%A)"
+echo "You are in: $(pwd)"</pre></div>
+<div class="tbl"><table>
+<tr><th>Line</th><th>Meaning</th></tr>
+<tr><td><code>#!/usr/bin/env bash</code></td><td>The <strong>shebang</strong>: which program should run this file (explained below)</td></tr>
+<tr><td><code># hello.sh - …</code></td><td>A <strong>comment</strong>. Anything after <code>#</code> is ignored by the shell; it's for humans</td></tr>
+<tr><td><code>echo "…"</code></td><td>Print a line</td></tr>
+<tr><td><code>$(date +%A)</code></td><td><strong>Command substitution</strong>: run <code>date +%A</code> (the weekday name) and put its output here</td></tr>
+</table></div>
+<p>There are two ways to run it:</p>
+<div class="code"><span class="cap">Terminal</span><pre>bash hello.sh          <span class="c"># way 1: ask bash to read the file</span>
+chmod +x hello.sh      <span class="c"># way 2: make it executable once...</span>
+./hello.sh             <span class="c"># ...then run it like any program</span></pre></div>
+<div class="code"><span class="cap">Output</span><pre>Hello from a script
+Today is Monday
+You are in: /Users/alex/qa-scripts</pre></div>
+<p>The <code>./</code> means "the file in this folder". You need it because the current folder isn't on PATH (<a href="#ch56">Chapter 56</a>). Without <code>chmod +x</code>, <code>./hello.sh</code> fails with <code>permission denied</code> and exit code 126.</p>
+
+<h4>The shebang</h4>
+<p>The <a class="gl" href="#g-shebang">shebang</a> is the two characters <code>#!</code> followed by the path of an interpreter, on the very first line. When you run <code>./hello.sh</code>, the operating system reads that line and starts that program to run the rest of the file.</p>
+<div class="tbl"><table>
+<tr><th>Shebang</th><th>Means</th></tr>
+<tr><td><code>#!/usr/bin/env bash</code></td><td>Find <code>bash</code> on the PATH and use it. Portable across macOS and Linux; the style used in this chapter</td></tr>
+<tr><td><code>#!/bin/bash</code></td><td>Use Bash at exactly that location</td></tr>
+<tr><td><code>#!/bin/sh</code></td><td>Use the basic POSIX shell: fewer features, runs almost anywhere</td></tr>
+<tr><td><code>#!/usr/bin/env python3</code></td><td>The same idea works for Python scripts (<a href="#ch59">Chapter 59</a>)</td></tr>
+</table></div>
+<div class="box note"><span class="tag">Why Bash and not zsh?</span><p>You type commands in zsh on a Mac, but CI servers and Docker images nearly always have Bash, so team scripts are usually written for Bash. macOS still includes Bash, but an old one: <code>bash --version</code> on our test Mac prints <code>GNU bash, version 3.2.57</code>. Every script in this chapter was tested with that version, so it also runs on the newer Bash found on Linux.</p></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A script is a written test procedure. Instead of a tester following "step 1, step 2, step 3" by hand each time, you write the steps down once in a form the computer can follow exactly. The shebang is the line at the top saying which language the procedure is written in.</p></div>
+
+<h3 id="ch57-2"><span class="num">57.2</span>Variables and quoting</h3>
+<div class="code"><span class="cap">Syntax</span><pre>name="Priya"                 <span class="c"># set: no spaces around =</span>
+echo "Hello, $name"          <span class="c"># use: $ in front</span>
+echo "Report: ${name}_report.txt"   <span class="c"># braces mark where the name ends</span>
+today=$(date +%Y-%m-%d)      <span class="c"># store a command's output</span>
+total=$((3 + 4))             <span class="c"># arithmetic: whole numbers only</span></pre></div>
+<p>Variables in a script work exactly like the shell variables in <a href="#ch56">Chapter 56</a>, and a script can read any environment variable that was exported to it, such as <code>$HOME</code> or <code>$BASE_URL</code>.</p>
+<h4>Quote your variables</h4>
+<p>Rule of thumb: <strong>always write <code>"$variable"</code> in double quotes</strong>. Without quotes the shell splits the value at spaces, which breaks file names like <code>Login tests.log</code>.</p>
+<div class="tbl"><table>
+<tr><th>Quotes</th><th>What happens inside</th><th>Example</th></tr>
+<tr><td>Double <code>"…"</code></td><td><code>$variables</code> and <code>$(commands)</code> are expanded; spaces are kept</td><td><code>echo "Env: $TEST_ENV"</code> prints <code>Env: staging</code></td></tr>
+<tr><td>Single <code>'…'</code></td><td>Nothing is expanded: exactly what you typed</td><td><code>echo 'Env: $TEST_ENV'</code> prints <code>Env: $TEST_ENV</code></td></tr>
+<tr><td>None</td><td>Expanded, then split at spaces and wildcards expanded</td><td>Avoid for variables</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Unquoted variables delete the wrong files</span><p>If <code>dir="old reports"</code>, then <code>rm -r $dir</code> becomes <code>rm -r old reports</code>: two separate folders, <code>old</code> and <code>reports</code>. <code>rm -r "$dir"</code> removes the one folder you meant. This is the most common serious scripting bug.</p></div>
+
+<h3 id="ch57-3"><span class="num">57.3</span>Arguments: input to your script</h3>
+<p>Words you type after the script name are its <strong>arguments</strong>. Inside the script they arrive as numbered variables.</p>
+<div class="tbl"><table>
+<tr><th>Variable</th><th>Holds</th></tr>
+<tr><td><code>$0</code></td><td>The script's own name, as it was called</td></tr>
+<tr><td><code>$1</code>, <code>$2</code>, …</td><td>First, second, … argument</td></tr>
+<tr><td><code>$#</code></td><td>How many arguments there are</td></tr>
+<tr><td><code>"$@"</code></td><td>All the arguments, each kept separate (use this to pass them on)</td></tr>
+<tr><td><code>${2:-staging}</code></td><td>Argument 2, or <code>staging</code> if it's missing or empty</td></tr>
+</table></div>
+<div class="code"><span class="cap">greet.sh</span><pre>#!/usr/bin/env bash
+# greet.sh - variables and arguments
+name="$1"
+env_name="${2:-staging}"
+echo "Script name: $0"
+echo "Number of arguments: $#"
+echo "Hello, $name. Testing against: $env_name"</pre></div>
+<div class="code"><span class="cap">Terminal</span><pre>chmod +x greet.sh
+./greet.sh Priya
+./greet.sh Priya production
+./greet.sh "Priya Shah" uat
+./greet.sh Priya Shah uat</pre></div>
+<div class="code"><span class="cap">Output</span><pre>Script name: ./greet.sh
+Number of arguments: 1
+Hello, Priya. Testing against: staging
+Script name: ./greet.sh
+Number of arguments: 2
+Hello, Priya. Testing against: production
+Script name: ./greet.sh
+Number of arguments: 2
+Hello, Priya Shah. Testing against: uat
+Script name: ./greet.sh
+Number of arguments: 3
+Hello, Priya. Testing against: Shah</pre></div>
+<p>Compare the last two runs. With quotes, <code>"Priya Shah"</code> is one argument. Without them it's two, so <code>Shah</code> became the environment name. The person running your script has to quote, too.</p>
+
+<h3 id="ch57-4"><span class="num">57.4</span>Making decisions with if</h3>
+<div class="code"><span class="cap">Syntax</span><pre>if CONDITION; then
+  commands
+elif OTHER_CONDITION; then
+  commands
+else
+  commands
+fi                          <span class="c"># "if" backwards closes the block</span></pre></div>
+<p>The key idea: the condition is just a <strong>command</strong>, and <code>if</code> looks at its exit code. 0 counts as true; anything else as false. So <code>if grep -q ERROR app.log; then</code> works directly. Most often the command is <code>[ … ]</code>, the <strong>test</strong> command, which compares things. The spaces inside the brackets are required.</p>
+<div class="tbl"><table>
+<tr><th>Test</th><th>True when</th></tr>
+<tr><td><code>[ -f "$file" ]</code></td><td>The file exists (and is a regular file)</td></tr>
+<tr><td><code>[ -d "$dir" ]</code></td><td>The directory exists</td></tr>
+<tr><td><code>[ -z "$x" ]</code> / <code>[ -n "$x" ]</code></td><td>The text is empty / not empty</td></tr>
+<tr><td><code>[ "$a" = "$b" ]</code> / <code>!=</code></td><td>Two pieces of text are equal / different</td></tr>
+<tr><td><code>[ "$n" -eq 0 ]</code></td><td>Numbers: <code>-eq</code> equal, <code>-ne</code> not equal, <code>-gt</code> greater, <code>-ge</code> greater or equal, <code>-lt</code> less, <code>-le</code> less or equal</td></tr>
+<tr><td><code>[ ! -f "$file" ]</code></td><td><code>!</code> reverses any test: "file does not exist"</td></tr>
+</table></div>
+<p>Note that numbers use letters (<code>-gt</code>) and text uses symbols (<code>=</code>). Mixing them up is a common beginner bug. Here is a script that fails when a log contains errors, a realistic CI check:</p>
+<div class="code"><span class="cap">check-log.sh</span><pre>#!/usr/bin/env bash
+# check-log.sh - fail if a log file contains ERROR lines
+log_file="$1"
+
+if [ -z "$log_file" ]; then
+  echo "Usage: $0 LOG_FILE" &gt;&amp;2
+  exit 2
+fi
+
+if [ ! -f "$log_file" ]; then
+  echo "No such file: $log_file" &gt;&amp;2
+  exit 2
+fi
+
+error_count=$(grep -c "ERROR" "$log_file")
+
+if [ "$error_count" -eq 0 ]; then
+  echo "OK: no errors in $log_file"
+  exit 0
+else
+  echo "FAIL: $error_count error(s) in $log_file"
+  exit 1
+fi</pre></div>
+<p><code>&gt;&amp;2</code> sends a message to stderr, the right place for usage and error messages (<a href="#ch55">Chapter 55</a>). <code>exit N</code> stops the script immediately with exit code N. We use 0 for pass, 1 for "the check found a problem" and 2 for "the script was used wrongly", following <code>grep</code>'s convention.</p>
+<div class="code"><span class="cap">Terminal</span><pre>chmod +x check-log.sh
+./check-log.sh; echo "exit=$?"
+./check-log.sh nope.log; echo "exit=$?"
+./check-log.sh ~/qa-practice/logs/app.log; echo "exit=$?"
+echo "INFO ok" &gt; clean.log
+./check-log.sh clean.log; echo "exit=$?"</pre></div>
+<div class="code"><span class="cap">Output</span><pre>Usage: ./check-log.sh LOG_FILE
+exit=2
+No such file: nope.log
+exit=2
+FAIL: 3 error(s) in /Users/alex/qa-practice/logs/app.log
+exit=1
+OK: no errors in clean.log
+exit=0</pre></div>
+
+<h3 id="ch57-5"><span class="num">57.5</span>Repeating work with loops</h3>
+<div class="code"><span class="cap">loops.sh</span><pre>#!/usr/bin/env bash
+# loops.sh - for and while loops
+for browser in chromium firefox webkit; do
+  echo "Would run tests in $browser"
+done
+
+for file in tests/*.sh; do
+  echo "Found test file: $file"
+done
+
+count=1
+while [ "$count" -le 3 ]; do
+  echo "Attempt $count"
+  count=$((count + 1))
+done</pre></div>
+<div class="tbl"><table>
+<tr><th>Loop</th><th>How it works</th></tr>
+<tr><td><code>for x in a b c; do … done</code></td><td>Runs the body once per word, with <code>$x</code> set to each in turn</td></tr>
+<tr><td><code>for file in tests/*.sh; do</code></td><td>The shell expands the wildcard to a list of matching file names, sorted alphabetically</td></tr>
+<tr><td><code>while CONDITION; do … done</code></td><td>Repeats as long as the condition command returns 0. Something inside must eventually make it false, or it loops forever (Ctrl+C stops it)</td></tr>
+</table></div>
+<p>To try it you need a <code>tests</code> folder. Create three pretend tests, each a tiny script that passes (exit 0) or fails (exit 1):</p>
+<div class="code"><span class="cap">Terminal (paste as one block)</span><pre>mkdir -p tests
+printf '#!/usr/bin/env bash\necho "login page loads"\nexit 0\n' &gt; tests/test_login.sh
+printf '#!/usr/bin/env bash\necho "search returns results"\nexit 0\n' &gt; tests/test_search.sh
+printf '#!/usr/bin/env bash\necho "expected total 42.00 but got 40.00" &gt;&amp;2\nexit 1\n' &gt; tests/test_checkout.sh
+chmod +x loops.sh
+./loops.sh</pre></div>
+<div class="code"><span class="cap">Output</span><pre>Would run tests in chromium
+Would run tests in firefox
+Would run tests in webkit
+Found test file: tests/test_checkout.sh
+Found test file: tests/test_login.sh
+Found test file: tests/test_search.sh
+Attempt 1
+Attempt 2
+Attempt 3</pre></div>
+<div class="box example"><span class="tag">Real-world example: waiting for a server</span><p>A <code>while</code> loop is how CI scripts wait for an app to start before testing it. This tries a health URL up to 30 times, a second apart, using <code>curl -sf</code> from <a href="#ch56">Chapter 56</a> as the condition:</p>
+<div class="code"><pre>tries=0
+until curl -sf "$BASE_URL/health" &gt; /dev/null; do
+  tries=$((tries + 1))
+  if [ "$tries" -ge 30 ]; then
+    echo "Server did not start" &gt;&amp;2
+    exit 1
+  fi
+  sleep 1
+done</pre></div>
+<p><code>until</code> is the opposite of <code>while</code>: it repeats until the condition succeeds. The <code>/health</code> path is illustrative; use your app's real health or home page.</p></div>
+
+<h3 id="ch57-6"><span class="num">57.6</span>Functions, and a QA runner</h3>
+<p>A <strong>function</strong> gives a name to a group of commands so you can reuse it. Inside a function, <code>$1</code>, <code>$2</code> are the function's own arguments, and <code>local</code> keeps a variable private to it.</p>
+<div class="code"><span class="cap">Syntax</span><pre>log() {
+  echo "[$(date +%H:%M:%S)] $1"
+}
+
+log "Starting tests"     <span class="c"># call it like a command: prints [14:43:36] Starting tests</span></pre></div>
+<p>Now put everything together. This script runs every test file in a folder, saves each test's output to its own log, prints progress, writes a summary report and exits 1 if anything failed, so CI marks the build red.</p>
+<div class="code"><span class="cap">run-qa.sh</span><pre>#!/usr/bin/env bash
+# run-qa.sh - run every test in a folder and write a summary report
+# Usage: ./run-qa.sh [TEST_DIR] [REPORT_FILE]
+
+test_dir="${1:-tests}"
+report="${2:-qa-report.txt}"
+passed=0
+failed=0
+failed_names=""
+
+log() {
+  echo "[$(date +%H:%M:%S)] $1"
+}
+
+run_test() {
+  local test_file="$1"
+  local name
+  name=$(basename "$test_file" .sh)
+  if bash "$test_file" &gt; "logs/$name.log" 2&gt;&amp;1; then
+    log "PASS  $name"
+    passed=$((passed + 1))
+  else
+    log "FAIL  $name (see logs/$name.log)"
+    failed=$((failed + 1))
+    failed_names="$failed_names $name"
+  fi
+}
+
+if [ ! -d "$test_dir" ]; then
+  echo "Test folder not found: $test_dir" &gt;&amp;2
+  exit 2
+fi
+
+mkdir -p logs
+log "Running tests in $test_dir"
+
+for test_file in "$test_dir"/*.sh; do
+  run_test "$test_file"
+done
+
+total=$((passed + failed))
+{
+  echo "QA report - $(date '+%Y-%m-%d %H:%M')"
+  echo "Total:  $total"
+  echo "Passed: $passed"
+  echo "Failed: $failed"
+  if [ "$failed" -gt 0 ]; then
+    echo "Failed tests:$failed_names"
+  fi
+} &gt; "$report"
+
+log "Report written to $report"
+cat "$report"
+
+if [ "$failed" -gt 0 ]; then
+  exit 1
+fi
+exit 0</pre></div>
+<div class="tbl"><table>
+<tr><th>Part</th><th>What it does</th></tr>
+<tr><td><code>"${1:-tests}"</code></td><td>Test folder from argument 1, defaulting to <code>tests</code></td></tr>
+<tr><td><code>basename "$test_file" .sh</code></td><td>Turns <code>tests/test_login.sh</code> into <code>test_login</code></td></tr>
+<tr><td><code>if bash "$test_file" &gt; … 2&gt;&amp;1; then</code></td><td>Runs the test, captures both its streams in a log file, and branches on its exit code</td></tr>
+<tr><td><code>{ … } &gt; "$report"</code></td><td>Groups several <code>echo</code>s and redirects them into the report file together</td></tr>
+<tr><td>Final <code>exit 1</code> / <code>exit 0</code></td><td>Passes the overall result to whoever ran the script: you, <code>&amp;&amp;</code>, or CI</td></tr>
+</table></div>
+<div class="code"><span class="cap">Terminal</span><pre>chmod +x run-qa.sh
+./run-qa.sh; echo "exit=$?"</pre></div>
+<div class="code"><span class="cap">Output</span><pre>[14:43:36] Running tests in tests
+[14:43:36] FAIL  test_checkout (see logs/test_checkout.log)
+[14:43:36] PASS  test_login
+[14:43:36] PASS  test_search
+[14:43:36] Report written to qa-report.txt
+QA report - 2026-11-09 14:43
+Total:  3
+Passed: 2
+Failed: 1
+Failed tests: test_checkout
+exit=1</pre></div>
+<p><code>cat logs/test_checkout.log</code> shows <code>expected total 42.00 but got 40.00</code>: the failure detail is kept, not lost in the scroll. And because the exit code is honest, the script works as a gate:</p>
+<div class="code"><span class="cap">Terminal</span><pre>./run-qa.sh &gt; /dev/null &amp;&amp; echo "Ready to release" || echo "Release blocked"</pre></div>
+<div class="code"><span class="cap">Output</span><pre>Release blocked</pre></div>
+<div class="flow"><div><b>Arguments</b>which tests, which report</div><div><b>Check input</b>exit 2 if wrong</div><div><b>Loop + function</b>run each test, log output</div><div><b>Report</b>counts and names</div><div class="hl"><b>Exit code</b>1 if any failed, else 0</div></div>
+<h4>Using a real test runner</h4>
+<p>The pretend tests stand in for your real suite. Real runners already return 0 for all-passed and non-zero for failures, so the same pattern applies: run them inside <code>if</code>, or save <code>$?</code> straight away.</p>
+<div class="code"><span class="cap">Example: wrap Playwright or pytest</span><pre>npx playwright test &gt; logs/playwright.log 2&gt;&amp;1
+status=$?                        <span class="c"># save it before any other command replaces it</span>
+echo "Playwright finished with exit code $status"
+exit "$status"                   <span class="c"># hand the real result to CI</span></pre></div>
+<p>Swap the first line for <code>python3 -m pytest &gt; logs/pytest.log 2&gt;&amp;1</code> on a Python project. For a richer report, have the runner write <a class="gl" href="#g-junit-xml">JUnit XML</a> (Playwright's <code>--reporter=junit</code>, pytest's <code>--junitxml=results.xml</code>), which CI tools can display; <a href="#ch59">Chapter 59</a> shows how to read it with Python.</p>
+
+<h3 id="ch57-7"><span class="num">57.7</span>Exit codes, safety settings and checking your script</h3>
+<p>Without an <code>exit</code> command, a script's exit code is that of the <strong>last command it ran</strong>. That's a trap: if the last line is <code>echo "Done"</code>, the script returns 0 even though the tests before it failed. Always end with an explicit <code>exit</code> based on what happened.</p>
+<h4>Strict mode: set -euo pipefail</h4>
+<p>Many team scripts start with one line after the shebang:</p>
+<div class="code"><pre>set -euo pipefail</pre></div>
+<div class="tbl"><table>
+<tr><th>Part</th><th>Effect</th></tr>
+<tr><td><code>-e</code></td><td>Stop the script as soon as a command fails (non-zero), except in conditions such as <code>if</code>, <code>&amp;&amp;</code> and <code>||</code></td></tr>
+<tr><td><code>-u</code></td><td>Treat use of an unset variable as an error (catches typos like <code>$BASE_ULR</code>)</td></tr>
+<tr><td><code>-o pipefail</code></td><td>A pipeline fails if any stage fails, not just the last (<a href="#ch55">Chapter 55</a>)</td></tr>
+</table></div>
+<details class="deep"><summary>Under the hood: the surprises in strict mode</summary><div class="body"><p><code>-e</code> stops on <em>any</em> non-zero exit code, including ones that aren't errors. We tested this: with <code>set -e</code>, the line <code>n=$(grep -c FATAL app.log)</code> ends the whole script with exit code 1, because <code>grep</code> returns 1 when it finds nothing, even though a count of 0 is exactly what you hoped for. Write <code>n=$(grep -c FATAL app.log || true)</code> to allow it. Likewise <code>-u</code> stops at the first unset variable with a message such as <code>UNDEFINED_VAR: unbound variable</code>; give optional variables defaults with <code>${VAR:-default}</code>. In our runner, a failing test is checked inside <code>if</code>, so <code>-e</code> wouldn't stop it. Strict mode is a good default, but understand it before adding it to an existing script.</p></div></details>
+<h4>Check before you run</h4>
+<div class="tbl"><table>
+<tr><th>Tool</th><th>What it does</th></tr>
+<tr><td><code>bash -n script.sh</code></td><td>Reads the script and reports syntax errors (a missing <code>fi</code> or <code>done</code>) without running anything. Silent and exit code 0 means none were found</td></tr>
+<tr><td><code>bash -x script.sh</code></td><td>Runs it, printing each command (with variables filled in) before it runs, prefixed with <code>+</code>. The best way to see where a script goes wrong</td></tr>
+<tr><td>ShellCheck</td><td>A free checker that warns about unquoted variables and dozens of other common bugs. Install with <code>brew install shellcheck</code> (macOS) or <code>sudo apt install shellcheck</code> (Ubuntu), then run <code>shellcheck run-qa.sh</code>. It also runs online at shellcheck.net</td></tr>
+</table></div>
+<div class="box opinion"><span class="tag">Opinion · this textbook's authors</span><p>Claude Code (Part IX) writes and explains shell scripts well, and asking it "explain this script line by line" is a great way to learn. But a script runs with your permissions and can delete files, so read every line you didn't write, run <code>bash -n</code> and ShellCheck, and try it on practice data first. When a script grows past about a page, or needs to parse JSON or XML, a Python script (<a href="#ch59">Chapter 59</a>) is usually easier to maintain.</p></div>
+<div class="tbl"><table>
+<tr><th>System</th><th>Notes</th></tr>
+<tr><td>Linux</td><td>Everything here runs unchanged; Bash is usually the default shell, version 5.</td></tr>
+<tr><td>Windows</td><td>Run these scripts in WSL or Git Bash. PowerShell's own scripts end in <code>.ps1</code> and use different syntax (<code>$args</code>, <code>if (…) { }</code>, <code>foreach</code>, <code>exit 1</code>). By default Windows may block <code>.ps1</code> files; <code>Set-ExecutionPolicy -Scope CurrentUser RemoteSigned</code> is the commonly used setting for your own scripts. Check your company's policy first.</td></tr>
+</table></div>
+
+<div class="lab"><div class="lab-h"><b>Build and break a QA runner</b><span>40 min · macOS, Linux, WSL or Git Bash</span></div><ol>
+<li>In <code>~/qa-scripts</code>, create <code>hello.sh</code> from 57.1 and run <code>bash hello.sh</code>.<span class="expect">three lines, including today's weekday.</span></li>
+<li>Run <code>./hello.sh</code> before and after <code>chmod +x hello.sh</code>.<span class="expect"><code>permission denied</code> first, then the same three lines.</span></li>
+<li>Create <code>greet.sh</code> and run the four commands in 57.3.<span class="expect">argument counts 1, 2, 2, 3; the last run greets "Priya" in environment "Shah".</span></li>
+<li>Create <code>check-log.sh</code>. Run it with no argument, with a missing file, with <code>~/qa-practice/logs/app.log</code> and with a clean log, printing <code>$?</code> each time.<span class="expect">exit codes 2, 2, 1, 0 with the messages shown in 57.4.</span></li>
+<li>Create the three pretend tests and <code>loops.sh</code> from 57.5, and run it.<span class="expect">three browser lines, three test files in alphabetical order, three attempts.</span></li>
+<li>Create <code>run-qa.sh</code> from 57.6 and run <code>bash -n run-qa.sh; echo $?</code>.<span class="expect">no output, then <code>0</code>: no syntax errors.</span></li>
+<li>Run <code>./run-qa.sh; echo "exit=$?"</code>, then <code>cat qa-report.txt</code> and <code>ls logs</code>.<span class="expect">2 passed, 1 failed, <code>exit=1</code>; three log files.</span></li>
+<li>Make the failing test pass: edit <code>tests/test_checkout.sh</code> so it ends in <code>exit 0</code>. Run the runner again.<span class="expect"><code>Failed: 0</code>, no "Failed tests" line, <code>exit=0</code>.</span></li>
+<li>Try the wrong folder: <code>./run-qa.sh nowhere; echo $?</code>.<span class="expect"><code>Test folder not found: nowhere</code> and <code>2</code>.</span></li>
+<li>Break it on purpose: delete the line <code>fi</code> after <code>exit 2</code>, and run <code>bash -n run-qa.sh</code>. Then put it back.<span class="expect">a syntax error message mentioning an unexpected end of file, and a non-zero exit code.</span></li>
+<li>Watch it work: <code>bash -x run-qa.sh 2&gt;&amp;1 | head -20</code>.<span class="expect">lines starting with <code>+</code> showing each command with its values filled in.</span></li>
+</ol>
+<p><b>Troubleshooting.</b> <code>bad interpreter</code>: the shebang has a typo, or the file was saved with Windows line endings (fix with your editor's "LF" setting). <code>command not found</code> for your script: use <code>./</code> in front. <code>[: missing ]</code>: a space is missing inside the brackets. <code>integer expression expected</code>: you used <code>-eq</code> on something that isn't a number, often an empty variable.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"<code>name = "Priya"</code> sets a variable."</dt><dd>The spaces make the shell run a command called <code>name</code>. Write <code>name="Priya"</code>.</dd>
+<dt>"A script that prints FAIL has failed."</dt><dd>CI ignores the words. Only the exit code counts, so end with <code>exit 1</code> when something failed.</dd>
+<dt>"Quotes around variables are optional."</dt><dd>They're optional only until a value contains a space. Quote every <code>"$variable"</code>.</dd>
+<dt>"<code>if [ $a = $b ]</code> and <code>if [ $a -eq $b ]</code> are the same."</dt><dd><code>=</code> compares text; <code>-eq</code> compares numbers. <code>"07" = "7"</code> is false; <code>07 -eq 7</code> is true.</dd>
+<dt>"<code>set -e</code> makes scripts safe."</dt><dd>It helps, but it also stops on harmless non-zero codes (like <code>grep</code> finding nothing) and is skipped inside conditions. Understand it, and still check exit codes deliberately.</dd>
+</dl></div>
+
+<h3 id="ch57-r"><span class="num">57.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>A script is a text file of commands. Start it with a shebang (<code>#!/usr/bin/env bash</code>), make it executable with <code>chmod +x</code>, and run it with <code>./name.sh</code>.</li>
+<li><code>name="value"</code> with no spaces; use as <code>"$name"</code>, always quoted. <code>$(cmd)</code> captures output, <code>$((…))</code> does arithmetic.</li>
+<li>Arguments arrive as <code>$1</code>, <code>$2</code>; <code>$#</code> counts them; <code>${1:-default}</code> fills gaps.</li>
+<li><code>if</code> branches on a command's exit code; <code>[ … ]</code> tests files, text and numbers. <code>for</code> loops over lists or files; <code>while</code>/<code>until</code> repeat on a condition.</li>
+<li>Functions name reusable steps. End every script with an explicit, honest <code>exit</code>: 0 for success, non-zero for failure.</li>
+<li>Check with <code>bash -n</code>, debug with <code>bash -x</code>, lint with ShellCheck; read every line of any script you didn't write.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What does the first line <code>#!/usr/bin/env bash</code> do?</p><div class="opts"><button>It's a comment that the system ignores completely</button><button data-ok>It tells the operating system to run the file with bash, found on the PATH</button><button>It makes the file executable</button></div><p class="why" hidden>That's the shebang. Execute permission still has to be given separately with <code>chmod +x</code>.</p></div>
+<div class="qz"><p class="q">You run <code>./report.sh "Sprint 42" uat</code>. What is <code>$#</code>?</p><div class="opts"><button>3</button><button data-ok>2</button><button>1</button></div><p class="why" hidden>The quotes keep "Sprint 42" as one argument, so there are two: <code>$1</code> is <code>Sprint 42</code>, <code>$2</code> is <code>uat</code>.</p></div>
+<div class="qz"><p class="q">Your script runs the tests and its last line is <code>echo "Done"</code>. The tests fail. What exit code does CI see?</p><div class="opts"><button>1, because the tests failed</button><button data-ok>0, because the last command (echo) succeeded</button><button>126</button></div><p class="why" hidden>Without an explicit <code>exit</code>, a script returns the last command's code. Save the test runner's <code>$?</code> and exit with it.</p></div>
+<div class="qz"><p class="q">Which condition is true when the variable count holds a number greater than zero?</p><div class="opts"><button>[ "$count" &gt; 0 ]</button><button>[ "$count" = 0 ]</button><button data-ok>[ "$count" -gt 0 ]</button></div><p class="why" hidden>Numbers use <code>-gt</code>, <code>-eq</code> and friends. Inside <code>[ ]</code>, <code>&gt;</code> is treated as redirection to a file called <code>0</code>.</p></div>
+<div class="qz"><p class="q">Which command shows each line of a script as it runs, with variables filled in?</p><div class="opts"><button>bash -n script.sh</button><button data-ok>bash -x script.sh</button><button>chmod +x script.sh</button></div><p class="why" hidden><code>-x</code> traces execution; <code>-n</code> only checks syntax without running anything.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Write <code>smoke.sh</code> for one of your team's test environments. It should take the base URL as argument 1 (with a sensible default), check three pages or API endpoints with <code>curl -s -o /dev/null -w "%{http_code}"</code> in a loop, print PASS or FAIL for each with a function, write a short report file with the date, and exit 1 if any check failed. Run it through <code>bash -n</code> and ShellCheck, then add it to a pipeline step or share it in a pull request.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"A shell script is just the commands you'd type, saved in a file. The first line, the shebang, says which shell runs it; chmod +x makes it runnable; dot-slash runs it. Inside, dollar-one and dollar-two are the arguments, if checks a command's exit code, for repeats over a list, and functions name a group of steps. The rule that matters most: end with exit 0 if everything passed and exit 1 if anything failed, because that number is all CI looks at."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>GNU, <a href="https://www.gnu.org/software/bash/manual/bash.html" target="_blank" rel="noopener">Bash Reference Manual</a>: shell parameters, conditional constructs, looping, functions, <a href="https://www.gnu.org/software/bash/manual/bash.html#The-Set-Builtin" target="_blank" rel="noopener">the set builtin</a>.</li>
+<li>The Open Group, <a href="https://pubs.opengroup.org/onlinepubs/9799919799/utilities/test.html" target="_blank" rel="noopener">POSIX <code>test</code> utility</a>.</li>
+<li><a href="https://www.shellcheck.net/" target="_blank" rel="noopener">ShellCheck</a> and its <a href="https://github.com/koalaman/shellcheck" target="_blank" rel="noopener">repository</a>.</li>
+<li>Playwright, <a href="https://playwright.dev/docs/test-reporters" target="_blank" rel="noopener">Reporters</a> (JUnit reporter); pytest, <a href="https://docs.pytest.org/en/stable/how-to/output.html" target="_blank" rel="noopener">Managing pytest's output</a> (<code>--junitxml</code>).</li>
+<li>Microsoft, <a href="https://learn.microsoft.com/powershell/module/microsoft.powershell.core/about/about_execution_policies" target="_blank" rel="noopener">about_Execution_Policies</a>.</li>
+</ol><p class="verified">Verified 9 November 2026: every script in this chapter was run on macOS 26.6 with GNU Bash 3.2.57; outputs are from those runs (user name and times will differ on your machine). Content type: established tools · Last reviewed 9 November 2026</p></div>

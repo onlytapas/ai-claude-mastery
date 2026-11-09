@@ -1,0 +1,181 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What a token is, with lots of real examples: words, numbers, code, emoji and other languages</li>
+<li>Why language models read tokens instead of letters or whole words</li>
+<li>What token IDs and a model's "vocabulary" are</li>
+<li>How a tokenizer is built, step by step (optional deep dive)</li>
+<li>Why tokens decide how much text fits, how much it costs and how fast it runs</li>
+<li>How to count tokens yourself, and why "AI tokens" are not the same thing as API tokens</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 6 helps (how language models predict the next word), but isn't required.</div>
+
+<div class="bigidea"><p>A language model never sees letters or words the way you do. Before Claude reads your message, a program called a <a class="gl" href="#g-tokenizer">tokenizer</a> cuts the text into small pieces called <a class="gl" href="#g-token">tokens</a>. A token is often a whole short word, sometimes part of a longer word, a space, a digit or a punctuation mark. Each piece becomes a number. The model reads those numbers and writes its answer back as more numbers, which are turned back into text. Tokens are also the unit of everything practical: how much text fits in the model's memory, how much a request costs and how long it takes.</p></div>
+
+<h3 id="ch14-1"><span class="num">14.1</span>What a token looks like</h3>
+<p>The easiest way to understand tokens is to see some. The splits below are <strong>illustrations</strong>: every company's tokenizer cuts text slightly differently, and even one company changes its tokenizer over time. But the patterns are the same everywhere.</p>
+<div class="tbl"><table>
+<tr><th>Text</th><th>One plausible split</th><th>Tokens</th><th>What it shows</th></tr>
+<tr><td>The test passed</td><td><code>The</code> · <code>␣test</code> · <code>␣passed</code></td><td>3</td><td>Common words are usually one token each. The space often travels with the word after it (shown as ␣).</td></tr>
+<tr><td>unresponsive</td><td><code>un</code> · <code>respons</code> · <code>ive</code></td><td>3</td><td>Longer or rarer words are built from familiar pieces.</td></tr>
+<tr><td>Playwright</td><td><code>Play</code> · <code>wright</code></td><td>2</td><td>Product names are often split, especially newer ones.</td></tr>
+<tr><td>2026-11-09</td><td><code>202</code> · <code>6</code> · <code>-</code> · <code>11</code> · <code>-</code> · <code>09</code></td><td>6</td><td>Numbers and dates break into many small chunks.</td></tr>
+<tr><td><code>assert(total == 90)</code></td><td><code>assert</code> · <code>(</code> · <code>total</code> · <code>␣==</code> · <code>␣90</code> · <code>)</code></td><td>6</td><td>Code is full of symbols, so it uses more tokens per character than plain English.</td></tr>
+<tr><td>👍</td><td>one or more byte pieces</td><td>1–3</td><td>Emoji are stored as several bytes and can take more than one token.</td></tr>
+<tr><td>नमस्ते (Hindi, "hello")</td><td>several pieces</td><td>often 3+</td><td>Many non-English languages, especially non-Latin scripts, need more tokens for the same meaning.</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a set of children's building blocks. Some blocks are big and common: a whole wall piece, a roof. Others are small and odd-shaped, for details. A common word is like a big block: one piece does the job. A rare word, a long number or an unusual name has to be built from several small blocks. The model only ever handles blocks.</p></div>
+
+<h3 id="ch14-2"><span class="num">14.2</span>Why not letters, or whole words?</h3>
+<p>Engineers had two obvious options and both have serious problems. Tokens are the compromise between them.</p>
+<div class="tbl"><table>
+<tr><th>Option</th><th>Advantage</th><th>Problem</th></tr>
+<tr><td><b>One letter at a time</b></td><td>Only a few hundred symbols to learn; nothing is ever "unknown"</td><td>Text becomes very long: "regression" is 10 steps instead of 1–2. Models are slower and see less text at once.</td></tr>
+<tr><td><b>One whole word at a time</b></td><td>Short sequences</td><td>Millions of words, names, typos and new terms. Any word not in the list becomes "unknown", so a new product name or a typo breaks things.</td></tr>
+<tr><td><b>Tokens (word pieces)</b></td><td>Common words are one piece; rare words are built from pieces; nothing is ever unknown</td><td>Splits can look odd to people, and some tasks (like counting letters) get harder</td></tr>
+</table></div>
+<p>With tokens, a model can read any text at all, including a brand-new error message, a misspelt word or a language it rarely saw, while keeping most text short.</p>
+
+<h3 id="ch14-3"><span class="num">14.3</span>Token IDs: the model's numbered dictionary</h3>
+<p>Every tokenizer comes with a fixed list of all the pieces it knows. This list is called its <a class="gl" href="#g-vocabulary">vocabulary</a>. Modern vocabularies contain tens of thousands to a few hundred thousand entries. Each entry has a number, its <a class="gl" href="#g-token-id">token ID</a>.</p>
+<div class="flow">
+<div><b>Your text</b>"The test passed"</div>
+<div><b>Split into tokens</b><code>The</code> · <code>␣test</code> · <code>␣passed</code></div>
+<div><b>Look up IDs</b>e.g. 791 · 1296 · 5946 (made-up numbers)</div>
+<div class="hl"><b>Model</b>Reads the numbers, predicts the next ID</div>
+<div><b>Back to text</b>The predicted ID is looked up and shown as a word piece</div>
+</div>
+<p>So when people say a model "predicts the next word", it actually predicts the next <em>token ID</em>, one at a time. A 500-word answer is roughly 600–700 predictions in a row. Chapter 15 shows the next step: each ID is turned into a long list of numbers that captures its meaning (an <a class="gl" href="#g-embedding">embedding</a>).</p>
+<div class="box example"><span class="tag">Real-world example</span><p>When you watch Claude's answer appear piece by piece in the chat, each little burst is roughly one token, or a few tokens sent together. That "typing" effect is the model's real working rhythm, not decoration.</p></div>
+
+<details class="deep"><summary>How a tokenizer is built: byte-pair encoding, step by step</summary><div class="body">
+<p>Most modern tokenizers use a method called <a class="gl" href="#g-byte-pair-encoding">byte-pair encoding</a> (BPE) or a close relative. It was originally a 1994 data-compression trick, adapted for language models in 2015–16. Here is the idea with a tiny made-up example.</p>
+<p><strong>Start:</strong> take a training text and split it into single characters. Suppose the text is the words <code>test</code>, <code>tests</code>, <code>tester</code>, <code>testing</code>.</p>
+<div class="code"><span class="cap">Step 0: everything is single characters</span><pre>t e s t   t e s t s   t e s t e r   t e s t i n g</pre></div>
+<p><strong>Step 1:</strong> count every pair of neighbouring pieces. <code>t e</code>, <code>e s</code> and <code>s t</code> each appear 4 times, more than any other pair. Pick one of the most frequent, say <code>e s</code>, and merge it into a new piece <code>es</code>. Add <code>es</code> to the vocabulary.</p>
+<div class="code"><pre>t es t   t es t s   t es t e r   t es t i n g</pre></div>
+<p><strong>Step 2:</strong> count again. Now <code>t es</code> appears 4 times. Merge it into <code>tes</code>.</p>
+<div class="code"><pre>tes t   tes t s   tes t e r   tes t i n g</pre></div>
+<p><strong>Step 3:</strong> <code>tes t</code> appears 4 times. Merge into <code>test</code>.</p>
+<div class="code"><pre>test   test s   test e r   test i n g</pre></div>
+<p><strong>Keep going</strong> until the vocabulary reaches the size you want. With a huge training text, frequent words like <code>the</code> and <code>test</code> become single tokens, common endings like <code>ing</code> and <code>ed</code> become tokens, and rare words stay as several pieces.</p>
+<p>Two details make this robust. First, many tokenizers start from <em>bytes</em> (the 0–255 values from Chapter 2) instead of letters, so any text in any language, emoji included, can always be represented, even if it costs several tokens. Second, the merges are learned once and then fixed: the same text always splits the same way with the same tokenizer.</p>
+<p>This also explains why languages that were rare in the training text cost more tokens: fewer merges were learned for them, so their words stay in smaller pieces.</p>
+</div></details>
+
+<h3 id="ch14-4"><span class="num">14.4</span>Different models, different tokens</h3>
+<p>Each company trains its own tokenizer on its own data, so the same sentence gives a different count in Claude, GPT and Gemini. A company can also change its tokenizer between model generations.</p>
+<div class="box note"><span class="tag">Verified 9 Nov 2026</span><p>Anthropic's documentation says Claude Opus 4.7 (April 2026) and later models use a newer tokenizer, and that the same text produces <strong>approximately 30% more tokens</strong> than on earlier models; the exact increase depends on the content. Anthropic advises recounting prompts against the model you plan to use, rather than reusing counts measured on an older model.</p></div>
+<p>Two practical consequences:</p>
+<ul>
+<li><strong>Don't compare token counts across companies.</strong> "Model A has a bigger context window than model B" only means something if you also know how many tokens each needs for your text.</li>
+<li><strong>Re-measure after a model change.</strong> A prompt that fitted comfortably and cost a known amount on an old model may be bigger and pricier on a new one.</li>
+</ul>
+
+<h3 id="ch14-5"><span class="num">14.5</span>Rules of thumb</h3>
+<p>Exact counts need a tool (14.8), but rough estimates are handy for planning. Treat these as approximate:</p>
+<div class="tbl"><table>
+<tr><th>Content</th><th>Rough guide</th></tr>
+<tr><td>Ordinary English prose</td><td>About ¾ of a word per token, so 100 tokens ≈ 75 words. Newer Claude tokenizers produce more tokens, so allow extra.</td></tr>
+<tr><td>A typical page of text (about 500 words)</td><td>Roughly 650–900 tokens</td></tr>
+<tr><td>Code, JSON, logs, stack traces</td><td>Noticeably more tokens per character than prose, because of symbols, indentation and IDs</td></tr>
+<tr><td>Numbers, dates, IDs, hashes</td><td>Many small tokens. A long ID or a hash can cost more tokens than a sentence.</td></tr>
+<tr><td>Non-English text</td><td>Often more tokens than English for the same meaning, especially in non-Latin scripts</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example: a QA view</span><p>A 2,000-line test log full of timestamps, thread IDs and stack traces is far "heavier" in tokens than a 2,000-line novel. That's why it's better to have Claude search a log for the error (Claude Code can run <code>grep</code>) than to paste the whole thing into the conversation.</p></div>
+
+<h3 id="ch14-6"><span class="num">14.6</span>Why tokens matter: space, cost and speed</h3>
+<h4>1. Space: how much fits</h4>
+<p>A model's <a class="gl" href="#g-context-window">context window</a> is measured in tokens. It holds everything in the conversation: instructions, your messages, files, tool results and the model's replies. The current Claude models (verified 9 Nov 2026) have a context window of <strong>1 million tokens</strong> and can write up to <strong>128,000 tokens</strong> in one reply. Chapter 20 explains how to use that space well.</p>
+<h4>2. Cost: what you pay</h4>
+<p>On the Claude API, you pay per million tokens (often written "MTok"), with a separate price for tokens you send (input) and tokens Claude writes (output). Output costs more, because each output token needs its own step of computation.</p>
+<div class="tbl"><table>
+<tr><th>Model (Verified 9 Nov 2026)</th><th>Input per MTok</th><th>Output per MTok</th></tr>
+<tr><td>Claude Fable 5.1</td><td>$10</td><td>$50</td></tr>
+<tr><td>Claude Opus 5.5</td><td>$4</td><td>$20</td></tr>
+<tr><td>Claude Sonnet 5.5</td><td>$2</td><td>$10</td></tr>
+<tr><td>Claude Haiku 5.5</td><td>$0.10 (prompts up to 100K tokens)</td><td>$0.50 (prompts up to 100K tokens)</td></tr>
+</table></div>
+<p>A worked example on Sonnet 5.5: you send a 2,000-token prompt and get a 500-token reply.</p>
+<div class="code"><span class="cap">Cost arithmetic</span><pre>input:  2,000 tokens × $2  / 1,000,000 = $0.004
+output:   500 tokens × $10 / 1,000,000 = $0.005
+total:                                   $0.009   (less than one cent)</pre></div>
+<p>One request is cheap. A test suite that calls the API 50,000 times a night is not, which is why token budgets matter when you build AI into pipelines (Chapter 90). On a claude.ai or Claude Code subscription you don't pay per token, but your plan's usage limits are still driven by how many tokens you use.</p>
+<h4>3. Speed: how long it takes</h4>
+<p>The model writes one token after another, so a long answer takes longer than a short one. Reading input is much faster per token than writing output, but very long inputs still add time.</p>
+
+<h3 id="ch14-7"><span class="num">14.7</span>Odd failures that tokens explain</h3>
+<p>Some famous AI "blunders" make sense once you know the model sees tokens, not letters.</p>
+<div class="tbl"><table>
+<tr><th>Failure</th><th>Why it happens</th></tr>
+<tr><td>Miscounting the letter r in "strawberry"</td><td>The word may arrive as two or three tokens (for example <code>straw</code> + <code>berry</code>). The model never "sees" ten separate letters, so it has to reason its way to the count.</td></tr>
+<tr><td>Reversing a word or spelling it backwards</td><td>Same reason: letters are hidden inside tokens.</td></tr>
+<tr><td>Small slips with long numbers</td><td>A number like 1234567 is split into chunks, so digit-by-digit arithmetic is harder without a calculator or code.</td></tr>
+<tr><td>Trouble with exact character limits</td><td>"Write exactly 160 characters" is hard when you work in tokens of varying length.</td></tr>
+</table></div>
+<p>Modern models handle these much better than older ones, partly because they can reason step by step (Chapter 19) and, in tools like Claude Code, can simply run a small piece of code to count. The lesson for testers: <strong>when exact characters or digits matter, ask Claude to use a tool or write code, and check the result.</strong></p>
+
+<h3 id="ch14-8"><span class="num">14.8</span>Counting tokens yourself</h3>
+<div class="tbl"><table>
+<tr><th>Where</th><th>How</th><th>What you get</th></tr>
+<tr><td>Claude Code</td><td>Type <code>/context</code> in a session</td><td>A coloured grid of how your context window is being used (system prompt, tools, memory files, messages), with suggestions</td></tr>
+<tr><td>Claude Code</td><td>Type <code>/usage</code> (also <code>/cost</code>)</td><td>Session cost, plan limits and activity statistics</td></tr>
+<tr><td>Claude API</td><td>The token-counting endpoint, <code>POST /v1/messages/count_tokens</code></td><td>The number of input tokens a message would use, for a specific model. Anthropic says it's free to use (with rate limits) and the count is an estimate that may differ slightly from the real request.</td></tr>
+<tr><td>Any API response</td><td>The <code>usage</code> section of each reply</td><td>Exact input and output tokens that request used</td></tr>
+</table></div>
+<div class="code"><span class="cap">Counting tokens with the Claude API (from Anthropic's documentation; needs an API key, see Chapter 98)</span><pre>curl https://api.anthropic.com/v1/messages/count_tokens \
+  -H "x-api-key: $ANTHROPIC_API_KEY" \
+  -H "content-type: application/json" \
+  -H "anthropic-version: 2026-10-21" \
+  -d '{
+    "model": "claude-opus-5-5",
+    "messages": [{"role": "user", "content": "Hello, Claude"}]
+  }'
+<span class="c"># the reply looks like: {"input_tokens": ...}</span></pre></div>
+<p>You don't need to run this yet; Chapter 86 walks through your first API call properly. The point is that counts are <em>measurable</em>, not guesses.</p>
+
+<div class="box warn"><span class="tag">Two different kinds of "token"</span><p>In this chapter a token is a <strong>piece of text</strong>. You will also hear "token" used for something completely different: an <strong>access token</strong> or <strong>API token</strong>, a secret string that proves who you are to a service, like the API key in the example above, a GitHub personal access token, or a Jira API token used to connect an MCP server. AI tokens are about text and cost; access tokens are about security. Mixing them up causes real confusion in teams. Chapter 98 covers access tokens, API keys and how to keep them safe.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Estimate, then measure</b><span>20 min · Claude Code or claude.ai</span></div><ol>
+<li>Write down three pieces of text: (a) one of your test cases in plain English, (b) a real line from an application log with a timestamp and an ID, (c) one sentence in a non-English language you know (or ask a colleague).</li>
+<li>For each, estimate the tokens using the rules of thumb in 14.5. Write your estimates down.<span class="expect">three numbers. Most people underestimate the log line.</span></li>
+<li>In Claude Code, run <code>/context</code> before and after pasting each one into the conversation, and note how much the message area grows. (If you have API access, use the counting endpoint in 14.8 instead for exact numbers.)<span class="expect">the log line and the non-English sentence use more tokens per word than the English test case.</span></li>
+<li>Ask Claude: "Split this sentence into the tokens you think a tokenizer would produce, and explain why your split might not be exact."<span class="expect">a plausible split plus an honest note that it can't see its own tokenizer's exact output. A good example of a model being clear about its limits.</span></li>
+<li>Ask Claude to count the letter "r" in "strawberry" and then to check its answer by writing and running a tiny piece of code (in Claude Code).<span class="expect">the correct answer, 3, confirmed by code.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"A token is a word."</dt><dd>Often, but not always. Long, rare and non-English words, numbers and code split into several tokens.</dd>
+<dt>"Token counts are the same in every AI tool."</dt><dd>Each company uses its own tokenizer, and tokenizers change between model generations. Claude 4.7 and later produce about 30% more tokens for the same text than earlier Claude models.</dd>
+<dt>"A bigger context window means I should paste everything."</dt><dd>More tokens cost more, take longer and can dilute the model's focus. Send what's relevant (Chapter 20).</dd>
+<dt>"AI tokens and API tokens are the same thing."</dt><dd>No. AI tokens are pieces of text. API or access tokens are secret passwords for services. Never paste an access token into a chat.</dd>
+<dt>"If it can't count letters, it can't reason."</dt><dd>Letter-counting trips over how text is split, not general reasoning. Give the model a tool and it gets it right.</dd>
+</dl></div>
+
+<h3 id="ch14-r"><span class="num">14.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>A tokenizer cuts text into tokens: common words are one token; rare words, numbers, code and many non-English words are several.</li>
+<li>Tokens balance the problems of letters (too long) and whole words (too many, and unknown words).</li>
+<li>Each token has an ID in the model's vocabulary; the model reads and predicts token IDs one at a time.</li>
+<li>Tokenizers are learned from data, often with byte-pair encoding, so every company's tokenizer differs, and Claude 4.7+ produce about 30% more tokens than earlier Claude models.</li>
+<li>Tokens set how much fits (1M-token context for current Claude models), what it costs (priced per million tokens, output dearer than input) and how long it takes.</li>
+<li>Count with <code>/context</code> and <code>/usage</code> in Claude Code, or the API's token-counting endpoint.</li>
+<li>AI tokens (text pieces) are completely different from access tokens (secrets).</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Which of these is most likely to use the most tokens?</p><div class="opts"><button>"The test passed"</button><button data-ok>"2026-11-09T14:02:17.441Z thread-7f3a ERROR id=9c41e2b0"</button><button>"Hello"</button></div><p class="why" hidden>Timestamps, IDs and hex strings break into many small tokens.</p></div>
+<div class="qz"><p class="q">Why do language models use tokens rather than whole words?</p><div class="opts"><button>Tokens are easier for people to read</button><button data-ok>Any text can be built from known pieces, while common words stay short</button><button>Whole words would make answers more accurate</button></div><p class="why" hidden>Word pieces avoid "unknown word" problems without making text as long as letter-by-letter reading.</p></div>
+<div class="qz"><p class="q">You move a prompt from an older Claude model to Claude Opus 5.5. What should you expect?</p><div class="opts"><button>Exactly the same token count</button><button data-ok>Probably more tokens for the same text, so recount</button><button>Half as many tokens</button></div><p class="why" hidden>Claude 4.7 and later use a newer tokenizer that produces about 30% more tokens for the same text.</p></div>
+<div class="qz"><p class="q">On the Claude API, which costs more per token?</p><div class="opts"><button>Input tokens</button><button data-ok>Output tokens</button><button>They always cost the same</button></div><p class="why" hidden>For example, Sonnet 5.5 is $2 per million input tokens and $10 per million output tokens (verified 9 Nov 2026).</p></div>
+<div class="qz"><p class="q">A colleague says "I pasted my Jira token into Claude to save tokens." What's wrong?</p><div class="opts"><button>Nothing</button><button data-ok>They've confused a secret access token with AI text tokens, and exposed a secret</button><button>Jira tokens are too long for Claude</button></div><p class="why" hidden>An access token is a password-like secret. Keep it out of chats; Chapter 98 explains how to handle it safely.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick one recurring AI task in your team, such as summarising a nightly test report or turning a user story into test cases. Measure the input and output tokens of one real run (with <code>/context</code>, <code>/usage</code> or the API's <code>usage</code> field). Using the verified prices in 14.6, estimate the cost of running it once, 100 times a day and 30 days a month on Sonnet 5.5 and on Haiku 5.5. Write two sentences on which you'd choose and why.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"AI models don't read words; they read tokens, which are small pieces of text. Common words are one token, while rare words, numbers, code and other languages are several. Every token is a number in the model's vocabulary, and the model predicts the next one, one at a time. Tokens decide how much fits, what it costs and how fast it is. And don't confuse them with API tokens: those are passwords."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/token-counting" target="_blank" rel="noopener">Token counting</a> (endpoint, free use with rate limits, estimate note, newer tokenizer note).</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/models/overview" target="_blank" rel="noopener">Models overview</a> and <a href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Pricing</a> (context window, max output, prices; tokenizer change from Claude 4.7).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/commands" target="_blank" rel="noopener">Claude Code commands</a> (<code>/context</code>, <code>/usage</code>, <code>/cost</code>).</li>
+<li>P. Gage, "A New Algorithm for Data Compression", <i>The C Users Journal</i> (1994): the original byte-pair encoding.</li>
+<li>R. Sennrich, B. Haddow and A. Birch, "Neural Machine Translation of Rare Words with Subword Units", ACL 2016, arXiv:1508.07909: BPE for language models.</li>
+<li>A. Radford et al., "Language Models are Unsupervised Multitask Learners" (GPT-2, 2019): byte-level BPE.</li>
+</ol><p class="verified">Verified 9 November 2026: prices, context window, tokenizer change and token-counting endpoint. Token splits in 14.1 and 14.3 are illustrations, not output from Claude's tokenizer.</p></div>

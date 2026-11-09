@@ -1,0 +1,252 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How to use git through Claude Code every day: branches, commits, diffs, merge conflicts and rebasing</li>
+<li>How to work with pull requests and issues from the terminal using the GitHub CLI (<code>gh</code>)</li>
+<li>How to get AI code reviews with <code>/code-review</code> and <code>claude ultrareview</code></li>
+<li>How to put Claude into GitHub itself with <code>/install-github-app</code> and the Claude GitHub Action</li>
+<li>The safety rules that stop an AI from damaging shared work, and three ready-made QA workflows</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch61">Chapter 61</a> (Git and GitHub from zero) and <a href="#ch67">Chapter 67</a> (planning and permission modes). You need a git repository you're allowed to experiment in.</div>
+
+<div class="bigidea"><p>Almost all software lives in git, and almost every change reaches the main code through a pull request on GitHub. Claude Code is fluent in both. It can create branches, write clear commit messages, explain a confusing diff, untangle a merge conflict, open a pull request and review someone else's. Your job is to decide what should happen and to check the result, especially before anything is pushed where other people will see it. This chapter shows how to make that partnership fast and safe.</p></div>
+
+<h3 id="ch71-1"><span class="num">71.1</span>Why git and Claude work so well together</h3>
+<p>Git is a time machine for files. Every <a class="gl" href="#g-commit">commit</a> is a saved snapshot you can return to. That makes it the perfect safety net for an AI that edits files: if Claude makes a mess, git can undo it exactly.</p>
+<div class="cols2">
+<div><h4>What Claude does well with git</h4><ul><li>Explaining what changed and why, in plain words</li><li>Writing clear, consistent commit messages</li><li>Resolving routine merge conflicts</li><li>Finding which commit introduced a bug</li><li>Remembering exact command syntax so you don't have to</li></ul></div>
+<div><h4>What stays your decision</h4><ul><li>What goes into each commit</li><li>When to push, and to which branch</li><li>Whether a conflict resolution is actually correct</li><li>Anything that rewrites shared history</li><li>Merging into the main branch</li></ul></div>
+</div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of git as the "track changes" feature in a shared document, plus a stack of dated backup copies, plus a formal sign-off process before changes go into the final version. Claude is a fast, careful assistant who can operate all of it, but you still hold the pen for the final signature.</p></div>
+
+<h3 id="ch71-2"><span class="num">71.2</span>Branches and commits, the Claude way</h3>
+<p>A <a class="gl" href="#g-branch">branch</a> is a separate line of work, so your changes don't disturb the main version until they're ready. You can ask Claude for each step in plain language. It runs the git commands, and you approve them (or they run automatically if your permission rules allow it).</p>
+<div class="code"><span class="cap">Prompts you can type in Claude Code</span><pre>Create a branch called test/coupon-expiry from the latest main.
+
+Show me what I've changed so far, grouped by file, in plain words.
+
+Commit only the test files, not the config change, with a clear message.
+
+What changed on this branch compared with main? Summarise it for a tester.</pre></div>
+<p>Behind the scenes Claude uses ordinary git commands. Knowing them lets you read the permission prompts with confidence:</p>
+<div class="tbl"><table>
+<tr><th>What you asked</th><th>Typical command Claude runs</th><th>What it does</th></tr>
+<tr><td>Create a branch</td><td><code>git switch -c test/coupon-expiry</code></td><td>Makes a new branch and moves onto it</td></tr>
+<tr><td>Get the latest main</td><td><code>git fetch origin</code></td><td>Downloads new commits without changing your files</td></tr>
+<tr><td>What's changed?</td><td><code>git status</code>, <code>git diff</code></td><td>Lists changed files; shows the exact lines</td></tr>
+<tr><td>Stage some files</td><td><code>git add tests/coupon.spec.ts</code></td><td>Chooses what goes into the next commit</td></tr>
+<tr><td>Save a snapshot</td><td><code>git commit -m "…"</code></td><td>Records the staged changes with a message</td></tr>
+<tr><td>Compare with main</td><td><code>git diff main...HEAD</code></td><td>Shows everything this branch adds</td></tr>
+<tr><td>History</td><td><code>git log --oneline -10</code></td><td>The last ten commits, one line each</td></tr>
+</table></div>
+<h4>Good commit messages</h4>
+<p>A commit message is a note to your future self and your team. Claude writes good ones if you tell it your team's style once, ideally in your project's CLAUDE.md (<a href="#ch77">Chapter 77</a>):</p>
+<div class="code"><span class="cap">A CLAUDE.md section for commits</span><pre>## Commits
+- Format: "&lt;area&gt;: &lt;what changed&gt;", e.g. "checkout tests: cover expired coupons"
+- First line under 72 characters; add a short body if the reason isn't obvious
+- One logical change per commit; never mix test changes with app changes
+- Reference the Jira key at the end of the body, e.g. "Refs CHK-412"</pre></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A tester finished a morning of work with eleven changed files: new tests, a fixed helper, and an accidental change to a config file. They asked: "Split my changes into sensible commits and leave the config change uncommitted." Claude proposed three commits with messages, showed which files went in each, and waited for approval. The config file stayed out. Ten minutes of fiddly work took one prompt and a careful read.</p></div>
+
+<h3 id="ch71-3"><span class="num">71.3</span>Reading diffs with Claude</h3>
+<p>A <a class="gl" href="#g-diff">diff</a> shows lines removed (often marked <code>-</code>) and lines added (<code>+</code>). Diffs are where you check Claude's work, and where you check developers' work too. Claude can explain any diff in the words you need:</p>
+<div class="code"><span class="cap">Useful diff prompts for testers</span><pre>Explain the diff on this branch as if I'm a tester who doesn't read code well.
+Which user-visible behaviours could this change affect?
+
+List every condition (if/else, validation rule, limit) that changed, with the
+old value and the new value.
+
+Does this diff change any test assertions? Flag any that got weaker.</pre></div>
+<p>That last prompt is a QA superpower. A weakened assertion, such as <code>toBe(90)</code> becoming <code>toBeGreaterThan(0)</code>, can hide a real bug while every test stays green.</p>
+
+<h3 id="ch71-4"><span class="num">71.4</span>Merge conflicts and rebasing</h3>
+<p>A <a class="gl" href="#g-merge-conflict">merge conflict</a> happens when two people changed the same lines differently, and git can't decide which version wins. Git marks the clash inside the file:</p>
+<div class="code"><span class="cap">What a conflict looks like</span><pre>&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
+const MAX_COUPONS = 1;
+=======
+const MAX_COUPONS = 2;
+&gt;&gt;&gt;&gt;&gt;&gt;&gt; feature/multi-coupon</pre></div>
+<p>Claude is good at untangling these, but the decision about which behaviour is correct is a product decision. A safe prompt:</p>
+<div class="code"><span class="cap">Prompt</span><pre>I have merge conflicts after merging main into my branch.
+For each conflict: show both sides, explain what each side intended,
+and propose a resolution. Don't apply anything until I approve each one.
+Afterwards, run the tests.</pre></div>
+<p><a class="gl" href="#g-rebase">Rebasing</a> replays your commits on top of the latest main, giving a tidier history. It also <em>rewrites</em> those commits. That's fine on your own branch, and dangerous on a branch other people use.</p>
+<div class="box warn"><span class="tag">Golden rule</span><p>Never rewrite history that other people have already pulled. That means: no rebasing shared branches, and no <a class="gl" href="#g-force-push">force push</a> to <code>main</code> or any team branch. If Claude suggests <code>git push --force</code>, stop and ask why.</p></div>
+<details class="deep"><summary>Finding the commit that broke something: git bisect</summary><div class="body">
+<p><code>git bisect</code> finds the commit that introduced a bug by binary search: you mark one commit "good" and one "bad", and git checks out the commit halfway between. You test, mark it good or bad, and repeat. A thousand commits take about ten steps.</p>
+<div class="code"><pre>git bisect start
+git bisect bad                 <span class="c"># the current commit has the bug</span>
+git bisect good v4.1.0         <span class="c"># this release didn't</span>
+<span class="c"># git checks out a middle commit; test it, then:</span>
+git bisect good                <span class="c"># or: git bisect bad</span>
+<span class="c"># …repeat until git names the first bad commit</span>
+git bisect reset               <span class="c"># return to where you started</span></pre></div>
+<p>Claude can drive this for you if there's a test or command that detects the bug: "Use git bisect between v4.1.0 and HEAD; the bug is present when <code>npx playwright test coupon</code> fails." Watch the first few steps to make sure the test really detects the bug.</p>
+</div></details>
+
+<h3 id="ch71-5"><span class="num">71.5</span>Pull requests and issues with the GitHub CLI</h3>
+<p>The <a class="gl" href="#g-github-cli">GitHub CLI</a>, <code>gh</code>, lets you (and Claude) work with GitHub from the terminal. Install it from <a href="https://cli.github.com" target="_blank" rel="noopener">cli.github.com</a>, then sign in once with <code>gh auth login</code>. Claude Code uses <code>gh</code> when you ask for anything on GitHub, if it's installed.</p>
+<div class="tbl"><table>
+<tr><th>Command</th><th>What it does</th><th>QA use</th></tr>
+<tr><td><code>gh pr list</code></td><td>Lists open pull requests</td><td>See what's waiting to be tested</td></tr>
+<tr><td><code>gh pr view 123</code></td><td>Shows a PR's description and status</td><td>Read what the developer says changed</td></tr>
+<tr><td><code>gh pr diff 123</code></td><td>Shows the PR's code changes</td><td>Feed the diff to Claude for analysis</td></tr>
+<tr><td><code>gh pr checks 123</code></td><td>Shows CI results for the PR</td><td>Find failing pipelines fast</td></tr>
+<tr><td><code>gh pr checkout 123</code></td><td>Puts the PR's branch on your machine</td><td>Run it locally and test it</td></tr>
+<tr><td><code>gh pr create</code></td><td>Opens a new pull request</td><td>Submit your new tests</td></tr>
+<tr><td><code>gh issue create</code></td><td>Opens a new issue</td><td>Log a bug (if your team uses GitHub Issues)</td></tr>
+<tr><td><code>gh run view --log-failed</code></td><td>Shows logs of failed CI steps</td><td>Investigate a red pipeline</td></tr>
+</table></div>
+<p>An alternative to <code>gh</code> is the GitHub MCP server (<a href="#ch103">Chapter 103</a>), which gives Claude GitHub tools directly. Both work; many teams use <code>gh</code> in the terminal and MCP in the chat apps.</p>
+<div class="box note"><span class="tag">Sessions linked to pull requests</span><p>Claude Code remembers which sessions were linked to which pull request. <code>claude --from-pr 123</code> (or a PR URL) resumes the session linked to that PR; on its own, <code>--from-pr</code> opens a picker. Handy when a reviewer asks for changes days later.</p></div>
+
+<h3 id="ch71-6"><span class="num">71.6</span>AI code review: /code-review and ultrareview</h3>
+<p>Claude Code includes a code-review skill. In a session:</p>
+<div class="code"><span class="cap">Syntax (verified in Claude Code 2.1.319)</span><pre>/code-review [low|medium|high|xhigh|max|ultra] [--fix] [--comment] [--max-findings n|all|default] [pr#|branch|path]</pre></div>
+<div class="tbl"><table>
+<tr><th>Part</th><th>Meaning</th></tr>
+<tr><td>Effort level</td><td>How hard to look: <code>low</code> gives few, high-confidence findings; higher levels find more, including uncertain ones. <code>ultra</code> runs a deep review in the cloud.</td></tr>
+<tr><td><code>--fix</code></td><td>Apply the fixes to your files after the review</td></tr>
+<tr><td><code>--comment</code></td><td>Post the findings as comments on the pull request</td></tr>
+<tr><td><code>--max-findings</code></td><td>How many findings to report</td></tr>
+<tr><td>Target</td><td>A PR number, branch or path; without one, it reviews your current changes</td></tr>
+</table></div>
+<p><code>/review</code> still works, but it's now simply another name for <code>/code-review</code>. The old <code>/pr-comments</code> command was removed.</p>
+<p>For a deeper, slower review there's <strong>ultrareview</strong>, a multi-agent review that runs in Anthropic's cloud. In a session use <code>/code-review ultra</code> (or <code>/ultrareview</code>); from the shell or a script:</p>
+<div class="code"><pre>claude ultrareview 123            <span class="c"># review PR 123 and print the findings</span>
+claude ultrareview 123 --post     <span class="c"># also post one comment on the PR, as you</span>
+claude ultrareview --json         <span class="c"># raw findings for scripts</span></pre></div>
+<p>By default ultrareview only prints its findings; it posts to the PR only with <code>--post</code>. The docs note a small number of free runs on Pro, Max and Ultra plans, after which it uses usage credits.</p>
+<div class="box example"><span class="tag">Real-world example: review for testability</span><p>Before testing a developer's PR, a tester ran <code>/code-review high 482</code>, then asked: "Given this diff and the review, what should I test manually, and which existing automated tests cover it?" The answer pointed out a new rounding rule with no test at all, which became the first bug of the sprint, found before the code was merged.</p></div>
+
+<h3 id="ch71-7"><span class="num">71.7</span>Claude inside GitHub: the GitHub App and Action</h3>
+<p>Claude can also work directly on GitHub, triggered by a comment. The quickest setup is to run, inside Claude Code:</p>
+<div class="code"><pre>/install-github-app</pre></div>
+<p>This works for repositories on github.com. It installs the Claude GitHub App, adds the needed secret to the repository, and opens a pull request containing a workflow file. After it's merged, anyone can write <code>@claude</code> in an issue or PR comment, for example "@claude add tests for the expired-coupon case", and Claude does the work in GitHub's cloud runners and replies.</p>
+<p>The workflow uses the official action <code>anthropics/claude-code-action@v1</code>. A minimal version from Anthropic's documentation:</p>
+<div class="code"><span class="cap">.github/workflows/claude.yml (from the Claude Code docs)</span><pre>name: Claude Code
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+jobs:
+  claude:
+    if: contains(github.event.comment.body, '@claude')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}</pre></div>
+<div class="tbl"><table>
+<tr><th>Part</th><th>Plain meaning</th></tr>
+<tr><td><code>on: issue_comment …</code></td><td>Run whenever someone comments on an issue or a PR review</td></tr>
+<tr><td><code>if: contains(…'@claude')</code></td><td>…but only if the comment mentions @claude</td></tr>
+<tr><td><code>permissions</code></td><td>What the job may do in the repository: write code, comment on PRs and issues</td></tr>
+<tr><td><code>secrets.ANTHROPIC_API_KEY</code></td><td>The API key, stored as an encrypted GitHub secret, never in the file (<a href="#ch98">Chapter 98</a>)</td></tr>
+</table></div>
+<p>Other documented inputs include <code>prompt</code> (run with a fixed instruction, for example on every new PR), <code>claude_args</code> (pass Claude Code flags), <code>claude_code_oauth_token</code> (use a subscription token from <code>claude setup-token</code> instead of an API key), <code>trigger_phrase</code> (change <code>@claude</code>), and options for Bedrock, Vertex and Foundry. GitLab has a similar integration, documented by Anthropic as beta and maintained by GitLab.</p>
+<div class="box warn"><span class="tag">Review bots need rules too</span><p>A bot that can write to your repository is a powerful team member. Decide who may trigger it, keep it from merging on its own (protect your main branch so merges need a human approval), and read what it changes like any other pull request.</p></div>
+
+<h3 id="ch71-8"><span class="num">71.8</span>Safety rules for git</h3>
+<p>Claude asks before running commands unless your rules allow them. Two layers make git work safe:</p>
+<p><strong>1. Permission rules</strong> (<a href="#ch78">Chapter 78</a>). Deny rules always win over allow rules, at every settings level:</p>
+<div class="code"><span class="cap">.claude/settings.json — let Claude commit, but never push</span><pre>{
+  "permissions": {
+    "allow": [
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ],
+    "deny": [
+      "Bash(git push *)",
+      "Bash(git reset --hard *)"
+    ]
+  }
+}</pre></div>
+<p>With this, Claude can stage, commit and inspect history freely, while pushing and destructive resets are blocked. You push yourself after reviewing.</p>
+<p><strong>2. Branch protection on GitHub.</strong> Protect <code>main</code> so it requires a pull request, passing checks and a human approval. Then even a mistaken push can't change the main code directly.</p>
+<div class="tbl"><table>
+<tr><th>Risky action</th><th>Why it's risky</th><th>Safe habit</th></tr>
+<tr><td><code>git push --force</code></td><td>Overwrites others' commits on the remote</td><td>Deny it; never on shared branches</td></tr>
+<tr><td><code>git reset --hard</code></td><td>Throws away uncommitted work with no undo</td><td>Commit or stash first; deny in settings</td></tr>
+<tr><td>Rebasing a shared branch</td><td>Rewrites history others depend on</td><td>Rebase only your own branches</td></tr>
+<tr><td>Committing secrets</td><td>Keys in git history are hard to remove and get leaked</td><td>Keep secrets in environment variables; check diffs</td></tr>
+<tr><td>Huge "fix everything" commits</td><td>Impossible to review or undo</td><td>One logical change per commit</td></tr>
+</table></div>
+
+<h3 id="ch71-9"><span class="num">71.9</span>Three QA workflows</h3>
+<h4>Workflow A: review a developer's PR for testability</h4>
+<div class="flow">
+<div><b>Fetch</b><code>gh pr checkout 482</code></div>
+<div><b>Review</b><code>/code-review high</code></div>
+<div><b>Map</b>"Which behaviours changed? Which tests cover them?"</div>
+<div class="hl"><b>Plan</b>A short manual + automated test plan for this PR</div>
+</div>
+<h4>Workflow B: write tests on a feature branch</h4>
+<div class="code"><pre>Create a branch test/CHK-412-coupons from main.
+In plan mode: plan Playwright tests for the expired-coupon story.
+[approve the plan]
+Implement, run the tests, and prove one assertion can fail by breaking the rule.
+Commit with our commit style. Don't push.</pre></div>
+<h4>Workflow C: open a PR with a test report</h4>
+<div class="code"><pre>Push is blocked for you, so I'll push. Then:
+Draft a pull request description with: what was tested, how to run the tests,
+results (pass/fail counts), anything not covered, and the Jira key.
+Use gh pr create with that description once I confirm.</pre></div>
+
+<div class="lab"><div class="lab-h"><b>A safe git round trip</b><span>40 min · a practice repository</span></div><ol>
+<li>In a practice repo, add the "commit but never push" rules from 68.8 to <code>.claude/settings.json</code>. Start <code>claude</code>.</li>
+<li>Ask: "Create a branch called practice/git-lab and add a small README section about how to run the tests."<span class="expect">a branch created and a file edited, with permission prompts for anything not in your allow list.</span></li>
+<li>Ask: "Commit this with a clear message, then push it."<span class="expect">the commit succeeds; the push is blocked by your deny rule, and Claude tells you so.</span></li>
+<li>Create a conflict on purpose: change the same line on main and on your branch, then ask Claude to merge main into your branch and resolve conflicts one by one with your approval.<span class="expect">conflict markers explained, a proposed resolution, and nothing applied without your OK.</span></li>
+<li>If you have <code>gh</code> and a GitHub practice repo, push yourself, then ask: "Open a draft pull request with a test-report style description."<span class="expect">a draft PR on GitHub with a structured description.</span></li>
+<li>Run <code>/code-review</code> on the branch.<span class="expect">a list of findings (possibly none on such a small change), with confidence levels.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Claude pushed my code, so it must be fine."</dt><dd>Pushing only moves code. Review the diff, run the tests, and prefer blocking push so you do it yourself.</dd>
+<dt>"An AI review means no human review is needed."</dt><dd>AI review catches different things from human review. Use both, and keep a human approval on merges.</dd>
+<dt>"Merge conflicts are a technical problem."</dt><dd>Often they're a product question: which behaviour is right? Claude can explain both sides; a person decides.</dd>
+<dt>"/review and /code-review are different tools."</dt><dd>In current versions <code>/review</code> is just another name for <code>/code-review</code>.</dd>
+</dl></div>
+
+<h3 id="ch71-r"><span class="num">71.10</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Git is Claude's safety net: every commit can be inspected and undone.</li>
+<li>Ask in plain language for branches, commits and diffs; know the underlying commands so you can read the prompts.</li>
+<li>Put your commit style in CLAUDE.md; use diff prompts to spot weakened assertions.</li>
+<li>Resolve conflicts with Claude's explanations, but decide behaviour yourself; never rewrite shared history.</li>
+<li><code>gh</code> brings PRs, issues and CI logs into the terminal; <code>--from-pr</code> resumes PR-linked sessions.</li>
+<li><code>/code-review</code> (alias <code>/review</code>) and <code>claude ultrareview</code> give AI reviews; <code>/install-github-app</code> puts Claude into GitHub via <code>anthropics/claude-code-action@v1</code>.</li>
+<li>Deny <code>git push</code> and destructive commands in settings, and protect main with required human approval.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">You want Claude to commit freely but never push. What's the most reliable way?</p><div class="opts"><button>Ask it nicely in every prompt</button><button data-ok>Add a deny rule such as <code>Bash(git push *)</code> in settings</button><button>Use a bigger model</button></div><p class="why" hidden>Deny rules are enforced by Claude Code itself and beat allow rules at every level.</p></div>
+<div class="qz"><p class="q">What does <code>/review</code> do in Claude Code 2.1.319?</p><div class="opts"><button>Shows PR comments</button><button data-ok>The same as <code>/code-review</code>: it's an alias</button><button>Nothing; it was removed</button></div><p class="why" hidden><code>/pr-comments</code> was removed; <code>/review</code> became an alias of <code>/code-review</code>.</p></div>
+<div class="qz"><p class="q">By default, what does <code>claude ultrareview 123</code> do with its findings?</p><div class="opts"><button>Posts them as a review on the PR</button><button data-ok>Prints them; it posts to the PR only with <code>--post</code></button><button>Fixes the code automatically</button></div><p class="why" hidden><code>--no-post</code> is the default; <code>--post</code> adds one plain comment as you.</p></div>
+<div class="qz"><p class="q">When is rebasing risky?</p><div class="opts"><button>Always</button><button data-ok>On branches other people have already pulled, because it rewrites history</button><button>Only on Fridays</button></div><p class="why" hidden>Rebasing your own branch is fine; rewriting shared history breaks other people's copies.</p></div>
+<div class="qz"><p class="q">What triggers the Claude GitHub Action in the documented example workflow?</p><div class="opts"><button>Every push to main</button><button data-ok>A comment that mentions @claude on an issue or PR review</button><button>A nightly schedule</button></div><p class="why" hidden>The <code>if:</code> line checks the comment body for <code>@claude</code>; the trigger phrase can be changed.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>For your team's main test repository, write a one-page "Git with Claude" guide: your commit message style (as a CLAUDE.md section), the permission rules you recommend (what's allowed, what's denied), your branch naming convention, and the three QA workflows from 68.9 adapted to your tools. Ask a developer on your team to review it, and agree the rules together.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Claude handles git for you in plain language: branches, commits, diffs, even merge conflicts. Let it commit, but block pushing in settings so you push after reviewing. Use <code>gh</code> for pull requests, <code>/code-review</code> for an AI review, and <code>/install-github-app</code> if you want to call @claude from GitHub comments. Never rewrite shared history, and keep a human approval on merges."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/commands" target="_blank" rel="noopener">Claude Code commands reference</a> (<code>/code-review</code>, <code>/review</code>, <code>/ultrareview</code>, <code>/install-github-app</code>).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/cli-reference" target="_blank" rel="noopener">CLI reference</a> (<code>claude ultrareview</code>, <code>--from-pr</code>) and the local <code>claude ultrareview --help</code> output.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/github-actions" target="_blank" rel="noopener">Claude Code GitHub Actions</a>; repository <a href="https://github.com/anthropics/claude-code-action" target="_blank" rel="noopener">anthropics/claude-code-action</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/settings" target="_blank" rel="noopener">Settings and permission rules</a>.</li>
+<li>GitHub, <a href="https://cli.github.com/manual/" target="_blank" rel="noopener">GitHub CLI manual</a> and <a href="https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches" target="_blank" rel="noopener">About protected branches</a>.</li>
+<li>Git, <a href="https://git-scm.com/docs/git-bisect" target="_blank" rel="noopener">git-bisect documentation</a>.</li>
+</ol><p class="verified">Verified 9 November 2026 against Claude Code 2.1.319</p></div>

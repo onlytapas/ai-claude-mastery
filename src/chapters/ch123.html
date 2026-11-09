@@ -1,0 +1,163 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How visual testing works with Playwright screenshots, and how Claude can spot layout problems in images</li>
+<li>How to write and read performance tests with k6, with Claude as your assistant</li>
+<li>The basics of accessibility and WCAG 2.2, and how to automate checks with axe-core</li>
+<li>Which checks AI can help with, and which still need a person</li>
+<li>Where basic security testing fits into a QA engineer's work</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 121 (test automation with Claude Code) and Chapter 102 (Playwright MCP). Chapter 85 (APIs and HTTP) helps for the performance section.</div>
+
+<div class="bigidea"><p>Functional tests ask "does it work?". Non-functional tests ask "does it look right, is it fast enough, can everyone use it, and is it safe?". These checks need specialist tools, and the tools have a learning curve. Claude flattens that curve. It writes the scripts, explains the results in plain words, and points out what the numbers or screenshots mean. The specialist tools still do the measuring, and some things, such as how a screen-reader user actually experiences your site, still need people.</p></div>
+
+<h3 id="ch123-1"><span class="num">123.1</span>Four kinds of non-functional testing</h3>
+<div class="tbl"><table>
+<tr><th>Kind</th><th>The question</th><th>Main tool in this chapter</th><th>How Claude helps</th></tr>
+<tr><td>Visual</td><td>Does the page look the way it should?</td><td>Playwright screenshot comparison</td><td>Writes tests, reviews screenshots, explains differences</td></tr>
+<tr><td>Performance</td><td>Is it fast enough, under realistic load?</td><td>k6 (load testing)</td><td>Writes scripts, reads results, compares runs</td></tr>
+<tr><td>Accessibility</td><td>Can people with disabilities use it?</td><td>axe-core with Playwright</td><td>Explains violations and fixes; reviews the accessibility tree</td></tr>
+<tr><td>Security (basics)</td><td>Can it be misused?</td><td>Your security team's tools</td><td>Suggests abuse cases and negative tests</td></tr>
+</table></div>
+
+<h3 id="ch123-2"><span class="num">123.2</span>Visual testing with Playwright</h3>
+<p><a class="gl" href="#g-visual-regression">Visual regression</a> testing compares a new screenshot of a page with an approved one (the <a class="gl" href="#g-baseline">baseline</a>) and fails if they differ. Playwright Test has this built in.</p>
+<div class="code"><span class="cap">tests/visual.spec.ts</span><pre><span class="k">import</span> { test, expect } <span class="k">from</span> <span class="s">'@playwright/test'</span>;
+
+test(<span class="s">'login page looks right'</span>, <span class="k">async</span> ({ page }) => {
+  <span class="k">await</span> page.goto(<span class="s">'https://demo.playwright.dev/todomvc'</span>);
+  <span class="k">await</span> expect(page).toHaveScreenshot();      <span class="c">// compare with the saved baseline</span>
+});</pre></div>
+<p>The first time it runs, there's no baseline yet, so Playwright saves one and reports that it wrote it. You check that image and commit it. From then on every run compares against it. When a change is intended, you update the baselines on purpose:</p>
+<div class="code"><span class="cap">Terminal</span><pre>npx playwright test --update-snapshots</pre></div>
+<div class="box warn"><span class="tag">The big catch</span><p>Playwright's documentation warns that rendering varies with the operating system, browser version, settings, hardware and headless mode. A baseline made on a Mac won't match a Linux CI machine. Generate and compare screenshots in the same environment, usually the CI container.</p></div>
+<h4>Reducing false alarms</h4>
+<p>Pages often contain things that change every run: dates, adverts, animations, avatars. Playwright's screenshot assertion has options for this, such as hiding parts of the page with <code>mask</code>, turning off animations, and allowing a small number of differing pixels with <code>maxDiffPixels</code>. Ask Claude Code: "Make the visual test ignore the clock and the user avatar, and explain each option you used." Check the options it uses against the Playwright docs page linked in the sources.</p>
+
+<h4>Claude as a second pair of eyes</h4>
+<p>Claude can read images. Paste a screenshot into Claude Code (or let it take one with Playwright MCP) and ask a question a pixel comparison can't answer:</p>
+<div class="code"><span class="cap">Prompt</span><pre>Here are the checkout page at desktop width and at 390px phone width.
+Look for layout problems a user would notice: overlapping or cut-off text,
+buttons off-screen, unreadable contrast, misaligned prices. List each with its location.</pre></div>
+<div class="cols2">
+<div><h4>Pixel comparison is good at</h4><ul><li>Catching any change at all, however small</li><li>Being exactly repeatable</li><li>Running on every commit</li></ul></div>
+<div><h4>Claude reviewing images is good at</h4><ul><li>Judging whether a change looks <em>wrong</em> to a person</li><li>Explaining the problem in words</li><li>Pages without a baseline yet</li></ul></div>
+</div>
+<p>Use both: pixel comparison as the automatic gate, Claude to triage differences and review new pages. Claude can miss small details and occasionally describes things that aren't there, so confirm anything it reports before filing a bug.</p>
+
+<h3 id="ch123-3"><span class="num">123.3</span>Performance testing with k6</h3>
+<p><a class="gl" href="#g-load-testing">Load testing</a> means sending many requests at once to see how a system behaves under pressure. <strong>k6</strong> is a popular open-source load-testing tool from Grafana Labs. You write tests in JavaScript and run them from the terminal. Claude is very good at writing k6 scripts, which makes performance testing far more approachable for testers who aren't performance specialists.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A restaurant that serves one customer perfectly might collapse when 200 arrive at once. Load testing is a rehearsal dinner with a crowd: you find out where the kitchen jams before the real opening night.</p></div>
+<div class="code"><span class="cap">checkout-load.js — a simple k6 test</span><pre><span class="k">import</span> http <span class="k">from</span> <span class="s">'k6/http'</span>;
+<span class="k">import</span> { check, sleep } <span class="k">from</span> <span class="s">'k6'</span>;
+
+<span class="k">export const</span> options = {
+  vus: 20,               <span class="c">// 20 virtual users at the same time</span>
+  duration: <span class="s">'1m'</span>,       <span class="c">// for one minute</span>
+  thresholds: {
+    http_req_failed: [<span class="s">'rate&lt;0.01'</span>],     <span class="c">// fewer than 1% of requests may fail</span>
+    http_req_duration: [<span class="s">'p(95)&lt;500'</span>],  <span class="c">// 95% of requests under 500 ms</span>
+  },
+};
+
+<span class="k">export default function</span> () {
+  <span class="k">const</span> res = http.get(<span class="s">'https://quickpizza.grafana.com'</span>);
+  check(res, { <span class="s">'status is 200'</span>: (r) => r.status === 200 });
+  sleep(1);              <span class="c">// each virtual user pauses 1 second, like a real person</span>
+}</pre></div>
+<div class="code"><span class="cap">Terminal</span><pre>k6 run checkout-load.js</pre></div>
+<p>The <code>thresholds</code> turn a performance test into a pass/fail check: if fewer than 95% of requests finish within 500 milliseconds, or more than 1% fail, k6 marks the whole test as failed. That means you can run it in CI like any other test. The example uses <code>quickpizza.grafana.com</code>, a demo site Grafana provides for k6 practice. Only load-test systems you own or have permission to test.</p>
+<details class="deep"><summary>Reading the results: why "p95" matters more than the average</summary><div class="body">
+<p>k6 reports response times as averages and as <a class="gl" href="#g-percentile">percentiles</a>. p95 is the time within which 95% of requests finished; the slowest 5% took longer. Averages hide pain: if 90 requests take 100 ms and 10 take 5 seconds, the average is about 0.6 seconds, which sounds fine, while one user in ten waits five seconds. Percentiles show that tail. This is why thresholds are usually set on p95 or p99.</p>
+<p>Paste the k6 summary into Claude and ask: "Explain these results for a non-specialist, compare p95 with last week's run (attached), and list what to investigate first." It turns a wall of numbers into a short, prioritised story. But the investigation itself (database queries, server metrics, profiling) needs the system's owners and monitoring tools.</p>
+</div></details>
+<div class="box example"><span class="tag">Real-world example</span><p>A tester who has never written a load test asks Claude Code: "Read our OpenAPI file and write a k6 test for the search and add-to-basket endpoints. Ramp up to 50 users over 2 minutes, hold for 5, ramp down. Fail if p95 is over 800 ms. Explain every line." Within minutes they have a working script and understand it. The team's performance engineer reviews the realistic-load assumptions; the tester owns running it.</p></div>
+<p>Claude can also convert or explain scripts for other tools your organisation already uses, such as Apache JMeter. The principle is the same: Claude writes and explains, the load tool measures, people decide what "fast enough" means.</p>
+
+<h3 id="ch123-4"><span class="num">123.4</span>Accessibility basics</h3>
+<p>Accessibility means people with disabilities can use your product: people who are blind and use a <a class="gl" href="#g-screen-reader">screen reader</a>, who can't use a mouse, who are colour-blind, deaf, or have cognitive or motor impairments. It's a legal requirement in many countries and simply good quality.</p>
+<p>The standard most organisations follow is <a class="gl" href="#g-wcag">WCAG</a> (Web Content Accessibility Guidelines) from the W3C. The current version, <strong>WCAG 2.2</strong>, became a W3C Recommendation in October 2023. It's organised around four principles:</p>
+<div class="tbl"><table>
+<tr><th>Principle</th><th>Plain meaning</th><th>Example check</th></tr>
+<tr><td>Perceivable</td><td>People can see or hear the content in some form</td><td>Images have text alternatives; enough colour contrast</td></tr>
+<tr><td>Operable</td><td>People can use every control</td><td>Everything works with a keyboard alone; focus is visible</td></tr>
+<tr><td>Understandable</td><td>Content and behaviour make sense</td><td>Form errors explain how to fix them</td></tr>
+<tr><td>Robust</td><td>It works with assistive technology</td><td>Buttons are real buttons, with names a screen reader can announce</td></tr>
+</table></div>
+<p>Success criteria come in three levels: A (minimum), AA (the usual legal and corporate target) and AAA (highest).</p>
+
+<h3 id="ch123-5"><span class="num">123.5</span>Automating accessibility checks with axe-core</h3>
+<p><a class="gl" href="#g-axe-core">axe-core</a> is a widely used open-source accessibility testing engine. The <code>@axe-core/playwright</code> package lets you run it inside Playwright tests, and Playwright's documentation has a guide for it.</p>
+<div class="code"><span class="cap">Terminal</span><pre>npm install --save-dev @axe-core/playwright</pre></div>
+<div class="code"><span class="cap">tests/a11y.spec.ts</span><pre><span class="k">import</span> { test, expect } <span class="k">from</span> <span class="s">'@playwright/test'</span>;
+<span class="k">import</span> AxeBuilder <span class="k">from</span> <span class="s">'@axe-core/playwright'</span>;
+
+test(<span class="s">'home page has no detectable WCAG A/AA violations'</span>, <span class="k">async</span> ({ page }) => {
+  <span class="k">await</span> page.goto(<span class="s">'https://demo.playwright.dev/todomvc'</span>);
+  <span class="k">const</span> results = <span class="k">await new</span> AxeBuilder({ page })
+    .withTags([<span class="s">'wcag2a'</span>, <span class="s">'wcag2aa'</span>, <span class="s">'wcag21a'</span>, <span class="s">'wcag21aa'</span>])  <span class="c">// only WCAG A and AA rules</span>
+    .analyze();
+  expect(results.violations).toEqual([]);   <span class="c">// fail if anything was found</span>
+});</pre></div>
+<p>When a test fails, the <code>violations</code> list is long and technical. This is where Claude earns its place:</p>
+<div class="code"><span class="cap">Prompt in Claude Code</span><pre>Run tests/a11y.spec.ts. For each violation: explain in plain English who is affected
+and how, which WCAG success criterion it relates to, the exact element, and the smallest fix.
+Write it as a bug report a developer can act on. Group duplicates.</pre></div>
+<h4>Claude reading the accessibility tree</h4>
+<p>The Playwright MCP server shows Claude the page's <a class="gl" href="#g-accessibility-tree">accessibility tree</a>: the structure a screen reader uses (Chapter 102). That lets Claude spot problems a rule engine may not, such as a button announced only as "button" with no name, or headings that skip levels, and explain how the page would sound to a screen-reader user.</p>
+
+<h3 id="ch123-6"><span class="num">123.6</span>What automation can't check</h3>
+<div class="box warn"><span class="tag">Important</span><p>Playwright's own guide says plainly that automated testing cannot detect all types of WCAG violations. A clean axe report means "no detectable problems", not "accessible".</p></div>
+<div class="cols2">
+<div><h4>Automation and AI can help with</h4><ul><li>Missing labels and alternative text</li><li>Colour contrast</li><li>Invalid structure and roles</li><li>Explaining issues and drafting fixes</li><li>Suggesting manual test steps</li></ul></div>
+<div><h4>Still needs people</h4><ul><li>Real screen-reader testing (VoiceOver, NVDA, JAWS)</li><li>Keyboard-only journeys end to end</li><li>Whether alt text is actually <em>meaningful</em></li><li>Cognitive load and clarity of language</li><li>Testing with disabled users, the gold standard</li></ul></div>
+</div>
+<p>A good use of Claude here: "Write a 20-minute manual screen-reader test script for the checkout, step by step, with what a tester should hear at each step." It makes manual testing faster to plan, without pretending to replace it.</p>
+
+<h3 id="ch123-7"><span class="num">123.7</span>Security testing basics for QA</h3>
+<p>Security testing is a specialist field, and serious testing (penetration tests, security code review) belongs to security professionals and only with authorisation. But QA engineers can catch many problems early with negative tests, and Claude is good at brainstorming abuse cases:</p>
+<div class="code"><span class="cap">Prompt</span><pre>For the "change email address" feature described in @docs/stories/ACC-77.md, list abuse cases
+a QA engineer should test (authorisation, input handling, rate limits, session handling),
+each as a test idea with expected behaviour. Only suggest tests appropriate for our own
+staging environment. Mark which ones need the security team.</pre></div>
+<p>Typical QA-level checks include: can user A see or change user B's data by editing an ID in the URL; do forms reject script and SQL-like input safely; do sessions expire; are errors free of internal details. Part XVI (Chapters 130–135) covers AI-specific security in depth, including prompt injection.</p>
+
+<div class="lab"><div class="lab-h"><b>Three non-functional checks in an hour</b><span>60 min · Claude Code, Node.js</span></div><ol>
+<li>In a Playwright project, ask Claude Code to add the visual test from 114.2 and run it twice.<span class="expect">the first run reports that a baseline screenshot was written; the second run passes.</span></li>
+<li>Ask Claude to add a to-do item before the screenshot so the page changes, and run again.<span class="expect">a failure with a difference image. Ask Claude to explain what changed.</span></li>
+<li>Install <code>@axe-core/playwright</code> and add the accessibility test from 114.5. Run it.<span class="expect">either a pass or a list of violations. Ask Claude to turn any violations into plain-English bug reports.</span></li>
+<li>If k6 is installed (see grafana.com/docs/k6 for installation), ask Claude to write a k6 script with 5 virtual users for 30 seconds against https://quickpizza.grafana.com with a p95 threshold, and run it.<span class="expect">a k6 summary with p95 and a threshold result. Ask Claude to explain each number.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"A passing axe scan means the site is accessible."</dt><dd>It means no automatically detectable problems. Manual and real-user testing are still needed.</dd>
+<dt>"The average response time tells me if it's fast."</dt><dd>Look at p95 and p99: averages hide the slow experiences that users complain about.</dd>
+<dt>"Claude can load-test the site by itself."</dt><dd>Claude writes and explains the scripts; a tool like k6 generates the load and measures.</dd>
+<dt>"Screenshot baselines work everywhere."</dt><dd>Rendering differs between machines. Create and compare baselines in the same environment.</dd>
+</dl></div>
+
+<h3 id="ch123-r"><span class="num">123.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Playwright's <code>toHaveScreenshot()</code> compares against baselines; keep them in one consistent environment and update them deliberately.</li>
+<li>Claude complements pixel comparison by judging whether a page looks wrong and explaining why.</li>
+<li>k6 scripts with thresholds turn performance into pass/fail checks; Claude writes and explains them; percentiles matter more than averages.</li>
+<li>WCAG 2.2 (A, AA, AAA) is the accessibility standard; axe-core automates part of it, Claude explains results, and people must test the rest.</li>
+<li>QA can catch basic security problems with negative tests and abuse cases; deeper testing belongs to security specialists.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">The first time a <code>toHaveScreenshot()</code> test runs, what happens?</p><div class="opts"><button>It fails permanently</button><button data-ok>Playwright saves a baseline screenshot to compare against next time</button><button>It compares against a screenshot on Playwright's servers</button></div><p class="why" hidden>The first run writes the baseline; check it and commit it.</p></div>
+<div class="qz"><p class="q">In k6, what does the threshold <code>http_req_duration: ['p(95)&lt;500']</code> mean?</p><div class="opts"><button>Every request must take under 500 ms</button><button data-ok>95% of requests must finish in under 500 ms, or the test fails</button><button>The average must be under 95 ms</button></div><p class="why" hidden>p(95) is the 95th percentile of response times.</p></div>
+<div class="qz"><p class="q">Which WCAG level is the usual target for organisations?</p><div class="opts"><button>A</button><button data-ok>AA</button><button>AAA</button></div><p class="why" hidden>AA is the common legal and corporate target.</p></div>
+<div class="qz"><p class="q">An axe-core scan reports zero violations. What can you conclude?</p><div class="opts"><button>The page is fully accessible</button><button data-ok>No automatically detectable problems were found; manual checks are still needed</button><button>The scan didn't run</button></div><p class="why" hidden>Automated tools catch only part of WCAG.</p></div>
+<div class="qz"><p class="q">What's the best division of work between Claude and k6?</p><div class="opts"><button>Claude generates the load</button><button data-ok>Claude writes and explains scripts and results; k6 generates load and measures</button><button>k6 writes the scripts</button></div><p class="why" hidden>Each does what it's good at.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Choose one important page of a product you test. Add a visual test and an axe accessibility test with Claude Code's help, and write a k6 script for one of its API calls (run it only where you have permission). Then ask Claude to write a 15-minute manual accessibility test plan for the same page. Present all four results to your team as a one-page "non-functional health check".</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Non-functional testing asks whether the product looks right, is fast enough and works for everyone. Playwright compares screenshots, k6 measures speed under load, and axe-core checks accessibility rules. Claude writes the scripts and translates the results into plain English. But automated accessibility checks only catch part of the problems, so real people with screen readers still need to test."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Playwright, <a href="https://playwright.dev/docs/test-snapshots" target="_blank" rel="noopener">Visual comparisons</a> and <a href="https://playwright.dev/docs/accessibility-testing" target="_blank" rel="noopener">Accessibility testing</a>.</li>
+<li>Deque, <a href="https://github.com/dequelabs/axe-core-npm/tree/develop/packages/playwright" target="_blank" rel="noopener">@axe-core/playwright</a> and <a href="https://github.com/dequelabs/axe-core" target="_blank" rel="noopener">axe-core</a>.</li>
+<li>Grafana Labs, <a href="https://grafana.com/docs/k6/latest/get-started/write-your-first-test/" target="_blank" rel="noopener">Write your first k6 test</a> and <a href="https://grafana.com/docs/k6/latest/using-k6/thresholds/" target="_blank" rel="noopener">Thresholds</a>.</li>
+<li>W3C, <a href="https://www.w3.org/TR/WCAG22/" target="_blank" rel="noopener">Web Content Accessibility Guidelines (WCAG) 2.2</a> and <a href="https://www.w3.org/WAI/standards-guidelines/wcag/" target="_blank" rel="noopener">WCAG overview</a>.</li>
+<li>Apache, <a href="https://jmeter.apache.org/" target="_blank" rel="noopener">JMeter</a>.</li>
+<li>OWASP, <a href="https://owasp.org/www-project-web-security-testing-guide/" target="_blank" rel="noopener">Web Security Testing Guide</a>.</li>
+</ol><p class="verified">Verified 9 November 2026</p></div>

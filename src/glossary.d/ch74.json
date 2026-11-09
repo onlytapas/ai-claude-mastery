@@ -1,0 +1,22 @@
+{
+ "Slash command": {
+  "d": "In Claude Code, an instruction that starts with / at the beginning of a message, such as /clear or /model. Some are built into the program; others are skills or come from plugins and MCP servers.",
+  "see": "ch74"
+ },
+ "Bundled skill": {
+  "d": "A skill that ships with Claude Code, such as /code-review or /simplify. It gives Claude detailed instructions that it carries out with its normal tools.",
+  "see": "ch74"
+ },
+ "Checkpoint": {
+  "d": "A snapshot of Claude's file edits saved at the start of each turn in Claude Code, so you can go back to it with /rewind. Not a replacement for git.",
+  "see": "ch74"
+ },
+ "Compaction": {
+  "d": "Replacing a long conversation with a shorter summary to free space in the context window, either automatically or with /compact.",
+  "see": "ch74"
+ },
+ "Alias": {
+  "d": "Another name for the same command. For example /reset and /new are aliases of /clear.",
+  "see": "ch74"
+ }
+}

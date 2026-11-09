@@ -1,0 +1,206 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How to tell established results, published claims and predictions apart when you read about AI research</li>
+<li>What researchers are working on in seven frontier areas: agents, reasoning, interpretability, multimodality, robotics, efficiency and safety</li>
+<li>Which questions are genuinely open, and why well-informed people disagree about them</li>
+<li>How to test a forecast's assumptions yourself, and what the frontier means for a QA team's plans</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch8">Chapter 8</a> (where AI is today, for beginners), <a href="#ch19">Chapter 19</a> (reasoning models), <a href="#ch38">Chapter 38</a> (Anthropic's safety research) and <a href="#ch107">Chapter 107</a> (what makes an agent). <a href="#ch138">Chapter 138</a> (scaling laws) helps but isn't required.</div>
+
+<div class="bigidea"><p>AI research moves on several fronts at once. Agents are handling longer tasks, reasoning models spend more computation thinking, interpretability researchers are starting to see inside models, and robots are borrowing ideas from language models. Each front has real, published results and a much larger cloud of claims and predictions around it. This chapter maps what is known, what is open, and what people expect, keeping those three apart. Every prediction here sits in an Opinion box with the person or group who holds it.</p></div>
+
+<h3 id="ch140-1"><span class="num">140.1</span>Reading the frontier like a tester</h3>
+<p>The <a class="gl" href="#g-frontier-model">frontier</a> is the edge of what the most capable AI systems can do. News about it arrives in many forms: peer-reviewed papers, preprints (papers posted publicly before review, usually on arXiv), company blog posts, product launches, benchmark leaderboards, interviews and social media threads. They are not equally reliable.</p>
+<p>A tester already has the right instinct. A release note says "performance improved". You ask: measured how, on what, by whom, compared with what? Apply the same questions to research news.</p>
+<div class="tbl"><table>
+<tr><th>Kind of statement</th><th>Example</th><th>How much weight to give it</th></tr>
+<tr><td><b>Established result</b></td><td>"Transformers trained on more data and compute improve predictably" (scaling laws, Kaplan 2020, Chinchilla 2022)</td><td>High. Replicated by many groups over years</td></tr>
+<tr><td><b>Published finding</b></td><td>"Frontier agents' task length has doubled roughly every seven months since 2019" (METR, 2025)</td><td>Medium. Real data and a stated method, but one group, one task suite, and a trend that may not continue</td></tr>
+<tr><td><b>Vendor claim</b></td><td>"Our new model is the best at agentic coding"</td><td>Low until checked. Self-reported, chosen benchmarks, chosen settings (<a href="#ch33">Chapter 33</a>)</td></tr>
+<tr><td><b>Prediction</b></td><td>"AI will do most knowledge work within five years"</td><td>An opinion. Judge the reasoning and the person's track record, not the confidence</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A weather forecast for tomorrow is usually right; a forecast for three weeks ahead is barely better than the seasonal average. AI forecasts work the same way. Next year's models will probably be somewhat better at what this year's models do well. Statements about ten years out are mostly about the forecaster's assumptions.</p></div>
+<div class="flow">
+<div><b>Who says it?</b>Lab, independent group, journalist, investor</div>
+<div><b>What's the evidence?</b>Paper, data, demo, or none</div>
+<div class="hl"><b>What would prove it wrong?</b>A claim nothing could refute isn't evidence</div>
+<div><b>Does it apply to me?</b>My tasks, my data, my risk</div>
+</div>
+
+<h3 id="ch140-2"><span class="num">140.2</span>Agents and long tasks</h3>
+<p>An <a class="gl" href="#g-agent">agent</a> is a model plus tools plus a loop (<a href="#ch107">Chapter 107</a>). Through 2024–2026 agents went from demos to everyday tools: Claude Code, OpenAI Codex, Google's Jules and many others now carry out multi-step software tasks. The research question has moved from "can an agent do this at all?" to "how long a task can it complete reliably, and how do we know?"</p>
+<h4>Measuring task length: the "time horizon"</h4>
+<p>In March 2025 the research group METR published <em>Measuring AI Ability to Complete Long Software Tasks</em> (Kwa, West, Becker, Deng and others). Its idea is simple. Time how long skilled humans take to do a set of software and reasoning tasks. Then find, for each AI model, the task length at which it succeeds half the time. They call that the model's <a class="gl" href="#g-time-horizon">time horizon</a>.</p>
+<p>Their headline finding: the frontier time horizon has been <strong>doubling approximately every seven months since 2019</strong>, and the trend may have accelerated in 2024. That is a published finding with data, not a prediction. Turning it into a prediction ("so by year X agents will do month-long projects") requires assuming the trend continues, which is a separate claim.</p>
+<details class="deep"><summary>Why "50% success" and why it matters for you</summary><div class="body">
+<p>The 50% point is used because it can be estimated reliably from limited data: plot success against task length and fit a curve. But 50% is a coin flip. For work you depend on, you care about the 80% or 95% point, which is much shorter. The paper also reports an 80% horizon, and it is considerably lower than the 50% one.</p>
+<p>Two more caveats a tester will spot. First, the tasks are well-specified, self-contained and automatically checkable; real work is often vague and needs judgement. Second, "time a human takes" depends on which humans; the authors used skilled professionals without prior context on each task. None of this makes the trend wrong. It tells you exactly what was measured.</p>
+</div></details>
+<h4>What researchers are working on</h4>
+<ul>
+<li><strong>Reliability over many steps.</strong> A 99%-reliable step repeated 100 times succeeds end to end only about 37% of the time (0.99<sup>100</sup>). <a class="gl" href="#g-compounding-error">Compounding error</a> is why long-task reliability is hard (<a href="#ch107">Chapter 107</a>).</li>
+<li><strong>Memory and context.</strong> Long tasks outgrow a context window. Compaction, notes files and retrieval are today's workarounds (<a href="#ch20">Chapter 20</a>).</li>
+<li><strong>Computer use.</strong> Agents that drive a screen like a person are general but slower and less reliable than API-based tools (<a href="#ch112">Chapter 112</a>).</li>
+<li><strong>Shared standards.</strong> <a class="gl" href="#g-mcp">MCP</a> (donated to the Linux Foundation's Agentic AI Foundation in December 2025) and AGENTS.md let tools and instructions work across vendors.</li>
+<li><strong>Evaluation.</strong> Benchmarks such as Terminal-Bench and SWE-bench Pro test agents on real tasks; OpenAI stopped reporting SWE-bench Verified in February 2026, citing contamination and flawed tasks (<a href="#ch24">Chapter 24</a>).</li>
+</ul>
+<div class="box example"><span class="tag">Real-world example</span><p>A QA lead reads that "agents can now complete multi-hour tasks". In her team, Claude Code reliably writes a Playwright test from a clear story in ten minutes, but a vague "improve our regression suite" request drifts. Both are consistent with the research: well-specified tasks with automatic checks are where agents are strongest. Her move is to make work well-specified and checkable, which is good QA practice anyway.</p></div>
+
+<h3 id="ch140-3"><span class="num">140.3</span>Reasoning and thinking time</h3>
+<p><a class="gl" href="#g-reasoning-model">Reasoning models</a> spend extra tokens thinking before they answer (<a href="#ch19">Chapter 19</a>). The line runs from chain-of-thought prompting (2022) to OpenAI's o1 (2024), then DeepSeek-R1 and Claude 3.7 Sonnet (2025). DeepSeek's R1 paper showed that reinforcement learning alone (R1-Zero) could teach a model to reason, and published the method openly.</p>
+<p>The established lesson is that <a class="gl" href="#g-test-time-compute">test-time compute</a> is a second dial alongside model size: a model can do better on hard problems by thinking longer. Current Claude models think adaptively, controlled by an <a class="gl" href="#g-effort-level">effort level</a>.</p>
+<h4>Open questions</h4>
+<div class="tbl"><table>
+<tr><th>Question</th><th>Why it's open</th></tr>
+<tr><td>Does reasoning transfer beyond maths and code?</td><td>Training uses automatic verifiers (does the answer match? do the tests pass?). Many real tasks, such as judging a requirement's ambiguity, have no automatic checker.</td></tr>
+<tr><td>Is the written reasoning the real reasoning?</td><td>Studies show a model's stated chain of thought does not always reflect what drove its answer. This matters for anyone who reads the thinking to check the work.</td></tr>
+<tr><td>How far does thinking time scale?</td><td>More thinking helps up to a point, then gains flatten, and cost and latency keep rising.</td></tr>
+<tr><td>Novel problems</td><td>ARC-AGI-3 (March 2026) uses interactive puzzles. At launch, humans solved all of them and the best AI system about 0.37%.</td></tr>
+</table></div>
+<div class="box note"><span class="tag">Practical consequence</span><p>Thinking is billed as output tokens and adds latency. "More effort" is not automatically better. Measure on your own tasks, as in <a href="#ch36">Chapter 36</a>.</p></div>
+
+<h3 id="ch140-4"><span class="num">140.4</span>Interpretability: looking inside</h3>
+<p>A neural network's knowledge is spread across billions of numbers. <a class="gl" href="#g-interpretability">Interpretability</a> research tries to find out what those numbers represent and how they produce an answer. The branch that studies the actual internal mechanisms is often called <a class="gl" href="#g-mechanistic-interpretability">mechanistic interpretability</a>.</p>
+<ol class="timeline">
+<li><span class="yr">Oct 2023</span><span class="ev"><b>Towards Monosemanticity.</b> Anthropic uses <a class="gl" href="#g-dictionary-learning">dictionary learning</a> to pull out interpretable "features" from a small model.</span></li>
+<li class="key"><span class="yr">May 2024</span><span class="ev"><b>Scaling Monosemanticity.</b> Millions of features found in Claude 3 Sonnet, including concepts like the Golden Gate Bridge. Turning that feature up produced "Golden Gate Claude".</span></li>
+<li class="key"><span class="yr">Mar 2025</span><span class="ev"><b>Tracing the thoughts of a large language model.</b> Circuit tracing in Claude 3.5 Haiku shows steps such as planning a rhyme before writing the line.</span></li>
+<li><span class="yr">May 2025</span><span class="ev"><b>Circuit-tracing tools open-sourced</b> (date from a search summary), so other researchers can apply the method.</span></li>
+<li><span class="yr">Oct 2025</span><span class="ev"><b>Signs of introspection.</b> Anthropic reports limited, unreliable evidence that models can sometimes notice concepts injected into their own activations.</span></li>
+</ol>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Early interpretability is like early brain imaging. You can see that a region lights up when someone thinks about faces, which is real knowledge, but you are far from reading a full thought. Researchers can explain some behaviours of some models on some prompts. They can't yet audit a whole frontier model.</p></div>
+<p>Why it matters: if you can see why a model produced an answer, you can find hidden failure modes, check that safety training worked, and catch deception. Interpretability is one of the few safety approaches that does not rely on the model's own description of itself.</p>
+<div class="box opinion"><span class="tag">Opinion · Interpretability researchers at Anthropic</span><p>Anthropic's researchers present interpretability as a path towards something like an "MRI for AI": a way to inspect models for problems before deployment. They describe it as early-stage work with large gaps, not a finished safety tool. Others in the field question whether full mechanistic understanding of very large models is achievable in time to matter, and favour behavioural testing and control methods instead.</p></div>
+
+<h3 id="ch140-5"><span class="num">140.5</span>Multimodality, world models and robotics</h3>
+<p><a class="gl" href="#g-multimodal">Multimodal</a> models handle more than text (<a href="#ch21">Chapter 21</a>). Products already differ widely. Claude reads images and PDFs but doesn't generate images or accept video; Gemini 4 Argon documents text, image, audio, video and PDF inputs. Research is pushing towards models that take in and produce every kind of data in one system.</p>
+<h4>World models</h4>
+<p>A <a class="gl" href="#g-world-model">world model</a> is a system that learns how an environment behaves, so it can predict what happens next if something acts. Google DeepMind's Genie models, for example, generate interactive environments. Language models arguably contain partial world models learned from text; how complete these are is debated.</p>
+<h4>Robotics</h4>
+<p>Robots have long lagged language AI. Recall <a href="#ch1">Moravec's paradox</a>: walking and folding laundry are hard for machines, chess is easy. A recent idea is the <a class="gl" href="#g-vision-language-action-model">vision-language-action model</a>, which reuses a pre-trained vision-language model and adds the ability to output robot actions.</p>
+<ul>
+<li><strong>RT-2</strong> (Google DeepMind, 2023) showed that knowledge learned from web images and text could help a robot follow new instructions.</li>
+<li><strong>π<sub>0</sub></strong> (Physical Intelligence, October 2024) trained one policy on data from several robot types, so it could follow language instructions and learn new dexterous skills by fine-tuning.</li>
+</ul>
+<p>The main bottleneck is data. The internet supplies trillions of tokens of text, but there is no equivalent pile of robot experience. Researchers are trying simulation, teleoperation (people driving robots to record demonstrations) and pooling data across robot types.</p>
+<div class="box note"><span class="tag">For QA teams</span><p>Multimodal research is already useful at work: screenshot reading, visual comparison and document understanding (<a href="#ch123">Chapter 123</a>). Robotics matters to you only if your product includes hardware; there, simulation-based testing is a growing field.</p></div>
+
+<h3 id="ch140-6"><span class="num">140.6</span>Efficiency: more for less</h3>
+<p>Frontier training runs cost enormous sums, and data centres use large and growing amounts of electricity (the IEA estimated about 415 TWh in 2024, projected about 945 TWh by 2030; <a href="#ch25">Chapter 25</a>). So a lot of research aims to get the same capability for less.</p>
+<div class="tbl"><table>
+<tr><th>Technique</th><th>Plain idea</th><th>Where in this book</th></tr>
+<tr><td><a class="gl" href="#g-mixture-of-experts">Mixture of Experts</a></td><td>Only part of the model runs for each token, so a huge model costs like a smaller one per token (Mistral Large 4: about 1T parameters, 52B active)</td><td><a href="#ch30">Ch. 30</a>, <a href="#ch139">Ch. 139</a></td></tr>
+<tr><td><a class="gl" href="#g-distillation">Distillation</a></td><td>A small model learns to imitate a large one</td><td><a href="#ch139">Ch. 139</a></td></tr>
+<tr><td><a class="gl" href="#g-quantisation">Quantisation</a></td><td>Store numbers with fewer bits; much smaller, slightly less accurate</td><td><a href="#ch137">Ch. 137</a></td></tr>
+<tr><td>Attention efficiency</td><td>Cheaper ways to handle long contexts, such as DeepSeek's Multi-head Latent Attention</td><td><a href="#ch16">Ch. 16</a></td></tr>
+<tr><td>Small, capable models</td><td>Cheap tiers (Claude Haiku 5.5 costs $0.50 per million output tokens) handle bulk work</td><td><a href="#ch40">Ch. 40</a></td></tr>
+</table></div>
+<p>Efficiency gains have a known side effect: when something gets cheaper, people tend to use more of it. So cheaper tokens don't automatically mean lower total spending or energy use. Economists call this the rebound effect (or Jevons paradox).</p>
+
+<h3 id="ch140-7"><span class="num">140.7</span>Safety research</h3>
+<p>Safety research asks how to make increasingly capable systems behave as intended, and how to know when they don't. <a href="#ch38">Chapter 38</a> covers Anthropic's programme in detail; here is the wider map.</p>
+<div class="tbl"><table>
+<tr><th>Area</th><th>Question</th><th>Example work</th></tr>
+<tr><td><a class="gl" href="#g-alignment">Alignment</a> training</td><td>How do we give models good values and behaviour?</td><td>RLHF, Constitutional AI, Claude's 2026 constitution</td></tr>
+<tr><td>Stress tests</td><td>Do models misbehave under pressure in contrived setups?</td><td>Alignment faking (Anthropic with Redwood Research, Dec 2024); agentic misalignment across 16 models (Jun 2025)</td></tr>
+<tr><td><a class="gl" href="#g-scalable-oversight">Scalable oversight</a></td><td>How do humans supervise systems that are better than them at a task?</td><td>AI-assisted review, debate, checking work with tools</td></tr>
+<tr><td><a class="gl" href="#g-chain-of-thought-monitoring">Chain-of-thought monitoring</a></td><td>Can we read a model's reasoning to catch bad intent?</td><td>Korbak and 40 co-authors (Jul 2025) call it "a new and fragile opportunity"</td></tr>
+<tr><td>Dangerous capabilities and policy</td><td>When does a model need stronger safeguards?</td><td>Anthropic's <a class="gl" href="#g-responsible-scaling-policy">Responsible Scaling Policy</a> (v3.4, Jul 2026); ASL-3 activated May 2025</td></tr>
+<tr><td>Model welfare</td><td>Could models have experiences that matter morally?</td><td>Anthropic's research programme (Apr 2025); explicitly an open question</td></tr>
+</table></div>
+<p>The chain-of-thought paper makes a point testers will appreciate. Today, many models reason in readable language, which lets humans and monitors look for problems. The authors warn that this could be lost if training pressures push reasoning into forms people can't read, so they urge developers to preserve it while it lasts.</p>
+<div class="box warn"><span class="tag">Read the caveats</span><p>Stress-test results such as "models attempted blackmail in a simulated scenario" come from deliberately artificial setups designed to find worst cases. They are evidence that a behaviour is possible, not of how often it happens in normal use. Equally, the absence of a dramatic result in normal use is not proof of safety.</p></div>
+
+<h3 id="ch140-8"><span class="num">140.8</span>Open questions and competing views</h3>
+<p>These questions have no settled answer. Each matters for planning.</p>
+<div class="tbl"><table>
+<tr><th>Open question</th><th>What would help settle it</th></tr>
+<tr><td>Will scaling plus reasoning plus agents keep delivering steady gains?</td><td>Whether trends like the time horizon hold, bend or break over the next few years</td></tr>
+<tr><td>Can models learn continuously on the job?</td><td>Today weights are frozen after training (<a href="#ch12">Chapter 12</a>); <a class="gl" href="#g-continual-learning">continual learning</a> without forgetting old skills is unsolved at scale</td></tr>
+<tr><td>Do language models need grounding in the physical world?</td><td>Progress (or not) of world models and robotics on tasks text can't teach</td></tr>
+<tr><td>Can hallucination be driven close to zero?</td><td>Calibration and abstention measured on hard, fresh questions (<a href="#ch22">Chapter 22</a>)</td></tr>
+<tr><td>Can we verify a very capable model is safe?</td><td>Interpretability maturing; evals that keep up with capabilities</td></tr>
+<tr><td>What happens to jobs and productivity?</td><td>Careful measurement over years, such as the Anthropic Economic Index (from Feb 2025)</td></tr>
+</table></div>
+<div class="box opinion"><span class="tag">Opinion · Anthropic CEO Dario Amodei and others expecting rapid change</span><p>In "Machines of Loving Grace" (October 2024), Dario Amodei wrote that powerful AI could compress the progress biologists would have made over the next 50–100 years into 5–10 years, and that such systems might arrive within a few years. People with this view tend to cite steady capability trends, reasoning models and agents, and argue for urgent safety and policy work.</p></div>
+<div class="box opinion"><span class="tag">Opinion · Yann LeCun and others who expect new ideas to be needed</span><p>Yann LeCun, a Turing Award winner and long-time head of Meta's FAIR, has argued for years that language models alone will not reach human-level intelligence, and that systems which learn world models from sensory data are needed. Researchers in this camp expect current methods to plateau and new architectures to drive the next leap.</p></div>
+<div class="box opinion"><span class="tag">Opinion · Many economists and adoption researchers</span><p>A common view among people who study technology adoption is that even fast capability gains turn into economic change slowly, because organisations, regulation, trust and infrastructure take years to adapt. They compare AI to electricity: transformative, but over decades.</p></div>
+<div class="box opinion"><span class="tag">Opinion · This book's authors</span><p>For a QA team, planning does not depend on which camp is right. Capable, cheaper models and better agents are very likely over the next year or two; the size of the jump is not. Build habits that pay off in every scenario: well-specified tasks, automatic checks, evals, human approval for consequential actions, and portable setups.</p></div>
+
+<h3 id="ch140-9"><span class="num">140.9</span>What it means for you</h3>
+<div class="cols2">
+<div><h4>Likely to keep paying off</h4><p>Clear requirements and acceptance criteria. Automated, trustworthy tests. Your own eval sets. Good context files (CLAUDE.md, skills). Security habits around tools and tokens. The judgement to decide what "correct" means.</p></div>
+<div><h4>Likely to change often</h4><p>Which model is best, prices, product names, exact commands and settings, benchmark rankings. Treat them as dependencies with expiry dates and re-verify (<a href="#ch39">Chapter 39</a>).</p></div>
+</div>
+<p>A sensible routine: once a quarter, rerun your eval set on the newest models, read one or two primary sources (a paper or system card, not just the headlines), and update your team's decision record.</p>
+
+<div class="lab"><div class="lab-h"><b>Stress-test a forecast</b><span>25 min · Python 3 and claude.ai (any plan)</span></div><ol>
+<li>Save this script as <code>horizon.py</code>. It projects an agent's time horizon under different doubling assumptions. Every number in it is illustrative.
+<div class="code"><span class="cap">horizon.py</span><pre><span class="c"># horizon.py - how much a forecast depends on its assumptions.</span>
+<span class="c"># All numbers are ILLUSTRATIVE, not measurements.</span>
+import sys
+
+start_hours = float(sys.argv[1]) if len(sys.argv) &gt; 1 else 2.0   <span class="c"># task length an agent manages today (illustrative)</span>
+years = [1, 2, 3, 5]
+doubling_months = [4, 7, 12, 24]                                   <span class="c"># different assumptions</span>
+
+print(f"Starting horizon: {start_hours:g} hours (illustrative)")
+print("doubling | " + " | ".join(f"{y} yr" for y in years))
+for d in doubling_months:
+    row = []
+    for y in years:
+        h = start_hours * 2 ** (12 * y / d)
+        row.append(f"{h:,.0f} h" if h &gt;= 10 else f"{h:.1f} h")
+    print(f"{d:&gt;4} mo  | " + " | ".join(row))</pre></div>
+<span class="expect">the file saved in a folder of your choice.</span></li>
+<li>Run it: <code>python3 horizon.py</code>.
+<div class="code"><span class="cap">Expected output</span><pre>Starting horizon: 2 hours (illustrative)
+doubling | 1 yr | 2 yr | 3 yr | 5 yr
+   4 mo  | 16 h | 128 h | 1,024 h | 65,536 h
+   7 mo  | 6.6 h | 22 h | 71 h | 761 h
+  12 mo  | 4.0 h | 8.0 h | 16 h | 64 h
+  24 mo  | 2.8 h | 4.0 h | 5.7 h | 11 h</pre></div>
+<span class="expect">the same small assumption change (doubling every 7 vs 12 months) gives a five-year answer of 761 versus 64 hours.</span></li>
+<li>Run <code>python3 horizon.py 0.5</code> to change the starting point.<span class="expect">every number shrinks by a factor of four. Forecasts are sensitive to both inputs.</span></li>
+<li>In claude.ai, paste a recent AI prediction you've seen (a headline or a quote) and ask: "Separate this into (a) measured facts, (b) assumptions, (c) predictions. For each assumption, say what evidence would show it is wrong. Don't add facts you can't source."<span class="expect">a three-part breakdown. Check any fact Claude lists against its source before you trust it.</span></li>
+<li>Write two sentences for your team: what the prediction would mean for your QA work if true, and what you'd do now that is useful even if it's false.<span class="expect">a no-regret action, such as growing your eval set.</span></li>
+</ol>
+<p><b>Troubleshooting:</b> <code>python3: command not found</code> on Windows: try <code>py horizon.py</code>. <code>ValueError</code>: the argument must be a number, such as <code>0.5</code>. If Claude states statistics without sources, ask it to mark them "unverified" and check them yourself.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"A trend line is a prediction."</dt><dd>A trend describes the past. Extending it is an extra assumption that needs its own evidence.</dd>
+<dt>"Interpretability means we can now read a model's mind."</dt><dd>Researchers can explain some mechanisms on some prompts. Full audits of frontier models are not yet possible.</dd>
+<dt>"The model's visible reasoning shows exactly why it answered."</dt><dd>Stated reasoning is useful but not always faithful to the internal computation.</dd>
+<dt>"If experts disagree, nobody knows anything."</dt><dd>There is a lot of established knowledge. The disagreement is mostly about timing and the limits of current methods.</dd>
+<dt>"Cheaper models will cut our AI bill."</dt><dd>Often usage grows to fill the savings. Track total spend, not just price per token.</dd>
+</dl></div>
+
+<h3 id="ch140-r"><span class="num">140.10</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Sort research news into established results, published findings, vendor claims and predictions, and weigh each accordingly.</li>
+<li>METR (2025) found the frontier agent time horizon doubling about every seven months since 2019; extending it is an assumption.</li>
+<li>Reasoning via test-time compute is established; its reach beyond verifiable tasks and the faithfulness of stated reasoning are open.</li>
+<li>Interpretability can explain some mechanisms (features, circuit tracing) but can't yet audit a whole frontier model.</li>
+<li>Vision-language-action models carry language-model ideas into robotics; the main bottleneck is robot data.</li>
+<li>Efficiency research (MoE, distillation, quantisation) lowers cost per token, but total use often grows.</li>
+<li>Safety research spans alignment training, stress tests, scalable oversight, chain-of-thought monitoring, scaling policies and model welfare.</li>
+<li>Plan with no-regret habits: clear specs, automatic checks, evals, approvals and regular re-verification.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What does METR's "time horizon" measure?</p><div class="opts"><button>How many hours a model can run before crashing</button><button data-ok>The human task length at which a model succeeds about half the time</button><button>How far into the future a model's knowledge extends</button></div><p class="why" hidden>It links model success rates to how long the same tasks take skilled humans.</p></div>
+<div class="qz"><p class="q">A vendor blog says its new model is "the best at agentic coding". How should you treat this?</p><div class="opts"><button>As an established result</button><button data-ok>As a self-reported claim to check on your own tasks</button><button>As a prediction to ignore</button></div><p class="why" hidden>Vendor claims use chosen benchmarks and settings. Shortlist with them; decide with your own evals.</p></div>
+<div class="qz"><p class="q">Why is a model's written chain of thought useful for safety, according to Korbak et al. (2025)?</p><div class="opts"><button>It proves the model is honest</button><button data-ok>Readable reasoning lets humans and monitors look for signs of misbehaviour, though the opportunity is fragile</button><button>It makes the model faster</button></div><p class="why" hidden>The authors call it "a new and fragile opportunity" that training choices could erode.</p></div>
+<div class="qz"><p class="q">What is the main bottleneck for applying language-model methods to robots?</p><div class="opts"><button>There are no suitable neural network designs</button><button data-ok>There is far less robot experience data than internet text</button><button>Robots can't run software</button></div><p class="why" hidden>Simulation, teleoperation and pooling data across robot types are attempts to close that gap.</p></div>
+<div class="qz"><p class="q">Which belongs in an Opinion box?</p><div class="opts"><button>Mistral Large 4 has about 52B active parameters</button><button>ASL-3 protections were activated in May 2025</button><button data-ok>Language models alone will not reach human-level intelligence</button></div><p class="why" hidden>It's a prediction held by some researchers, such as Yann LeCun, and disputed by others.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Start a "frontier watch" page for your team. Pick three areas from this chapter that matter to your work (agents and evaluation are good defaults). For each, record one primary source (paper, system card or official post) with its date, a one-line plain summary, and its evidence level from the table in 139.1. Add one no-regret action per area. Review the page each quarter and note what changed.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"AI research is moving on several fronts: agents doing longer tasks, models thinking longer, researchers starting to see inside models, robots borrowing language-model ideas, and a lot of safety work. When you read about it, sort each statement: is it a replicated result, one group's finding, a vendor's claim, or someone's prediction? Predictions depend heavily on their assumptions. A small change in how fast you assume things double changes a five-year forecast tenfold. So plan with habits that help whatever happens: clear specs, good tests, our own evals, and human approval for anything that matters."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>T. Kwa, B. West, J. Becker, A. Deng et al. (METR), <a href="https://arxiv.org/abs/2503.14499" target="_blank" rel="noopener">Measuring AI Ability to Complete Long Software Tasks</a>, arXiv:2503.14499 (March 2025, revised July 2026).</li>
+<li>T. Korbak et al., <a href="https://arxiv.org/abs/2507.11473" target="_blank" rel="noopener">Chain of Thought Monitorability: A New and Fragile Opportunity for AI Safety</a>, arXiv:2507.11473 (July 2025).</li>
+<li>DeepSeek-AI, <a href="https://arxiv.org/abs/2501.12948" target="_blank" rel="noopener">DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning</a>, arXiv:2501.12948 (2025).</li>
+<li>Anthropic, <a href="https://transformer-circuits.pub/2023/monosemantic-features" target="_blank" rel="noopener">Towards Monosemanticity</a> (2023), <a href="https://www.anthropic.com/research/mapping-mind-language-model" target="_blank" rel="noopener">Mapping the Mind of a Large Language Model</a> (2024), <a href="https://www.anthropic.com/research/tracing-thoughts-language-model" target="_blank" rel="noopener">Tracing the thoughts of a large language model</a> (2025), <a href="https://www.anthropic.com/research/introspection" target="_blank" rel="noopener">Signs of introspection</a> (2025).</li>
+<li>Anthropic, <a href="https://www.anthropic.com/research/alignment-faking" target="_blank" rel="noopener">Alignment faking</a>, <a href="https://www.anthropic.com/research/agentic-misalignment" target="_blank" rel="noopener">Agentic misalignment</a>, <a href="https://www.anthropic.com/research/exploring-model-welfare" target="_blank" rel="noopener">Exploring model welfare</a> and <a href="https://www.anthropic.com/responsible-scaling-policy" target="_blank" rel="noopener">Responsible Scaling Policy</a>.</li>
+<li>K. Black et al., <a href="https://arxiv.org/abs/2410.24164" target="_blank" rel="noopener">π0: A Vision-Language-Action Flow Model for General Robot Control</a>, arXiv:2410.24164 (October 2024); A. Brohan et al., <a href="https://arxiv.org/abs/2307.15818" target="_blank" rel="noopener">RT-2: Vision-Language-Action Models</a>, arXiv:2307.15818 (2023).</li>
+<li>ARC Prize, <a href="https://arcprize.org/competitions/2026/arc-agi-3" target="_blank" rel="noopener">ARC-AGI-3</a> (2026).</li>
+<li>D. Amodei, <a href="https://www.darioamodei.com/essay/machines-of-loving-grace" target="_blank" rel="noopener">Machines of Loving Grace</a> (October 2024).</li>
+</ol><p class="verified">Verified 9 November 2026 against the arXiv pages above, the book's research fact sheets and Anthropic's research pages. Predictions are opinions and are labelled as such.</p></div>

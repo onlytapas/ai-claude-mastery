@@ -1,0 +1,285 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What fine-tuning changes inside a model, and what it can't do</li>
+<li>Why you should fine-tune rarely, and the cheaper options to try first</li>
+<li>The main methods: full fine-tuning, LoRA and other parameter-efficient methods, preference tuning, reinforcement fine-tuning and distillation</li>
+<li>How to prepare training data and evaluate a fine-tuned model honestly</li>
+<li>What the major cloud platforms actually offer today, including for Claude (verified 9 November 2026)</li>
+<li>Where the real costs are: not only training, but hosting, evaluation and retraining</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> this is an <b>expert, optional</b> chapter. You should know how a network learns (<a href="#ch12">Chapter 12</a>), what post-training and supervised fine-tuning are (<a href="#ch18">Chapter 18</a>), RAG (<a href="#ch23">Chapter 23</a>) and evals (<a href="#ch125">Chapter 125</a>). Most readers will never need to fine-tune a model; reading 135.1 and 135.2 is enough to make that call. The lab needs only Python 3.</div>
+
+<div class="bigidea"><p><a class="gl" href="#g-fine-tuning">Fine-tuning</a> means training an existing model a little more on your own examples, so its <a class="gl" href="#g-weight">weights</a> change and it behaves differently without being told in every prompt. It's good at teaching a consistent style, format or narrow skill, especially to a smaller, cheaper model. It's bad at teaching facts that change, and it brings ongoing costs: data, evaluation, hosting and retraining when the base model is retired. Today's strong models, good prompts and retrieval solve most problems first. And for Claude specifically, fine-tuning options are very limited, so check carefully before you plan around them.</p></div>
+
+<h3 id="ch136-1"><span class="num">136.1</span>What fine-tuning is, and isn't</h3>
+<p>In <a href="#ch18">Chapter 18</a> you saw that every chat model is already fine-tuned: a pre-trained base model is post-trained on examples of good conversations. Fine-tuning for your own use is the same idea, at a much smaller scale. You give the model hundreds or thousands of input-and-desired-output examples, and a training job nudges its weights so that it produces outputs like yours.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Prompting is like giving a skilled contractor detailed written instructions each morning. RAG is like giving them the right reference binder for each job. Fine-tuning is like sending them on a training course: after it, they do things your way without being told, but the course costs money, takes time, and they'll need another course if your way changes, or if you hire a new contractor.</p></div>
+<div class="tbl"><table>
+<tr><th>Fine-tuning is good for</th><th>Fine-tuning is poor for</th></tr>
+<tr><td>A consistent output format or house style across millions of calls</td><td>Teaching facts, especially ones that change (use <a class="gl" href="#g-rag">RAG</a>)</td></tr>
+<tr><td>A narrow, repetitive task, such as classifying bug reports into your categories</td><td>Tasks where you have only a few dozen examples</td></tr>
+<tr><td>Making a <em>small</em> model good enough at one task, to cut cost and latency</td><td>Making a model "smarter" in general</td></tr>
+<tr><td>Replacing a very long prompt full of examples that you send on every request</td><td>Anything you could fix by writing clearer instructions</td></tr>
+<tr><td>Teaching tone or preferences that are hard to describe but easy to demonstrate</td><td>Guaranteeing safety: fine-tuning can weaken a model's safety behaviour</td></tr>
+</table></div>
+
+<h3 id="ch136-2"><span class="num">136.2</span>Try these first: the customisation ladder</h3>
+<p>Climb this ladder one rung at a time, and only go up when you have <em>measured</em> that the rung below isn't enough. Each rung up costs more and is harder to change.</p>
+<div class="flow"><div><b>1. Better prompt</b>Clear instructions, format, constraints (<a href="#ch44">Ch 44</a>)</div><div><b>2. Few-shot examples</b>Show 3–20 examples in the prompt (<a href="#ch45">Ch 45</a>)</div><div><b>3. Retrieval (RAG)</b>Supply the right documents per request (<a href="#ch92">Ch 92</a>)</div><div><b>4. Tools and structured output</b>Let code do exact work; force a schema (<a href="#ch89">Ch 89</a>)</div><div><b>5. Model choice and routing</b>A different tier or model for this task (<a href="#ch35">Ch 35</a>)</div><div class="hl"><b>6. Fine-tuning</b>Only with data, an eval set and a measured gap</div></div>
+<p>Two modern developments make fine-tuning less necessary than it used to be. Context windows are large enough to hold many examples, and <a class="gl" href="#g-prompt-caching">prompt caching</a> (<a href="#ch89">Chapter 89</a>) makes sending the same long set of examples on every request far cheaper. Together they cover much of what people once fine-tuned for.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>A QA team wanted to auto-classify incoming bug reports into five components. Their first thought was fine-tuning. Instead they wrote a clear prompt with the five definitions and 15 cached examples, and measured it on 300 already-labelled historical bugs. Accuracy was close to what two humans agreed on with each other, so there was nothing left for fine-tuning to win. (Illustrative scenario.) If they later need to classify millions of reports a day at minimum cost, fine-tuning a small open-weight model becomes worth evaluating, and the 300 labelled bugs are already their test set.</p></div>
+<div class="box opinion"><span class="tag">Opinion · widely held among AI engineers</span><p>Many practitioners advise treating fine-tuning as an optimisation for a working system, not a way to make a system work. Get it working with prompting and retrieval on a large model first; then, if cost or latency matters, consider fine-tuning a smaller model to match it. Some teams with very specialised data or strict latency needs disagree and fine-tune earlier. Both positions exist; the deciding factor should be your measured results.</p></div>
+
+<h3 id="ch136-3"><span class="num">136.3</span>The methods</h3>
+<p>There are several ways to fine-tune. They differ in what training signal you provide and how much of the model changes.</p>
+<div class="tbl"><table>
+<tr><th>Method</th><th>You provide</th><th>Plain idea</th></tr>
+<tr><td><a class="gl" href="#g-supervised-fine-tuning">Supervised fine-tuning</a> (SFT)</td><td>Prompts with the ideal response</td><td>"Answer like this." The most common method.</td></tr>
+<tr><td>Preference tuning, e.g. <a class="gl" href="#g-direct-preference-optimisation">DPO</a></td><td>A prompt with a better and a worse response</td><td>"Prefer this one over that one." Good for tone and quality where there's no single right answer.</td></tr>
+<tr><td><a class="gl" href="#g-reinforcement-fine-tuning">Reinforcement fine-tuning</a> (RFT)</td><td>Prompts plus a grader or reward function that scores answers</td><td>"Try, get scored, improve." Fits tasks where answers can be checked automatically.</td></tr>
+<tr><td><a class="gl" href="#g-distillation">Distillation</a></td><td>Prompts; a large "teacher" model writes the answers</td><td>A small "student" model learns to imitate the big one on your task.</td></tr>
+<tr><td><a class="gl" href="#g-continued-pre-training">Continued pre-training</a></td><td>Lots of unlabelled domain text</td><td>More next-token training on, say, your industry's documents. Rarely offered or needed today.</td></tr>
+</table></div>
+<h4>Full fine-tuning versus parameter-efficient fine-tuning</h4>
+<p><strong>Full fine-tuning</strong> updates every weight in the model. For a model with billions of <a class="gl" href="#g-parameter">parameters</a> that needs a lot of GPU memory, and each fine-tuned version is a complete copy of the model to store and serve.</p>
+<p><a class="gl" href="#g-peft">Parameter-efficient fine-tuning</a> (PEFT) freezes the original weights and trains a small number of new ones. The most popular PEFT method is <a class="gl" href="#g-lora">LoRA</a> (Low-Rank Adaptation, Hu et al., 2021). Instead of changing a big weight matrix directly, LoRA learns a small "correction" made of two thin matrices, which is added on top. The result is a small <strong>adapter</strong> file. You can keep one base model in memory and swap adapters for different tasks.</p>
+<details class="deep"><summary>Under the hood: why LoRA is so small</summary><div class="body"><p>A layer in a Transformer (<a href="#ch16">Chapter 16</a>) multiplies its input by a weight matrix <code>W</code>, say 4,096 × 4,096: about 16.8 million numbers. Full fine-tuning learns a change <code>ΔW</code> of the same size. LoRA's insight is that the useful change for one task usually has a simple structure, so it can be approximated as the product of two thin matrices: <code>ΔW ≈ A × B</code>, where <code>A</code> is 4,096 × <i>r</i> and <code>B</code> is <i>r</i> × 4,096. The <strong>rank</strong> <i>r</i> is small, often 4 to 64. With <i>r</i> = 8, A and B together hold 2 × 4,096 × 8 = 65,536 numbers: about 0.4% of the full matrix. The lab's <code>lora_params.py</code> computes this for several ranks.</p><p><strong>QLoRA</strong> (Dettmers et al., 2023) goes further: it stores the frozen base model in 4-bit <a class="gl" href="#g-quantisation">quantised</a> form while training LoRA adapters on top, so fairly large open-weight models can be fine-tuned on a single GPU. On the open-source side, Hugging Face's <code>peft</code> and <code>trl</code> libraries are common starting points (<a href="#ch137">Chapter 137</a> covers running models locally).</p></div></details>
+<h4>The settings you'll meet</h4>
+<p>Training jobs expose a few <a class="gl" href="#g-hyperparameter">hyperparameters</a>: the number of <a class="gl" href="#g-epoch">epochs</a> (passes through the data), the <a class="gl" href="#g-learning-rate">learning rate</a> (often as a multiplier) and the batch size. Start with the platform's defaults. More epochs or a higher learning rate make the model fit your data more tightly, which risks <a class="gl" href="#g-overfitting">overfitting</a> and <a class="gl" href="#g-catastrophic-forgetting">catastrophic forgetting</a>: getting better at your task while getting worse at everything else.</p>
+
+<h3 id="ch136-4"><span class="num">136.4</span>Preparing the data</h3>
+<p>Data quality decides the result far more than any setting. A model fine-tuned on inconsistent examples learns to be inconsistent. Most platforms take <strong>JSONL</strong>: one JSON object per line, each a short conversation ending with the response you want.</p>
+<div class="code"><span class="cap">train.jsonl — one example per line (shown wrapped here)</span><pre>{"messages": [
+  {"role": "system", "content": "Classify the bug report into one of: UI, API, Performance, Data, Security. Reply with the label only."},
+  {"role": "user", "content": "POST /orders returns 500 when the body is empty"},
+  {"role": "assistant", "content": "API"}
+]}</pre></div>
+<p>The exact field names differ by platform, so always follow the provider's format page. The checklist doesn't change:</p>
+<ul>
+<li><strong>Consistent labels.</strong> If two experts would label an example differently, fix the guideline first. Measure how often humans agree; that's roughly the ceiling for the model.</li>
+<li><strong>Representative.</strong> Real inputs, in their real messiness: typos, long and short, all categories, edge cases.</li>
+<li><strong>Balanced enough.</strong> A category with five examples will be learned poorly.</li>
+<li><strong>Clean.</strong> Remove duplicates, broken rows and examples where the "ideal" answer is actually wrong.</li>
+<li><strong>Safe.</strong> Remove personal data, secrets and anything under restriction (<a href="#ch132">Chapter 132</a>). A model can memorise and repeat training data.</li>
+<li><strong>Split before you start.</strong> Separate <a class="gl" href="#g-training-set">training</a>, <a class="gl" href="#g-validation-set">validation</a> and <a class="gl" href="#g-test-set">test</a> sets, and never let test examples leak into training. Keep the test set locked away until the end.</li>
+</ul>
+
+<h3 id="ch136-5"><span class="num">136.5</span>Evaluating honestly</h3>
+<p>A fine-tuned model is a new model. Evaluate it like one, with the methods from <a href="#ch125">Chapter 125</a> and <a href="#ch36">Chapter 36</a>.</p>
+<div class="flow"><div><b>Baseline</b>Best prompt-only result on the test set</div><div><b>Train</b>Watch training and validation loss</div><div class="hl"><b>Compare</b>Same test set, same grader, several runs</div><div><b>Check side effects</b>General ability, safety, refusals</div><div><b>Decide</b>Is the gain worth the ongoing cost?</div></div>
+<ul>
+<li><strong>Compare against the best prompt, not a lazy one.</strong> A fine-tuned model beating a one-line prompt proves little.</li>
+<li><strong>Watch both loss curves.</strong> If training loss keeps falling while validation loss rises, the model is memorising rather than learning: stop earlier or use fewer epochs.</li>
+<li><strong>Test beyond the task.</strong> Run a small general eval and your safety and bias checks (<a href="#ch135">Chapter 135</a>). Researchers have shown that fine-tuning, even on harmless-looking data, can weaken a model's safety behaviour (Qi et al., 2023).</li>
+<li><strong>Count total cost per correct answer,</strong> including hosting, not only accuracy.</li>
+</ul>
+
+<h3 id="ch136-6"><span class="num">136.6</span>What the platforms offer today</h3>
+<p>This changes often, and much of what's written online is out of date or wrong. The table below comes from each provider's official documentation as read on <strong>9 November 2026</strong>. Check again before you plan anything.</p>
+<input class="filter" data-filter="#ch135Platforms" data-empty="#ch135PlatformsEmpty" type="search" placeholder="Filter platforms or models…" aria-label="Filter platforms or models">
+<div class="tbl"><table id="ch135Platforms">
+<tr><th>Platform</th><th>What it offers</th><th>Claude?</th></tr>
+<tr class="group"><td colspan="3">Anthropic</td></tr>
+<tr><td>Claude API (Anthropic)</td><td>Anthropic's developer documentation index does not list a self-service fine-tuning feature. Customisation is through prompting, tools, retrieval, skills and caching.</td><td>No self-service fine-tuning documented</td></tr>
+<tr class="group"><td colspan="3">Amazon Bedrock</td></tr>
+<tr><td>Supervised fine-tuning</td><td>Supported models include Amazon Nova (Nova 2 Lite, Lite, Micro, Pro, Canvas), Titan image and embedding models, Meta Llama 3.1, 3.2 and 3.3 models, and Anthropic <strong>Claude 3 Haiku</strong> (US West, Oregon only)</td><td>Claude 3 Haiku only; no Claude 4 or 5 model is listed</td></tr>
+<tr><td>Reinforcement fine-tuning</td><td>Nova 2 Lite, OpenAI gpt-oss-20B, Qwen3 32B</td><td>No</td></tr>
+<tr><td>Distillation</td><td>Nova and Llama teacher–student pairs. The docs state distillation "is not currently available for Anthropic models".</td><td>No</td></tr>
+<tr><td>Using the result</td><td>Provisioned Throughput, or a custom model deployment for on-demand inference. Training is charged per token processed (data tokens × epochs) plus monthly model storage.</td><td>—</td></tr>
+<tr class="group"><td colspan="3">Google Cloud (Vertex AI)</td></tr>
+<tr><td>Gemini tuning</td><td>Supervised fine-tuning for Gemini 3.5 Flash-Lite, 3.5 Flash, 3.1 Flash-Lite, 2.5 Pro, 2.5 Flash-Lite and 2.5 Flash; preference tuning for 2.5 Flash-Lite and 2.5 Flash; reinforcement-learning fine-tuning for 3.5 Flash and 3.1 Flash-Lite</td><td>The tuning page doesn't mention Claude</td></tr>
+<tr class="group"><td colspan="3">Microsoft Foundry</td></tr>
+<tr><td>Managed Training</td><td>SFT, DPO and RFT depending on model: GPT-4.1 family and GPT-4o (SFT, DPO), o4-mini (RFT), GPT-5 (RFT, by invitation), plus open models such as Llama 3.3 70B, Qwen3-32B, gpt-oss-20b and Ministral-3B. Programmed Training is in preview, by approval.</td><td>Not in the supported-models table</td></tr>
+<tr class="group"><td colspan="3">OpenAI API</td></tr>
+<tr><td>Fine-tuning platform</td><td>SFT and DPO for GPT-4.1, 4.1 mini and 4.1 nano; vision fine-tuning for GPT-4o. The docs state OpenAI "is winding down the fine-tuning platform": it is no longer open to new users, and existing fine-tuned models remain available until their base models are deprecated.</td><td>—</td></tr>
+<tr class="group"><td colspan="3">Your own hardware or rented GPUs</td></tr>
+<tr><td>Open-weight models</td><td>Fine-tune models such as Llama, Qwen, Mistral or Gemma yourself with open-source tools (for example LoRA via Hugging Face <code>peft</code>), within each model's licence</td><td>No: Claude's weights aren't public</td></tr>
+</table></div>
+<p id="ch135PlatformsEmpty" hidden>No rows match.</p>
+<div class="box warn"><span class="tag">The Claude 3 Haiku catch</span><p>Bedrock's fine-tuning table still lists Claude 3 Haiku. But Anthropic retired Claude 3 Haiku from its own API on 20 April 2026 (<a href="#ch39">Chapter 39</a>). Bedrock runs its own model lifecycle, so availability there may differ; check Bedrock's model lifecycle page and talk to AWS before starting. Building on a three-generations-old model that is already retired elsewhere is rarely a good plan. This is the clearest example of fine-tuning's hidden cost: <strong>your custom model is tied to its base model, and when the base retires, your investment goes with it.</strong></p></div>
+<div class="box note"><span class="tag">Expert-led programmes</span><p>In November 2023 AWS announced a Custom Model Program in which its Generative AI Innovation Center's scientists work with selected customers to fine-tune Claude models on proprietary data, with the results served privately through Bedrock. It was expert-led, not self-service. Its current status and which Claude models it covers could not be verified from current official documentation; ask your AWS account team if it matters to you.</p></div>
+
+<h3 id="ch136-7"><span class="num">136.7</span>The real costs</h3>
+<p>The training run is often the smallest cost. A fuller picture:</p>
+<div class="tbl"><table>
+<tr><th>Cost</th><th>What drives it</th></tr>
+<tr><td>Data</td><td>Collecting, cleaning, labelling and reviewing hundreds or thousands of examples: usually the biggest cost, in people's time</td></tr>
+<tr><td>Training</td><td>Training tokens × epochs, per run; you'll rarely get it right first time, so plan for several runs</td></tr>
+<tr><td>Evaluation</td><td>Building and running the test set, plus general and safety checks, after every run</td></tr>
+<tr><td>Hosting</td><td>Some platforms charge for storing the custom model and for dedicated capacity to serve it, whether or not you use it</td></tr>
+<tr><td>Maintenance</td><td>Retraining when your categories, style or data change, and when the base model is retired</td></tr>
+<tr><td>Opportunity</td><td>While you maintain a custom model, new general models keep improving; a prompt can move to a new model in an afternoon</td></tr>
+</table></div>
+<p>A rough sizing formula for the training run: <em>examples × average tokens per example × epochs = training tokens</em>. For instance, 2,000 examples × 500 tokens × 3 epochs = 3 million training tokens (illustrative numbers). Multiply by the platform's current per-token training price; prices vary by model and change often, so check the provider's pricing page.</p>
+
+<div class="lab"><div class="lab-h"><b>Lab: prepare and check a fine-tuning dataset</b><span>30 min · your computer, Python 3, no cloud account</span></div><ol>
+<li>This lab does the part of fine-tuning that matters most and costs nothing: preparing the data. Make a folder (<code>mkdir ft-lab &amp;&amp; cd ft-lab</code>) and save this as <code>prep_data.py</code>:
+<div class="code"><span class="cap">prep_data.py</span><pre>"""prep_data.py - check and split a chat-format fine-tuning dataset (JSONL), offline.
+
+  python3 prep_data.py make-sample     writes sample.jsonl (illustrative, with planted problems)
+  python3 prep_data.py check FILE      validates, removes bad rows, splits train/validation/test
+"""
+import json
+import random
+import re
+import sys
+from collections import Counter
+
+LABELS = ["UI", "API", "Performance", "Data", "Security"]
+EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
+CARD = re.compile(r"\b(?:\d[ -]?){13,16}\b")
+
+def example(bug, label):
+    return {"messages": [
+        {"role": "system", "content": "Classify the bug report into one of: " + ", ".join(LABELS) + ". Reply with the label only."},
+        {"role": "user", "content": bug},
+        {"role": "assistant", "content": label},
+    ]}
+
+def make_sample():
+    rows = []
+    templates = {
+        "UI": ["Button '{x}' overlaps the footer on small screens", "The {x} dropdown text is cut off in Firefox"],
+        "API": ["POST /{x} returns 500 when the body is empty", "GET /{x} ignores the page parameter"],
+        "Performance": ["The {x} page takes 9 seconds to load", "Search for {x} times out under load"],
+        "Data": ["Totals on the {x} report don't match the database", "Duplicate {x} records after import"],
+        "Security": ["User can view another user's {x} by changing the ID", "Session for {x} doesn't expire after logout"],
+    }
+    words = ["orders", "invoices", "profile", "basket", "reports", "settings", "users", "payments"]
+    for label, temps in templates.items():
+        for t in temps:
+            for w in words:
+                rows.append(example(t.format(x=w), label))
+    rows.append(rows[0])                                                   # planted: duplicate
+    rows.append(example("Email jane.doe@example.com about the refund page bug", "UI"))  # planted: personal data
+    rows.append(example("Login page is slow", "Slow"))                     # planted: unknown label
+    rows.append({"messages": [{"role": "user", "content": "No answer here"}]})         # planted: no assistant turn
+    with open("sample.jsonl", "w", encoding="utf-8") as f:
+        for r in rows:
+            f.write(json.dumps(r) + "\n")
+    print(f"Wrote sample.jsonl with {len(rows)} rows (illustrative data, 4 planted problems).")
+
+def problems_in(row):
+    msgs = row.get("messages")
+    if not isinstance(msgs, list) or not msgs:
+        return ["no messages list"]
+    if msgs[-1].get("role") != "assistant":
+        return ["last message is not from the assistant"]
+    issues = []
+    text = " ".join(m.get("content", "") for m in msgs)
+    if EMAIL.search(text) or CARD.search(text):
+        issues.append("possible personal data")
+    if msgs[-1]["content"] not in LABELS:
+        issues.append(f"unknown label '{msgs[-1]['content']}'")
+    return issues
+
+def check(path):
+    good, seen, dropped = [], set(), Counter()
+    with open(path, encoding="utf-8") as f:
+        for n, line in enumerate(f, 1):
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                dropped["invalid JSON"] += 1
+                print(f"  line {n}: invalid JSON")
+                continue
+            key = json.dumps(row, sort_keys=True)
+            if key in seen:
+                dropped["duplicate"] += 1
+                print(f"  line {n}: duplicate")
+                continue
+            seen.add(key)
+            issues = problems_in(row)
+            if issues:
+                for i in issues:
+                    dropped[i.split(" '")[0]] += 1
+                print(f"  line {n}: {'; '.join(issues)}")
+                continue
+            good.append(row)
+    print(f"\nKept {len(good)} rows, dropped {sum(dropped.values())}: {dict(dropped)}")
+    print("Label balance:", dict(Counter(r["messages"][-1]["content"] for r in good)))
+
+    random.seed(42)                       # fixed seed: the same split every run
+    by_label = {}
+    for r in good:
+        by_label.setdefault(r["messages"][-1]["content"], []).append(r)
+    splits = {"train": [], "validation": [], "test": []}
+    for rows in by_label.values():        # stratified: each label split 70/15/15
+        random.shuffle(rows)
+        a, b = int(len(rows) * 0.7), int(len(rows) * 0.85)
+        splits["train"] += rows[:a]
+        splits["validation"] += rows[a:b]
+        splits["test"] += rows[b:]
+    for name, rows in splits.items():
+        with open(f"{name}.jsonl", "w", encoding="utf-8") as f:
+            for r in rows:
+                f.write(json.dumps(r) + "\n")
+        print(f"  {name}.jsonl: {len(rows)} rows")
+
+    chars = sum(len(m["content"]) for r in splits["train"] for m in r["messages"])
+    tokens = chars / 4                    # rough rule of thumb for English: about 4 characters per token
+    print(f"\nRough training size: ~{tokens:,.0f} tokens per epoch, ~{tokens * 3:,.0f} for 3 epochs (estimate only)")
+
+if __name__ == "__main__":
+    if len(sys.argv) &gt;= 2 and sys.argv[1] == "make-sample":
+        make_sample()
+    elif len(sys.argv) == 3 and sys.argv[1] == "check":
+        check(sys.argv[2])
+    else:
+        print(__doc__)</pre></div>
+<span class="expect">The file is saved. It uses only Python's standard library.</span></li>
+<li>Create the practice dataset: <code>python3 prep_data.py make-sample</code>
+<span class="expect"><code>Wrote sample.jsonl with 84 rows (illustrative data, 4 planted problems).</code></span></li>
+<li>Check and split it: <code>python3 prep_data.py check sample.jsonl</code>
+<span class="expect">Four problem lines: line 81 duplicate, line 82 possible personal data, line 83 unknown label 'Slow', line 84 last message not from the assistant. Then <code>Kept 80 rows, dropped 4</code>, a label balance of 16 per label, and three files: <code>train.jsonl: 55 rows</code>, <code>validation.jsonl: 10 rows</code>, <code>test.jsonl: 15 rows</code>, followed by a rough token estimate.</span></li>
+<li>Open <code>test.jsonl</code> and confirm none of its lines appear in <code>train.jsonl</code>. On macOS or Linux: <code>grep -F -x -f test.jsonl train.jsonl | wc -l</code>
+<span class="expect"><code>0</code>: no test example leaked into training.</span></li>
+<li>See why LoRA is cheap. Save this as <code>lora_params.py</code> and run <code>python3 lora_params.py</code>:
+<div class="code"><span class="cap">lora_params.py</span><pre>"""lora_params.py - how many parameters does LoRA train, compared with full fine-tuning?"""
+d_in, d_out = 4096, 4096          # one weight matrix in a mid-sized model (illustrative)
+full = d_in * d_out
+print(f"Full fine-tuning of one {d_in}x{d_out} matrix: {full:,} parameters")
+for r in (4, 8, 16, 64):
+    lora = r * (d_in + d_out)     # A is d_in x r, B is r x d_out
+    print(f"LoRA rank {r:&gt;2}: {lora:&gt;9,} parameters ({lora / full:.2%} of full)")</pre></div>
+<span class="expect">Full fine-tuning of one matrix: 16,777,216 parameters. LoRA rank 4: 32,768 (0.20%); rank 8: 65,536 (0.39%); rank 16: 131,072 (0.78%); rank 64: 524,288 (3.12%).</span></li>
+<li>Now apply the ladder. Before any fine-tuning, you'd measure a prompt-only baseline on <code>test.jsonl</code> with the harness from <a href="#ch125">Chapter 125</a>. Write down in one sentence what accuracy the fine-tuned model would need to beat, and what extra ongoing cost would be acceptable for that gain.
+<span class="expect">A decision rule, such as "Fine-tune only if it beats the best prompt by 5 points on the test set and costs less per 1,000 calls" (illustrative).</span></li>
+</ol>
+<p><b>Troubleshooting:</b> <code>No such file or directory: 'sample.jsonl'</code>: run step 2 first, in the same folder. A <code>grep</code> count above 0: a test example is also in training; regenerate the split and check your source data for duplicates. On Windows without <code>grep</code>, open both files and compare a few lines by hand, or ask Claude to write a five-line Python check. To use your own data, replace the <code>LABELS</code> list and run <code>check</code> on your JSONL file.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Fine-tuning is how you teach the model about our product."</dt><dd>Knowledge that changes belongs in retrieval (RAG). Fine-tuning teaches behaviour, format and narrow skills, and facts learned this way go stale.</dd>
+<dt>"We can fine-tune the latest Claude model."</dt><dd>As of 9 November 2026, no self-service fine-tuning for current Claude models is documented by Anthropic or the major clouds. Bedrock lists only Claude 3 Haiku.</dd>
+<dt>"More epochs means a better model."</dt><dd>More epochs often means overfitting and forgetting. Watch validation loss and test on held-out data.</dd>
+<dt>"Once it's trained, we're done."</dt><dd>Custom models need re-evaluation and retraining when data changes or the base model retires, plus hosting costs in the meantime.</dd>
+<dt>"Fine-tuning keeps the model's safety behaviour intact."</dt><dd>It can weaken it. Re-run safety and bias checks on every fine-tuned version.</dd>
+</dl></div>
+
+<h3 id="ch136-r"><span class="num">136.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Fine-tuning changes a model's weights using your examples; it's good for style, format and narrow tasks, and poor for changing facts.</li>
+<li>Climb the ladder first: prompt, few-shot, RAG, tools and structured output, model choice. Fine-tune only with data, an eval set and a measured gap.</li>
+<li>LoRA and other PEFT methods train a tiny fraction of parameters as a swappable adapter; QLoRA adds quantisation to fit on smaller GPUs.</li>
+<li>Data quality, clean splits and honest comparison against the best prompt decide whether fine-tuning was worth it.</li>
+<li>As of 9 November 2026: no self-service Claude fine-tuning on the Claude API; Bedrock lists only Claude 3 Haiku; Gemini, Foundry and open-weight models offer more options; OpenAI is winding its platform down.</li>
+<li>The biggest costs are data, evaluation, hosting and retraining, and every custom model is tied to a base model that will retire.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Your support bot gives outdated answers about this month's pricing. What's the right fix?</p><div class="opts"><button>Fine-tune it on the new price list</button><button data-ok>Retrieve the current price list at request time (RAG)</button><button>Increase the number of training epochs</button></div><p class="why" hidden>Changing facts belong in retrieval; fine-tuned facts go stale and need retraining.</p></div>
+<div class="qz"><p class="q">With LoRA rank 8 on a 4,096 × 4,096 matrix, roughly what share of that matrix's parameters is trained?</p><div class="opts"><button>About 50%</button><button>About 10%</button><button data-ok>About 0.4%</button></div><p class="why" hidden>2 × 4,096 × 8 = 65,536, against 16.8 million: about 0.39%.</p></div>
+<div class="qz"><p class="q">Training loss keeps falling, but validation loss starts rising. What's happening?</p><div class="opts"><button>The model is learning faster</button><button data-ok>The model is overfitting: memorising training data rather than generalising</button><button>The validation set is too large</button></div><p class="why" hidden>Diverging curves are the classic overfitting signal; stop earlier or reduce epochs.</p></div>
+<div class="qz"><p class="q">According to Amazon Bedrock's documentation on 9 November 2026, which Claude model is listed for supervised fine-tuning?</p><div class="opts"><button>Claude Opus 5.5</button><button>Claude Haiku 5.5</button><button data-ok>Claude 3 Haiku, in US West (Oregon)</button></div><p class="why" hidden>It's the only Anthropic model in Bedrock's fine-tuning table, and it has already been retired from Anthropic's own API.</p></div>
+<div class="qz"><p class="q">What should a fine-tuned model be compared against?</p><div class="opts"><button>The base model with no prompt</button><button data-ok>The best prompt-only (and RAG) solution, on the same held-out test set</button><button>Its own training data</button></div><p class="why" hidden>Only a strong baseline on unseen data shows whether fine-tuning added value.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick a repetitive AI task in your team (for example bug-report classification or test-case formatting). Write a one-page decision record: the task; which ladder rungs you tried, with measured results (or a plan to measure them); whether fine-tuning is justified; if so, which platform and model you'd use, confirmed against today's official documentation with the date; an estimate of training tokens using the formula in 135.7; and who would maintain the model and what happens when its base model retires.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Fine-tuning is sending a model on a training course with our own examples, so it does things our way without being told. It's good for a consistent format or a narrow task, especially to make a small model cheap and fast. It's bad for facts that change; that's what retrieval is for. Most of the time a clear prompt with examples gets you there, so we try that first and measure. And for Claude in particular, there's no self-service fine-tuning on current models today, so check the official docs before planning around it. Remember, a custom model is tied to its base model, and when that retires, you start again."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>AWS, <a href="https://docs.aws.amazon.com/bedrock/latest/userguide/custom-model-fine-tuning.html" target="_blank" rel="noopener">Customize a model with fine-tuning in Amazon Bedrock</a> (supported models and Regions), <a href="https://docs.aws.amazon.com/bedrock/latest/userguide/custom-models.html" target="_blank" rel="noopener">Customize your model</a>, <a href="https://docs.aws.amazon.com/bedrock/latest/userguide/reinforcement-fine-tuning.html" target="_blank" rel="noopener">Reinforcement fine-tuning</a> and <a href="https://docs.aws.amazon.com/bedrock/latest/userguide/prequisites-model-distillation.html" target="_blank" rel="noopener">Distillation teacher and student models</a>.</li>
+<li>AWS Machine Learning Blog, <a href="https://aws.amazon.com/blogs/machine-learning/introducing-the-aws-generative-ai-innovation-centers-custom-model-program-for-anthropic-claude" target="_blank" rel="noopener">Introducing the Generative AI Innovation Center's Custom Model Program for Anthropic Claude</a> (29 November 2023).</li>
+<li>Google Cloud, <a href="https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/tune-models" target="_blank" rel="noopener">Tune Gemini models</a>.</li>
+<li>Microsoft, <a href="https://learn.microsoft.com/en-us/azure/foundry/fine-tuning/overview" target="_blank" rel="noopener">Fine-tuning in Microsoft Foundry</a>.</li>
+<li>OpenAI, <a href="https://developers.openai.com/api/docs/guides/model-optimization" target="_blank" rel="noopener">Model optimization</a> (fine-tuning methods and wind-down notice).</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/model-deprecations" target="_blank" rel="noopener">Model deprecations</a> (Claude 3 Haiku retirement).</li>
+<li>Hu et al., <a href="https://arxiv.org/abs/2106.09685" target="_blank" rel="noopener">LoRA: Low-Rank Adaptation of Large Language Models</a> (2021); Dettmers et al., <a href="https://arxiv.org/abs/2305.14314" target="_blank" rel="noopener">QLoRA</a> (2023).</li>
+<li>Qi et al., <a href="https://arxiv.org/abs/2310.03693" target="_blank" rel="noopener">Fine-tuning Aligned Language Models Compromises Safety, Even When Users Do Not Intend To!</a> (2023).</li>
+</ol><p class="verified">Verified 9 November 2026 against the Amazon Bedrock, Google Cloud, Microsoft Foundry, OpenAI and Anthropic documentation listed above. The status of the AWS Custom Model Program is unverified. Lab scripts tested with Python 3.</p></div>

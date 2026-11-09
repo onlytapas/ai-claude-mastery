@@ -1,0 +1,372 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How to read any command-line usage line: commands, subcommands, arguments, flags and values</li>
+<li>Every <code>claude</code> subcommand in version 2.1.319, what it does and when you'd use it</li>
+<li>Every flag, grouped by job, with its exact syntax, its allowed values and whether it only works in print mode</li>
+<li>The environment variables that matter for ordinary users, CI pipelines and MCP</li>
+<li>Ready-made combinations for QA work: CI triage, structured JSON output, spending caps and parallel sessions</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 54 (your first terminal commands) and Chapter 73 (the five kinds of command). This is a reference chapter: read sections 72.1 and 72.2 once, then use the searchable tables whenever you need them.</div>
+
+<div class="bigidea"><p>Everything you can type <em>before</em> Claude Code opens is part of its command-line interface, or CLI. You type <code>claude</code>, optionally followed by a <a class="gl" href="#g-subcommand">subcommand</a> (like <code>mcp</code> or <code>update</code>), <a class="gl" href="#g-flag">flags</a> (like <code>--model opus</code>) and a prompt. Flags change how a session starts; subcommands do a different job altogether without opening a chat. This chapter lists them all, checked against the installed program and Anthropic's documentation, so you never have to guess.</p></div>
+
+<div class="box note"><span class="tag">Which version this describes</span><p>Everything here was checked on 9 November 2026 against <strong>Claude Code 2.1.319</strong>: the output of <code>claude --help</code> and each subcommand's <code>--help</code> on a real installation, plus the official CLI reference at <a href="https://code.claude.com/docs/en/cli-reference" target="_blank" rel="noopener">code.claude.com/docs/en/cli-reference</a>. Claude Code updates often. Run <code>claude --version</code> to see yours, and <code>claude --help</code> to see what your version offers.</p></div>
+
+<h3 id="ch75-1"><span class="num">75.1</span>How to read a usage line</h3>
+<p>Every command-line program describes itself with a "usage line". Here is Claude Code's, exactly as <code>claude --help</code> prints it:</p>
+<div class="code"><span class="cap">From claude --help</span><pre>Usage: claude [options] [command] [prompt]</pre></div>
+<p>Read it left to right like a sentence with optional parts:</p>
+<div class="tbl"><table>
+<tr><th>Part</th><th>What it means</th><th>Example</th></tr>
+<tr><td><code>claude</code></td><td>The program you are running</td><td><code>claude</code></td></tr>
+<tr><td><code>[options]</code></td><td>Flags that change behaviour. Square brackets mean "optional".</td><td><code>--model sonnet</code></td></tr>
+<tr><td><code>[command]</code></td><td>A subcommand: a separate job such as managing MCP servers</td><td><code>mcp list</code></td></tr>
+<tr><td><code>[prompt]</code></td><td>Text to send as your first message</td><td><code>"explain this repo"</code></td></tr>
+<tr><td><code>&lt;name&gt;</code></td><td>Angle brackets mean "required; replace with a real value"</td><td><code>claude attach &lt;id&gt;</code> → <code>claude attach 7f3a</code></td></tr>
+<tr><td><code>a|b</code></td><td>A vertical bar means "one of these"</td><td><code>--output-format text|json|stream-json</code></td></tr>
+<tr><td><code>...</code></td><td>"You can give more than one"</td><td><code>--add-dir ../api ../web</code></td></tr>
+</table></div>
+
+<h4>Short and long flags</h4>
+<p>Many flags have a short form (one dash, one letter) and a long form (two dashes, a word). They do the same thing. <code>-p</code> and <code>--print</code> are identical; so are <code>-c</code> and <code>--continue</code>. Long forms are easier to read in scripts; short forms are quicker to type.</p>
+
+<h4>Flags that take a value</h4>
+<p>Some flags are switches (on if present): <code>--verbose</code>. Others need a value after them: <code>--model opus</code> or <code>--model=opus</code>. A few take an <em>optional</em> value, shown as <code>[value]</code>: <code>--resume</code> alone opens a picker, while <code>--resume my-session</code> resumes that session.</p>
+
+<h4>Quoting</h4>
+<p>Your shell (Chapter 52) splits what you type at spaces. Anything with spaces or special characters must be in quotes, or the shell will break it apart before Claude Code sees it:</p>
+<div class="code"><pre><span class="c"># Wrong: the shell sees three separate words</span>
+claude -p summarise the failures
+
+<span class="c"># Right: one prompt</span>
+claude -p "summarise the failures"
+
+<span class="c"># Tool rules contain brackets and asterisks, so quote each one</span>
+claude --allowedTools "Bash(npx playwright test *)" "Read"</pre></div>
+
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of ordering at a coffee shop. "Coffee" is the program. "Large, oat milk" are the options. "To take away" is like a subcommand that changes the whole transaction. And "with a note that says 'happy birthday'" is the prompt. You can leave out the extras and still get a coffee.</p></div>
+
+<h3 id="ch75-2"><span class="num">75.2</span>Five everyday patterns</h3>
+<p>Most real use is one of these five shapes. Learn them first; the rest of the chapter fills in detail.</p>
+<div class="tbl"><table>
+<tr><th>Pattern</th><th>What happens</th></tr>
+<tr><td><code>claude</code></td><td>Opens an interactive session in the current folder</td></tr>
+<tr><td><code>claude "explain the test folder"</code></td><td>Opens an interactive session and sends that first message</td></tr>
+<tr><td><code>claude -p "list the flaky tests"</code></td><td><a class="gl" href="#g-print-mode">Print mode</a>: answers once, prints the result and exits. Used in scripts and CI.</td></tr>
+<tr><td><code>cat results.xml | claude -p "summarise failures"</code></td><td>Sends a file's contents into print mode through a pipe (Chapter 55)</td></tr>
+<tr><td><code>claude -c</code> / <code>claude -r</code></td><td>Continues the most recent conversation in this folder / opens a picker of older ones</td></tr>
+</table></div>
+<p>A mistyped subcommand gets a suggestion: typing <code>claude udpate</code> prints <code>Did you mean claude update?</code></p>
+
+<h3 id="ch75-3"><span class="num">75.3</span>Every subcommand</h3>
+<p>A subcommand does a job and usually returns you to your shell without opening a chat. Use the filter to find one quickly. "Status" tells you where it was verified: <span class="vchip">Docs + help</span> means both the documentation and the installed help list it; <span class="vchip">Docs, hidden</span> means it works and is documented but isn't listed in the top-level <code>claude --help</code>.</p>
+<input class="filter" type="search" data-filter="#ch75-subs" data-empty="#ch75-subs-empty" placeholder="Filter subcommands, e.g. mcp, auth, background" aria-label="Filter subcommands">
+<div class="tbl"><table id="ch75-subs">
+<tr><th>Subcommand</th><th>What it does</th><th>Status</th></tr>
+<tr class="group"><td colspan="3"><b>Accounts and installation</b></td></tr>
+<tr><td><code>claude auth login [--claudeai|--console] [--email &lt;email&gt;] [--sso]</code></td><td>Signs in. <code>--claudeai</code> (your Claude subscription) is the default; <code>--console</code> signs in for Claude Console API billing.</td><td>Docs + help</td></tr>
+<tr><td><code>claude auth logout</code></td><td>Signs out of your Anthropic account.</td><td>Docs + help</td></tr>
+<tr><td><code>claude auth status [--json|--text]</code></td><td>Shows whether and how you're signed in, as JSON by default. The <a class="gl" href="#g-exit-code">exit code</a> is 0 if signed in and 1 if not, which makes it handy in scripts.</td><td>Docs + help</td></tr>
+<tr><td><code>claude setup-token</code></td><td>Creates a long-lived (one-year) sign-in token for CI. It is printed once, not saved. Needs a Claude subscription. Store it as <code>CLAUDE_CODE_OAUTH_TOKEN</code> (Chapter 98).</td><td>Docs + help</td></tr>
+<tr><td><code>claude install [--force] [stable|latest|&lt;version&gt;]</code></td><td>Installs or reinstalls the native build, optionally a specific channel or version.</td><td>Docs + help</td></tr>
+<tr><td><code>claude update</code> (alias <code>upgrade</code>)</td><td>Checks for and installs updates. Package-manager installs (Homebrew, WinGet, npm) update through that package manager instead.</td><td>Docs + help</td></tr>
+<tr><td><code>claude doctor</code></td><td>Read-only health check of your installation and settings, without starting a session. For a checkup that can also fix things, run <code>/doctor</code> inside a session.</td><td>Docs + help</td></tr>
+<tr><td><code>claude import [codex|gemini|cursor] [--dry-run] [--yes]</code></td><td>Imports configuration from another AI coding agent. <code>--dry-run</code> shows what would be imported without writing anything.</td><td>Docs + help</td></tr>
+<tr><td><code>claude purge [path] [--all] [--dry-run] [-i] [-y]</code></td><td>Deletes a project's local Claude Code data (transcripts, tasks, file history and its entry in <code>~/.claude.json</code>) from this computer only. <code>--all</code> means every project; <code>-i</code> asks about each item.</td><td>Docs + help</td></tr>
+
+<tr class="group"><td colspan="3"><b>MCP servers</b> (Chapters 83 and 100)</td></tr>
+<tr><td><code>claude mcp add [options] &lt;name&gt; &lt;commandOrUrl&gt; [args...]</code></td><td>Adds an MCP server. Options: <code>-t/--transport stdio|sse|http</code>, <code>-s/--scope local|user|project</code> (default <code>local</code>), <code>-e/--env KEY=value</code>, <code>-H/--header</code>, <code>--client-id</code>, <code>--client-secret</code>, <code>--callback-port</code>.</td><td>Docs + help</td></tr>
+<tr><td><code>claude mcp add-json &lt;name&gt; &lt;json&gt;</code></td><td>Adds a server from a JSON string (stdio, SSE, HTTP or WebSocket).</td><td>Docs + help</td></tr>
+<tr><td><code>claude mcp add-from-claude-desktop</code></td><td>Imports MCP servers already set up in Claude Desktop (Mac and WSL only).</td><td>Docs + help</td></tr>
+<tr><td><code>claude mcp list</code></td><td>Lists configured servers. Unapproved project servers show as "Pending approval"; approved ones are health-checked.</td><td>Docs + help</td></tr>
+<tr><td><code>claude mcp get &lt;name&gt;</code></td><td>Shows details for one server.</td><td>Docs + help</td></tr>
+<tr><td><code>claude mcp remove &lt;name&gt;</code></td><td>Removes a server.</td><td>Docs + help</td></tr>
+<tr><td><code>claude mcp login &lt;name&gt; [--no-browser]</code> / <code>claude mcp logout &lt;name&gt;</code></td><td>Signs in to, or clears stored sign-in for, an HTTP, SSE or claude.ai connector server.</td><td>Docs + help</td></tr>
+<tr><td><code>claude mcp reset-project-choices</code></td><td>Forgets which project (<code>.mcp.json</code>) servers you approved or rejected, so you're asked again.</td><td>Docs + help</td></tr>
+<tr><td><code>claude mcp serve</code></td><td>Runs Claude Code itself as an MCP server that other apps can connect to.</td><td>Docs + help</td></tr>
+
+<tr class="group"><td colspan="3"><b>Plugins</b> (Chapter 84)</td></tr>
+<tr><td><code>claude plugin install|i &lt;plugin&gt;</code></td><td>Installs a plugin from an available marketplace. <code>plugins</code> works as an alias for <code>plugin</code>.</td><td>Docs + help</td></tr>
+<tr><td><code>claude plugin uninstall|remove &lt;plugin&gt;</code></td><td>Uninstalls a plugin.</td><td>Docs + help</td></tr>
+<tr><td><code>claude plugin enable &lt;plugin&gt;</code> / <code>disable [plugin]</code></td><td>Turns an installed plugin on or off.</td><td>Docs + help</td></tr>
+<tr><td><code>claude plugin list</code></td><td>Lists installed plugins.</td><td>Docs + help</td></tr>
+<tr><td><code>claude plugin update &lt;plugin&gt;</code></td><td>Updates a plugin to its latest version.</td><td>Docs + help</td></tr>
+<tr><td><code>claude plugin details &lt;name&gt;</code></td><td>Shows what a plugin contains and its projected token cost.</td><td>Docs + help</td></tr>
+<tr><td><code>claude plugin configure &lt;plugin&gt;</code></td><td>Shows a plugin's options and which are unset, or saves values from standard input.</td><td>Docs + help</td></tr>
+<tr><td><code>claude plugin validate &lt;path&gt;</code></td><td>Checks that a plugin or marketplace is valid.</td><td>Docs + help</td></tr>
+<tr><td><code>claude plugin marketplace add|list|remove|update</code></td><td>Manages plugin marketplaces (catalogues of plugins).</td><td>Docs + help</td></tr>
+<tr><td><code>claude plugin init|new &lt;name&gt;</code></td><td>Scaffolds a new plugin at <code>~/.claude/skills/&lt;name&gt;/</code>.</td><td>Docs + help</td></tr>
+<tr><td><code>claude plugin prune|autoremove</code></td><td>Removes automatically installed dependencies that nothing needs any more.</td><td>Docs + help</td></tr>
+<tr><td><code>claude plugin tag [path]</code></td><td>Creates a <code>{name}--v{version}</code> git tag for a plugin release.</td><td>Docs + help</td></tr>
+<tr><td><code>claude plugin eval [target]</code></td><td>Runs a plugin's evaluation cases and reports scores (Chapter 125). Evaluate only plugins you trust: it runs them on your machine.</td><td>Docs + help</td></tr>
+<tr><td><code>claude plugin test [dir]</code></td><td>Runs a plugin's tests.</td><td>Docs + help</td></tr>
+
+<tr class="group"><td colspan="3"><b>Background sessions</b> (research preview; Chapter 69)</td></tr>
+<tr><td><code>claude agents [options]</code></td><td>Opens agent view to watch and dispatch background sessions. <code>--json</code> prints active sessions as JSON (add <code>--all</code> for finished ones); <code>--cwd &lt;path&gt;</code> filters by folder.</td><td>Docs + help</td></tr>
+<tr><td><code>claude attach &lt;id|name&gt;</code></td><td>Opens a background session in this terminal. Part of the session name works too.</td><td>Docs + help</td></tr>
+<tr><td><code>claude logs &lt;id|name&gt;</code></td><td>Prints a background session's recent output.</td><td>Docs + help</td></tr>
+<tr><td><code>claude stop &lt;id&gt;</code> (alias <code>kill</code>)</td><td>Stops a background session. The conversation is kept, so you can attach or resume later.</td><td>Docs + help</td></tr>
+<tr><td><code>claude rm &lt;id&gt;</code></td><td>Deletes a background session and its worktree when that's safe. Works on sessions that already exited. Extra options: <code>--discard-unpushed &lt;commit&gt;@&lt;worktree-id&gt;</code>, <code>--force-remove-worktree &lt;worktree-id&gt;</code>.</td><td>Docs + help</td></tr>
+<tr><td><code>claude respawn &lt;id&gt;</code> / <code>claude respawn --all</code></td><td>Restarts a background session (or all of them) so it runs the current Claude Code version.</td><td>Docs + help</td></tr>
+<tr><td><code>claude daemon run|status|logs|stop|uninstall</code></td><td>Manages the supervisor process behind background sessions. <code>stop</code> accepts <code>--any</code> and <code>--keep-workers</code>.</td><td>Docs, hidden</td></tr>
+
+<tr class="group"><td colspan="3"><b>Review, remote and cloud</b></td></tr>
+<tr><td><code>claude ultrareview [target] [--json] [--timeout &lt;minutes&gt;] [--post|--no-post] [--trust-workspace]</code></td><td>Runs a cloud-hosted, multi-agent code review of the current branch (or a PR number or base branch) and prints the findings. <code>--post</code> posts them to the PR; the default is not to. Timeout defaults to 45 minutes.</td><td>Docs + help</td></tr>
+<tr><td><code>claude remote-control [options]</code></td><td>Starts a Remote Control server so you can continue local sessions from claude.ai/code or the Claude mobile app. Options include <code>--name</code>, <code>-c/--continue</code>, <code>--session-id</code>, <code>--permission-mode</code>, <code>--[no-]chrome</code>. Needs a Claude subscription (not an API key).</td><td>Docs, hidden</td></tr>
+<tr><td><code>claude auto-mode config|defaults|critique|reset</code></td><td>Inspects auto mode (Chapter 67): prints your effective config or the built-in rules as JSON, gets AI feedback on your custom rules, or resets to the shipped defaults.</td><td>Docs + help</td></tr>
+
+<tr class="group"><td colspan="3"><b>For administrators</b></td></tr>
+<tr><td><code>claude gateway --config &lt;path&gt;</code></td><td>Runs the self-hosted enterprise sign-in and telemetry gateway from a YAML config.</td><td>Docs + help</td></tr>
+<tr><td><code>claude self-hosted-runner [setup|doctor|orchestrator]</code></td><td>Registers a machine as a self-hosted environment for cloud sessions.</td><td>Docs, hidden</td></tr>
+</table></div>
+<p id="ch75-subs-empty" hidden>No subcommand matches that filter.</p>
+
+<div class="box example"><span class="tag">Real-world example</span><p>A CI job needs to fail early if nobody is signed in. <code>claude auth status --text</code> prints a readable status and exits with 1 when signed out, so the next line of the script can stop the job with a clear message instead of a confusing error later.</p></div>
+
+<h3 id="ch75-4"><span class="num">75.4</span>Every flag, by job</h3>
+<p>Flags go after <code>claude</code> and before the prompt. The "Print only" column marks flags that need <code>-p</code> (they're for scripts). The "Status" column says where each flag is confirmed:</p>
+<ul>
+<li><span class="vchip">Docs + help</span> listed in both the official reference and the installed <code>--help</code>.</li>
+<li><span class="vchip">Docs only</span> documented but not shown by <code>--help</code>. The documentation itself warns that <code>--help</code> doesn't list every flag, so these are expected to work.</li>
+<li><span class="vchip">Help only</span> shown by the installed <code>--help</code> but not described in the documentation. Use with care.</li>
+<li><span class="vchip">Deprecated</span> or <span class="vchip">Removed</span>: avoid.</li>
+</ul>
+<input class="filter" type="search" data-filter="#ch75-flags" data-empty="#ch75-flags-empty" placeholder="Filter flags, e.g. model, json, permission, budget" aria-label="Filter flags">
+<div class="tbl"><table id="ch75-flags">
+<tr><th>Flag</th><th>What it does</th><th>Print only</th><th>Status</th></tr>
+
+<tr class="group"><td colspan="4"><b>Sessions: start, continue, resume, name</b></td></tr>
+<tr><td><code>-c</code>, <code>--continue</code></td><td>Continues the most recent conversation in the current folder.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>-r</code>, <code>--resume [value]</code></td><td>Resumes a conversation by session ID, name or transcript path; with no value, opens a picker (an optional search term filters it).</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--fork-session</code></td><td>With <code>--resume</code> or <code>--continue</code>, starts a new session ID instead of reusing the original, so the original stays untouched.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--from-pr [value]</code></td><td>Resumes a session linked to a pull request by number or URL, or opens a picker.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>-n</code>, <code>--name &lt;name&gt;</code></td><td>Gives the session a display name (shown in the prompt box, the resume picker and the terminal title).</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--session-id &lt;uuid&gt;</code></td><td>Uses a specific session ID (must be a valid UUID).</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--no-session-persistence</code></td><td>Doesn't save the session to disk, so it can't be resumed.</td><td>Yes</td><td>Docs + help</td></tr>
+<tr><td><code>-w</code>, <code>--worktree [name]</code></td><td>Starts in a new git worktree (a separate working copy) at <code>.claude/worktrees/&lt;name&gt;</code>. A PR number like <code>'#123'</code> or a PR URL branches from that pull request.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--tmux</code></td><td>Opens the worktree session in tmux (iTerm2 panes when available; <code>--tmux=classic</code> for traditional tmux). Needs <code>--worktree</code>.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--init</code>, <code>--init-only</code>, <code>--maintenance</code></td><td>Run Setup hooks at start-up (<code>--init-only</code> runs them and exits; <code>--maintenance</code> runs maintenance hooks).</td><td>No</td><td>Docs only</td></tr>
+
+<tr class="group"><td colspan="4"><b>Models and effort</b> (Chapter 68)</td></tr>
+<tr><td><code>--model &lt;model&gt;</code></td><td>Model for this session: an alias such as <code>fable</code>, <code>opus</code>, <code>sonnet</code>, <code>haiku</code>, <code>best</code>, <code>default</code>, or a full model name such as <code>claude-opus-5-5</code>.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--effort &lt;level&gt;</code></td><td>Effort for this session: <code>low</code>, <code>medium</code>, <code>high</code>, <code>xhigh</code> or <code>max</code>. The docs also accept <code>ultracode</code> (sets <code>xhigh</code> and turns on workflow orchestration).</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--fallback-model &lt;model&gt;</code></td><td>Model(s) to fall back to when the main one is overloaded or unavailable; a comma-separated list is tried in order (up to three). The main model is retried at the start of each turn.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--advisor &lt;model&gt;</code></td><td>Sets an advisor model for the session.</td><td>No</td><td>Docs only</td></tr>
+<tr><td><code>--betas &lt;betas...&gt;</code></td><td>Extra beta headers on API requests (API-key users only).</td><td>No</td><td>Docs + help</td></tr>
+
+<tr class="group"><td colspan="4"><b>Permissions and tools</b> (Chapters 67 and 78)</td></tr>
+<tr><td><code>--permission-mode &lt;mode&gt;</code></td><td>Starting permission mode: <code>default</code> (shown as <code>manual</code> in help and "Manual" in the app), <code>acceptEdits</code>, <code>plan</code>, <code>auto</code>, <code>dontAsk</code>, <code>bypassPermissions</code>. Interactive sessions start in <code>auto</code> by default; <code>-p</code> starts in <code>default</code>.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--allowedTools</code>, <code>--allowed-tools &lt;tools...&gt;</code></td><td>Tools or rules that run without asking, comma or space separated, e.g. <code>"Bash(git log *)" "Read"</code>.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--disallowedTools</code>, <code>--disallowed-tools &lt;tools...&gt;</code></td><td>Deny rules. A bare tool name removes that tool completely.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--tools &lt;tools...&gt;</code></td><td>Restricts which built-in tools exist at all: <code>""</code> for none, <code>"default"</code> for the normal set, or names like <code>"Bash,Edit,Read"</code>.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--permission-prompts host|none</code></td><td>Who answers permission prompts in print mode. <code>none</code> means anything that would ask is denied automatically. Default <code>host</code>.</td><td>Yes</td><td>Docs + help</td></tr>
+<tr><td><code>--permission-prompt-tool &lt;tool&gt;</code></td><td>An MCP tool that answers permission prompts in non-interactive runs.</td><td>Yes</td><td>Docs only</td></tr>
+<tr><td><code>--allow-dangerously-skip-permissions</code></td><td>Makes "bypass permissions" available in the Shift+Tab cycle without starting in it. For sandboxes only.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--dangerously-skip-permissions</code></td><td>Same as <code>--permission-mode bypassPermissions</code>: no permission checks at all. Only in isolated containers or virtual machines with no internet access.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--add-dir &lt;directories...&gt;</code></td><td>Gives Claude access to extra folders besides the current one.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--restricted</code></td><td>Restricted mode: removes command-running tools and WebFetch (unless <code>--tools</code> names them), ignores user, project and local settings, keeps file tools inside the working folders, and refuses bypass mode. Designed for evaluation harnesses.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--enable-auto-mode</code></td><td>Old way to enable auto mode. Use <code>--permission-mode auto</code>.</td><td>n/a</td><td>Removed</td></tr>
+
+<tr class="group"><td colspan="4"><b>System prompts and agents</b></td></tr>
+<tr><td><code>--system-prompt &lt;prompt&gt;</code></td><td>Replaces the whole default system prompt.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--system-prompt-file &lt;path&gt;</code></td><td>Replaces the system prompt with the contents of a file.</td><td>No</td><td>Docs only</td></tr>
+<tr><td><code>--append-system-prompt &lt;prompt&gt;</code></td><td>Adds text to the end of the default system prompt (safer than replacing it).</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--append-system-prompt-file &lt;path&gt;</code></td><td>Appends a file's contents to the default system prompt.</td><td>No</td><td>Docs only</td></tr>
+<tr><td><code>--append-subagent-system-prompt</code>, <code>--append-subagent-system-prompt-file</code></td><td>Appends text (or a file) to subagents' system prompts.</td><td>No</td><td>Docs only</td></tr>
+<tr><td><code>--system-prompt-snapshot on|off</code></td><td>Whether the first request's system prompt is recorded and reused verbatim for the rest of the conversation (default <code>on</code>). <code>off</code> is for iterating on prompt text.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--exclude-dynamic-system-prompt-sections</code></td><td>Moves per-machine details (folder, git status, memory paths) out of the system prompt so prompt caching works better across users.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--agent &lt;agent&gt;</code></td><td>Runs the session as a named custom agent (Chapter 81).</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--agents &lt;json-or-file&gt;</code></td><td>Defines custom subagents inline as JSON, e.g. <code>'{"reviewer": {"description": "Reviews code", "prompt": "You are a code reviewer"}}'</code>. With <code>-p</code> it can also be a file path.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--teammate-mode in-process|auto|tmux|iterm2</code></td><td>How agent teammates are displayed.</td><td>No</td><td>Docs only</td></tr>
+<tr><td><code>--brief</code></td><td>Enables a tool for the agent to send messages to the user.</td><td>No</td><td>Help only</td></tr>
+
+<tr class="group"><td colspan="4"><b>Print mode, output and structured results</b> (Chapter 121)</td></tr>
+<tr><td><code>-p</code>, <code>--print</code></td><td>Non-interactive: answers, prints and exits. Skips the workspace trust dialog, so use it only in folders you trust; invalid settings files are silently ignored in this mode.</td><td>n/a</td><td>Docs + help</td></tr>
+<tr><td><code>--output-format text|json|stream-json</code></td><td>Output format: plain text (default), one JSON result, or a stream of JSON events.</td><td>Yes</td><td>Docs + help</td></tr>
+<tr><td><code>--input-format text|stream-json</code></td><td>Input format: plain text (default) or a real-time stream of JSON messages.</td><td>Yes</td><td>Docs + help</td></tr>
+<tr><td><code>--json-schema &lt;schema&gt;</code></td><td>Makes the answer follow a JSON Schema and validates it. Example: <code>'{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}'</code>.</td><td>Yes</td><td>Docs + help</td></tr>
+<tr><td><code>--max-budget-usd &lt;amount&gt;</code></td><td>Stops the run when estimated API spend reaches this many US dollars.</td><td>Yes</td><td>Docs + help</td></tr>
+<tr><td><code>--max-turns &lt;n&gt;</code></td><td>Limits how many agent turns a print-mode run may take.</td><td>Yes</td><td>Docs only</td></tr>
+<tr><td><code>--include-partial-messages</code></td><td>Includes partial message chunks as they arrive. Needs <code>--output-format stream-json</code>.</td><td>Yes</td><td>Docs + help</td></tr>
+<tr><td><code>--include-hook-events</code></td><td>Includes hook lifecycle events in the output stream. Needs <code>stream-json</code>.</td><td>Yes</td><td>Docs + help</td></tr>
+<tr><td><code>--forward-subagent-text</code></td><td>Forwards subagents' text and thinking into the output stream. Needs <code>stream-json</code>.</td><td>Yes</td><td>Docs + help</td></tr>
+<tr><td><code>--replay-user-messages</code></td><td>Echoes user messages from standard input back to output. Needs stream-json in and out.</td><td>Yes</td><td>Docs + help</td></tr>
+<tr><td><code>--prompt-suggestions [value]</code></td><td>Emits a predicted next prompt after each turn (in print/SDK mode).</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--verbose</code></td><td>Shows full turn-by-turn output.</td><td>No</td><td>Docs + help</td></tr>
+
+<tr class="group"><td colspan="4"><b>MCP, plugins and settings</b></td></tr>
+<tr><td><code>--mcp-config &lt;configs...&gt;</code></td><td>Loads MCP servers from JSON files or JSON strings for this session.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--strict-mcp-config</code></td><td>Uses only the servers from <code>--mcp-config</code>, ignoring every other MCP configuration.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--plugin-dir &lt;path&gt;</code></td><td>Loads a plugin from a folder or <code>.zip</code> for this session only (repeatable).</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--plugin-url &lt;url&gt;</code></td><td>Fetches a plugin <code>.zip</code> from a URL for this session only (repeatable).</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--settings &lt;file-or-json&gt;</code></td><td>Loads extra settings from a file or JSON string.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--setting-sources &lt;sources&gt;</code></td><td>Which settings files load: any of <code>user</code>, <code>project</code>, <code>local</code>, comma separated.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--disable-slash-commands</code></td><td>Disables all skills and commands for the session.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--autocompact &lt;auto|tokens&gt;</code></td><td>Sets when the conversation is automatically compacted: <code>auto</code>, or a size between 100k and 1M tokens.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--file &lt;specs...&gt;</code></td><td>Downloads file resources at start-up, in the form <code>file_id:relative_path</code>.</td><td>No</td><td>Help only</td></tr>
+
+<tr class="group"><td colspan="4"><b>Background, cloud and remote</b> (Chapters 69 and 70)</td></tr>
+<tr><td><code>--bg</code>, <code>--background</code></td><td>Starts the session in the background and returns at once, printing the ID that <code>attach</code>, <code>logs</code>, <code>stop</code> and <code>rm</code> use. Can't be combined with <code>-p</code>.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--exec &lt;command&gt;</code></td><td>With <code>--bg</code>, runs a shell command as a background job, e.g. <code>claude --bg --exec 'pytest -x'</code>.</td><td>No</td><td>Docs only</td></tr>
+<tr><td><code>--cloud [description|session_id|url]</code></td><td>Creates a cloud session (it clones your GitHub repository at the current branch, so push first), or attaches to an existing one.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--remote</code></td><td>Old name for <code>--cloud</code>.</td><td>No</td><td>Deprecated</td></tr>
+<tr><td><code>--environment &lt;environment_id&gt;</code></td><td>Creates a cloud session on a self-hosted environment (<code>ccpool_...</code>).</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--ref &lt;branch&gt;</code></td><td>Branch to use with <code>--environment</code>.</td><td>No</td><td>Docs only</td></tr>
+<tr><td><code>--teleport [session]</code></td><td>Pulls a cloud session into your local terminal.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--remote-control [name]</code> (alias <code>--rc</code>)</td><td>Starts an interactive session you can also continue from claude.ai/code or the Claude mobile app.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--remote-control-session-name-prefix &lt;prefix&gt;</code></td><td>Prefix for automatically generated Remote Control session names (default: your computer's hostname).</td><td>No</td><td>Docs + help</td></tr>
+
+<tr class="group"><td colspan="4"><b>Debugging and troubleshooting</b> (Chapter 72)</td></tr>
+<tr><td><code>-d</code>, <code>--debug [filter]</code></td><td>Debug logging, optionally filtered by category: <code>--debug=hooks,mcp</code>, or exclude with <code>--debug='!hooks'</code>. The filter only applies in the <code>=</code> form.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--debug-file &lt;path&gt;</code></td><td>Writes debug logs to a file (turns debug mode on).</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--safe-mode</code></td><td>Starts with every customisation disabled (CLAUDE.md, skills, plugins, hooks, MCP servers, custom agents and more) to find which one is breaking things. Admin policies, sign-in and permissions still work.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--bare</code></td><td>Minimal mode: skips hooks, plugin sync, auto memory and CLAUDE.md discovery, and only uses <code>ANTHROPIC_API_KEY</code> or an <code>apiKeyHelper</code> for sign-in. You supply all context explicitly. Good for reproducible CI runs.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>-v</code>, <code>--version</code></td><td>Prints the version, e.g. <code>2.1.319 (Claude Code)</code>.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>-h</code>, <code>--help</code></td><td>Shows help. Works after any subcommand too: <code>claude mcp --help</code>.</td><td>No</td><td>Docs + help</td></tr>
+
+<tr class="group"><td colspan="4"><b>Editors, desktop, browser and accessibility</b></td></tr>
+<tr><td><code>--ide</code></td><td>Connects to your code editor on start-up if exactly one is available.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--desktop</code></td><td>Opens the Claude Desktop app on this folder instead of the terminal (with <code>--continue</code> or <code>--resume &lt;id&gt;</code> to pick a session).</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--chrome</code> / <code>--no-chrome</code></td><td>Turns the Claude in Chrome browser integration on or off for the session.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--ax-screen-reader</code></td><td>Screen-reader-friendly output: flat text, no decorative borders or animations.</td><td>No</td><td>Docs + help</td></tr>
+<tr><td><code>--channels</code>, <code>--dangerously-load-development-channels</code></td><td>Channels (research preview).</td><td>No</td><td>Docs only</td></tr>
+</table></div>
+<p id="ch75-flags-empty" hidden>No flag matches that filter.</p>
+
+<div class="box mistakes"><span class="tag">Easy to mix up</span><dl>
+<dt><code>--system-prompt</code> vs <code>--append-system-prompt</code></dt><dd>The first <em>replaces</em> Claude Code's built-in instructions (it loses its knowledge of how to use its tools well). The second <em>adds</em> to them. Almost always use append.</dd>
+<dt><code>--tools</code> vs <code>--allowedTools</code></dt><dd><code>--tools</code> decides which tools exist at all. <code>--allowedTools</code> decides which existing tools run without asking.</dd>
+<dt><code>--bare</code> vs <code>--safe-mode</code></dt><dd>Both switch customisations off. <code>--bare</code> is for scripts: lean, predictable, API-key sign-in only. <code>--safe-mode</code> is for troubleshooting a broken setup while signing in normally.</dd>
+<dt><code>--cloud</code> vs <code>--remote-control</code></dt><dd><code>--cloud</code> runs the session on Anthropic's servers. <code>--remote-control</code> keeps it on your computer and lets you steer it from your phone or browser.</dd>
+</dl></div>
+
+<h3 id="ch75-5"><span class="num">75.5</span>Environment variables</h3>
+<p>An <a class="gl" href="#g-environment-variable">environment variable</a> is a named setting your shell passes to every program it starts (Chapter 56). Set one for a single command by putting it in front (<code>MCP_TIMEOUT=10000 claude</code>), for the whole shell with <code>export</code>, or for Claude Code only in the <code>"env"</code> block of a settings file (Chapter 78). These are the ones ordinary users and CI pipelines need; the official list at <a href="https://code.claude.com/docs/en/env-vars" target="_blank" rel="noopener">code.claude.com/docs/en/env-vars</a> has many more.</p>
+<input class="filter" type="search" data-filter="#ch75-env" data-empty="#ch75-env-empty" placeholder="Filter variables, e.g. KEY, MODEL, MCP, proxy" aria-label="Filter environment variables">
+<div class="tbl"><table id="ch75-env">
+<tr><th>Variable</th><th>What it does</th></tr>
+<tr class="group"><td colspan="2"><b>Signing in and choosing a provider</b> (Chapter 98)</td></tr>
+<tr><td><code>ANTHROPIC_API_KEY</code></td><td>An API key. In interactive mode you approve it once and it then overrides your subscription; with <code>-p</code> it is always used. A forgotten old key is a common cause of "organisation disabled" errors: <code>unset ANTHROPIC_API_KEY</code> to go back to your subscription.</td></tr>
+<tr><td><code>ANTHROPIC_AUTH_TOKEN</code></td><td>A custom value sent as <code>Authorization: Bearer</code>, for company gateways.</td></tr>
+<tr><td><code>CLAUDE_CODE_OAUTH_TOKEN</code></td><td>The one-year token from <code>claude setup-token</code>, for CI. Not read in <code>--bare</code> mode.</td></tr>
+<tr><td><code>ANTHROPIC_BASE_URL</code></td><td>Sends requests through a proxy or gateway instead of Anthropic directly. Turns off Remote Control.</td></tr>
+<tr><td><code>CLAUDE_CODE_USE_BEDROCK</code> / <code>CLAUDE_CODE_USE_VERTEX</code> / <code>CLAUDE_CODE_USE_FOUNDRY</code></td><td>Set to <code>1</code> to use Amazon Bedrock / Google Cloud's Agent Platform (formerly Vertex AI) / Microsoft Foundry, with that cloud's own credentials.</td></tr>
+<tr><td><code>CLAUDE_CONFIG_DIR</code></td><td>Moves <code>~/.claude</code> somewhere else. Handy for keeping separate work and personal accounts.</td></tr>
+<tr class="group"><td colspan="2"><b>Models and thinking</b></td></tr>
+<tr><td><code>ANTHROPIC_MODEL</code></td><td>Model for the session (alias or full name). Beats the <code>model</code> setting; <code>--model</code> beats it.</td></tr>
+<tr><td><code>ANTHROPIC_DEFAULT_MODEL</code></td><td>The model new sessions start on.</td></tr>
+<tr><td><code>ANTHROPIC_DEFAULT_OPUS_MODEL</code>, <code>_SONNET_MODEL</code>, <code>_HAIKU_MODEL</code>, <code>_FABLE_MODEL</code></td><td>Pin what each alias resolves to (useful on cloud providers where aliases may point to older models).</td></tr>
+<tr><td><code>CLAUDE_CODE_SUBAGENT_MODEL</code></td><td>Default model for subagents.</td></tr>
+<tr><td><code>CLAUDE_CODE_EFFORT_LEVEL</code></td><td>Effort level (<code>low</code> to <code>max</code>, or <code>auto</code>). Highest priority of all effort settings.</td></tr>
+<tr><td><code>MAX_THINKING_TOKENS</code></td><td>A fixed thinking budget; <code>0</code> turns thinking off where the model allows it (not on the 5.5 models or Fable).</td></tr>
+<tr><td><code>CLAUDE_CODE_MAX_OUTPUT_TOKENS</code></td><td>Maximum output tokens per response.</td></tr>
+<tr class="group"><td colspan="2"><b>MCP</b> (Chapters 83 and 105)</td></tr>
+<tr><td><code>MCP_TIMEOUT</code></td><td>How long to wait for an MCP server to start, in milliseconds (default 30000).</td></tr>
+<tr><td><code>MCP_TOOL_TIMEOUT</code></td><td>Time limit for each MCP tool call, for all servers.</td></tr>
+<tr><td><code>MAX_MCP_OUTPUT_TOKENS</code></td><td>Largest MCP tool output allowed into the conversation (default 25000 tokens), e.g. <code>export MAX_MCP_OUTPUT_TOKENS=50000</code>.</td></tr>
+<tr class="group"><td colspan="2"><b>Updates, network and privacy</b></td></tr>
+<tr><td><code>DISABLE_AUTOUPDATER</code></td><td><code>1</code> stops background updates (<code>claude update</code> still works).</td></tr>
+<tr><td><code>DISABLE_UPDATES</code></td><td><code>1</code> blocks all updates.</td></tr>
+<tr><td><code>CLAUDE_CODE_PACKAGE_MANAGER_AUTO_UPDATE</code></td><td><code>1</code> lets Claude Code run the Homebrew or WinGet upgrade for you.</td></tr>
+<tr><td><code>HTTPS_PROXY</code> / <code>HTTP_PROXY</code></td><td>Your company's proxy server.</td></tr>
+<tr><td><code>DISABLE_TELEMETRY</code></td><td>Opts out of telemetry. Any value, even <code>0</code>, opts out; unset it to opt back in.</td></tr>
+<tr><td><code>CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC</code></td><td>Turns off auto-updates, telemetry, error reporting, feedback, release notes and Remote Control in one go.</td></tr>
+<tr class="group"><td colspan="2"><b>Behaviour</b></td></tr>
+<tr><td><code>CLAUDE_CODE_SIMPLE</code></td><td><code>1</code> is the same as <code>--bare</code>.</td></tr>
+<tr><td><code>CLAUDE_CODE_SAFE_MODE</code></td><td><code>1</code> is the same as <code>--safe-mode</code>.</td></tr>
+<tr><td><code>BASH_DEFAULT_TIMEOUT_MS</code></td><td>Time limit for commands Claude runs (default 120000 ms, two minutes). Raise it for slow test suites.</td></tr>
+<tr><td><code>CLAUDE_CODE_DISABLE_BACKGROUND_TASKS</code></td><td><code>1</code> turns off background tasks and <kbd>Ctrl</kbd>+<kbd>B</kbd>.</td></tr>
+<tr><td><code>CLAUDE_CODE_DISABLE_AUTO_MEMORY</code></td><td><code>1</code> turns off auto memory (Chapter 77).</td></tr>
+<tr><td><code>CLAUDE_CODE_AUTO_COMPACT_WINDOW</code></td><td>When to auto-compact, between 100000 and 1000000 tokens.</td></tr>
+<tr><td><code>CLAUDE_AX_SCREEN_READER</code></td><td><code>1</code> gives screen-reader output.</td></tr>
+<tr><td><code>CLAUDE_CODE_GIT_BASH_PATH</code></td><td>Windows only: where Git Bash's <code>bash.exe</code> is.</td></tr>
+<tr><td><code>USE_BUILTIN_RIPGREP</code></td><td><code>0</code> uses your system's ripgrep search tool, a fix when file search or <code>@</code> mentions can't find files.</td></tr>
+</table></div>
+<p id="ch75-env-empty" hidden>No variable matches that filter.</p>
+<details class="deep"><summary>Which sign-in wins when several are set?</summary><div class="body">
+<p>Claude Code checks credentials in a fixed order and uses the first it finds: cloud-provider variables (Bedrock, Agent Platform, Foundry), then <code>ANTHROPIC_AUTH_TOKEN</code>, then <code>ANTHROPIC_API_KEY</code>, then an <code>apiKeyHelper</code> script, then <code>CLAUDE_CODE_OAUTH_TOKEN</code>, then other Anthropic profile credentials, and finally your normal <code>/login</code> subscription sign-in. This is why an old API key in your shell profile can silently take over from your subscription. Run <code>/status</code> in a session, or <code>claude auth status</code> in the shell, to see which one is active.</p>
+</div></details>
+
+<h3 id="ch75-6"><span class="num">75.6</span>Recipes for QA work</h3>
+<p>These combinations come up again and again in testing. Each uses only flags from the tables above.</p>
+
+<h4>1. Summarise test failures in CI, safely</h4>
+<div class="code"><pre>claude -p "Read test-results/junit.xml and summarise failures by likely cause as a Markdown table" \
+  --allowedTools "Read" \
+  --permission-prompts none \
+  --max-budget-usd 1 \
+  &gt; failure-summary.md</pre></div>
+<p>Only reading is allowed; anything else that would need permission is denied automatically; spending stops at one US dollar; the answer goes into a file the pipeline can post or attach.</p>
+
+<h4>2. Get machine-readable output a script can trust</h4>
+<div class="code"><pre>claude -p "Classify each failing test in results.xml as product-bug, test-bug or flaky" \
+  --output-format json \
+  --json-schema '{"type":"object","properties":{"tests":{"type":"array","items":{"type":"object","properties":{"name":{"type":"string"},"verdict":{"type":"string","enum":["product-bug","test-bug","flaky"]}},"required":["name","verdict"]}}},"required":["tests"]}'</pre></div>
+<p>The schema forces a predictable shape (a list of tests, each with one of three verdicts), which a later pipeline step can read without guessing.</p>
+
+<h4>3. Reproducible runs: same behaviour on every machine</h4>
+<div class="code"><pre>claude --bare -p "Run npx playwright test and report the result" \
+  --append-system-prompt-file ci-instructions.md \
+  --mcp-config ci-mcp.json --strict-mcp-config \
+  --allowedTools "Bash(npx playwright test *)" "Read"</pre></div>
+<p><code>--bare</code> ignores whatever CLAUDE.md, hooks and plugins happen to be on the machine; you pass the instructions and MCP servers explicitly, so the run behaves the same everywhere. Remember that <code>--bare</code> signs in only with <code>ANTHROPIC_API_KEY</code> or an <code>apiKeyHelper</code>.</p>
+
+<h4>4. Lock down what can run</h4>
+<div class="code"><pre>claude --permission-mode dontAsk \
+  --allowedTools "Read" "Grep" "Bash(npm test *)" \
+  --disallowedTools "Bash(git push *)" "WebFetch"</pre></div>
+<p><code>dontAsk</code> denies anything that isn't pre-approved. Deny rules win over everything else.</p>
+
+<h4>5. Two test tasks in parallel, without collisions</h4>
+<div class="code"><pre>claude --bg -w api-tests "Add negative tests for POST /orders"
+claude --bg -w ui-tests  "Fix the flaky checkout test"
+claude agents          <span class="c"># watch both; Enter to attach, ← to detach</span></pre></div>
+<p>Each background session works in its own <a class="gl" href="#g-git-worktree">git worktree</a>, so the two never edit the same files.</p>
+
+<h4>6. Try a different model on the same question</h4>
+<div class="code"><pre>claude -c --fork-session --model fable "Re-examine the root cause of the payment test failure"</pre></div>
+<p>Continues the last conversation in a <em>new</em> session with a different model, leaving the original conversation untouched for comparison.</p>
+
+<div class="lab"><div class="lab-h"><b>Explore your own CLI</b><span>25 min · terminal</span></div><ol>
+<li>Run <code>claude --version</code>.<span class="expect">a version number such as <code>2.1.319 (Claude Code)</code>. If yours is newer, some flags may have changed; trust your own help output.</span></li>
+<li>Run <code>claude --help | less</code> and find three flags in this chapter's tables. Press <kbd>q</kbd> to leave.<span class="expect">the same flags with the same descriptions.</span></li>
+<li>Run <code>claude auth status --text</code>, then <code>echo $?</code>.<span class="expect">your sign-in method, then <code>0</code> (signed in). The second command prints the previous command's exit code.</span></li>
+<li>In a practice folder, run <code>claude -p "In one sentence, what is in this folder?" --allowedTools "Read" "Glob" --output-format json</code>.<span class="expect">a JSON object containing the answer, plus details such as cost and duration.</span></li>
+<li>Run the same prompt with <code>--permission-prompts none --tools ""</code>.<span class="expect">an answer saying it can't look at the folder, because no tools exist. You've just seen how flags shape what Claude can do.</span></li>
+<li>Run <code>claude mcp list</code> and <code>claude plugin list</code>.<span class="expect">your configured MCP servers and installed plugins (possibly none).</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"If it's not in <code>--help</code>, it doesn't exist."</dt><dd>Anthropic's documentation says plainly that <code>--help</code> doesn't list every flag. <code>--max-turns</code> and <code>--system-prompt-file</code> are documented but not shown.</dd>
+<dt>"Flags and slash commands are the same thing."</dt><dd>Flags go on the command line <em>before</em> a session starts (<code>claude --model opus</code>). Slash commands are typed <em>inside</em> a session (<code>/model opus</code>). Chapter 73 explains all five kinds.</dd>
+<dt>"<code>-p</code> works exactly like an interactive session."</dt><dd>Print mode skips the folder-trust question, starts in <code>default</code> rather than <code>auto</code> mode, silently ignores broken settings files and uses an API key if one is set. Test your CI commands before relying on them.</dd>
+<dt>"<code>--dangerously-skip-permissions</code> is fine on my laptop."</dt><dd>It removes every safety check. Use it only inside a disposable, isolated container or virtual machine.</dd>
+</dl></div>
+
+<h3 id="ch75-r"><span class="num">75.7</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Usage lines read like sentences: <code>[optional]</code>, <code>&lt;required&gt;</code>, <code>a|b</code> for choices, <code>...</code> for repeats. Quote anything with spaces or special characters.</li>
+<li>Subcommands do separate jobs (<code>auth</code>, <code>mcp</code>, <code>plugin</code>, <code>update</code>, <code>doctor</code>, background-session tools); flags shape how a session starts.</li>
+<li>Many flags only work with <code>-p</code>: output formats, <code>--json-schema</code>, <code>--max-budget-usd</code>, <code>--max-turns</code>, <code>--permission-prompts</code>.</li>
+<li>For CI, combine least-privilege tools, a spending cap, structured output and, for reproducibility, <code>--bare</code>.</li>
+<li>Environment variables set sign-in, models, MCP limits, proxies and updates. An old <code>ANTHROPIC_API_KEY</code> can silently override your subscription.</li>
+<li>This reference matches 2.1.319. Your own <code>claude --help</code> is the final word for your version.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">In the usage line <code>claude attach &lt;id|name&gt;</code>, what do the angle brackets and the bar mean?</p><div class="opts"><button>The value is optional; either word can be typed literally</button><button data-ok>A value is required, and it can be either an ID or a name</button><button>You must type both an ID and a name</button></div><p class="why" hidden>Angle brackets mean "required, replace with a real value"; the bar means "one of these".</p></div>
+<div class="qz"><p class="q">Which flag only works together with <code>-p</code>?</p><div class="opts"><button><code>--model</code></button><button data-ok><code>--max-budget-usd</code></button><button><code>--continue</code></button></div><p class="why" hidden>Spending caps, output formats and JSON schemas are print-mode features for scripts.</p></div>
+<div class="qz"><p class="q">A nightly CI run should behave the same on every build machine regardless of local CLAUDE.md files or plugins. Which flag helps most?</p><div class="opts"><button><code>--safe-mode</code></button><button data-ok><code>--bare</code></button><button><code>--verbose</code></button></div><p class="why" hidden><code>--bare</code> skips local customisations and makes you pass context explicitly. <code>--safe-mode</code> is for troubleshooting.</p></div>
+<div class="qz"><p class="q">You want Claude to read files but never even have the Bash tool available. Which flag removes Bash entirely?</p><div class="opts"><button><code>--allowedTools "Read"</code></button><button data-ok><code>--tools "Read,Grep,Glob"</code></button><button><code>--permission-mode plan</code></button></div><p class="why" hidden><code>--tools</code> decides which tools exist. <code>--allowedTools</code> only decides which run without asking; Bash would still exist and could prompt.</p></div>
+<div class="qz"><p class="q">Claude Code suddenly says your organisation is disabled, though your subscription is active. What's the most likely cause?</p><div class="opts"><button>The model alias changed</button><button data-ok>An old <code>ANTHROPIC_API_KEY</code> in your environment is overriding your subscription</button><button><code>MCP_TIMEOUT</code> is too low</button></div><p class="why" hidden>API keys take priority over subscription sign-in. <code>unset ANTHROPIC_API_KEY</code> and remove it from your shell profile.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Write the CI command your team would use to summarise nightly test failures. It must: use print mode, allow only reading and your test command, deny anything else without asking, cap spending, and produce JSON that matches a schema you write. Run it once on real or sample results, save the command and output, and write three sentences explaining each flag to a teammate who has never used the CLI.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Everything before the chat starts is the CLI. <code>claude</code> opens a session; subcommands like <code>claude mcp</code> or <code>claude update</code> do other jobs; flags like <code>--model</code> or <code>--permission-mode</code> change how a session starts. Add <code>-p</code> for scripts: answer once and exit, with extras like JSON output, schemas and spending caps. And if anything here differs from your version, <code>claude --help</code> wins."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Claude Code 2.1.319, output of <code>claude --help</code> and of <code>--help</code> for <code>mcp</code>, <code>mcp add</code>, <code>plugin</code>, <code>auth</code>, <code>agents</code>, <code>purge</code>, <code>ultrareview</code>, <code>import</code>, <code>install</code>, <code>respawn</code>, <code>rm</code>, <code>daemon</code>, <code>self-hosted-runner</code>, <code>remote-control</code>, <code>auto-mode</code> and <code>gateway</code>, captured 9 November 2026.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/cli-reference" target="_blank" rel="noopener">CLI reference</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/env-vars" target="_blank" rel="noopener">Environment variables</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/authentication" target="_blank" rel="noopener">Authentication</a>, <a href="https://code.claude.com/docs/en/model-config" target="_blank" rel="noopener">Model configuration</a> and <a href="https://code.claude.com/docs/en/permission-modes" target="_blank" rel="noopener">Permission modes</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/agent-view" target="_blank" rel="noopener">Agent view</a>, <a href="https://code.claude.com/docs/en/worktrees" target="_blank" rel="noopener">Worktrees</a> and <a href="https://code.claude.com/docs/en/mcp" target="_blank" rel="noopener">MCP</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/plugins/cli-reference" target="_blank" rel="noopener">Plugins CLI reference</a>.</li>
+</ol><p class="verified">Verified 9 November 2026 against Claude Code 2.1.319</p></div>

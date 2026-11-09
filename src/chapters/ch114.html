@@ -1,0 +1,238 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>The seven stages of the software lifecycle, and what AI realistically contributes at each one</li>
+<li>Concrete Claude and Claude Code techniques for planning, design, coding, review, testing, release and operations</li>
+<li>How roles shift for developers, testers, product owners, analysts, operations staff and managers</li>
+<li>The main risks of AI across the lifecycle, and the controls that address them</li>
+<li>How to measure whether AI is helping delivery, using the DORA metrics and honest baselines</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch63">Chapter 63</a> (Claude Code first steps) and <a href="#ch118">Chapter 118</a> (how AI changes QA). Helpful: <a href="#ch71">Chapter 71</a> (git workflows) and <a href="#ch121">Chapter 121</a> (test automation). The lab needs Claude Code, git and Python 3.</div>
+
+<div class="bigidea"><p>Software moves through a lifecycle: someone decides what to build, it's designed, written, reviewed, tested, released and then run in production. AI can help at every stage, but the help looks different at each one: spotting gaps in a user story, comparing design options, writing code, reviewing changes, generating tests, drafting release notes and reading incident logs. The biggest gains come when a team uses AI across the whole flow, not just for typing code faster. The biggest risks come from trusting output nobody checked. Measure the whole delivery system, not lines of code.</p></div>
+
+<h3 id="ch114-1"><span class="num">114.1</span>The lifecycle in one picture</h3>
+<p>The <a class="gl" href="#g-software-development-lifecycle">software development lifecycle</a> (SDLC) is the path every change takes from idea to running software. Teams draw it differently (Scrum sprints, Kanban flow, continuous delivery), but the same stages appear in all of them:</p>
+<div class="flow">
+<div><b>Plan</b>What and why: stories, acceptance criteria</div>
+<div><b>Design</b>How: architecture, APIs, data</div>
+<div><b>Code</b>Build it</div>
+<div class="hl"><b>Review</b>Check the change</div>
+<div><b>Test</b>Prove it works</div>
+<div><b>Release</b>Ship it safely</div>
+<div><b>Operate</b>Run it, learn, feed back into Plan</div>
+</div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Building a house has the same shape: the client brief, the architect's drawings, construction, the site inspection, the final survey, handing over the keys, then living in it and calling the plumber. A powerful new tool, such as a machine that lays bricks ten times faster, helps one stage. If the drawings are wrong or nobody inspects the work, faster bricklaying just produces the wrong house sooner.</p></div>
+<p>That analogy is the main lesson of this chapter. Speeding up coding alone moves the bottleneck to review and testing. Teams that gain the most use AI at every stage, and especially on the stages that were already slow.</p>
+<div class="tbl"><table>
+<tr><th>Stage</th><th>What AI is good at</th><th>What stays with people</th><th>Where to go deeper</th></tr>
+<tr><td>Plan</td><td>Finding ambiguity, drafting acceptance criteria, splitting stories</td><td>Priorities, value, saying no</td><td><a href="#ch120">Ch 120</a>, <a href="#ch101">Ch 101</a></td></tr>
+<tr><td>Design</td><td>Listing options and trade-offs, drafting decision records, API contracts</td><td>Choosing, owning long-term consequences</td><td>113.3</td></tr>
+<tr><td>Code</td><td>Writing, refactoring, explaining unfamiliar code</td><td>Direction, scope, accepting the change</td><td><a href="#ch63">Ch 63</a>–<a href="#ch76">76</a></td></tr>
+<tr><td>Review</td><td>First-pass bug finding, consistency, security scanning</td><td>Judgement on design and intent; merge approval</td><td><a href="#ch71">Ch 71</a>, <a href="#ch115">Ch 115</a></td></tr>
+<tr><td>Test</td><td>Test ideas, test code, data, failure analysis</td><td>Risk decisions, exploratory insight, sign-off</td><td><a href="#ch118">Ch 118</a>–<a href="#ch129">128</a></td></tr>
+<tr><td>Release</td><td>Release notes, readiness summaries, checklists</td><td>Go/no-go decision</td><td>113.7</td></tr>
+<tr><td>Operate</td><td>Reading logs, summarising incidents, drafting runbooks and postmortems</td><td>Incident command, customer communication</td><td><a href="#ch115">Ch 115</a>, <a href="#ch95">Ch 95</a></td></tr>
+</table></div>
+
+<h3 id="ch114-2"><span class="num">114.2</span>Plan: better stories before any code exists</h3>
+<p>Problems found in a user story cost minutes to fix. The same problems found in production cost days. That makes planning the cheapest place to use AI, and it's where testers can have a big effect (<a class="gl" href="#g-shift-left-testing">shift-left testing</a>).</p>
+<div class="code"><span class="cap">Prompt: story refinement (paste the story, or fetch it with the Jira MCP server from Chapter 101)</span><pre>Here is a user story for the checkout team:
+&lt;story&gt;
+As a shopper I can apply a coupon at checkout so that I pay less.
+&lt;/story&gt;
+1. List every question a developer or tester would need answered before starting.
+2. Propose acceptance criteria in Given/When/Then form.
+3. Suggest how to split it if it's too big for one sprint.
+Mark anything you're assuming rather than reading from the story.</pre></div>
+<p>Typical questions back: Can two coupons be combined? Do coupons expire? Are they case-sensitive? Is there a minimum spend? What happens to the discount if an item is returned? Each one is a future bug avoided.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>A tester began running every story through a refinement prompt the day before backlog refinement, and bringing the top five questions to the meeting. The product owner first found it annoying, then started running the prompt herself before writing stories. The team agreed that the "questions found in refinement" count was a better early measure of quality than anything they'd tracked before.</p></div>
+
+<h3 id="ch114-3"><span class="num">114.3</span>Design: options, trade-offs and decision records</h3>
+<p>Design is where a team decides <em>how</em> to build something: which components change, how data is stored, what an API looks like. AI is useful here as a fast, well-read sparring partner. It isn't the decision-maker, because it doesn't carry the consequences.</p>
+<ul>
+<li><b>Generate options.</b> "Give me three ways to store coupon usage, with pros, cons and what each makes harder to test."</li>
+<li><b>Draft a <a class="gl" href="#g-decision-record">decision record</a>.</b> A short document capturing the context, the options, the decision and its consequences, so future readers know why.</li>
+<li><b>Draft contracts.</b> An OpenAPI description of a new endpoint, which testers can review and use for contract tests before the code exists.</li>
+<li><b>Think about failure.</b> "What could go wrong with this design under load, with bad input, or if the payment service is down?"</li>
+</ul>
+<p>In Claude Code, <b>plan mode</b> fits this stage: Claude reads the codebase and proposes a plan, but can't edit files until you approve it (<a href="#ch67">Chapter 67</a>). Use <code>/plan</code> or Shift+Tab to enter it.</p>
+<div class="box warn"><span class="tag">Plausible is not proven</span><p>An AI design proposal can sound authoritative and still ignore a constraint it was never told about: a legacy system, a regulation, a team's skills. Feed it the constraints explicitly, and have a person who owns the system sign the decision.</p></div>
+
+<h3 id="ch114-4"><span class="num">114.4</span>Code: from autocomplete to agents</h3>
+<p>AI coding help has moved through three styles, and teams now use all three:</p>
+<div class="tbl"><table>
+<tr><th>Style</th><th>What it looks like</th><th>Good for</th></tr>
+<tr><td>Inline suggestions</td><td>The editor suggests the next lines as you type</td><td>Small, local code where you already know what you want</td></tr>
+<tr><td>Chat about code</td><td>You paste code and ask questions</td><td>Explaining, small fixes, learning</td></tr>
+<tr><td>Agentic coding</td><td>A tool like Claude Code reads the repository, edits many files, runs commands and tests</td><td>Whole tasks: a feature, a migration, a set of tests</td></tr>
+</table></div>
+<p>Agentic coding shifts the developer's work towards three activities: giving clear direction (a good task description and a project <code>CLAUDE.md</code>, <a href="#ch77">Chapter 77</a>), keeping changes small enough to review, and checking the result. The same habits that make a human team effective, such as small pull requests, clear conventions and fast tests, make an AI-assisted team effective.</p>
+<div class="box note"><span class="tag">Tests are the agent's eyes</span><p>An agent can only check its own work against something. A fast, reliable test suite lets Claude Code run the tests after each change and fix what it broke. A slow or flaky suite leaves it guessing. Investment in test automation pays back twice once AI writes code.</p></div>
+
+<h3 id="ch114-5"><span class="num">114.5</span>Review: the new bottleneck</h3>
+<p>When code is written faster, more code waits for review. Reviewers can't simply read faster, so teams add AI as a first pass:</p>
+<div class="tbl"><table>
+<tr><th>Tool</th><th>What it does</th><th>Where it's covered</th></tr>
+<tr><td><code>/code-review</code> (alias <code>/review</code>)</td><td>Reviews your current changes, a PR, branch or path for correctness bugs, at an effort level from <code>low</code> to <code>max</code>; <code>ultra</code> runs a deep review in the cloud</td><td><a href="#ch71">Chapter 71</a> (syntax); <a href="#ch115">Chapter 115</a> (how to use findings)</td></tr>
+<tr><td><code>claude ultrareview</code></td><td>The same cloud multi-agent review from the shell or a script</td><td><a href="#ch71">Chapter 71</a></td></tr>
+<tr><td><code>/security-review</code></td><td>Reviews your branch's changes against the default branch for security vulnerabilities (needs an <code>origin</code> remote)</td><td><a href="#ch134">Chapter 134</a></td></tr>
+<tr><td>Claude GitHub Action</td><td>Runs Claude on pull requests when someone writes <code>@claude</code>, or on every PR with a fixed prompt</td><td><a href="#ch71">Chapter 71</a></td></tr>
+</table></div>
+<p>AI review is a first pass, not a replacement. It's strong at spotting bugs in the lines that changed; humans are better at asking whether the change is the right change at all. <a href="#ch115">Chapter 115</a> covers how to review AI-written code.</p>
+
+<h3 id="ch114-6"><span class="num">114.6</span>Test: the part this book knows best</h3>
+<p>Testing is covered throughout Part XV (<a href="#ch118">Chapters 118</a>–<a href="#ch129">128</a>): test design, automation with Playwright (<a href="#ch121">Chapter 121</a>), exploratory testing, accessibility, evals and ROI. From a lifecycle view, three points stand out:</p>
+<ul>
+<li><b>Testing moves earlier.</b> Acceptance criteria and test ideas can exist before code, because AI drafts them from the story.</li>
+<li><b>More code means more to test.</b> If developers deliver more changes, regression risk grows. Automated suites and risk-based selection matter more, not less.</li>
+<li><b>Testers check the AI too.</b> AI-written tests can assert the wrong thing. "Prove it can fail" (<a href="#ch121">Chapter 121</a>) becomes a routine step.</li>
+</ul>
+
+<h3 id="ch114-7"><span class="num">114.7</span>Release: readiness, notes and automation</h3>
+<p>Release work is mostly gathering and summarising information, which suits AI well. Common uses:</p>
+<ul>
+<li><b>Release notes</b> from merged pull requests and Jira tickets, in language customers understand.</li>
+<li><b>Release-readiness summaries:</b> open bugs by severity, test results, known risks, untested areas. The go/no-go decision stays with people.</li>
+<li><b>Checks in the pipeline</b> using Claude Code non-interactively. <code>claude -p</code> runs one task and prints the result; with <code>--permission-mode dontAsk</code>, anything not pre-approved is denied rather than waiting for a person who isn't there.</li>
+</ul>
+<div class="code"><span class="cap">Terminal: draft release notes from the git history (read-only tools only)</span><pre>git log --oneline v4.1.0..HEAD &gt; changes.txt
+claude -p "Read changes.txt and draft customer-facing release notes grouped as
+New, Improved and Fixed. Leave out internal refactors. Flag any change that
+sounds risky for a tester to check." \
+  --permission-mode dontAsk --allowedTools "Read" &gt; release-notes-draft.md</pre></div>
+<div class="box warn"><span class="tag">Drafts, not decisions</span><p>Treat AI release notes and readiness summaries as drafts for a named person to check. A confident summary that omits a known critical bug is worse than no summary.</p></div>
+
+<h3 id="ch114-8"><span class="num">114.8</span>Operate: logs, incidents and learning</h3>
+<p>Once software is live, the work is keeping it healthy. AI helps operations staff (often called SRE, site reliability engineering, or DevOps) to:</p>
+<ul>
+<li><b>Read logs and traces</b> quickly during an incident: "Group these errors by cause and show when each started."</li>
+<li><b>Draft incident timelines and postmortems</b> from chat messages and alerts (<a href="#ch115">Chapter 115</a> covers root-cause analysis).</li>
+<li><b>Write and update runbooks</b>, the step-by-step guides for handling known problems.</li>
+<li><b>Watch for change.</b> In Claude Code, <code>/loop</code> re-runs a prompt on an interval while the session is open, for example <code>/loop 5m check if the deploy finished</code>; <code>/schedule</code> creates cloud scheduled tasks.</li>
+</ul>
+<p>What operations learns feeds back into planning: a recurring incident becomes a story, and its postmortem becomes test cases. This loop is where QA, development and operations meet.</p>
+<div class="box warn"><span class="tag">Production is different</span><p>Giving an AI agent write access to production systems is a high-risk decision. Start with read-only access to logs and dashboards, and apply the supervision design in <a href="#ch113">Chapter 113</a> before allowing any action.</p></div>
+
+<h3 id="ch114-9"><span class="num">114.9</span>How roles change</h3>
+<p>No role disappears in this picture, but the balance of each role's work shifts from producing to directing and checking.</p>
+<div class="tbl"><table>
+<tr><th>Role</th><th>Less time on</th><th>More time on</th></tr>
+<tr><td>Developer</td><td>Typing routine code, looking up syntax</td><td>Specifying tasks, reviewing AI changes, architecture, keeping changes small</td></tr>
+<tr><td>Tester / QA engineer</td><td>Writing boilerplate test code, test data, repetitive regression</td><td>Risk analysis, early story review, exploratory testing, checking AI output, evals</td></tr>
+<tr><td>Product owner / BA</td><td>First drafts of stories and documents</td><td>Clarifying intent, acceptance criteria, saying what not to build</td></tr>
+<tr><td>Operations / SRE</td><td>Searching logs by hand, writing first drafts of postmortems</td><td>Incident judgement, supervising agents, reliability design</td></tr>
+<tr><td>Engineering manager</td><td>Status chasing</td><td>Setting AI policy, measuring outcomes honestly, coaching review skills</td></tr>
+</table></div>
+<div class="box opinion"><span class="tag">Opinion · widely argued by engineering leaders</span><p>Many engineering leaders argue that the most valuable skill in an AI-assisted team becomes judgement: knowing what good looks like, and noticing when output is plausible but wrong. Testers have practised exactly that for years. On this view, QA experience becomes more valuable, not less. It's a view, not a measured result, and it depends on testers moving towards risk and review work (<a href="#ch118">Chapter 118</a>).</p></div>
+
+<h3 id="ch114-10"><span class="num">114.10</span>Risks across the lifecycle</h3>
+<div class="tbl"><table>
+<tr><th>Risk</th><th>What it looks like</th><th>Control</th></tr>
+<tr><td>Unchecked output</td><td>AI code, tests or notes merged without real review</td><td>Human approval on merges; small PRs; review checklists</td></tr>
+<tr><td>Review overload</td><td>Reviewers rubber-stamp because the queue is too long</td><td>Limit PR size; AI first-pass review; track review time</td></tr>
+<tr><td>Weak tests</td><td>Tests that pass but assert nothing important</td><td>"Prove it can fail"; mutation checks; tester review of assertions</td></tr>
+<tr><td>Security flaws</td><td>Injection, secrets in code, unsafe dependencies</td><td><code>/security-review</code>; secret scanning; dependency checks</td></tr>
+<tr><td>Data leakage</td><td>Customer data or secrets pasted into tools</td><td>Approved tools only; data rules; commercial plans (<a href="#ch132">Chapter 132</a>)</td></tr>
+<tr><td>Skill erosion</td><td>People stop understanding the code they ship</td><td>Ask for explanations; rotate who reviews; pair on hard parts</td></tr>
+<tr><td>Over-autonomous agents</td><td>An agent takes actions nobody approved</td><td>Permission rules, staged rollout (<a href="#ch113">Chapter 113</a>)</td></tr>
+</table></div>
+
+<h3 id="ch114-11"><span class="num">114.11</span>Measuring whether AI is helping</h3>
+<p>The tempting measures are the wrong ones: lines of code written by AI, number of suggestions accepted, prompts per day. They measure activity, not results, and they're easy to inflate (Goodhart's law, <a href="#ch126">Chapter 126</a>). Measure the delivery system instead.</p>
+<p>The DORA research programme (now part of Google Cloud) has studied software delivery performance for over a decade. Its current guide lists five <a class="gl" href="#g-dora-metrics">software delivery metrics</a>:</p>
+<div class="tbl"><table>
+<tr><th>Group</th><th>Metric</th><th>Definition (from DORA)</th></tr>
+<tr><td rowspan="3">Throughput</td><td>Change lead time</td><td>Time from committing a change to it being deployed to production</td></tr>
+<tr><td>Deployment frequency</td><td>How often deployments happen</td></tr>
+<tr><td>Failed deployment recovery time</td><td>How long it takes to recover from a failed deployment that needs immediate intervention</td></tr>
+<tr><td rowspan="2">Instability</td><td>Change fail rate</td><td>Share of deployments that need immediate intervention, such as a rollback or hotfix</td></tr>
+<tr><td>Deployment rework rate</td><td>Share of deployments that are unplanned and result from a production incident</td></tr>
+</table></div>
+<p>If AI really helps, throughput should improve <em>without</em> instability getting worse. Pair the DORA metrics with a few lifecycle-specific ones: review time per PR, questions found in refinement, escaped defects, and the QA measures in <a href="#ch126">Chapter 126</a>.</p>
+<div class="box example"><span class="tag">Research example: feelings are not measurements</span><p>In July 2025 the research group METR published a randomised study of 16 experienced open-source developers working on 246 real issues in their own large repositories. With AI tools allowed, they took 19% longer on average. Before the study they expected a 24% speed-up, and afterwards they still believed AI had sped them up by about 20%. METR has since said those results are out of date and published a follow-up study in February 2026 covering late-2025 tools. The lasting lesson isn't "AI is slow" or "AI is fast"; it's that people's impression of their own speed can be wrong in either direction, so measure.</p></div>
+<div class="box note"><span class="tag">Start with a baseline</span><p>Record your current numbers before rolling AI out across the lifecycle. Without a "before", no "after" means anything (<a href="#ch126">Chapter 126</a>).</p></div>
+
+<div class="lab"><div class="lab-h"><b>One story through the whole lifecycle</b><span>40 min · Claude Code + git + Python 3, a practice folder</span></div>
+<p><b>Setup.</b> Create a tiny practice project:</p>
+<div class="code"><span class="cap">Terminal</span><pre>mkdir lifecycle-lab &amp;&amp; cd lifecycle-lab &amp;&amp; git init</pre></div>
+<div class="code"><span class="cap">pricing.py</span><pre>"""Basket pricing for the practice shop."""
+
+COUPONS = {"SAVE10": 10, "SAVE25": 25}  # percent off
+
+
+def basket_total(prices, coupon=None):
+    """Return the basket total in pence after an optional coupon."""
+    total = sum(prices)
+    if coupon:
+        percent = COUPONS.get(coupon.upper())
+        if percent is None:
+            raise ValueError(f"Unknown coupon: {coupon}")
+        total = total - total * percent // 100
+    return total</pre></div>
+<div class="code"><span class="cap">test_pricing.py</span><pre>import unittest
+from pricing import basket_total
+
+
+class BasketTotalTests(unittest.TestCase):
+    def test_no_coupon(self):
+        self.assertEqual(basket_total([1000, 500]), 1500)
+
+    def test_save10(self):
+        self.assertEqual(basket_total([1000, 500], "SAVE10"), 1350)
+
+    def test_unknown_coupon(self):
+        with self.assertRaises(ValueError):
+            basket_total([1000], "BOGUS")
+
+
+if __name__ == "__main__":
+    unittest.main()</pre></div>
+<div class="code"><span class="cap">Terminal</span><pre>python3 -m unittest -v
+git add . &amp;&amp; git commit -m "Initial pricing module"</pre></div>
+<ol>
+<li>Confirm the starting point.<span class="expect"><code>Ran 3 tests</code> and <code>OK</code>, then a first commit.</span></li>
+<li><b>Plan.</b> Start <code>claude</code>. Paste the story "SAVE25 only applies to baskets of £50 or more" and use the refinement prompt from 113.2.<span class="expect">questions such as: is £50 measured before or after other discounts; exactly £50 included; what message does the shopper see; and Given/When/Then criteria.</span></li>
+<li>Decide the answers yourself (for example: total before discount, £50.00 included, raise <code>ValueError</code> with a clear message). Ask Claude to save the story and criteria as <code>docs/story-save25.md</code>.<span class="expect">a short Markdown file with your decisions, not Claude's guesses.</span></li>
+<li><b>Design.</b> Switch to plan mode (Shift+Tab until the status bar shows plan mode) and ask: "Plan how to implement this story in pricing.py, including tests. Don't edit yet."<span class="expect">a plan naming the threshold constant, the check and the new tests. Approve it only if it matches your decisions.</span></li>
+<li><b>Code and test.</b> Let Claude implement and run <code>python3 -m unittest -v</code>.<span class="expect">new tests for 4999 pence (rejected), 5000 (accepted) and above; all tests pass.</span></li>
+<li>Prove a test can fail: ask Claude to change the threshold to 6000 temporarily, run the tests, then revert.<span class="expect">the 5000-pence test fails with a clear message; after reverting, everything passes.</span></li>
+<li><b>Review.</b> Run <code>/code-review</code> on your uncommitted changes.<span class="expect">a list of findings, possibly none for such a small change. Read each one and decide whether you agree.</span></li>
+<li><b>Release.</b> Commit, then ask: "Draft a customer-facing release note and a three-line release-readiness summary for this change."<span class="expect">a plain-language note ("SAVE25 now needs a basket of £50 or more") and a summary listing tests run and residual risks.</span></li>
+<li><b>Operate.</b> Ask: "Imagine support reports shoppers confused by the SAVE25 error. Draft a runbook entry and a follow-up story."<span class="expect">a short runbook entry and a new story, closing the loop back to Plan.</span></li>
+</ol>
+<p><b>Troubleshooting.</b> <code>No module named pricing</code>: run the tests from the <code>lifecycle-lab</code> folder. Plan mode not reachable: type <code>/plan</code> instead. <code>/code-review</code> reports nothing: that's normal for tiny diffs; try it on a larger change later. Claude changes behaviour you didn't decide: reject the edit and point it at <code>docs/story-save25.md</code>.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"AI in software development means AI writing code."</dt><dd>Coding is one stage of seven. Planning, review, testing and operations often gain as much or more.</dd>
+<dt>"If developers are faster, the team is faster."</dt><dd>Only if review, testing and release keep up. Otherwise the queue just moves.</dd>
+<dt>"Percentage of code written by AI is a good success metric."</dt><dd>It measures activity. Use delivery and quality measures such as the DORA metrics and escaped defects.</dd>
+<dt>"We felt more productive, so it worked."</dt><dd>Feelings and measurements can disagree, as METR's 2025 study showed. Compare against a baseline.</dd>
+</dl></div>
+
+<h3 id="ch114-r"><span class="num">114.12</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>The lifecycle has seven stages: plan, design, code, review, test, release, operate. AI helps at each in a different way.</li>
+<li>Planning is the cheapest place to use AI: find ambiguity and draft acceptance criteria before code exists.</li>
+<li>Design with AI as a sparring partner; people choose and own decisions, recorded in decision records.</li>
+<li>Faster coding makes review and testing the bottleneck; use <code>/code-review</code>, <code>/security-review</code> and strong automated tests.</li>
+<li>Release and operations work (notes, readiness summaries, logs, postmortems) suits AI drafting with human sign-off.</li>
+<li>Roles shift from producing to directing and checking; testers' judgement becomes central.</li>
+<li>Measure delivery with the five DORA metrics and quality measures, against a baseline, not with AI activity counts.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">A team doubles coding speed with AI but sees no change in delivery speed. What's the most likely reason?</p><div class="opts"><button>The model is too small</button><button data-ok>The bottleneck moved to review, testing or release</button><button>They didn't use enough prompts</button></div><p class="why" hidden>Speeding up one stage only helps if the stages after it can keep up.</p></div>
+<div class="qz"><p class="q">Which is the cheapest stage at which to catch an ambiguous requirement?</p><div class="opts"><button data-ok>Planning, during story refinement</button><button>Code review</button><button>Production operations</button></div><p class="why" hidden>Fixing a sentence in a story costs minutes; fixing behaviour in production costs far more.</p></div>
+<div class="qz"><p class="q">Which of these is one of DORA's software delivery metrics?</p><div class="opts"><button>Lines of code written by AI</button><button data-ok>Change fail rate</button><button>Prompts per developer per day</button></div><p class="why" hidden>DORA measures delivery outcomes: lead time, deployment frequency, recovery time, change fail rate and rework rate.</p></div>
+<div class="qz"><p class="q">In a CI job with nobody watching, which permission mode makes Claude Code deny anything not pre-approved?</p><div class="opts"><button>bypassPermissions</button><button>acceptEdits</button><button data-ok>dontAsk</button></div><p class="why" hidden><code>dontAsk</code> fails closed: actions that would need a prompt are denied. Bypass skips checks entirely.</p></div>
+<div class="qz"><p class="q">What was the main lesson of METR's July 2025 developer study?</p><div class="opts"><button>AI always makes developers slower</button><button data-ok>Developers' impressions of their own speed-up can differ from measured results</button><button>AI tools are useless for open-source work</button></div><p class="why" hidden>Developers believed they were about 20% faster while measured times were 19% longer. METR says the results are now out of date; the lesson is to measure.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Draw your team's real lifecycle as a flow (it may have more or fewer stages than seven). For each stage, write: where AI is used today, one new use worth trying, the main risk and its control, and who owns sign-off. Then choose two DORA metrics and one QA metric, find your current values (your baseline), and agree with your manager how you'll track them for the next three months.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Every change goes through plan, design, code, review, test, release and operate. AI can help at each step: spotting gaps in stories, comparing designs, writing code, first-pass reviews, tests, release notes and reading logs. If you only speed up coding, the work just piles up at review and testing. So use it across the whole flow, keep people deciding at each step, and measure delivery, not how much code the AI wrote."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>DORA, <a href="https://dora.dev/guides/dora-metrics/" target="_blank" rel="noopener">DORA's software delivery metrics guide</a>.</li>
+<li>METR, <a href="https://metr.org/blog/2025-07-10-early-2025-ai-experienced-os-dev-study/" target="_blank" rel="noopener">Measuring the impact of early-2025 AI on experienced open-source developer productivity</a> (10 July 2025), and METR's later follow-up linked from that page.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/commands" target="_blank" rel="noopener">Claude Code commands</a> (<code>/code-review</code>, <code>/security-review</code>, <code>/plan</code>, <code>/loop</code>, <code>/schedule</code>).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/cli-reference" target="_blank" rel="noopener">CLI reference</a> (<code>-p</code>, <code>--permission-mode</code>, <code>--allowedTools</code>) and <a href="https://code.claude.com/docs/en/permission-modes" target="_blank" rel="noopener">permission modes</a>.</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/github-actions" target="_blank" rel="noopener">Claude Code GitHub Actions</a>.</li>
+</ol><p class="verified">Verified 9 November 2026 against Claude Code 2.1.319 documentation, the DORA metrics guide and METR's study page. Lab code tested with Python 3.</p></div>

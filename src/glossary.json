@@ -1,0 +1,289 @@
+{
+ "Activation function": {
+  "d": "A small rule inside each artificial neuron that decides how strongly it passes its signal on. It lets networks learn curved, complicated patterns instead of only straight lines.",
+  "see": "ch11"
+ },
+ "Agent": {
+  "d": "An AI system that works towards a goal by repeatedly deciding what to do, using tools (reading files, searching, running commands) and checking the results, rather than giving one answer and stopping.",
+  "see": "ch107"
+ },
+ "AGI": {
+  "d": "Artificial general intelligence: a hypothetical AI that could learn and perform almost any intellectual task a person can. No agreed definition or test exists, and no current system is generally accepted as AGI.",
+  "see": "ch1"
+ },
+ "Algorithm": {
+  "d": "A precise, step-by-step set of instructions for solving a problem, like a recipe a computer can follow."
+ },
+ "AI winter": {
+  "d": "A period when disappointment with AI led to big cuts in funding and interest. There were two major ones, in the mid-1970s and the late 1980s to early 1990s.",
+  "see": "ch4"
+ },
+ "API": {
+  "d": "Application programming interface: a defined way for one program to ask another program to do something. The Claude API lets your software send messages to Claude and receive replies.",
+  "see": "ch85"
+ },
+ "Artifact": {
+  "d": "In the Claude apps, a piece of content Claude creates in a panel beside the chat, such as a document, web page, diagram or small app, which you can view, use and share.",
+  "see": "ch48"
+ },
+ "Artificial intelligence": {
+  "d": "The field of building computer systems that do things we'd normally say need intelligence, such as understanding language, recognising images, solving problems or making decisions.",
+  "see": "ch1"
+ },
+ "Attention": {
+  "d": "The mechanism inside a Transformer that lets each word (token) look at every other word in the text and decide which ones matter most for understanding it.",
+  "see": "ch16"
+ },
+ "Backpropagation": {
+  "d": "The method neural networks use to learn: after a wrong answer, it works backwards through the network to calculate how much each connection contributed to the error, so each can be adjusted slightly.",
+  "see": "ch12"
+ },
+ "Benchmark": {
+  "d": "A standard test used to compare AI models, such as a fixed set of exam questions or coding problems. Useful, but easy to over-trust.",
+  "see": "ch24"
+ },
+ "Binary": {
+  "d": "A way of writing numbers using only two digits, 0 and 1. Computers store and process everything (text, pictures, sound) as binary.",
+  "see": "ch2"
+ },
+ "Bit": {
+  "d": "The smallest unit of information: a single 0 or 1. Eight bits make a byte.",
+  "see": "ch2"
+ },
+ "Chatbot": {
+  "d": "A program you talk to in ordinary language. Early chatbots followed scripted rules; modern ones are powered by large language models.",
+  "see": "ch6"
+ },
+ "CLAUDE.md": {
+  "d": "A plain text file of instructions that Claude Code reads at the start of every session, used to tell it how a project works and what rules to follow.",
+  "see": "ch77"
+ },
+ "Claude Code": {
+  "d": "Anthropic's agentic coding tool. It runs in your terminal, code editor, desktop app or browser, and can read files, edit them and run commands to complete tasks.",
+  "see": "ch63"
+ },
+ "CLI": {
+  "d": "Command-line interface: a way of using a program by typing commands rather than clicking buttons. Claude Code is a CLI program.",
+  "see": "ch52"
+ },
+ "Compute": {
+  "d": "Computing power: how many calculations can be done, usually provided by specialised chips such as GPUs. Modern AI needs enormous amounts of it.",
+  "see": "ch25"
+ },
+ "Constitutional AI": {
+  "d": "Anthropic's method of training an AI to follow a written set of principles (a 'constitution'), partly by having the AI critique and improve its own answers against those principles.",
+  "see": "ch18"
+ },
+ "Context window": {
+  "d": "The total amount of text, measured in tokens, that a model can consider at one time: your messages, its replies, files and instructions. Anything outside it is invisible to the model.",
+  "see": "ch20"
+ },
+ "Dataset": {
+  "d": "A collection of examples used to train or test an AI model, such as millions of labelled photos or a large body of text.",
+  "see": "ch13"
+ },
+ "Deep learning": {
+  "d": "Machine learning using neural networks with many layers. The 'deep' refers to the number of layers. It powers modern speech recognition, image recognition and language models.",
+  "see": "ch5"
+ },
+ "Embedding": {
+  "d": "A list of numbers that represents the meaning of a piece of text (or an image), arranged so that similar meanings get similar numbers.",
+  "see": "ch15"
+ },
+ "Expert system": {
+  "d": "A 1970s–80s style of AI built from hundreds or thousands of hand-written if-then rules captured from human experts.",
+  "see": "ch4"
+ },
+ "Fine-tuning": {
+  "d": "Further training an already-trained model on a smaller, specialised set of examples to change or improve its behaviour for particular tasks.",
+  "see": "ch18"
+ },
+ "Generative AI": {
+  "d": "AI that creates new content, such as text, images, audio, video or code, rather than only classifying or predicting from existing data.",
+  "see": "ch7"
+ },
+ "GPU": {
+  "d": "Graphics processing unit: a chip originally designed for video-game graphics that turned out to be ideal for the huge numbers of simple calculations AI needs.",
+  "see": "ch25"
+ },
+ "Gradient descent": {
+  "d": "The step-by-step method used to improve a model during training: repeatedly nudging its settings in whichever direction reduces its error, like walking downhill in fog by feeling the slope.",
+  "see": "ch12"
+ },
+ "Hallucination": {
+  "d": "When an AI produces information that sounds confident and plausible but is wrong or made up.",
+  "see": "ch22"
+ },
+ "Hook": {
+  "d": "In Claude Code, a command or check that runs automatically at a set moment, such as before a tool runs or after a file is edited.",
+  "see": "ch82"
+ },
+ "Inference": {
+  "d": "Using a trained model to produce an answer. Training is learning; inference is answering.",
+  "see": "ch25"
+ },
+ "Knowledge cutoff": {
+  "d": "The date after which a model has no information from its training data. It may not know about events after that date unless given a search tool or the information directly.",
+  "see": "ch20"
+ },
+ "Large language model": {
+  "d": "An AI model trained on a very large amount of text to predict and generate language. Claude, GPT and Gemini are large language models (LLMs).",
+  "see": "ch17"
+ },
+ "Layer": {
+  "d": "A stage in a neural network. Information passes through layer after layer, each transforming it a little more.",
+  "see": "ch11"
+ },
+ "LLM": {
+  "d": "Short for large language model.",
+  "see": "ch17"
+ },
+ "Machine learning": {
+  "d": "A way of building AI where the computer learns patterns from examples instead of following rules a person wrote by hand.",
+  "see": "ch5"
+ },
+ "MCP": {
+  "d": "Model Context Protocol: an open standard, introduced by Anthropic in 2024, for connecting AI applications to outside tools and data such as calendars, databases or a web browser.",
+  "see": "ch97"
+ },
+ "Model": {
+  "d": "The trained AI system itself: a very large set of learned numbers plus the program that uses them to turn input into output.",
+  "see": "ch9"
+ },
+ "Moore's law": {
+  "d": "Gordon Moore's 1965 observation that the number of transistors on a chip was doubling at a regular pace (later settled at about every two years), making computers steadily more powerful and cheaper.",
+  "see": "ch2"
+ },
+ "Multimodal": {
+  "d": "Able to work with more than one kind of input or output, such as text and images together.",
+  "see": "ch21"
+ },
+ "Natural language processing": {
+  "d": "The branch of AI concerned with understanding and producing human language. Often shortened to NLP.",
+  "see": "ch6"
+ },
+ "Neural network": {
+  "d": "A computer system loosely inspired by the brain, made of many simple connected units ('neurons') whose connection strengths are adjusted during training.",
+  "see": "ch11"
+ },
+ "Neuron": {
+  "d": "In AI, a tiny calculation that takes in numbers, weighs each one, adds them up and passes on a result. Millions or billions of them make up a neural network.",
+  "see": "ch11"
+ },
+ "Open-weight model": {
+  "d": "A model whose trained weights are published so anyone can download and run it, such as Meta's Llama. Different from 'open source', which would also include training code and data.",
+  "see": "ch32"
+ },
+ "Parameter": {
+  "d": "One of the numbers inside a model that is adjusted during training. Large models have billions of parameters. Also called a weight.",
+  "see": "ch11"
+ },
+ "Perceptron": {
+  "d": "An early artificial neuron that could learn simple yes/no decisions from examples, built by Frank Rosenblatt in 1958.",
+  "see": "ch3"
+ },
+ "Pre-training": {
+  "d": "The first and largest stage of training a language model, in which it learns from a huge amount of general text by repeatedly predicting the next token.",
+  "see": "ch17"
+ },
+ "Prompt": {
+  "d": "The input you give an AI model: your question, instructions and any material you include.",
+  "see": "ch44"
+ },
+ "Prompt engineering": {
+  "d": "The skill of writing instructions and context so that an AI produces the result you want.",
+  "see": "ch44"
+ },
+ "Prompt injection": {
+  "d": "An attack where text hidden inside content the AI reads (a web page, email or document) tries to give the AI new instructions.",
+  "see": "ch131"
+ },
+ "RAG": {
+  "d": "Retrieval-augmented generation: looking up relevant documents first and giving them to the model along with the question, so its answer is based on those sources.",
+  "see": "ch23"
+ },
+ "Reasoning model": {
+  "d": "A model trained to work through a problem step by step before giving its final answer, spending extra time 'thinking' on hard questions.",
+  "see": "ch19"
+ },
+ "Reinforcement learning": {
+  "d": "A way of learning by trial and error: the system tries actions and is rewarded or penalised, gradually learning what works.",
+  "see": "ch10"
+ },
+ "RLHF": {
+  "d": "Reinforcement learning from human feedback: improving a model by having people rate its answers and training it to produce the kinds of answers people prefer.",
+  "see": "ch18"
+ },
+ "Self-attention": {
+  "d": "Attention where the words in a piece of text look at each other (rather than at a separate text). It's the core operation of the Transformer.",
+  "see": "ch16"
+ },
+ "Skill": {
+  "d": "In Claude, a packaged set of instructions (and optionally files and scripts) for a particular kind of task, which Claude loads when relevant or when you call it by name.",
+  "see": "ch80"
+ },
+ "Subagent": {
+  "d": "In Claude Code, a helper agent with its own separate context that the main agent can hand a task to, receiving back only the result.",
+  "see": "ch81"
+ },
+ "Supervised learning": {
+  "d": "Learning from labelled examples, where each example comes with the correct answer, such as photos labelled 'cat' or 'dog'.",
+  "see": "ch10"
+ },
+ "Symbolic AI": {
+  "d": "The early approach to AI based on writing explicit rules and logic for the computer to follow, using symbols that stand for things in the world.",
+  "see": "ch3"
+ },
+ "System prompt": {
+  "d": "Instructions given to a model before the conversation starts, setting its role, rules and style. Usually hidden from the person chatting.",
+  "see": "ch87"
+ },
+ "Temperature": {
+  "d": "How much randomness a model uses when picking each next word: lower is more predictable, higher is more varied. Many AI APIs let developers set it, but Anthropic's API removed the setting in API version 2026-10-21 (Chapter 83).",
+  "see": "ch17"
+ },
+ "Terminal": {
+  "d": "A window where you type text commands for the computer to run, instead of clicking icons.",
+  "see": "ch52"
+ },
+ "Token": {
+  "d": "A small chunk of text, often a whole short word or part of a longer one, that a language model reads and writes. In English a token is on average roughly three-quarters of a word.",
+  "see": "ch14"
+ },
+ "Tokenizer": {
+  "d": "The part of a language model system that splits text into tokens and turns each one into a number the model can process.",
+  "see": "ch14"
+ },
+ "Tool use": {
+  "d": "A model's ability to ask the application around it to perform an action (search the web, read a file, run code) and use the result.",
+  "see": "ch89"
+ },
+ "Training": {
+  "d": "The process of adjusting a model's parameters using example data until it performs a task well.",
+  "see": "ch12"
+ },
+ "Transformer": {
+  "d": "The neural network design, introduced by Google researchers in 2017, that underlies modern language models. Its key idea is attention.",
+  "see": "ch16"
+ },
+ "Transistor": {
+  "d": "A tiny electronic switch, invented in 1947, that is the basic building block of all modern computer chips.",
+  "see": "ch2"
+ },
+ "Turing Test": {
+  "d": "Alan Turing's 1950 proposal for judging machine intelligence: if a judge chatting by text can't reliably tell the machine from a person, the machine passes.",
+  "see": "ch3"
+ },
+ "Unsupervised learning": {
+  "d": "Learning patterns from data that has no labels, such as grouping similar customers together without being told what the groups are.",
+  "see": "ch10"
+ },
+ "Vector": {
+  "d": "An ordered list of numbers. In AI, vectors are used to represent things such as words, images or meanings.",
+  "see": "ch15"
+ },
+ "Weight": {
+  "d": "A number that sets how strongly one neuron's output influences the next. Training means finding good weights.",
+  "see": "ch11"
+ }
+}

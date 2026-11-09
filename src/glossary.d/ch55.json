@@ -1,0 +1,54 @@
+{
+ "Regular expression": {
+  "d": "A compact pattern language for describing text, such as [0-9]* for 'any run of digits'. Tools like grep, editors and most programming languages use it to search and extract text. Often shortened to regex.",
+  "see": "ch55"
+ },
+ "Standard input": {
+  "d": "Stream 0 (stdin): the channel a command-line program reads input from. Normally your keyboard, but a pipe or < can connect it to another program or a file.",
+  "see": "ch55"
+ },
+ "Standard output": {
+  "d": "Stream 1 (stdout): the channel a command-line program writes its normal results to. Normally your screen, but > sends it to a file and | to another program.",
+  "see": "ch55"
+ },
+ "Standard error": {
+  "d": "Stream 2 (stderr): a separate channel programs use for error and warning messages, so they don't mix with the real results. Redirected with 2>.",
+  "see": "ch55"
+ },
+ "Pipe": {
+  "d": "The | symbol in a terminal, which feeds the output of one command straight into the input of the next, as in grep ERROR app.log | wc -l.",
+  "see": "ch55"
+ },
+ "Redirection": {
+  "d": "Sending a command's input or output to a file instead of the keyboard or screen, using > (overwrite), >> (append), 2> (errors) or < (read from a file).",
+  "see": "ch55"
+ },
+ "Process": {
+  "d": "A program that is currently running. Each process has its own ID number and a parent process that started it; ps lists them and kill stops them.",
+  "see": "ch56"
+ },
+ "Process ID": {
+  "d": "The unique number (PID) the operating system gives each running process. You use it to inspect or stop that process, for example kill 4321.",
+  "see": "ch56"
+ },
+ "Background job": {
+  "d": "A command started with & at the end, so it keeps running while you get your prompt back. Managed with jobs, fg, bg and kill %N.",
+  "see": "ch56"
+ },
+ "File permissions": {
+  "d": "The rules stored with each file on macOS and Linux saying whether its owner, its group and everyone else may read (r), write (w) or execute (x) it. Shown by ls -l and changed with chmod.",
+  "see": "ch56"
+ },
+ "sudo": {
+  "d": "'Superuser do': runs a single command with administrator (root) rights after asking for your password. Powerful and risky; use only when you understand why it's needed.",
+  "see": "ch56"
+ },
+ "Shell script": {
+  "d": "A plain text file of shell commands that runs them in order as one program, with variables, conditions, loops and functions. Used to automate repeated tasks such as test runs.",
+  "see": "ch57"
+ },
+ "Shebang": {
+  "d": "The first line of a script, starting #!, naming the program that should run it, for example #!/usr/bin/env bash.",
+  "see": "ch57"
+ }
+}

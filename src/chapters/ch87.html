@@ -1,0 +1,367 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>Why the Claude API has no memory, and how a conversation is really a list of messages you send every time</li>
+<li>What belongs in the system prompt, and the newer rules about system messages and prefill</li>
+<li>How to read stop reasons in a chat application and react to each one</li>
+<li>How streaming works: server-sent events, the order of events, and what each one carries</li>
+<li>How to stream with the Python and TypeScript SDKs, and how to recover when a stream breaks</li>
+<li>How to build, test and extend a small command-line chat program in Python</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch86">Chapter 86</a> (your first Claude API call: keys, headers, request and response). <a href="#ch14">Chapter 14</a> (tokens) and <a href="#ch20">Chapter 20</a> (context windows) explain why long conversations cost more. You need Python 3.9 or newer and a virtual environment (<a href="#ch58">Chapter 58</a>). An API key is needed for the live parts; the streaming lab has an offline part that needs no key.</div>
+
+<div class="bigidea"><p>The Claude API doesn't remember anything between calls. A "conversation" is simply a list of messages, alternating <code>user</code> and <code>assistant</code>, that your program keeps and sends again with every request, together with a <a class="gl" href="#g-system-prompt">system prompt</a> that sets the rules. Each reply ends with a <a class="gl" href="#g-stop-reason">stop reason</a> that tells your code what to do next. <a class="gl" href="#g-streaming">Streaming</a> lets you show the answer as it's written, using <a class="gl" href="#g-server-sent-events">server-sent events</a>. Put these three ideas together and you can build a working chat program in about 70 lines of Python.</p></div>
+
+<h3 id="ch87-1"><span class="num">87.1</span>The API has no memory</h3>
+<p>When you chat on claude.ai, it feels as if Claude remembers what you said a minute ago. Underneath, the app is doing something simple: every time you press Enter, it sends the <em>whole conversation so far</em> to the model. The Messages API works the same way, and it leaves that job to you. Anthropic's documentation says it directly: the Messages API is <a class="gl" href="#g-stateless">stateless</a>, so "you always send the full conversational history to the API". <span class="vchip">Verified 9 Nov 2026</span></p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Imagine a brilliant consultant with no memory at all. Every time you phone, you read out the full transcript of all your earlier calls, then ask your new question. They answer perfectly, because the transcript is all they need. But each call gets longer, and you pay by the minute. That is exactly how a multi-turn API conversation works, and exactly why long chats get expensive.</p></div>
+<p>Here is a three-turn conversation as the API sees it. The third message is the new question; the first two are history your program kept.</p>
+<div class="code"><span class="cap">A multi-turn request body</span><pre>{
+  "model": "claude-opus-5-5",
+  "max_tokens": 1000,
+  "system": "You are a senior QA engineer. Reply concisely.",
+  "messages": [
+    {"role": "user",      "content": "Give boundary values for an age field accepting 18 to 65."},
+    {"role": "assistant", "content": "17, 18, 65 and 66. Also try 0, -1 and a non-number."},
+    {"role": "user",      "content": "Turn those into a table with expected results."}
+  ]
+}</pre></div>
+<p>Three things follow from this design:</p>
+<ul>
+<li><strong>You own the history.</strong> If your program forgets to append Claude's reply, the next turn won't know what Claude said. If you save the list to a file or database, you can resume a conversation days later.</li>
+<li><strong>You can edit the history.</strong> Earlier turns don't have to be real. The docs note that you can include "synthetic" assistant messages, which is useful in tests: you can start a conversation from any state you want to check.</li>
+<li><strong>Every turn re-sends everything.</strong> Input tokens grow with each turn, so turn 20 costs far more than turn 1. Section 87.8 covers what to do about it.</li>
+</ul>
+<div class="box note"><span class="tag">Message threads (beta)</span><p>Anthropic's docs also describe <strong>message threads</strong>, a beta feature where the API keeps the conversation so that later requests send only the new messages. A thread expires 5 minutes after its last request. This chapter uses the standard stateless pattern, which works everywhere and is what every SDK example assumes. Check the current docs before relying on a beta.</p></div>
+
+<h4>Content: a string or a list of blocks</h4>
+<p>A message's <code>content</code> can be a plain string, as above, or a list of <strong>content blocks</strong>, such as a text block and an image block in the same user message. Claude's replies always come back as a list of blocks (<a href="#ch86">Chapter 86</a>), and on current models that list can include <code>thinking</code> blocks before the text. The safest habit is to append Claude's reply to your history <strong>exactly as it came back</strong>, the whole <code>content</code> list, rather than copying out just the text. Chapter 89 shows why this matters for tool use, where the API requires the thinking blocks to be returned unchanged.</p>
+
+<h3 id="ch87-2"><span class="num">87.2</span>System prompts: the standing brief</h3>
+<p>The <code>system</code> field holds instructions that apply to the whole conversation: who Claude is in this application, the rules it follows, the format you want, and any background it needs. It is not part of the <code>messages</code> list; it's a separate top-level field.</p>
+<div class="tbl"><table>
+<tr><th>Put it in <code>system</code></th><th>Put it in a <code>user</code> message</th></tr>
+<tr><td>The role ("You are a QA analyst for the payments team")</td><td>The actual task or question for this turn</td></tr>
+<tr><td>Rules that never change ("Never invent test data that looks like real card numbers")</td><td>The user story, log file or document to work on</td></tr>
+<tr><td>Output format ("Each test case has a title, steps and expected result")</td><td>Anything the end user typed</td></tr>
+<tr><td>Product background every turn needs</td><td>Content from outside sources (and treat it as data: Chapter 88)</td></tr>
+</table></div>
+<p>Anthropic's prompting guide says that setting a role in the system prompt "focuses Claude's behavior and tone for your use case", and that even a single sentence makes a difference. It also recommends explaining <em>why</em> a rule exists, because Claude generalises from the explanation. "Keep answers under 200 words because they're shown in a narrow side panel" works better than "Be brief".</p>
+<div class="box example"><span class="tag">Real-world example: one app, two system prompts</span><p>A team builds an internal "test helper" chat. For testers, the system prompt says: "You help manual testers. Use plain language. Output test cases as numbered lists." For the automation squad, a second deployment says: "You help automation engineers using Playwright with TypeScript. Output runnable code using getByRole locators." Same model, same code, different behaviour, controlled entirely by the system prompt. Both prompts live in version control, so a change to either one is reviewed like a code change (Chapter 88).</p></div>
+<h4>Two newer rules worth knowing</h4>
+<ul>
+<li><strong>Mid-conversation system messages.</strong> On current models (including Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 5.5), you can add a message with <code>"role": "system"</code> <em>after</em> a user turn to give a new instruction partway through. It has the same authority as the top-level field. It can't be the first entry in <code>messages</code>: instructions that apply from the start still go in <code>system</code>. <span class="vchip">Verified 9 Nov 2026</span></li>
+<li><strong>No more <a class="gl" href="#g-prefill">prefill</a>.</strong> Older tutorials end the message list with a partial assistant message, such as <code>{"role": "assistant", "content": "{"}</code>, to force Claude to continue in a set format. Prefilling the last assistant turn is not supported on Claude 4.6 and later models: those requests return a 400 error. Use structured outputs (Chapter 89) or clear instructions instead.</li>
+</ul>
+<div class="box warn"><span class="tag">The system prompt is not a secret vault</span><p>Don't put API keys, passwords or confidential data in a system prompt. Determined users can sometimes coax a model into revealing its instructions, and the prompt is sent (and possibly logged) with every request. Keep secrets in your code's environment, and give the model only what it needs (Chapter 88 covers least privilege).</p></div>
+
+<h3 id="ch87-3"><span class="num">87.3</span>Stop reasons in a chat application</h3>
+<p>Every successful reply has a <code>stop_reason</code> field explaining why Claude stopped writing. <a href="#ch86">Chapter 86</a> listed them all. In a chat program, each one calls for a different reaction. Anthropic's guide stresses one point that surprises people: stop reasons are <strong>not errors</strong>. They arrive in a normal HTTP 200 response; real errors are 4xx and 5xx status codes.</p>
+<div class="tbl"><table>
+<tr><th><code>stop_reason</code></th><th>What your chat program should do</th></tr>
+<tr><td><code>end_turn</code></td><td>Show the reply and append it to the history. The normal case.</td></tr>
+<tr><td><code>max_tokens</code></td><td>Show the reply but warn the user it was cut off. Consider raising <code>max_tokens</code>.</td></tr>
+<tr><td><code>stop_sequence</code></td><td>Only happens if you set <code>stop_sequences</code>. Check which one in the <code>stop_sequence</code> field.</td></tr>
+<tr><td><code>refusal</code></td><td>Claude declined. <code>stop_details</code> names the policy category. Show a polite message; don't keep retrying the same text.</td></tr>
+<tr><td><code>model_context_window_exceeded</code></td><td>The conversation filled the context window. Treat the reply as truncated, then shorten the history (87.8).</td></tr>
+<tr><td><code>tool_use</code>, <code>pause_turn</code></td><td>Only when you use tools (Chapter 89).</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example: testing an AI chat feature</span><p>When you test any chat feature built on the API, add one test case per stop reason. Can you make it hit <code>max_tokens</code> (ask for a very long answer with a small cap)? Does the UI say the answer was cut off, or does it silently end mid-sentence? What happens after a refusal: is the refused message kept in the history, poisoning every later turn? These are cheap tests that catch real bugs.</p></div>
+
+<h3 id="ch87-4"><span class="num">87.4</span>Why stream?</h3>
+<p>Without streaming, your program sends a request and waits, showing nothing, until Claude has written the entire answer. For a long answer, with thinking first, that can take many seconds. <a class="gl" href="#g-streaming">Streaming</a> sends the answer in small pieces as it's generated, so the user sees words appear almost at once, the way claude.ai does.</p>
+<div class="cols2">
+<div><h4>Without streaming</h4><ul><li>One request, one complete JSON response</li><li>Simple code</li><li>The user stares at a spinner</li><li>Very long requests risk HTTP timeouts</li></ul></div>
+<div><h4>With streaming</h4><ul><li>One request, many small events</li><li>A little more code (the SDK hides most of it)</li><li>The first words appear quickly</li><li>Long generations stay alive; the docs note the SDKs <em>require</em> streaming for large <code>max_tokens</code> values to avoid timeouts</li></ul></div>
+</div>
+<p>Streaming doesn't make Claude finish faster overall, and it doesn't cost more: you pay for the same tokens either way. It improves <a class="gl" href="#g-time-to-first-token">time to first token</a>, the delay before anything appears, which is what users feel.</p>
+
+<h3 id="ch87-5"><span class="num">87.5</span>How streaming works: server-sent events</h3>
+<p>To stream, add <code>"stream": true</code> to the request body. The response is no longer one JSON object. It's a series of <a class="gl" href="#g-server-sent-events">server-sent events</a> (SSE): a simple web standard where the server keeps the connection open and writes short text messages, one after another. Each event has a name line and a data line holding JSON, followed by a blank line. <span class="vchip">Verified 9 Nov 2026</span></p>
+<div class="code"><span class="cap">Terminal: watch a raw stream (-N stops curl buffering the output)</span><pre>curl https://api.anthropic.com/v1/messages -N \
+  -H "content-type: application/json" \
+  -H "Authorization: Bearer $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2026-10-21" \
+  -d '{
+    "model": "claude-opus-5-5",
+    "max_tokens": 1000,
+    "stream": true,
+    "messages": [{"role": "user", "content": "Give four boundary values for an age field accepting 18 to 65."}]
+  }'</pre></div>
+<p>Every stream follows the same order, documented by Anthropic:</p>
+<div class="flow"><div><b>message_start</b>A Message object with empty content and starting usage</div><div class="hl"><b>Content blocks</b>For each block: content_block_start, one or more content_block_delta, content_block_stop</div><div><b>message_delta</b>Top-level changes: the stop_reason and the output token count</div><div><b>message_stop</b>The end</div></div>
+<p>Here is a short, real-format stream, trimmed from the example in Anthropic's streaming guide (only the text values are changed):</p>
+<div class="code"><span class="cap">stream.txt: a raw SSE stream</span><pre>event: message_start
+data: {"type": "message_start", "message": {"id": "msg_01ABC", "type": "message", "role": "assistant", "content": [], "model": "claude-opus-5-5", "stop_reason": null, "stop_sequence": null, "usage": {"input_tokens": 25, "output_tokens": 1}}}
+
+event: content_block_start
+data: {"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}}
+
+event: ping
+data: {"type": "ping"}
+
+event: content_block_delta
+data: {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": "Test 17, 18, 65"}}
+
+event: content_block_delta
+data: {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": " and 66."}}
+
+event: content_block_stop
+data: {"type": "content_block_stop", "index": 0}
+
+event: message_delta
+data: {"type": "message_delta", "delta": {"stop_reason": "end_turn", "stop_sequence": null}, "usage": {"output_tokens": 15}}
+
+event: message_stop
+data: {"type": "message_stop"}</pre></div>
+<h4>Reading the events</h4>
+<div class="tbl"><table>
+<tr><th>Event</th><th>What it carries</th><th>What your code does</th></tr>
+<tr><td><code>message_start</code></td><td>Message ID, model, input token count; <code>stop_reason</code> is <code>null</code> here</td><td>Note the input tokens</td></tr>
+<tr><td><code>content_block_start</code></td><td>The block's <code>index</code> and type (<code>text</code>, <code>thinking</code>, <code>tool_use</code>)</td><td>Start a new block</td></tr>
+<tr><td><code>content_block_delta</code></td><td>A small piece: <code>text_delta</code> for text, <code>thinking_delta</code> and <code>signature_delta</code> for thinking, <code>input_json_delta</code> for tool inputs</td><td>Append the piece to the block at that index (print text pieces)</td></tr>
+<tr><td><code>content_block_stop</code></td><td>The block is complete</td><td>For tool inputs, parse the collected JSON now</td></tr>
+<tr><td><code>message_delta</code></td><td>The <code>stop_reason</code> and <code>usage</code></td><td>Read the stop reason; output token counts here are <strong>cumulative</strong>, not increments</td></tr>
+<tr><td><code>message_stop</code></td><td>Nothing more</td><td>Finish</td></tr>
+<tr><td><code>ping</code></td><td>Nothing; keeps the connection alive</td><td>Ignore</td></tr>
+<tr><td><code>error</code></td><td>An error mid-stream, for example <code>overloaded_error</code> (which would be HTTP 529 without streaming)</td><td>Stop, and retry or report</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Expect the unexpected</span><p>Anthropic's versioning policy allows it to add new event types at any time, and the streaming guide says your code "should handle unknown event types gracefully". In practice: ignore any event you don't recognise instead of crashing. That's also a good negative test for any stream parser your team writes.</p></div>
+<details class="deep"><summary>Under the hood: parsing SSE yourself</summary><div class="body">
+<p>You'll rarely need to parse SSE by hand, because the SDKs do it. But writing a tiny parser once makes the format concrete, and it's useful for testing: you can save a stream to a file and replay it. The rules are simple. A line starting <code>event:</code> names the event. A line starting <code>data:</code> carries the payload. A blank line ends the event. This script rebuilds the reply from a saved stream and ignores pings and unknown events.</p>
+<div class="code"><span class="cap">parse_sse.py (standard library only; tested offline)</span><pre>"""parse_sse.py: rebuild Claude's reply from a saved raw SSE stream."""
+import json
+import sys
+
+
+def events(lines):
+    """Yield (event_name, data_dict) pairs from SSE lines."""
+    name, data = None, []
+    for raw in lines:
+        line = raw.rstrip("\n")
+        if line.startswith("event:"):
+            name = line[len("event:"):].strip()
+        elif line.startswith("data:"):
+            data.append(line[len("data:"):].strip())
+        elif line == "" and data:           # a blank line ends one event
+            yield name, json.loads("".join(data))
+            name, data = None, []
+    if data:
+        yield name, json.loads("".join(data))
+
+
+def main(path):
+    text, stop_reason, usage = [], None, {}
+    with open(path, encoding="utf-8") as f:
+        for name, data in events(f):
+            if name == "message_start":
+                usage.update(data["message"]["usage"])
+            elif name == "content_block_delta" and data["delta"]["type"] == "text_delta":
+                text.append(data["delta"]["text"])
+            elif name == "message_delta":
+                stop_reason = data["delta"].get("stop_reason")
+                usage.update(data.get("usage", {}))
+            elif name == "error":
+                print("Stream error:", data["error"]["type"])
+                return
+            # ping and unknown event types are ignored on purpose
+    print("Text:", "".join(text))
+    print("Stop reason:", stop_reason)
+    print("Usage:", usage)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1] if len(sys.argv) &gt; 1 else "stream.txt")</pre></div>
+<div class="code"><span class="cap">Terminal</span><pre>python3 parse_sse.py stream.txt
+Text: Test 17, 18, 65 and 66.
+Stop reason: end_turn
+Usage: {'input_tokens': 25, 'output_tokens': 15}</pre></div>
+<p>Note how <code>usage</code> is merged: the input count comes from <code>message_start</code>, and the output count from the last <code>message_delta</code>, which is a running total.</p>
+</div></details>
+
+<h3 id="ch87-6"><span class="num">87.6</span>Streaming with the SDKs</h3>
+<p>The official SDKs give you a higher-level helper that collects the events for you. In Python, <code>client.messages.stream(...)</code> is used as a context manager (<code>with ... as stream:</code>), and <code>stream.text_stream</code> gives you just the text pieces as they arrive. When the stream ends, <code>stream.get_final_message()</code> returns the complete <code>Message</code> object, identical to what a non-streaming call would have returned, with content blocks, stop reason and usage. <span class="vchip">Verified 9 Nov 2026</span></p>
+<div class="code"><span class="cap">Python: stream_once.py</span><pre>import anthropic
+
+client = anthropic.Anthropic()
+
+with client.messages.stream(
+    model="claude-opus-5-5",
+    max_tokens=1000,
+    system="You are a senior QA engineer. Reply concisely.",
+    messages=[{"role": "user", "content": "Write three test ideas for a password reset link."}],
+) as stream:
+    for text in stream.text_stream:
+        print(text, end="", flush=True)    <span class="c"># show each piece immediately</span>
+    final = stream.get_final_message()
+
+print("\nStop reason:", final.stop_reason)
+print("Tokens:", final.usage.input_tokens, "in,", final.usage.output_tokens, "out")</pre></div>
+<div class="code"><span class="cap">TypeScript: stream-once.ts (ES module)</span><pre>import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic();
+
+const stream = client.messages
+  .stream({
+    model: "claude-opus-5-5",
+    max_tokens: 1000,
+    messages: [{ role: "user", content: "Write three test ideas for a password reset link." }]
+  })
+  .on("text", (text) => process.stdout.write(text));
+
+const final = await stream.finalMessage();
+console.log("\nStop reason:", final.stop_reason);</pre></div>
+<div class="box note"><span class="tag">When you don't need the pieces</span><p>If you only want the finished answer but your <code>max_tokens</code> is large, you can still use the stream helper and just call <code>stream.get_final_message()</code> without printing anything. The docs recommend this for long generations, because the SDK uses streaming internally to avoid HTTP timeouts and hands you the normal <code>Message</code> at the end.</p></div>
+<h4>When a stream breaks</h4>
+<p>Networks fail. If a stream stops partway, the docs describe a capture-and-resume approach: keep the text you received, then send a new request. On Claude 4.6 and later models, because prefill isn't allowed, you do this with a <strong>user</strong> message that contains the partial answer and asks Claude to continue from where it left off. Tool-use and thinking blocks can't be partially recovered; you can resume only from the most recent text. For most chat apps, the simpler choice is to show "Connection lost, retry?" and resend the turn.</p>
+
+<h3 id="ch87-7"><span class="num">87.7</span>Build it: a command-line chat in Python</h3>
+<p>Time to put the pieces together. This program keeps a history list, streams each reply, handles errors and stop reasons, and prints the token count after every turn so you can watch the conversation grow.</p>
+<div class="code"><span class="cap">Terminal: setup (macOS/Linux; on Windows activate with .venv\Scripts\activate)</span><pre>mkdir qa-chat &amp;&amp; cd qa-chat
+python3 -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install anthropic
+export ANTHROPIC_API_KEY="paste-your-key-here"   <span class="c"># Chapter 86</span></pre></div>
+<div class="code"><span class="cap">chat.py (complete)</span><pre>"""chat.py: a small streaming chat CLI for Claude (QA assistant)."""
+import anthropic
+
+MODEL = "claude-opus-5-5"
+MAX_TOKENS = 4000
+SYSTEM = (
+    "You are a QA assistant for a software testing team. "
+    "Answer concisely. When asked for test cases, use a numbered list "
+    "where each item has a title, steps and an expected result."
+)
+
+
+def ask(client, history):
+    """Stream one reply for the conversation so far. Returns the final Message."""
+    with client.messages.stream(
+        model=MODEL,
+        max_tokens=MAX_TOKENS,
+        system=SYSTEM,
+        messages=history,
+    ) as stream:
+        for text in stream.text_stream:
+            print(text, end="", flush=True)
+        return stream.get_final_message()
+
+
+def main():
+    client = anthropic.Anthropic()          # reads ANTHROPIC_API_KEY
+    history = []                            # the whole conversation lives here
+    print("QA chat. Commands: /reset clears the history, /quit exits.")
+    while True:
+        try:
+            user_text = input("\nYou: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+        if not user_text:
+            continue
+        if user_text == "/quit":
+            break
+        if user_text == "/reset":
+            history.clear()
+            print("(history cleared)")
+            continue
+
+        history.append({"role": "user", "content": user_text})
+        print("Claude: ", end="", flush=True)
+        try:
+            reply = ask(client, history)
+        except anthropic.APIError as err:
+            history.pop()                   # forget the turn that failed
+            print(f"\n[error] {err}")
+            continue
+
+        print()
+        if reply.stop_reason == "refusal":
+            history.pop()                   # don't keep a refused turn
+            print("[declined] Claude declined this request.")
+            continue
+        history.append({"role": "assistant", "content": reply.content})
+        if reply.stop_reason == "max_tokens":
+            print("[warning] reply was cut off at max_tokens")
+        print(f"[turns: {len(history)} | tokens in: {reply.usage.input_tokens}"
+              f" | out: {reply.usage.output_tokens}]")
+
+
+if __name__ == "__main__":
+    main()</pre></div>
+<h4>How it works, line by line</h4>
+<ul>
+<li><strong><code>history</code></strong> is the conversation. Each user turn is appended before the call; each reply is appended after it, using the full <code>reply.content</code> list.</li>
+<li><strong><code>ask()</code></strong> streams the reply and returns the final <code>Message</code>, so the rest of the code can check <code>stop_reason</code> and <code>usage</code> as if it were a normal call.</li>
+<li><strong>On an API error</strong> (a 429 or 529, say, after the SDK's own automatic retries), the user turn is removed again with <code>history.pop()</code>. Without this, the history would end with two user messages in a row on the next attempt, which is a classic bug.</li>
+<li><strong>On a refusal</strong>, the refused turn is dropped, so it doesn't affect later turns.</li>
+<li><strong><code>/reset</code></strong> clears the history: the cheapest way to start fresh.</li>
+</ul>
+<div class="code"><span class="cap">Example session (illustrative; Claude's wording and token counts will differ)</span><pre>QA chat. Commands: /reset clears the history, /quit exits.
+
+You: Give boundary values for an age field that accepts 18 to 65.
+Claude: 17 (reject), 18 (accept), 65 (accept), 66 (reject). Also try 0, -1, 18.5 and an empty field.
+[turns: 2 | tokens in: 61 | out: 154]
+
+You: Turn them into Gherkin scenarios.
+Claude: Scenario Outline: Age validation ...
+[turns: 4 | tokens in: 239 | out: 402]</pre></div>
+<p>Look at "tokens in". It rises every turn, because each request carries the whole history. The output count includes Claude's thinking, which is billed as output even though <code>text_stream</code> doesn't print it.</p>
+<div class="box note"><span class="tag">How this code was tested</span><p>No API key was available when this chapter was written, so <code>chat.py</code> was tested offline with the official Python SDK (version 2.6.0) pointed at a fake transport that returned recorded-format SSE streams. The test confirmed that the SDK sends <code>anthropic-version: 2026-10-21</code>, that the history grows 1, 3, 5 messages per turn, that a 429 error removes the failed turn, and that <code>/reset</code> starts again from one message. Run it against the real API in the lab.</p></div>
+
+<h3 id="ch87-8"><span class="num">87.8</span>Managing a growing conversation</h3>
+<p>Current Claude models have a 1-million-token <a class="gl" href="#g-context-window">context window</a>, so a chat rarely runs out of room. Cost and quality usually become problems first. Every turn re-bills the whole history as input, and Anthropic's docs note that "as token count grows, accuracy and recall degrade", a problem called <a class="gl" href="#g-context-rot">context rot</a> (<a href="#ch20">Chapter 20</a>).</p>
+<div class="tbl"><table>
+<tr><th>Strategy</th><th>How</th><th>Trade-off</th></tr>
+<tr><td><b>Reset</b></td><td>Start a new conversation for a new task</td><td>Loses everything; often the right call</td></tr>
+<tr><td><b>Sliding window</b></td><td>Send only the last N turns (always cut in user/assistant pairs)</td><td>Simple; Claude forgets early details</td></tr>
+<tr><td><b>Summarise</b></td><td>Ask Claude to summarise older turns, then replace them with the summary</td><td>Keeps the gist; costs an extra call; details can be lost</td></tr>
+<tr><td><b>Server-side <a class="gl" href="#g-compaction">compaction</a></b></td><td>An API feature (beta) that summarises earlier parts on the server so the conversation can continue past the limit</td><td>Less code; beta, so check the current docs</td></tr>
+<tr><td><b><a class="gl" href="#g-prompt-caching">Prompt caching</a></b></td><td>Mark the stable start of the conversation so repeated input is billed at a much lower rate</td><td>Cuts cost, not context size (Chapter 90)</td></tr>
+</table></div>
+<p>Choosing what stays in the window, and in what order, is the heart of <strong>context engineering</strong>, the subject of <a href="#ch88">Chapter 88</a>.</p>
+
+<div class="lab"><div class="lab-h"><b>Streams, history and stop reasons</b><span>30 min · terminal · steps 1–2 need no key; steps 3–6 need an API key</span></div><ol>
+<li>Offline: save the stream in 87.5 as <code>stream.txt</code> and the parser in 87.5 as <code>parse_sse.py</code> in the same folder. Run <code>python3 parse_sse.py stream.txt</code>.<span class="expect">Text: Test 17, 18, 65 and 66. / Stop reason: end_turn / Usage with input_tokens 25 and output_tokens 15.</span></li>
+<li>Offline negative test: add an unknown event to the file (<code>event: shiny_new_event</code>, then <code>data: {"type": "shiny_new_event"}</code>, then a blank line) between two deltas, and run it again.<span class="expect">The same output. The parser ignores events it doesn't know, as the docs require.</span></li>
+<li>Live: set up the <code>qa-chat</code> folder and run <code>python chat.py</code>. Ask for boundary values for a field from your own work, then ask a follow-up that only makes sense with memory ("Now as a table").<span class="expect">Text appears word by word. The follow-up works because the history was sent. "tokens in" is higher on the second turn.</span></li>
+<li>Type <code>/reset</code>, then ask "Now as a table" again.<span class="expect">Claude asks what you mean: the history is gone, which proves the memory lived in your program.</span></li>
+<li>Edit <code>MAX_TOKENS = 4000</code> to <code>MAX_TOKENS = 60</code>, run again and ask for ten detailed test cases.<span class="expect">The reply stops early and the program prints "[warning] reply was cut off at max_tokens". On a thinking model the reply may be very short or empty, because thinking also uses the cap.</span></li>
+<li>Restore <code>MAX_TOKENS</code>, then break the key for one run: <code>ANTHROPIC_API_KEY=wrong python chat.py</code> and send a message.<span class="expect">An "[error]" line mentioning a 401 authentication error, and the program keeps running. Type <code>/quit</code>.</span></li>
+</ol></div>
+<p><strong>Troubleshooting.</strong> <em>ModuleNotFoundError: anthropic</em>: activate the virtual environment first. <em>401</em>: the key isn't set in this terminal (<code>echo ${ANTHROPIC_API_KEY:0:7}</code>). <em>400 mentioning temperature</em>: you copied an old example; API version 2026-10-21 rejects <code>temperature</code>. <em>400 about the last message</em>: check that you aren't ending with an assistant message (prefill) on a current model. <em>No text appears until the end</em>: you're printing without <code>flush=True</code>, or a proxy is buffering.</p>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Claude remembers my earlier API calls."</dt><dd>It doesn't. The conversation exists only in the list your program sends each time.</dd>
+<dt>"Streaming is cheaper or makes Claude faster."</dt><dd>You pay for the same tokens. Streaming only shows the answer sooner.</dd>
+<dt>"I can append just the reply text to the history."</dt><dd>That works for plain chat but breaks tool use. Append the whole <code>content</code> list as returned.</dd>
+<dt>"A refusal or max_tokens is an error, so it'll raise an exception."</dt><dd>Both arrive as normal 200 responses. Your code must check <code>stop_reason</code>.</dd>
+<dt>"I can force JSON by prefilling an opening brace."</dt><dd>Not on Claude 4.6 and later: prefill returns a 400. Use structured outputs (Chapter 89).</dd>
+</dl></div>
+
+<h3 id="ch87-r"><span class="num">87.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>The Messages API is stateless: your program keeps the conversation and sends all of it every turn.</li>
+<li>The <code>system</code> field holds the role, rules and format; current models also accept mid-conversation system messages. Prefill no longer works on Claude 4.6 and later.</li>
+<li>Check <code>stop_reason</code> on every reply: stop reasons are normal 200 responses, not errors.</li>
+<li>Streaming uses server-sent events in a fixed order: message_start, content blocks (start, deltas, stop), message_delta, message_stop, with pings and possible error events. Ignore unknown events.</li>
+<li>In Python, <code>client.messages.stream()</code> with <code>text_stream</code> and <code>get_final_message()</code> gives you live text and the complete message.</li>
+<li>Long conversations cost more and can lose quality; reset, trim, summarise or compact.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Your chat app forgets what the user said two turns ago. What's the most likely cause?</p><div class="opts"><button>The model's context window is too small</button><button data-ok>The program isn't appending turns to the history it sends</button><button>Streaming is turned on</button></div><p class="why" hidden>The API is stateless. If the earlier turns aren't in the <code>messages</code> list, Claude never sees them.</p></div>
+<div class="qz"><p class="q">In a stream, where do you find the stop reason?</p><div class="opts"><button>In message_start</button><button>In every content_block_delta</button><button data-ok>In the message_delta event near the end</button></div><p class="why" hidden><code>stop_reason</code> is null in <code>message_start</code> and arrives in <code>message_delta</code>, along with cumulative output usage.</p></div>
+<div class="qz"><p class="q">Your stream parser crashes when it meets an event type it has never seen. What should it do instead?</p><div class="opts"><button data-ok>Ignore unknown events and carry on</button><button>Stop and report an API bug</button><button>Retry the whole request</button></div><p class="why" hidden>Anthropic may add new event types within an API version, and the docs say to handle unknown events gracefully.</p></div>
+<div class="qz"><p class="q">You want Claude's answer to always start with "{" so it's JSON. On Opus 5.5, what's the right approach?</p><div class="opts"><button>Prefill the assistant turn with "{"</button><button>Set temperature to 0</button><button data-ok>Use structured outputs or clear format instructions</button></div><p class="why" hidden>Prefill returns a 400 on Claude 4.6 and later, and <code>temperature</code> is rejected on API version 2026-10-21. Structured outputs guarantee JSON (Chapter 89).</p></div>
+<div class="qz"><p class="q">Why does turn 20 of a conversation cost more than turn 1, even if both questions are short?</p><div class="opts"><button>The API charges a per-turn fee</button><button data-ok>Each request re-sends the whole history as input tokens</button><button>Streaming costs more on later turns</button></div><p class="why" hidden>Input tokens include every earlier message. That's why trimming, summarising and caching matter.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Extend <code>chat.py</code> in three ways. (1) Add a <code>/save</code> command that writes the history to <code>chat.json</code>, and a <code>--resume</code> option that loads it at start-up (hint: convert reply content blocks with <code>block.model_dump()</code> before saving). (2) Add a sliding window that sends only the last 10 messages, always cutting at a user message. (3) Print a running cost estimate using the prices in <a href="#ch86">Chapter 86</a>. Then write five test cases for your changes, including "resume a conversation that ended with an error" and "window cuts in the middle of a pair".</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"The Claude API has no memory. A chat is just a list of user and assistant messages that our program keeps and sends again every time, plus a system prompt that sets the rules. Every reply has a stop reason, and our code must check it, because a cut-off or refused answer still comes back as a normal success. Streaming sends the answer as a series of small events, so users see words straight away; the SDK collects them and hands us the full message at the end. And because every turn re-sends the history, long chats get slower and pricier, so we reset or trim them."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/working-with-messages" target="_blank" rel="noopener">Using the Messages API</a>: stateless multi-turn conversations, synthetic assistant messages, message threads (beta), mid-conversation system messages, prefill not supported on Claude 4.6 and later.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/streaming" target="_blank" rel="noopener">Streaming messages</a>: SSE event flow, delta types, ping and error events, cumulative usage, SDK helpers, error recovery.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/handling-stop-reasons" target="_blank" rel="noopener">Stop reasons and fallback</a>: every stop reason and how to handle it.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices" target="_blank" rel="noopener">Prompting best practices</a>: giving Claude a role, adding context to instructions, migrating away from prefill.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/context-windows" target="_blank" rel="noopener">Context windows</a>: 1M-token windows, context rot, compaction (beta).</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/api/versioning" target="_blank" rel="noopener">Versions</a>: API version 2026-10-21; new event types may be added within a version.</li>
+<li>MDN Web Docs, <a href="https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events" target="_blank" rel="noopener">Using server-sent events</a>: the SSE format.</li>
+</ol><p class="verified">Verified 9 November 2026 against platform.claude.com documentation (API version 2026-10-21). Code tested offline with the anthropic Python SDK 2.6.0 against a mocked transport; no live API call was made.</p></div>

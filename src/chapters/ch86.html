@@ -1,0 +1,281 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How to get a Claude API key from the Claude Console, and how organisations, workspaces and billing fit together</li>
+<li>How to store the key safely in an environment variable</li>
+<li>Every part of a Messages API request: endpoint, headers, version and body</li>
+<li>How to read the response: content blocks, stop reasons and token usage</li>
+<li>How to make the same call with the official Python and TypeScript SDKs</li>
+<li>How much a call costs, and what the common error codes mean</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 85 (APIs, HTTP and JSON). Chapter 14 (tokens) helps with the cost section. Chapter 56 (environment variables) helps with storing the key.</div>
+
+<div class="bigidea"><p>Claude isn't only an app. Underneath claude.ai and Claude Code is the <strong>Claude API</strong>, which any program can call. You create an API key in the <strong>Claude Console</strong>, keep it secret in an environment variable, and send an HTTP <code>POST</code> to <code>https://api.anthropic.com/v1/messages</code> with three headers and a small JSON body: which model, how long the answer may be, and the messages. Claude replies with JSON containing its answer and a count of the <a class="gl" href="#g-token">tokens</a> used, which is what you pay for. Once you've done this once, you can put Claude inside test tools, scripts and pipelines.</p></div>
+
+<h3 id="ch86-1"><span class="num">86.1</span>Why use the API at all?</h3>
+<div class="cols2">
+<div><h4>Use the apps (claude.ai, Claude Code) when…</h4><ul><li>a person is in the loop, typing and reading</li><li>you want features like Projects, Artifacts or file editing already built</li><li>you're on a subscription plan</li></ul></div>
+<div><h4>Use the API when…</h4><ul><li>a program needs Claude, with no person typing</li><li>you're building Claude into your own tool</li><li>you need to run the same prompt hundreds of times, such as classifying every test failure overnight</li></ul></div>
+</div>
+<div class="box example"><span class="tag">Real-world example: QA uses for the API</span><ul>
+<li>A nightly job sends each failed test's error log to Claude and posts a grouped summary to Slack.</li>
+<li>A small internal web page where testers paste a user story and get draft test cases in the team's format.</li>
+<li>A pipeline step that checks every new bug report has steps, expected and actual results, and asks the reporter to fill gaps.</li>
+<li>An evaluation harness that sends 200 prompts to your company's chatbot and to Claude-as-judge (Chapter 125).</li>
+</ul></div>
+<div class="box note"><span class="tag">Separate billing</span><p>The API is billed separately from claude.ai subscriptions. A Pro, Max, Team or Enterprise chat plan doesn't include API credits, and API usage is paid per token through the Console. Your company may already have an API organisation; ask before creating your own.</p></div>
+
+<h3 id="ch86-2"><span class="num">86.2</span>The Claude Console: organisations, workspaces and keys</h3>
+<p>The <strong>Claude Console</strong> at <a href="https://platform.claude.com" target="_blank" rel="noopener">platform.claude.com</a> is where developers manage API access. (It used to be at console.anthropic.com, which now redirects there.)</p>
+<div class="tbl"><table>
+<tr><th>Concept</th><th>Plain meaning</th></tr>
+<tr><td><b>Organisation</b></td><td>Your company's API account: billing, members, limits</td></tr>
+<tr><td><b>Workspace</b></td><td>A sub-area of the organisation that groups API keys, members and limits, such as "QA tools" or "Production chatbot". An organisation can have up to 100.</td></tr>
+<tr><td><b>API key</b></td><td>A secret string that identifies your program to the API. It belongs to a workspace.</td></tr>
+<tr><td><b>Billing</b></td><td>Buy credits or set up invoicing; set your own spend limit (Settings → Billing)</td></tr>
+<tr><td><b>Usage tier</b></td><td>Your organisation's level, which sets rate limits and a monthly spend cap. It rises automatically as you build usage history.</td></tr>
+<tr><td><b>Playground</b></td><td>A page in the Console for trying requests by hand before writing code (83.8)</td></tr>
+</table></div>
+<h4>Creating a key, step by step</h4>
+<ol>
+<li>Sign in at <a href="https://platform.claude.com" target="_blank" rel="noopener">platform.claude.com</a> (or create an account).</li>
+<li>Make sure billing is set up, or that your organisation admin has given you access to a workspace with credits.</li>
+<li>Go to <strong>Settings → API keys</strong> (<a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">platform.claude.com/settings/keys</a>) and create a key. Give it a descriptive name, like "qa-nightly-triage", and choose the workspace.</li>
+<li>Copy the key immediately and store it safely (next section). The Console doesn't show the full key again.</li>
+</ol>
+<div class="box warn"><span class="tag">One key per purpose</span><p>Create separate keys for separate tools and people. If one leaks, you revoke just that key and everything else keeps working. Never share a key in chat, email, tickets or screenshots. Chapter 98 covers key rotation, expiry and secrets managers.</p></div>
+
+<h3 id="ch86-3"><span class="num">86.3</span>Storing the key: ANTHROPIC_API_KEY</h3>
+<p>The official tools look for your key in an environment variable called <code>ANTHROPIC_API_KEY</code>. An environment variable is a named value your terminal keeps in memory and passes to programs you run (Chapter 56). Using one keeps the key out of your code.</p>
+<div class="code"><span class="cap">macOS / Linux (zsh or bash): current terminal only</span><pre>export ANTHROPIC_API_KEY="paste-your-key-here"
+echo ${ANTHROPIC_API_KEY:0:12}…     <span class="c"># check it's set by printing only the start</span></pre></div>
+<div class="code"><span class="cap">Windows PowerShell: current window only</span><pre>$env:ANTHROPIC_API_KEY = "paste-your-key-here"</pre></div>
+<p>The variable disappears when you close the terminal. To keep it, teams use a secrets manager, a password manager's command-line tool, or a <code>.env</code> file that is listed in <code>.gitignore</code> so it's never committed. In CI systems such as GitHub Actions, it goes in the platform's encrypted secrets.</p>
+<div class="box mistakes"><span class="tag">Classic key leaks</span><dl>
+<dt>Hard-coding it</dt><dd><code>client = Anthropic(api_key="sk-...")</code> committed to git. Bots scan public repositories for keys within minutes.</dd>
+<dt>Printing it in logs</dt><dd>Debug output or <code>curl -v</code> in a CI log shows the full Authorization header.</dd>
+<dt>Pasting it into an AI chat</dt><dd>Including asking Claude Code "why doesn't my key sk-… work?". Describe the problem instead.</dd>
+</dl></div>
+
+<h3 id="ch86-4"><span class="num">86.4</span>Anatomy of a Messages API request</h3>
+<p>Everything you send to Claude goes to one <a class="gl" href="#g-endpoint">endpoint</a>: <code>POST https://api.anthropic.com/v1/messages</code>. Here is a complete request in curl, with every part explained below. <span class="vchip">Verified 9 Nov 2026</span></p>
+<div class="code"><span class="cap">Your first Claude API call</span><pre>curl https://api.anthropic.com/v1/messages \
+  -H "content-type: application/json" \
+  -H "Authorization: Bearer $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2026-10-21" \
+  -d '{
+    "model": "claude-opus-5-5",
+    "max_tokens": 1000,
+    "system": "You are a senior QA engineer. Reply concisely.",
+    "messages": [
+      {"role": "user", "content": "Give five boundary test values for an age field that accepts 18 to 65."}
+    ]
+  }'</pre></div>
+<h4>The headers</h4>
+<div class="tbl"><table>
+<tr><th>Header</th><th>Value</th><th>Required?</th><th>Meaning</th></tr>
+<tr><td><code>content-type</code></td><td><code>application/json</code></td><td>Yes</td><td>The body is JSON</td></tr>
+<tr><td><code>Authorization</code></td><td><code>Bearer &lt;your key&gt;</code></td><td>Yes, unless <code>x-api-key</code> is used</td><td>Your API key (or a short-lived access token from Anthropic's identity features)</td></tr>
+<tr><td><code>x-api-key</code></td><td><code>&lt;your key&gt;</code></td><td>Alternative</td><td>The older way to send the key. Still supported; you'll see it in many examples, including Anthropic's quick-start.</td></tr>
+<tr><td><code>anthropic-version</code></td><td><code>2026-10-21</code></td><td>Yes</td><td>Which version of the API's rules you're writing against</td></tr>
+</table></div>
+<details class="deep"><summary>Why there's a version header</summary><div class="body">
+<p>APIs change over time. If Anthropic changed how a field worked, every existing program would break overnight. Instead, you declare which version you were written for, and Anthropic promises not to remove or change existing inputs and outputs within that version. It may still add new optional fields and new values, so well-written code ignores fields it doesn't recognise.</p>
+<p>The current version, <code>2026-10-21</code>, is the first new one since <code>2023-06-01</code>. Among other changes, it <strong>removes the <code>temperature</code>, <code>top_p</code> and <code>top_k</code> parameters</strong>: sending any of them now returns a 400 error. Older tutorials that set <code>temperature</code> will fail with this version. The official SDKs send the version header for you.</p>
+</div></details>
+<h4>The body</h4>
+<div class="tbl"><table>
+<tr><th>Field</th><th>Required?</th><th>What it does</th></tr>
+<tr><td><code>model</code></td><td>Yes</td><td>Which Claude model. Current IDs: <code>claude-fable-5-1</code>, <code>claude-opus-5-5</code>, <code>claude-sonnet-5-5</code>, <code>claude-haiku-5-5</code>. Anthropic recommends starting with Opus 5.5 for most work (Chapter 40).</td></tr>
+<tr><td><code>max_tokens</code></td><td>Yes</td><td>The most tokens Claude may produce in its reply. A safety cap on length and cost, not a target. If the answer hits it, it's cut off.</td></tr>
+<tr><td><code>messages</code></td><td>Yes</td><td>The conversation: a list of turns, each with a <code>role</code> (<code>user</code> or <code>assistant</code>) and <code>content</code>. For one question, it's a single user message.</td></tr>
+<tr><td><code>system</code></td><td>No</td><td>The <a class="gl" href="#g-system-prompt">system prompt</a>: instructions about role, rules and format that apply to the whole conversation</td></tr>
+</table></div>
+<p>There are many more optional fields: streaming, tools, effort and structured outputs. Chapters 87–90 cover them. These four are enough to start.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of the request as a form you hand to a very capable contractor. The <em>model</em> is which contractor you hire. <em>max_tokens</em> is "don't write more than ten pages". The <em>system</em> prompt is the standing brief ("you're working for the QA team; use our format"). The <em>messages</em> are the actual conversation so far.</p></div>
+
+<h3 id="ch86-5"><span class="num">86.5</span>Reading the response</h3>
+<p>Claude replies with a JSON object. Here is the shape documented by Anthropic, annotated:</p>
+<div class="code"><span class="cap">A Messages API response (annotated)</span><pre>{
+  "id": "msg_013mHbppMPd2PrVJzGMZPt2D",   <span class="c">← unique ID of this reply</span>
+  "type": "message",
+  "role": "assistant",                     <span class="c">← it's Claude speaking</span>
+  "model": "claude-opus-5-5",              <span class="c">← the model that answered</span>
+  "content": [                             <span class="c">← a LIST of content blocks</span>
+    {
+      "type": "text",
+      "text": "1. 17 (just below minimum, should be rejected)\n2. 18 ..."
+    }
+  ],
+  "stop_reason": "end_turn",               <span class="c">← why it stopped</span>
+  "stop_sequence": null,
+  "stop_details": null,
+  "usage": {
+    "input_tokens": 42,                    <span class="c">← tokens you sent (billed as input)</span>
+    "output_tokens": 310                   <span class="c">← tokens it produced (billed as output)</span>
+  }
+}</pre></div>
+<h4>Content is a list</h4>
+<p><code>content</code> is a list of blocks, not a single string, because a reply can contain different kinds of things: text, a request to use a tool (Chapter 89), or, on models that think before answering, a <code>thinking</code> block before the text. Current models such as Opus 5.5 always think adaptively, so your code should <strong>pick out the blocks whose type is <code>text</code></strong> rather than assume the first block is the answer. The official examples do exactly that.</p>
+<h4>Stop reasons</h4>
+<div class="tbl"><table>
+<tr><th><code>stop_reason</code></th><th>Meaning</th><th>What to do</th></tr>
+<tr><td><code>end_turn</code></td><td>Claude finished naturally</td><td>Use the answer</td></tr>
+<tr><td><code>max_tokens</code></td><td>It hit your <code>max_tokens</code> cap mid-answer</td><td>The answer is cut off: raise the limit or ask for less</td></tr>
+<tr><td><code>stop_sequence</code></td><td>It produced a stop sequence you defined</td><td>Expected if you set one</td></tr>
+<tr><td><code>tool_use</code></td><td>Claude wants your program to run a tool</td><td>Run it and send back the result (Chapter 89)</td></tr>
+<tr><td><code>pause_turn</code></td><td>A long-running server-side step paused</td><td>Send the response back to let it continue (Chapter 89)</td></tr>
+<tr><td><code>refusal</code></td><td>Claude declined for safety reasons; <code>stop_details</code> gives the category</td><td>Handle gracefully in your app</td></tr>
+<tr><td><code>model_context_window_exceeded</code></td><td>The conversation filled the context window</td><td>Shorten or summarise (Chapter 20)</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example: a QA check</span><p>A common bug in apps built on the API: the code shows the reply to users without checking <code>stop_reason</code>, so answers that hit <code>max_tokens</code> appear silently truncated, ending mid-sentence. Add "a reply that hits max_tokens" to your test cases for any AI feature.</p></div>
+
+<h3 id="ch86-6"><span class="num">86.6</span>The same call in Python and TypeScript</h3>
+<p>Writing raw HTTP is fine for learning, but real programs use Anthropic's official <strong>SDKs</strong> (software development kits). They add the headers for you, read <code>ANTHROPIC_API_KEY</code> automatically, retry temporary failures, and turn errors into clear exceptions. SDKs exist for Python, TypeScript, C#, Go, Java, PHP and Ruby. <span class="vchip">Verified 9 Nov 2026</span></p>
+<div class="code"><span class="cap">Python: install (inside a virtual environment, Chapter 58)</span><pre>python3 -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install anthropic</pre></div>
+<div class="code"><span class="cap">Python: first_call.py</span><pre>import anthropic
+
+client = anthropic.Anthropic()          <span class="c"># reads ANTHROPIC_API_KEY from the environment</span>
+
+message = client.messages.create(
+    model="claude-opus-5-5",
+    max_tokens=1000,
+    system="You are a senior QA engineer. Reply concisely.",
+    messages=[
+        {"role": "user", "content": "Give five boundary test values for an age field that accepts 18 to 65."}
+    ],
+)
+
+for block in message.content:           <span class="c"># content is a list of blocks</span>
+    if block.type == "text":
+        print(block.text)
+
+print("Stop reason:", message.stop_reason)
+print("Tokens in/out:", message.usage.input_tokens, message.usage.output_tokens)</pre></div>
+<div class="code"><span class="cap">TypeScript: install and first-call.ts</span><pre><span class="c"># npm init -y &amp;&amp; npm pkg set type=module &amp;&amp; npm install @anthropic-ai/sdk</span>
+import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic();          <span class="c">// reads ANTHROPIC_API_KEY</span>
+
+const message = await client.messages.create({
+  model: "claude-opus-5-5",
+  max_tokens: 1000,
+  messages: [
+    { role: "user", content: "Give five boundary test values for an age field that accepts 18 to 65." }
+  ]
+});
+
+for (const block of message.content) {
+  if (block.type === "text") console.log(block.text);
+}
+console.log("Tokens:", message.usage.input_tokens, message.usage.output_tokens);</pre></div>
+<div class="tbl"><table>
+<tr><th></th><th>Python</th><th>TypeScript</th></tr>
+<tr><td>Package</td><td><code>anthropic</code> (PyPI)</td><td><code>@anthropic-ai/sdk</code> (npm)</td></tr>
+<tr><td>Create a client</td><td><code>anthropic.Anthropic()</code></td><td><code>new Anthropic()</code></td></tr>
+<tr><td>Send a message</td><td><code>client.messages.create(...)</code></td><td><code>await client.messages.create({...})</code></td></tr>
+<tr><td>Automatic retries</td><td>Twice by default, with backoff, for connection errors, 408, 409, 429 and 5xx</td><td>Same behaviour</td></tr>
+</table></div>
+<details class="deep"><summary>What the SDK does that curl doesn't</summary><div class="body">
+<ul>
+<li><strong>Headers and version</strong> are filled in for you, so you can't forget <code>anthropic-version</code>.</li>
+<li><strong>Retries with exponential backoff</strong>: by default the Python SDK retries certain failures twice (configurable with <code>max_retries</code>).</li>
+<li><strong>Typed errors</strong>: a 404 arrives as <code>anthropic.NotFoundError</code>, a 429 as <code>anthropic.RateLimitError</code>, so your code can handle each case properly instead of reading raw JSON.</li>
+<li><strong>Request IDs</strong>: <code>message._request_id</code> gives the ID to quote when reporting a problem to Anthropic support.</li>
+<li><strong>Streaming helpers</strong>: show the answer word by word as it's generated (Chapter 87).</li>
+</ul>
+</div></details>
+
+<h3 id="ch86-7"><span class="num">86.7</span>What a call costs</h3>
+<p>You pay per token: input tokens (everything you send, including the system prompt and earlier messages) and output tokens (everything Claude writes, <strong>including its internal thinking</strong>, which is billed as output even when you don't see all of it). Prices are quoted per million tokens (MTok). <span class="vchip">Verified 9 Nov 2026</span></p>
+<div class="tbl"><table>
+<tr><th>Model</th><th>Input per MTok</th><th>Output per MTok</th><th>Good for</th></tr>
+<tr><td>Claude Fable 5.1</td><td>$10</td><td>$50</td><td>The hardest reasoning and long agentic work</td></tr>
+<tr><td>Claude Opus 5.5</td><td>$4</td><td>$20</td><td>Recommended starting point for most work</td></tr>
+<tr><td>Claude Sonnet 5.5</td><td>$2</td><td>$10</td><td>Fast, strong everyday model</td></tr>
+<tr><td>Claude Haiku 5.5</td><td>$0.10 (prompts up to 100K tokens)</td><td>$0.50</td><td>High-volume, simple tasks</td></tr>
+</table></div>
+<h4>A worked example</h4>
+<p>You send a user story and instructions (about 500 input tokens) and get back test cases plus thinking (about 1,500 output tokens).</p>
+<div class="code"><span class="cap">Cost arithmetic</span><pre>Opus 5.5:   500 × $4 / 1,000,000   = $0.0020
+          1,500 × $20 / 1,000,000  = $0.0300
+                                     ────────
+                         one call ≈ $0.032    → 1,000 stories ≈ $32
+
+Haiku 5.5:  500 × $0.10 / 1,000,000 = $0.00005
+          1,500 × $0.50 / 1,000,000 = $0.00075
+                         one call ≈ $0.0008   → 1,000 stories ≈ $0.80</pre></div>
+<p>The real numbers are in each response's <code>usage</code> field, so you can measure instead of estimating. Batch processing is 50% cheaper, and prompt caching makes repeated long prompts much cheaper (Chapter 90).</p>
+<div class="box note"><span class="tag">Spend controls</span><p>Each usage tier has a monthly spend cap, and you can set your own lower limit on the Console's Billing page. When the tier cap is reached, requests return 429 until the next month or until a higher limit is approved. Set a limit before running anything in a loop.</p></div>
+
+<h3 id="ch86-8"><span class="num">86.8</span>The Console playground</h3>
+<p>The <strong>playground</strong> (<a href="https://platform.claude.com/playground" target="_blank" rel="noopener">platform.claude.com/playground</a>) lets you build a request with forms (model, system prompt, messages and every other parameter), run it, and see the response. It also shows the equivalent SDK code for each run, which you can copy into your program. It replaced the older Workbench, which closed on 17 August 2026. Use it to get a prompt right before you write code around it.</p>
+
+<h3 id="ch86-9"><span class="num">86.9</span>When it goes wrong: error codes</h3>
+<p>Errors come back as JSON with a type, a message and a request ID:</p>
+<div class="code"><pre>{
+  "type": "error",
+  "error": { "type": "not_found_error", "message": "The requested resource could not be found." },
+  "request_id": "req_011CSHoEeqs5C35K2UUqR7Fy"
+}</pre></div>
+<div class="tbl"><table>
+<tr><th>Status</th><th>Error type</th><th>Usual cause</th><th>Fix</th></tr>
+<tr><td>400</td><td><code>invalid_request_error</code></td><td>Malformed JSON, missing field, unsupported parameter (such as <code>temperature</code> on version 2026-10-21), or a spend limit you set was reached</td><td>Read the message; it names the problem</td></tr>
+<tr><td>401</td><td><code>authentication_error</code></td><td>Key missing, mistyped, revoked or expired</td><td>Check <code>ANTHROPIC_API_KEY</code> is set and current</td></tr>
+<tr><td>402</td><td><code>billing_error</code></td><td>Billing or payment problem</td><td>Check billing in the Console</td></tr>
+<tr><td>403</td><td><code>permission_error</code></td><td>The key's workspace isn't allowed this resource</td><td>Check workspace and organisation settings</td></tr>
+<tr><td>404</td><td><code>not_found_error</code></td><td>Wrong URL path or resource ID</td><td>Check the endpoint</td></tr>
+<tr><td>413</td><td><code>request_too_large</code></td><td>Request body too big</td><td>Send less, or use the Files API</td></tr>
+<tr><td>429</td><td><code>rate_limit_error</code></td><td>Rate limit hit, or the monthly spend cap reached</td><td>Back off and retry; check Console limits</td></tr>
+<tr><td>500</td><td><code>api_error</code></td><td>Unexpected problem at Anthropic</td><td>Retry with backoff; report with the request ID if it persists</td></tr>
+<tr><td>504</td><td><code>timeout_error</code></td><td>The request took too long</td><td>Use streaming for long answers (Chapter 87)</td></tr>
+<tr><td>529</td><td><code>overloaded_error</code></td><td>The API is temporarily overloaded across all users</td><td>Retry later with backoff</td></tr>
+</table></div>
+<p>Responses also carry headers such as <code>anthropic-ratelimit-requests-remaining</code> and <code>anthropic-ratelimit-tokens-limit</code>, so your program can see how close it is to a limit. Chapter 90 covers limits in detail.</p>
+
+<div class="lab"><div class="lab-h"><b>From requirement to test cases, by API</b><span>40 min · terminal · needs an API key with credits</span></div><ol>
+<li>Create a key in the Console (83.2) and set it in your terminal: <code>export ANTHROPIC_API_KEY="…"</code><span class="expect">nothing printed. Run <code>echo ${ANTHROPIC_API_KEY:0:7}</code> to confirm the start of the key is there.</span></li>
+<li>Run the curl request from 83.4, but change the user message to a real requirement from your work (remove anything confidential).<span class="expect">a JSON response with <code>"stop_reason": "end_turn"</code>, your test values in a <code>text</code> block, and a <code>usage</code> section.</span></li>
+<li>Break it on purpose: remove the <code>anthropic-version</code> header and run again.<span class="expect">a 400 <code>invalid_request_error</code> whose message mentions the missing header.</span></li>
+<li>Break it differently: set a wrong key, <code>ANTHROPIC_API_KEY=wrong</code>, just for one command.<span class="expect">a 401 <code>authentication_error</code>. You've just run two negative API tests against the Claude API itself.</span></li>
+<li>Now Python: create a virtual environment, <code>pip install anthropic</code>, save <code>first_call.py</code> from 83.6 with your requirement in the message, and run <code>python first_call.py</code>.<span class="expect">the answer, the stop reason and two token counts printed.</span></li>
+<li>Change the model to <code>claude-haiku-5-5</code> and run again. Using the prices in 83.7, work out the cost of each run from its token counts.<span class="expect">a much cheaper Haiku run. Compare the quality: is it good enough for this task?</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"My Claude Pro subscription covers API calls."</dt><dd>It doesn't. The API is billed separately, per token, through the Console.</dd>
+<dt>"The first content block is always the answer."</dt><dd>Models that think may return a thinking block first. Select blocks with <code>type == "text"</code>.</dd>
+<dt>"max_tokens is how long the answer will be."</dt><dd>It's an upper limit. If it's too low, answers are cut off with <code>stop_reason: "max_tokens"</code>.</dd>
+<dt>"The API remembers my previous call."</dt><dd>It doesn't. Each request is independent: to continue a conversation you send all the earlier messages again (Chapter 87).</dd>
+<dt>"Copying an old tutorial will work."</dt><dd>Old examples may set <code>temperature</code> or use retired model IDs, both of which now return errors. Check the current docs.</dd>
+</dl></div>
+
+<h3 id="ch86-r"><span class="num">86.10</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>API keys are created in the Claude Console (platform.claude.com) inside a workspace; API usage is billed per token, separately from chat plans.</li>
+<li>Store the key in <code>ANTHROPIC_API_KEY</code>, never in code, chats or logs.</li>
+<li>A request is <code>POST https://api.anthropic.com/v1/messages</code> with <code>content-type</code>, <code>Authorization: Bearer …</code> (or <code>x-api-key</code>) and <code>anthropic-version: 2026-10-21</code>, plus <code>model</code>, <code>max_tokens</code> and <code>messages</code> (and optionally <code>system</code>).</li>
+<li>The response's <code>content</code> is a list of blocks; read the text blocks, check <code>stop_reason</code>, and use <code>usage</code> to track cost.</li>
+<li>The Python (<code>anthropic</code>) and TypeScript (<code>@anthropic-ai/sdk</code>) SDKs handle headers, retries and typed errors.</li>
+<li>Know the error codes: 400 request, 401 key, 403 permission, 429 limits, 500/529 Anthropic's side.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Which three body fields are required in every Messages API request?</p><div class="opts"><button>model, system, temperature</button><button data-ok>model, max_tokens, messages</button><button>messages, stream, tools</button></div><p class="why" hidden><code>system</code> is optional, and <code>temperature</code> is no longer accepted on API version 2026-10-21.</p></div>
+<div class="qz"><p class="q">Your script gets a 401 <code>authentication_error</code>. What's the most likely cause?</p><div class="opts"><button>The JSON is malformed</button><button data-ok>The API key is missing, wrong, revoked or expired</button><button>The API is overloaded</button></div><p class="why" hidden>401 is about identity. Check that the environment variable is set in the terminal running the script.</p></div>
+<div class="qz"><p class="q">A user reports that answers in your AI feature sometimes end mid-sentence. What should you check first?</p><div class="opts"><button>The anthropic-version header</button><button data-ok>Whether stop_reason is "max_tokens", meaning the cap was too low</button><button>The model's knowledge cutoff</button></div><p class="why" hidden>Truncated answers come from hitting <code>max_tokens</code>. Raise the cap or handle that stop reason.</p></div>
+<div class="qz"><p class="q">A call to Opus 5.5 uses 1,000 input tokens and 2,000 output tokens. Roughly what does it cost?</p><div class="opts"><button>$0.004</button><button data-ok>$0.044</button><button>$4.40</button></div><p class="why" hidden>1,000 × $4 / 1M = $0.004, plus 2,000 × $20 / 1M = $0.04. Total $0.044.</p></div>
+<div class="qz"><p class="q">Where should an API key used by a CI pipeline be stored?</p><div class="opts"><button>In the test code, so the pipeline can find it</button><button>In the README</button><button data-ok>In the CI platform's encrypted secrets, passed in as ANTHROPIC_API_KEY</button></div><p class="why" hidden>Secrets stores keep keys out of code and logs and make rotation easy.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Write a small Python script, <code>triage.py</code>, that reads a text file of test failure messages (one per line), sends them to Claude in a single request asking for a grouping by likely root cause, prints the result, and prints the token usage and estimated cost. Then write five test cases for your own script: an empty file, a huge file, a missing API key, a response that hits <code>max_tokens</code>, and a 429. Ask Claude Code to help with the code if you like, but review every line it writes.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Underneath every Claude app is an API. You create a key in the Claude Console and keep it secret in an environment variable. Then you POST to /v1/messages with your key, the API version and a JSON body: model, max_tokens and messages. You get back JSON with the answer in content blocks, a stop reason, and token counts, which are what you pay for. The Python and TypeScript SDKs do the plumbing for you."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/get-started" target="_blank" rel="noopener">Get started with Claude</a>: Console account, API keys, first call in curl, Python and TypeScript.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/api/overview" target="_blank" rel="noopener">API overview</a>: endpoint, authentication headers (<code>Authorization: Bearer</code>, <code>x-api-key</code> fallback), <code>anthropic-version</code>, request IDs.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/api/versioning" target="_blank" rel="noopener">Versions</a>: version 2026-10-21 and its changes, including removal of temperature, top_p and top_k.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/api/errors" target="_blank" rel="noopener">Claude API errors</a> and <a href="https://platform.claude.com/docs/en/api/rate-limits" target="_blank" rel="noopener">Rate limits</a>.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/models/overview" target="_blank" rel="noopener">Models overview</a> and <a href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Pricing</a>.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/cli-sdks-libraries/overview" target="_blank" rel="noopener">SDKs, CLI and libraries</a> and the <a href="https://platform.claude.com/docs/en/cli-sdks-libraries/sdks/python" target="_blank" rel="noopener">Python SDK</a> page (retries, typed errors).</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/build-with-claude/adaptive-thinking" target="_blank" rel="noopener">Adaptive thinking</a>: thinking tokens are billed as output tokens.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/release-notes/overview" target="_blank" rel="noopener">Release notes</a>: Workbench replaced by playground (August 2026).</li>
+</ol><p class="verified">Verified 9 November 2026 against platform.claude.com documentation (API version 2026-10-21)</p></div>

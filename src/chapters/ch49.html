@@ -1,0 +1,200 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>When Claude answers from its training and when it looks things up, and why that difference matters for accuracy</li>
+<li>How to turn on web search, read its citations and check them properly</li>
+<li>What Research mode does, which plans have it, and when it is worth the extra usage</li>
+<li>What connectors are, how to add one from the directory, and how the Google Drive, GitHub, Jira and Slack options differ</li>
+<li>How custom connectors work and what to check before you trust one</li>
+<li>Which controls Team and Enterprise owners have over search and connectors</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch43">Chapter 43</a> (getting started with Claude) and <a href="#ch47">Chapter 47</a> (Projects). <a href="#ch97">Chapter 97</a> explains MCP, the technology under connectors; <a href="#ch100">Chapter 100</a> covers the same connectors from the Claude Code and API side. You need a Claude account; a free one is enough for most of this chapter.</div>
+
+<div class="bigidea"><p>On its own, Claude only knows what was in its training data, which stops at a <a class="gl" href="#g-knowledge-cutoff">knowledge cutoff</a>, and it knows nothing about your company's documents. <a class="gl" href="#g-web-search">Web search</a> lets Claude look up current pages and show you where each claim came from. <a class="gl" href="#g-research-mode">Research mode</a> runs many searches that build on each other and turns them into a longer report. <a class="gl" href="#g-connector">Connectors</a> let Claude reach your own tools, such as Google Drive, GitHub, Jira or Slack, using your own permissions. All three make answers more useful, and all three need the same habit from you: open the sources and check them.</p></div>
+
+<h3 id="ch49-1"><span class="num">49.1</span>Three ways Claude can know something</h3>
+<p>Before turning features on, it helps to know where an answer comes from. There are three places.</p>
+<div class="tbl"><table>
+<tr><th>Where the answer comes from</th><th>Good for</th><th>Weak at</th><th>How you can check it</th></tr>
+<tr><td><b>Training</b> (what the model learned before its cutoff)</td><td>Concepts, explanations, writing, code patterns, test design techniques</td><td>Anything recent, anything niche, anything private to your company</td><td>You can't see a source. Treat specific facts, versions and numbers as unverified.</td></tr>
+<tr><td><b>Web search</b> and <b>Research</b></td><td>Current versions, release notes, public documentation, news, standards</td><td>Pages behind logins; low-quality pages that rank well; long pages that eat usage</td><td>Each claim has a <a class="gl" href="#g-citation">citation</a> you can open</td></tr>
+<tr><td><b>Connectors</b> and attached files</td><td>Your Jira stories, Drive documents, repositories, Slack decisions</td><td>Only what your account can open; only what the connector's tools expose</td><td>Claude links or names the item it read; open it in the source tool</td></tr>
+</table></div>
+<p>Using external sources to anchor an answer is called <a class="gl" href="#g-grounding">grounding</a>. A grounded answer is much less likely to be a <a class="gl" href="#g-hallucination">hallucination</a>, but "less likely" is not "never". Claude can still misread a page, quote the wrong version, or summarise a source that was itself wrong.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a well-read colleague. Ask them a general question and they answer from memory: fast, usually right, sometimes out of date. Ask them to "check the docs" and they open a browser and come back with links. Ask them about your sprint and they need access to Jira first. Web search is the browser; connectors are the access badge.</p></div>
+
+<h3 id="ch49-2"><span class="num">49.2</span>Web search: turning it on and reading the answer</h3>
+<p>Web search is available on all plans, including Free. It lets Claude search the public web and, when you give it a link, read the full page (Anthropic's help pages call that second part "web fetch"). Answers that use search include citations: links to the sources, and sometimes the exact quote Claude relied on.</p>
+<h4>Turning it on</h4>
+<p>As of 9 November 2026 (menus change often, so look for the same words if the layout has moved):</p>
+<div class="flow"><div><b>1. Open the menu</b>Select the <b>+</b> button at the lower left of the message box</div><div class="hl"><b>2. Choose Web search</b>A checkmark shows it is on for this chat</div><div><b>3. Ask</b>Claude decides when a search would help and shows the sources</div></div>
+<p>Anthropic's help page also notes that in the newer version of the Claude interface there may be no toggle at all: Claude searches when it judges a search would help. If you can't find the option, that is the likely reason.</p>
+<div class="box note"><span class="tag">Team and Enterprise</span><p>On Team and Enterprise plans, web search is off for everyone until an Owner or Primary Owner enables it in <b>Organization settings &gt; Capabilities</b>. If the option is missing on your work account, ask your Claude admin rather than assuming the feature doesn't exist.</p></div>
+<h4>What it costs you</h4>
+<p>Searches and page reads count toward your usage limits. A long page you paste as a link (Anthropic's example is a 10,000-word article) fills a large part of the <a class="gl" href="#g-context-window">context window</a> and uses far more of your allowance than a short answer. The help page suggests switching web search off for chats that don't need current information, and being selective about long links.</p>
+
+<h4>Reading citations like a tester</h4>
+<p>A citation shows where Claude says a claim came from. It does not prove the claim. Testers already know this pattern: a passing test only tells you what it actually checked. Apply the same thinking.</p>
+<div class="tbl"><table>
+<tr><th>Check</th><th>What you're looking for</th><th>Red flag</th></tr>
+<tr><td>Does the source exist and load?</td><td>The link opens the page Claude named</td><td>Dead link, login page, or a different page</td></tr>
+<tr><td>Does it say what Claude says?</td><td>The quoted or summarised claim is actually on the page</td><td>The page talks about the topic but not that specific claim</td></tr>
+<tr><td>Is it the right source?</td><td>Official docs, release notes, the standard itself</td><td>A blog, forum post or content farm used for a fact the vendor publishes</td></tr>
+<tr><td>Is it the right version and date?</td><td>The page matches the version you use</td><td>Docs for an older major version; an undated page</td></tr>
+<tr><td>Is anything missing?</td><td>Claims without a citation are clearly marked as Claude's own reasoning</td><td>A confident number or date with no source next to it</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A QA lead asks: "Which browsers does the current Playwright release support, and has anything changed in the last two releases?" With web search on, Claude cites the Playwright release notes and the browser support page. The lead opens both, confirms the version numbers match the notes, and pastes the links into the test-strategy page. Without web search, Claude could only describe Playwright as of its training, and might name a version that is months old.</p></div>
+<div class="box warn"><span class="tag">Search results can carry instructions</span><p>Web pages are written by strangers. A page can contain hidden text aimed at AI tools ("ignore your instructions and…"). This is <a class="gl" href="#g-prompt-injection">prompt injection</a>, covered in <a href="#ch127">Chapter 127</a>. For plain web search the main risk is a misleading answer. The risk grows when the same chat also has connectors that can take actions, which is why later sections talk about approvals.</p></div>
+
+<h3 id="ch49-3"><span class="num">49.3</span>Research mode: many searches, one report</h3>
+<p>A single web search answers a single question. Some questions need more: "What are the main approaches to visual regression testing, which tools support each, and what do teams report as the trade-offs?" Research mode is built for this. According to Anthropic's help page, Claude runs several searches that build on each other, decides what to explore next, and works through open questions before writing its answer.</p>
+<div class="flow"><div><b>Your question</b>Ideally with scope, audience and the output you want</div><div><b>Plan</b>Claude works out what it needs to find</div><div class="hl"><b>Search, read, repeat</b>Each finding shapes the next search, across the web and any connectors that are on</div><div><b>Report</b>A longer answer with sources</div></div>
+<h4>Plans, apps and how to start</h4>
+<ul>
+<li><b>Plans:</b> paid plans only (Pro, Max, Ultra, Team and Enterprise).</li>
+<li><b>Apps:</b> web, desktop and mobile. On mobile it searches only the web and silently skips connectors, so start research on the web or desktop if you need your own tools included.</li>
+<li><b>Needs:</b> web search must be on.</li>
+<li><b>Start it:</b> select <b>+</b> at the lower left of the message box, then <b>Research</b>. A blue indicator appears at the bottom of the chat; select it again to turn Research off. (UI as of 9 November 2026.)</li>
+</ul>
+<p>Two details from the help page are easy to miss. First, Research runs on a specific top-tier Opus model whatever model you picked for the chat, so on Team and Enterprise it stops working if an admin has blocked those models for your role. Second, Research can use your connectors' tools automatically, without asking for approval each time. It also can't use local MCP servers configured in the desktop app.</p>
+<div class="box warn"><span class="tag">Automatic tool use</span><p>Because Research calls connector tools without stopping to ask, only turn on connectors you are happy for it to use freely. For a research task, read-only tools (search, read) are what you want. Use tool permissions (section 49.6) to set write tools to "Needs approval" or "Blocked".</p></div>
+<h4>When Research is worth it</h4>
+<p>Research uses the same usage limits as normal chats but can use them up faster, because it reads many sources. Use it when the question really is broad.</p>
+<div class="cols2"><div><h4>Good fits</h4><ul>
+<li>Comparing three accessibility-testing tools for a tool-selection memo</li>
+<li>"What changed in WCAG 2.2 that affects our checkout form?"</li>
+<li>Pulling together everything your Drive and Jira hold about a feature before a test-planning session</li>
+<li>A landscape review of contract-testing approaches</li>
+</ul></div><div><h4>Poor fits</h4><ul>
+<li>"What's the latest version of Node?" (one search is enough)</li>
+<li>Explaining a concept Claude already knows well</li>
+<li>Anything you need in thirty seconds</li>
+<li>Questions about data no connector or website holds</li>
+</ul></div></div>
+<div class="code"><span class="cap">Prompt: a well-scoped research request</span><pre>Research question: which open-source tools can our team use for automated
+accessibility checks in a Playwright test suite?
+
+Context: web app, React front end, Playwright tests in TypeScript, run in
+GitHub Actions. We must report against WCAG 2.2 AA.
+
+I need:
+1. A comparison table: tool, licence, how it plugs into Playwright,
+   what it can and cannot detect, maintenance activity.
+2. What automated tools cannot catch, with sources.
+3. A recommendation with the trade-offs stated.
+
+Prefer official documentation and the W3C over blogs. Say clearly when a
+claim has no source.</pre></div>
+<details class="deep"><summary>Why multi-step search gives better answers (and new failure modes)</summary><div class="body"><p>A single search returns whatever ranks well for one query. Research works more like an <a class="gl" href="#g-agent">agent</a> (<a href="#ch107">Chapter 107</a>): it reads results, notices gaps ("the docs mention a config option I haven't seen explained"), and issues follow-up searches. That loop finds things one query misses.</p><p>The same loop brings new risks. Early mistakes can shape later searches, so a wrong assumption gets "confirmed" by sources that were chosen because of it. A long report also hides weak claims in the middle of strong ones. Checking two or three key claims at random, rather than just the first, is a cheap way to catch this. <a href="#ch92">Chapter 92</a> covers the same retrieval problems when you build your own system.</p></div></details>
+
+<h3 id="ch49-4"><span class="num">49.4</span>Connectors: letting Claude into your tools</h3>
+<p>A connector links Claude to an outside app or service so it can find information there and, for some connectors, take actions. Under the hood most connectors are remote <a class="gl" href="#g-mcp-server">MCP servers</a>: programs that offer Claude a set of tools such as "search issues" or "read file". You don't need to know that to use them, but it explains why connectors from different companies behave alike.</p>
+<p>The rule that matters most: <b>Claude inherits your permissions.</b> A connector signs in as you, so Claude can only see what you can see in that service. If you can't open a Confluence space, neither can Claude. (A custom connector that uses one shared credential is the exception: it can reach whatever that credential allows.)</p>
+<h4>Where connectors work</h4>
+<div class="tbl"><table>
+<tr><th>App</th><th>Kinds of connector</th></tr>
+<tr><td>claude.ai on the web</td><td>Remote connectors, including interactive ones that display content in the chat</td></tr>
+<tr><td>Claude desktop app</td><td>Remote connectors, plus local connectors installed as desktop extensions (<a href="#ch100">Chapter 100</a>)</td></tr>
+<tr><td>Claude mobile apps</td><td>Remote connectors you already added (installing new ones on mobile is in beta)</td></tr>
+<tr><td>Claude Code</td><td>Connectors you added in claude.ai, when you sign in with your Claude account</td></tr>
+</table></div>
+<h4>Adding one from the directory</h4>
+<p>The Connectors Directory lists connectors from Anthropic and other providers, each labelled Verified or Community. As of 9 November 2026 you reach it through <b>Customize &gt; Connectors</b> (in the desktop app, <b>Customize</b> is in the sidebar). From a chat you can also select <b>+</b>, hover over <b>Connectors</b>, and choose <b>Manage connectors</b>. Some help pages still say <b>Settings &gt; Connectors</b>: the location has moved before and may move again.</p>
+<div class="flow"><div><b>Find it</b>Customize &gt; Connectors, then browse or search</div><div><b>Connect</b>Select the connect button; some ask for a server URL or region first</div><div class="hl"><b>Sign in and review</b>You're sent to the service to sign in and approve the access Claude asks for</div><div><b>Turn it on per chat</b>+ &gt; Connectors, then the toggle for that service</div></div>
+<p>Connecting doesn't mean Claude uses it everywhere. In each conversation you choose which connectors are on. When Claude wants to use a tool it may ask first; you can choose <b>Allow once</b> or <b>Always allow</b>. The <b>Tool access</b> setting in the same menu (<b>Auto</b> by default, or <b>On demand</b>) controls how many tools are loaded up front; the help page suggests On demand when you have ten or more connectors active.</p>
+<div class="box note"><span class="tag">Plans</span><p>Directory connectors are available on all plans, including Free, on web, desktop and mobile. Custom connectors (your own server URL) are on all plans too, but Free accounts are limited to one. On Team and Enterprise, an Owner must add a connector for the organization first; each member then signs in with their own account.</p></div>
+
+<h3 id="ch49-5"><span class="num">49.5</span>The connectors QA teams ask about</h3>
+<p>Names and features in this area change quickly. This table reflects Anthropic's documentation on 9 November 2026.</p>
+<input class="filter" data-filter="#ch49Conn" data-empty="#ch49ConnEmpty" type="search" placeholder="Filter connectors…" aria-label="Filter connectors">
+<div class="tbl"><table id="ch49Conn">
+<tr><th>Service</th><th>What Claude can do</th><th>Worth knowing</th></tr>
+<tr class="group"><td colspan="3">Documents and email</td></tr>
+<tr><td>Google Drive</td><td>Search your Drive, list recent files, read Docs, Sheets, Slides, PDFs, Word/Excel/PowerPoint files and images; create new files</td><td>Built and run by Google. Can't read comments or suggested edits. You can also attach a Drive file directly (<b>+ &gt; Add from Google Drive</b>); in projects that works only in private projects.</td></tr>
+<tr><td>Gmail, Google Calendar</td><td>Search email and answer with citations to each message; answer questions about meetings and availability</td><td>Separate connectors from Drive. Research can use them.</td></tr>
+<tr><td>Microsoft 365</td><td>SharePoint, OneDrive, Outlook and Teams content</td><td>A separate connector from the Office add-ins in <a href="#ch51">Chapter 51</a>.</td></tr>
+<tr class="group"><td colspan="3">Code and issues</td></tr>
+<tr><td>GitHub (built-in integration)</td><td>Read file names, file contents and branch content from repositories you add to a chat or project</td><td>All plans. Does <b>not</b> see commit history, pull requests, issues or repository metadata. For editing code and opening PRs, use Claude Code (<a href="#ch63">Chapter 63</a>).</td></tr>
+<tr><td>Jira and Confluence (Atlassian)</td><td>Atlassian lists a connector in the directory that reaches Jira and Confluence under your Atlassian permissions</td><td>Check the directory listing for the current tool list and status. Atlassian restricts admin and delete tools unless an org admin enables them.</td></tr>
+<tr class="group"><td colspan="3">Chat</td></tr>
+<tr><td>Slack connector</td><td>Search your workspace's channels, DMs and files from claude.ai</td><td>Team and Enterprise only. Different from using Claude <em>inside</em> Slack (Claude Tag, <a href="#ch51">Chapter 51</a>).</td></tr>
+</table></div>
+<p id="ch49ConnEmpty" hidden>No connectors match.</p>
+<div class="box example"><span class="tag">Real-world example: story to test ideas</span><p>A tester has the Atlassian and Google Drive connectors on. They ask: "Read story PAY-1423 in Jira and the 'Refunds v2' spec in Drive. List acceptance criteria that are ambiguous or contradict the spec, then draft test ideas for each criterion." Claude fetches both, quotes the exact lines that conflict, and links back to each. The tester checks the quoted lines in Jira and Drive before raising the questions in refinement. Two tools, one answer, and the tester never pasted anything. (The story key is illustrative.)</p></div>
+<div class="box warn"><span class="tag">Connectors can write</span><p>Many connectors have tools that change things: create a Jira issue, post a Slack message, edit a file. Before turning a connector on in a chat that also reads untrusted content (web pages, customer emails, uploaded files), ask what the worst action it could take would be. Keep write tools on <b>Needs approval</b>, read the approval prompt properly, and never click "Always allow" on a write tool you haven't thought about. This is <a class="gl" href="#g-least-privilege">least privilege</a> applied to AI.</p></div>
+
+<h3 id="ch49-6"><span class="num">49.6</span>Custom connectors and tool permissions</h3>
+<p>If the service you need isn't in the directory but offers a remote MCP server, you can add it as a custom connector. As of 9 November 2026: <b>Customize &gt; Connectors</b>, select <b>Add</b>, hover over <b>Custom</b>, choose <b>Web</b>, then enter a name and the server URL. You then pick an <b>Authentication</b> option: <b>Sign in now</b>, <b>Sign in when needed</b> or <b>No sign in</b>. Servers that use <a class="gl" href="#g-oauth">OAuth</a> may also need an OAuth client choice, and fixed credentials go under <b>Request headers</b>.</p>
+<p>Two facts shape what's possible:</p>
+<ul>
+<li><b>Claude connects from Anthropic's cloud,</b> not from your laptop. Your server must be reachable from the public internet unless your organisation uses the private-network options Anthropic documents. A server running on <code>localhost</code> or inside your company VPN won't work as a web connector; for that, use a desktop extension or Claude Code (<a href="#ch100">Chapter 100</a>).</li>
+<li><b>Anthropic doesn't verify custom connectors.</b> Only connect to servers you trust, and read the sign-in request before approving it.</li>
+</ul>
+<h4>Tool permissions</h4>
+<p>Each connector's page under <b>Customize &gt; Connectors</b> has <b>Tool permissions</b>. Tools are grouped by type (for example read-only versus write or delete), and each group or single tool can be set to <b>Always allow</b>, <b>Needs approval</b> or <b>Blocked</b>. On Team and Enterprise, Owners can set organisation-wide limits that members cannot override. Restrictions only ever narrow access: they never give Claude more than your account has in the source system.</p>
+<div class="tbl"><table>
+<tr><th>Tool type</th><th>Sensible default for a QA team</th><th>Why</th></tr>
+<tr><td>Search and read</td><td>Always allow</td><td>Low risk, and approvals for every read get tedious fast</td></tr>
+<tr><td>Create (issues, comments, messages)</td><td>Needs approval</td><td>Visible to colleagues; easy to undo, but noisy if wrong</td></tr>
+<tr><td>Update, transition, delete</td><td>Needs approval or Blocked</td><td>Can change sprint data, close bugs or remove content</td></tr>
+<tr><td>Admin tools</td><td>Blocked</td><td>No QA chat needs them</td></tr>
+</table></div>
+<p>To stop using a connector in one chat, turn its toggle off. To sign Claude out of the service entirely, select <b>Disconnect</b> on the connector's page. <b>Remove</b> (in the three-dot menu) takes it off your account.</p>
+
+<h3 id="ch49-7"><span class="num">49.7</span>What admins control on Team and Enterprise</h3>
+<p>If you're the person setting Claude up for a team, these are the switches that matter. Only Owners and Primary Owners can change them. Paths are as of 9 November 2026.</p>
+<div class="tbl"><table>
+<tr><th>Control</th><th>Where</th><th>Effect</th></tr>
+<tr><td>Web search on or off</td><td>Organization settings &gt; Capabilities</td><td>Members can't use web search (or Research) until this is on</td></tr>
+<tr><td>Which connectors exist</td><td>Organization settings &gt; Connectors</td><td>Owners add connectors for the organisation; members then authenticate individually</td></tr>
+<tr><td>Member requests</td><td>"Let members request connectors"</td><td>On by default for Team, off for Enterprise. Requests appear for owners to approve, decline, or decline and block</td></tr>
+<tr><td>Organisation tool permissions</td><td>Connector settings, Tool permissions</td><td>Always allow, Needs approval or Blocked per tool group, which members can't override</td></tr>
+<tr><td>Sharing chats that used connectors</td><td>"Share chats that use connectors"</td><td>If off, members can't share chats that contain connector or synced content</td></tr>
+<tr><td>Outside accounts (Enterprise)</td><td>Connector settings</td><td>Stop verified-domain services connecting to accounts outside the organisation</td></tr>
+</table></div>
+<div class="box note"><span class="tag">Data location</span><p>Connected services process data on their own infrastructure under their own terms, which may be outside the US. Settings such as US-only inference in Claude don't change what the connected service does. If your organisation has data-residency rules, check each connector's provider, not just Anthropic.</p></div>
+<div class="box opinion"><span class="tag">Opinion · this book's authors</span><p>For a QA team's first month, start small: web search on, one read-heavy connector (Drive or Atlassian), write tools set to Needs approval, and a shared page listing which connectors are approved and why. Add more once people have the habit of checking citations and reading approval prompts. Turning everything on at once tends to produce a few surprising Jira comments and a loss of trust that takes longer to fix than the setup did.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Search, verify, then connect</b><span>35 min · claude.ai (Free works for parts 1 and 3; part 2 needs a paid plan)</span></div><ol>
+<li><b>Part 1: web search.</b> Start a new chat. Select <b>+</b> and turn on <b>Web search</b> (or skip this if your interface has no toggle). Ask: <code>What is the latest stable release of Playwright, what date was it released, and what are three notable changes? Cite the official release notes.</code><span class="expect">An answer with clickable citations, at least one pointing to playwright.dev or the microsoft/playwright GitHub releases page.</span></li>
+<li>Open every citation. For each claim, write down: source loads (yes/no), claim is on the page (yes/no), official source (yes/no).<span class="expect">Usually most claims check out. If one doesn't, you've found the reason this habit exists; note it.</span></li>
+<li>Ask a follow-up with no search: turn web search off and ask the same question in a new chat.<span class="expect">Claude answers from training, probably naming an older version, or says it can't know the latest release. Compare the two answers.</span></li>
+<li><b>Part 2: Research (paid plans).</b> In a new chat select <b>+ &gt; Research</b> and paste the accessibility-tools prompt from section 49.3.<span class="expect">The blue Research indicator shows; Claude takes noticeably longer than a normal answer and returns a structured report with many sources.</span></li>
+<li>Pick three claims from the <em>middle</em> of the report and verify them as in step 2.<span class="expect">A short note of what held up. If you're on Free, do steps 1 to 3 with two related questions instead.</span></li>
+<li><b>Part 3: the GitHub integration.</b> Go to <b>Customize &gt; Connectors</b>, select <b>GitHub Integration</b> and connect your GitHub account. Then in a chat select <b>+ &gt; Add from GitHub</b> and add a small public repository you know (your own, or a small sample project). Ask: <code>Which test framework does this repository use, where are the tests, and which areas look untested?</code><span class="expect">An answer that names real file paths from the repository. If you ask about open pull requests, Claude should say it can't see them, because the integration only reads files.</span></li>
+<li>Open the connector's page and look at its settings. Then remove the repository from the chat or disconnect GitHub if you don't want to keep it.<span class="expect">The connector shows <b>Connect</b> again after you disconnect.</span></li>
+</ol>
+<p><b>Troubleshooting:</b> No Web search option: you may be on the newer interface (Claude searches automatically) or a Team/Enterprise account where an Owner hasn't enabled it. No Research option: Free plan, or web search is off. <b>Add from GitHub</b> missing: connect GitHub in Customize &gt; Connectors first; on Team/Enterprise an Owner must turn GitHub on. "Claude cannot access that resource": the repository is private and the Claude GitHub App hasn't been given access; follow the link in the message.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"If there's a citation, the claim is true."</dt><dd>A citation shows where Claude says it got the claim. Open it: the page may not say that, may be outdated, or may itself be wrong.</dd>
+<dt>"Connectors let Claude see everything in our Jira."</dt><dd>A standard connector signs in as you and sees only what your account can see. Custom connectors with shared credentials are the exception.</dd>
+<dt>"Research mode is just a better web search, so I'll leave it on."</dt><dd>It uses your limits faster, takes longer, and calls connector tools without asking. Use it for broad questions only.</dd>
+<dt>"The GitHub integration can review my pull requests."</dt><dd>It reads file names and contents only. It doesn't see pull requests, issues or commit history. Claude Code or Claude Tag handle that work.</dd>
+<dt>"A custom connector can reach our internal test server."</dt><dd>Web connectors connect from Anthropic's cloud, so the server must be publicly reachable (or use the documented private-network options). Local servers belong in the desktop app or Claude Code.</dd>
+</dl></div>
+
+<h3 id="ch49-r"><span class="num">49.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Training knowledge is fixed at a cutoff and has no sources; web search and connectors add current and private information with citations.</li>
+<li>Web search is on all plans; on Team and Enterprise an Owner must enable it. Citations must be opened and checked.</li>
+<li>Research runs many linked searches for broad questions. Paid plans only; it uses limits faster and calls connector tools automatically.</li>
+<li>Connectors sign in as you and inherit your permissions. Turn them on per chat, and use tool permissions to keep write tools on Needs approval.</li>
+<li>Custom connectors are remote MCP servers reached from Anthropic's cloud. Anthropic doesn't verify them, so connect only to servers you trust.</li>
+<li>UI paths in this chapter are correct as of 9 November 2026 and move often; look for the same words.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Your Team-plan colleague can't find web search anywhere. What's the most likely reason?</p><div class="opts"><button>Web search is only on the Free plan</button><button data-ok>An Owner hasn't enabled it in the organisation's capabilities settings</button><button>Web search only works in the mobile app</button></div><p class="why" hidden>On Team and Enterprise, an Owner or Primary Owner must turn web search on for the organisation before members can use it.</p></div>
+<div class="qz"><p class="q">Claude cites a vendor page for a claim about a configuration option. What should you do before putting it in your test plan?</p><div class="opts"><button>Nothing: a citation means it was verified</button><button>Ask Claude whether it's sure</button><button data-ok>Open the page and confirm it says that, for the version you use</button></div><p class="why" hidden>Citations show where a claim came from, not that it is right. Check the page and the version yourself.</p></div>
+<div class="qz"><p class="q">Which is true of Research mode, according to Anthropic's help page?</p><div class="opts"><button data-ok>It can use turned-on connector tools without asking for approval each time</button><button>It is available on the Free plan</button><button>It includes connectors when started from the mobile app</button></div><p class="why" hidden>Research uses connector tools automatically, is for paid plans, and on mobile searches only the web.</p></div>
+<div class="qz"><p class="q">You add a repository through the GitHub integration and ask "Which open PRs touch the payment module?" What should you expect?</p><div class="opts"><button>A full list of open pull requests</button><button data-ok>Claude can't see pull requests; the integration reads file names and contents only</button><button>Claude opens a new pull request</button></div><p class="why" hidden>The integration retrieves file names, contents and branch content, not commit history, pull requests, issues or metadata.</p></div>
+<div class="qz"><p class="q">Your team wants a custom connector for an MCP server running only inside the company VPN. What's the problem?</p><div class="opts"><button>Custom connectors are Enterprise-only</button><button>MCP servers can't be used with Claude</button><button data-ok>Web connectors connect from Anthropic's cloud, so the server must be reachable from there</button></div><p class="why" hidden>Claude connects to custom connectors from Anthropic's infrastructure. Use the documented private-network options, a desktop extension, or Claude Code for internal-only servers.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Write a one-page "Claude research and connectors guide" for your QA team. Include: when to use plain chat, web search and Research (with one example question each from your own product); a citation-checking checklist (adapt the table in 49.2); the connectors your team should use, with a tool-permission setting for each tool group; and a list of things never to do (for example, "Always allow" on write tools, or custom connectors from unknown sources). If you're on Team or Enterprise, show it to your Claude admin and agree which settings they will enforce centrally.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Out of the box, Claude only knows what it learned in training, so it can be out of date and it knows nothing about our systems. Web search lets it look things up and show its sources. Research does lots of searches in a row for big questions, but it's slower, uses more of your allowance and uses connectors without asking. Connectors plug Claude into Drive, Jira, GitHub or Slack, signed in as you, so it sees what you see. Two rules: always open the citations before you trust a claim, and keep anything that writes on 'Needs approval'."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic Help Center, <a href="https://support.claude.com/en/articles/10684626-enable-and-use-web-search" target="_blank" rel="noopener">Enable and use web search</a> (toggle, citations, web fetch, usage, Team/Enterprise enablement).</li>
+<li>Anthropic Help Center, <a href="https://support.claude.com/en/articles/11088861-use-research-on-claude" target="_blank" rel="noopener">Use Research on Claude</a> (plans, apps, model, automatic connector use, mobile behaviour).</li>
+<li>Anthropic Help Center, <a href="https://support.claude.com/en/articles/11176164-use-connectors-to-extend-claude-s-capabilities" target="_blank" rel="noopener">Use connectors to extend Claude's capabilities</a> (directory, custom connectors, plans, owner controls, tool permissions, data handling).</li>
+<li>Claude documentation, <a href="https://claude.com/docs/connectors/getting-started" target="_blank" rel="noopener">Get started with connectors</a> and <a href="https://claude.com/docs/connectors/directory" target="_blank" rel="noopener">Connectors directory</a>.</li>
+<li>Claude documentation, <a href="https://claude.com/docs/connectors/google/drive" target="_blank" rel="noopener">Google Drive</a>, <a href="https://claude.com/docs/connectors/github" target="_blank" rel="noopener">GitHub integration</a> and <a href="https://claude.com/docs/connectors/slack/index" target="_blank" rel="noopener">Slack integration</a>.</li>
+<li>Atlassian, <a href="https://www.atlassian.com/platform/remote-mcp-server" target="_blank" rel="noopener">Atlassian remote MCP server</a> (Jira and Confluence access, permissions).</li>
+</ol><p class="verified">Verified 9 November 2026 against the Anthropic Help Center and claude.com connector documentation. Interface locations change often; check the linked pages if a menu has moved.</p></div>

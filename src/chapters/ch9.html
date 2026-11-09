@@ -1,0 +1,199 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How AI, machine learning, deep learning, generative AI and large language models fit inside each other</li>
+<li>What a "model" actually is, and how it differs from the app or product you use</li>
+<li>The difference between training and inference, and why it matters for cost, privacy and freshness</li>
+<li>Where everyday products and common QA tools sit on the map</li>
+<li>How to ask precise questions when a vendor says their tool is "AI-powered"</li>
+<li>How to start your own working glossary that you'll grow through the rest of this book</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> nothing technical. It helps to have read the history in <a href="#ch1">Chapter 1</a> (what intelligence is), <a href="#ch5">Chapter 5</a> (machine learning and deep learning) and <a href="#ch7">Chapter 7</a> (the arrival of ChatGPT and Claude), but this chapter stands on its own.</div>
+
+<div class="bigidea"><p>People use "AI", "machine learning", "deep learning", "generative AI" and "LLM" as if they meant the same thing. They don't. They fit inside each other like nesting dolls: AI is the whole field, machine learning is the part that learns from examples, deep learning is machine learning with many-layered neural networks, generative AI is the part that creates new content, and large language models are generative models for text. A <a class="gl" href="#g-model">model</a> is the learned thing at the centre: a big set of numbers that turns an input into an output. Building it is <a class="gl" href="#g-training">training</a>; using it is <a class="gl" href="#g-inference">inference</a>. With this map you can place any product, read any article and ask better questions.</p></div>
+
+<h3 id="ch9-1"><span class="num">9.1</span>Why you need a map</h3>
+<p>Open any news site or vendor brochure and you'll see sentences like "Our AI-powered, machine-learning-driven platform uses deep generative models." Most readers nod and move on. But each of those words means something specific, and the differences matter when you have to decide whether to trust, buy, test or build something.</p>
+<p>Here's a typical workplace moment. A tool vendor says their test automation product has "AI self-healing". That could mean any of these:</p>
+<ul>
+<li>A hand-written rule: "if the button ID changed, try the button text instead". No learning at all.</li>
+<li>A small machine-learning model trained to guess which element on a page is "the same" as before.</li>
+<li>A call to a large language model such as Claude, asking it to pick the right element.</li>
+</ul>
+<p>All three get marketed as "AI". They behave very differently. The first is predictable and cheap. The second needs training data and can drift. The third costs money per call, can give different answers on different runs, and sends your page content to a third party. Knowing the map lets you ask which one it is.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>"Vehicle", "car", "electric car" and "Tesla Model 3" are all correct words for the same object, at different levels of detail. If a colleague says "I bought a vehicle", you don't know whether to ask about charging. AI words work the same way: each one is correct at its own level, but only the specific one tells you how the thing behaves.</p></div>
+
+<h3 id="ch9-2"><span class="num">9.2</span>The nesting dolls</h3>
+<p>Here is the map, from the widest circle to the narrowest.</p>
+<div class="flow">
+<div><b>Artificial intelligence</b>Any technique that makes computers do things we'd call intelligent</div>
+<div><b>Machine learning</b>AI that learns patterns from examples instead of following hand-written rules</div>
+<div><b>Deep learning</b>Machine learning with neural networks of many layers</div>
+<div><b>Generative AI</b>Deep learning models that create new text, images, audio, video or code</div>
+<div class="hl"><b>Large language models</b>Generative models trained on huge amounts of text: Claude, GPT, Gemini</div>
+</div>
+<p>Each box sits inside the one before it. Every LLM is a kind of generative AI; every generative AI system you'll meet today is deep learning; all deep learning is machine learning; all machine learning is AI. The reverse isn't true: plenty of AI is not machine learning, and plenty of machine learning is not deep learning.</p>
+<div class="tbl"><table>
+<tr><th>Circle</th><th>Plain definition</th><th>Everyday example</th><th>QA example</th></tr>
+<tr><td><a class="gl" href="#g-artificial-intelligence">Artificial intelligence</a></td><td>The whole field of making computers do things we'd normally say need intelligence</td><td>A route planner finding the fastest way home</td><td>A rule engine that flags any build with more than 5 failing tests as "do not release"</td></tr>
+<tr><td><a class="gl" href="#g-machine-learning">Machine learning</a></td><td>The computer learns the rules from examples rather than being told them</td><td>An email spam filter that learned from millions of emails people marked as spam</td><td>A model that predicts which tests are likely to fail, trained on past CI runs</td></tr>
+<tr><td><a class="gl" href="#g-deep-learning">Deep learning</a></td><td>Machine learning using <a class="gl" href="#g-neural-network">neural networks</a> with many layers</td><td>Face unlock on a phone; speech-to-text</td><td>A vision model that spots visual layout problems in screenshots</td></tr>
+<tr><td><a class="gl" href="#g-generative-ai">Generative AI</a></td><td>Models that produce new content rather than only labelling or scoring it</td><td>An image generator drawing a picture from a sentence</td><td>Generating realistic synthetic test data</td></tr>
+<tr><td><a class="gl" href="#g-large-language-model">Large language models</a> (LLMs)</td><td>Generative models that read and write text (and often code and images), trained on enormous text collections</td><td>Claude, ChatGPT, Gemini</td><td>Drafting test cases from a Jira story; summarising a failing CI log</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example</span><p>Your team uses three "AI" things. A rule in Jira automatically sets priority to "Highest" when a ticket contains "payment" and "production". A dashboard predicts which test files a pull request will break, from two years of history. And Claude Code writes Playwright tests. On the map: the first is plain AI in the broadest sense (really just automation with rules), the second is classic machine learning, and the third is an LLM. They need three different kinds of testing: the rule needs ordinary test cases, the predictor needs accuracy measured on fresh data, and the LLM needs <a class="gl" href="#g-eval">evals</a> that cope with varied answers (<a href="#ch125">Chapter 125</a>).</p></div>
+<details class="deep"><summary>Where the neat picture is a simplification</summary><div class="body">
+<p>The nesting-doll picture is the standard teaching map, and it's right in spirit. Real life has some blurry edges worth knowing:</p>
+<ul>
+<li><strong>AI outside machine learning is still alive.</strong> Search algorithms, planners, constraint solvers and rule-based <a class="gl" href="#g-expert-system">expert systems</a> (Chapter 4) are AI without learning. Modern systems often mix them: a chess program can combine classic search with a learned evaluation.</li>
+<li><strong>Not all generative models are LLMs.</strong> Image generators usually use a different design called a diffusion model. Speech generators and music generators are generative but not language models.</li>
+<li><strong>Not all language models are generative chatbots.</strong> BERT (2018, Chapter 6) is a language model built for understanding text, used for search and classification, not for writing replies.</li>
+<li><strong>Generative AI could, in principle, exist without deep learning.</strong> Older statistical methods generated text too (the n-gram models in Chapter 6). In practice every generative system worth using today is deep learning.</li>
+<li><strong>"Multimodal" LLMs</strong> read images, PDFs and sometimes audio as well as text (<a href="#ch21">Chapter 21</a>). Some people prefer the broader term <a class="gl" href="#g-foundation-model">foundation model</a> for these large, general-purpose models.</li>
+</ul>
+</div></details>
+
+<h3 id="ch9-3"><span class="num">9.3</span>What a "model" actually is</h3>
+<p>"Model" is the most important word on the map, and the most misunderstood. In machine learning, a model is a mathematical function with adjustable numbers inside it. You give it an input; it gives you an output. Training sets those numbers so that the outputs are useful.</p>
+<div class="flow">
+<div><b>Input</b>An email; a photo; a sentence; a test-run history</div>
+<div class="hl"><b>Model</b>A fixed recipe of arithmetic plus millions or billions of learned numbers</div>
+<div><b>Output</b>"Spam: 97%"; "cat"; the next word; "likely to fail"</div>
+</div>
+<p>The learned numbers are called <a class="gl" href="#g-parameter">parameters</a>, or <a class="gl" href="#g-weight">weights</a>. A small spam filter might have thousands. A large language model has billions or more. Physically, a model is a set of files: a description of the arithmetic (the "architecture") and the weights. It is not a database of facts and not a program full of if-statements. Nobody wrote its rules; they emerged from training.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a sound-mixing desk with thousands of sliders. The wiring of the desk (which slider affects which channel) is the architecture. The positions of the sliders are the weights. Training is the long process of nudging every slider until the music sounds right. Once the sliders are set, you can copy their positions onto another identical desk and get exactly the same sound. That copy is the model.</p></div>
+<h4>Model, product, tool: three different things</h4>
+<p>A common mix-up is between the model and the products built around it.</p>
+<div class="tbl"><table>
+<tr><th>Layer</th><th>What it is</th><th>Claude examples</th></tr>
+<tr><td>Model</td><td>The trained weights that turn input into output</td><td>Claude Opus 5.5, Claude Sonnet 5.5, Claude Haiku 5.5, Claude Fable 5.1</td></tr>
+<tr><td>Platform / API</td><td>A service that lets programs send input to a model and get output back</td><td>The Claude API (<a href="#ch86">Chapter 86</a>)</td></tr>
+<tr><td>Product / app</td><td>Software for people, which calls a model and adds features such as chat history, file upload, memory and search</td><td>The Claude apps on web, desktop and mobile</td></tr>
+<tr><td>Tool / agent</td><td>Software that lets a model take actions: read files, run commands, use a browser</td><td>Claude Code (<a href="#ch63">Chapter 63</a>)</td></tr>
+</table></div>
+<p>When someone says "Claude got this wrong", it's worth asking which layer. Was it the model's reasoning, the instructions the product gave it, a missing file the tool didn't read, or a setting? Testers do this instinctively for normal software. Do it for AI too.</p>
+<div class="box note"><span class="tag">Model names change; the idea doesn't</span><p>The Claude models named above are current as of 9 November 2026 (see <a href="#ch40">Chapter 40</a> for details and how to choose). New versions arrive every few months. The map in this chapter will stay true long after the names change.</p></div>
+
+<h3 id="ch9-4"><span class="num">9.4</span>Training versus inference</h3>
+<p>Every model has two lives. First it is built. Then it is used. These are completely separate activities with different costs, timings and risks.</p>
+<div class="cols2">
+<div><h4>Training: learning</h4><p>The model sees enormous numbers of examples. After each batch, its weights are nudged so it does a little better. For a large language model this takes weeks or months on thousands of specialised chips and costs a great deal. It happens a few times per model, at the AI company. When it ends, the weights are frozen.</p></div>
+<div><h4>Inference: answering</h4><p>The frozen model is given a new input and produces an output. This happens every time anyone sends a message. Each single answer is cheap and quick (seconds), but there are millions of them, so total inference cost is large. The weights do not change.</p></div>
+</div>
+<div class="tbl"><table>
+<tr><th></th><th>Training</th><th>Inference</th></tr>
+<tr><td>Purpose</td><td>Set the weights</td><td>Use the weights</td></tr>
+<tr><td>Who does it</td><td>The model developer (Anthropic, OpenAI, Google…)</td><td>Everyone who uses the model</td></tr>
+<tr><td>How often</td><td>Rarely: once per model version, plus later fine-tuning</td><td>Constantly: every request</td></tr>
+<tr><td>Do weights change?</td><td>Yes</td><td>No</td></tr>
+<tr><td>What you pay for as a user</td><td>Nothing directly</td><td>Usage: tokens in and out (<a href="#ch14">Chapter 14</a>), or a subscription</td></tr>
+<tr><td>Explained in</td><td><a href="#ch12">Chapter 12</a>, <a href="#ch17">Chapter 17</a>, <a href="#ch18">Chapter 18</a></td><td><a href="#ch25">Chapter 25</a></td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>A medical student spends years studying: that's training. A qualified doctor seeing patients is inference. The doctor uses what they learned, but seeing one more patient doesn't rewrite their medical school education. And a doctor who qualified in 2020 won't know about a drug approved last month unless someone tells them.</p></div>
+<h4>Three practical consequences</h4>
+<ol>
+<li><strong>Models have a <a class="gl" href="#g-knowledge-cutoff">knowledge cutoff</a>.</strong> A model only knows what was in its training data. Anything later must be given to it at inference time: pasted into the chat, found through web search, or fetched by a tool.</li>
+<li><strong>Chatting doesn't retrain the model.</strong> When you correct Claude in a conversation, its weights don't change. It "remembers" only because the earlier messages are sent back with each new one, inside its <a class="gl" href="#g-context-window">context window</a> (<a href="#ch20">Chapter 20</a>). Memory features in apps work the same way: they store notes and feed them back in as context.</li>
+<li><strong>Testing targets inference.</strong> As a tester you almost always evaluate a frozen model through inference: same inputs, judged outputs. When the vendor releases a new version, the weights are different, so you re-run your checks. That's regression testing for AI.</li>
+</ol>
+<details class="deep"><summary>Fine-tuning: training after training</summary><div class="body">
+<p>Training happens in stages. <a class="gl" href="#g-pre-training">Pre-training</a> teaches a model general patterns from a huge, broad dataset (Chapter 17). Then post-training, including <a class="gl" href="#g-fine-tuning">fine-tuning</a> and <a class="gl" href="#g-rlhf">RLHF</a>, shapes it into a helpful, honest assistant (Chapter 18). Some providers also let customers fine-tune models on their own data. Either way, it's still training: weights change, and it happens before the model answers your questions, not during.</p>
+<p>Context is the other lever. Giving a model the right documents at inference time, a technique called <a class="gl" href="#g-rag">RAG</a> (Chapter 23), is usually cheaper, faster to update and easier to check than fine-tuning. Most workplace "teach the AI about our product" needs are solved with context, not training.</p>
+</div></details>
+<div class="box warn"><span class="tag">Privacy is a separate question</span><p>"Chatting doesn't change the weights in real time" is not the same as "my chats are never used for training". Whether a provider may use your conversations to train future models depends on the product, the plan and your settings. Check your organisation's agreement and the provider's current policy before pasting customer data or confidential code. <a href="#ch98">Chapter 98</a> covers secrets and access.</p></div>
+
+<h3 id="ch9-5"><span class="num">9.5</span>Where everyday products sit</h3>
+<p>Use the filter to find a product or tool and see where it sits. These placements describe the typical technique behind each kind of product, not any one company's internal design, which is often not public.</p>
+<input class="filter" data-filter="#ch9Products" data-empty="#ch9Empty" type="search" placeholder="Filter products…" aria-label="Filter products">
+<div class="tbl"><table id="ch9Products">
+<tr><th>Product or feature</th><th>Narrowest circle</th><th>Why</th></tr>
+<tr class="group"><td colspan="3">Everyday life</td></tr>
+<tr><td>Sat-nav fastest route</td><td>AI (search, not learning)</td><td>Classic route-finding algorithms over a road map; traffic predictions may add machine learning</td></tr>
+<tr><td>Email spam filter</td><td>Machine learning</td><td>Learns from emails people have marked as spam or not spam</td></tr>
+<tr><td>Streaming and shopping recommendations</td><td>Machine learning</td><td>Learns from what similar people watched or bought</td></tr>
+<tr><td>Card fraud alerts</td><td>Machine learning</td><td>Scores each transaction against learned patterns of fraud</td></tr>
+<tr><td>Phone face unlock</td><td>Deep learning</td><td>A neural network compares your face to a stored representation</td></tr>
+<tr><td>Speech-to-text dictation</td><td>Deep learning</td><td>Neural networks map sound to words</td></tr>
+<tr><td>Image generators</td><td>Generative AI</td><td>Create new images from a text description (usually diffusion models, not LLMs)</td></tr>
+<tr><td>Claude, ChatGPT, Gemini</td><td>LLM</td><td>Generate text one token at a time; most also read images</td></tr>
+<tr class="group"><td colspan="3">QA and engineering</td></tr>
+<tr><td>Pixel-diff visual regression</td><td>Not AI</td><td>Compares screenshots pixel by pixel with a threshold. Useful, but no learning (<a class="gl" href="#g-visual-regression">visual regression</a>)</td></tr>
+<tr><td>Rule-based ticket routing</td><td>AI in the broad sense, or just automation</td><td>Hand-written if-then rules</td></tr>
+<tr><td>Flaky-test or failure prediction from history</td><td>Machine learning</td><td>Learns from past runs which tests tend to fail together</td></tr>
+<tr><td>Grouping similar crash reports</td><td>Machine learning</td><td>Clusters reports by similarity without labels (<a href="#ch10">Chapter 10</a>)</td></tr>
+<tr><td>Screenshot-based UI checks with a vision model</td><td>Deep learning</td><td>A neural network judges what is on screen</td></tr>
+<tr><td>Test case drafting from a user story</td><td>LLM</td><td>Reads text, writes text</td></tr>
+<tr><td>Claude Code fixing a failing test</td><td>LLM inside an agent</td><td>An LLM that can also run tools in a loop (<a class="gl" href="#g-agent">agent</a>)</td></tr>
+</table></div>
+<p id="ch9Empty" hidden>No products match.</p>
+<div class="box note"><span class="tag">"AI" in marketing</span><p>Marketing often uses "AI" for anything automated. That's not always wrong, since the field has always been broad. But "AI-powered" tells you almost nothing about how a product behaves. The narrowest accurate circle is what tells you how to test it.</p></div>
+
+<h3 id="ch9-6"><span class="num">9.6</span>Other words you'll meet</h3>
+<p>A few more terms sit beside the main map rather than inside it.</p>
+<div class="tbl"><table>
+<tr><th>Term</th><th>Plain meaning</th><th>Where it fits</th></tr>
+<tr><td><a class="gl" href="#g-narrow-ai">Narrow AI</a></td><td>A system good at one task or a limited range of tasks</td><td>Every AI system in use today, including LLMs, is narrow by most definitions, though LLMs are much broader than older systems</td></tr>
+<tr><td><a class="gl" href="#g-agi">AGI</a></td><td>Artificial general intelligence: AI that matches people across most thinking tasks</td><td>A goal and a debate, not a product category. Definitions differ (<a href="#ch8">Chapter 8</a>)</td></tr>
+<tr><td><a class="gl" href="#g-foundation-model">Foundation model</a></td><td>A large model trained on broad data that can be adapted to many tasks</td><td>Most LLMs are foundation models. The term was popularised by a Stanford group in 2021</td></tr>
+<tr><td><a class="gl" href="#g-natural-language-processing">Natural language processing</a></td><td>The field of computers working with human language</td><td>A subject area, spanning rules, statistics and deep learning (<a href="#ch6">Chapter 6</a>)</td></tr>
+<tr><td><a class="gl" href="#g-computer-vision">Computer vision</a></td><td>The field of computers working with images and video</td><td>A subject area; today mostly deep learning</td></tr>
+<tr><td>Data science</td><td>Using data, statistics and code to answer questions and support decisions</td><td>Overlaps heavily with machine learning but also includes reporting, experiments and analysis without any model</td></tr>
+<tr><td><a class="gl" href="#g-algorithm">Algorithm</a></td><td>A step-by-step procedure</td><td>The training method is an algorithm; the model is what the algorithm produces</td></tr>
+<tr><td><a class="gl" href="#g-agent">Agent</a></td><td>A model that can take actions with tools, in a loop, toward a goal</td><td>A way of <em>using</em> a model, not a new kind of model (<a href="#ch107">Chapter 107</a>)</td></tr>
+</table></div>
+<div class="box opinion"><span class="tag">Opinion · researchers and commentators</span><p>Whether LLMs count as "narrow" AI is genuinely contested. Some researchers argue that models which write code, analyse contracts and pass professional exams are already a form of general intelligence, at least in early form. Others argue that they remain pattern-matchers with serious gaps in reliability, planning and learning from experience. This book treats it as an open debate, not a settled fact.</p></div>
+
+<h3 id="ch9-7"><span class="num">9.7</span>Using the map at work</h3>
+<p>The map turns vague claims into testable questions. When someone presents an "AI" feature, work inward through the circles:</p>
+<div class="flow">
+<div><b>Does it learn?</b>If not, it's rules. Test it like any other software.</div>
+<div><b>From what data?</b>If yes, ask what it was trained on and how recently.</div>
+<div><b>What kind of model?</b>A small classifier, a vision network, or an LLM?</div>
+<div class="hl"><b>Where does inference run?</b>On your machine, in your cloud, or on a third-party API? What data leaves?</div>
+<div><b>How is it measured?</b>Accuracy on what test set? How often does it change?</div>
+</div>
+<div class="box example"><span class="tag">Real-world example: a vendor call</span><p>A vendor demos "AI test generation". You ask: "Is this an LLM? Which one, and through which API? Does our application's page content get sent to it? Is it the same model every run, or can it change underneath us? How do you measure the quality of the tests it writes?" Five questions, straight from the map. Their answers tell you more than the slide deck did.</p></div>
+<div class="box note"><span class="tag">Understanding, using, building</span><p>This book separates three skills. <strong>Understanding</strong> is knowing what the circles mean and how models are made (Part II). <strong>Using</strong> is getting good results from tools like Claude and Claude Code (Parts VI onwards). <strong>Building</strong> is creating your own systems on top of models with APIs and MCP. This chapter is pure understanding; it makes the other two easier.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Build your working glossary</b><span>15 min · claude.ai (or any AI assistant) and a spreadsheet</span></div><ol>
+<li>Create a spreadsheet or document with four columns: <em>Term</em>, <em>My plain definition</em>, <em>Circle on the map</em>, <em>Example from my work</em>.<span class="expect">an empty table you'll keep adding to throughout the book.</span></li>
+<li>Fill in rows for: artificial intelligence, machine learning, deep learning, generative AI, LLM, model, training, inference, parameter, knowledge cutoff. Write the definition in your own words before checking this chapter.<span class="expect">ten rows. It's fine if some feel shaky; that tells you what to re-read.</span></li>
+<li>Ask Claude: "Here are my definitions of ten AI terms. For each, tell me whether it's accurate, too broad or too narrow, and suggest one improvement. Don't rewrite them completely." Paste your table.<span class="expect">feedback per term. Expect it to flag at least one definition that blurs model and product, or training and inference.</span></li>
+<li>List five tools your team uses that claim to be "AI" or "smart". For each, place it in the narrowest circle you can justify, and write one question you'd ask the vendor.<span class="expect">five placements. For at least one you'll realise you don't know, which is the point: that's your vendor question.</span></li>
+<li>Ask Claude: "Are you a model, a product or both? What is the difference between the model I'm talking to and the app I'm using?"<span class="expect">an explanation that separates the underlying Claude model from the app's features (chat history, file handling, tools). Compare it with section 9.3.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"AI and machine learning are the same thing."</dt><dd>Machine learning is one part of AI. Search, planning and rule-based systems are AI without learning.</dd>
+<dt>"Claude learns from my conversation."</dt><dd>Its weights don't change during a chat. It uses the earlier messages as context. Whether your data might be used to train future models is a separate policy question.</dd>
+<dt>"A model is a database of facts."</dt><dd>It's a set of learned numbers that turn input into output. It can reproduce facts it saw often, but it doesn't look them up, which is one reason it can be confidently wrong (<a href="#ch22">Chapter 22</a>).</dd>
+<dt>"All generative AI is an LLM."</dt><dd>Image, audio and video generators are generative but usually not language models.</dd>
+<dt>"If a product says 'AI', it uses a neural network."</dt><dd>It might be a few if-statements. Ask.</dd>
+</dl></div>
+
+<h3 id="ch9-r"><span class="num">9.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>AI ⊃ machine learning ⊃ deep learning ⊃ generative AI ⊃ LLMs. Each inner circle is a special case of the one outside it.</li>
+<li>A model is a fixed arithmetic recipe plus learned numbers (parameters or weights) that turn input into output.</li>
+<li>The model is different from the API, the app and the agent tool built around it.</li>
+<li>Training sets the weights, rarely and expensively. Inference uses the frozen weights, constantly and cheaply per request.</li>
+<li>Chatting doesn't retrain a model; context does the "remembering". Knowledge stops at the training cutoff unless you supply more.</li>
+<li>The narrowest accurate circle tells you how a product behaves and how to test it.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Which statement about the map is true?</p><div class="opts"><button>All AI is machine learning</button><button data-ok>All deep learning is machine learning</button><button>All machine learning is deep learning</button></div><p class="why" hidden>Deep learning is a subset of machine learning. AI also includes non-learning techniques, and much machine learning uses simpler methods than deep networks.</p></div>
+<div class="qz"><p class="q">You correct Claude in a chat and it does better for the rest of the conversation. What happened?</p><div class="opts"><button>Its weights were updated by your correction</button><button data-ok>Your correction is now part of the context it reads with every new message</button><button>Anthropic retrained the model overnight</button></div><p class="why" hidden>During inference the weights are frozen. Earlier messages are sent back as context, so the model can follow your correction within that conversation.</p></div>
+<div class="qz"><p class="q">A visual regression tool compares screenshots pixel by pixel with a 1% tolerance. Where does it sit?</p><div class="opts"><button>Deep learning</button><button>Generative AI</button><button data-ok>Not AI: it's a fixed comparison rule</button></div><p class="why" hidden>Nothing is learned. It's a useful algorithm, but no model is trained.</p></div>
+<div class="qz"><p class="q">What is a model, physically?</p><div class="opts"><button>A database of question-and-answer pairs</button><button data-ok>Files describing the architecture plus the learned weights</button><button>The chat app you type into</button></div><p class="why" hidden>The architecture says what arithmetic to do; the weights are the numbers training found. The app is a product built around the model.</p></div>
+<div class="qz"><p class="q">Which costs happen every time someone sends a message?</p><div class="opts"><button>Training costs</button><button data-ok>Inference costs</button><button>Pre-training costs</button></div><p class="why" hidden>Each message runs the frozen model once (inference). Training is done ahead of time.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Pick one "AI-powered" tool your team uses or is considering. Write a one-page note that places it on the map (narrowest circle you can justify), says whether learning happens during training only or also in use, names where inference runs and what data leaves your network, and lists three tests you would run to check it. Share it with a colleague and see whether they agree with your placement.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Think nesting dolls. AI is the whole field. Machine learning is AI that learns from examples. Deep learning is machine learning with many-layered neural networks. Generative AI is deep learning that creates content. LLMs like Claude are generative models for text. The model itself is just a big set of learned numbers. Building those numbers is training, done once at the AI company; using them is inference, every time you send a message. So chatting doesn't retrain it, and it only knows what's in its training data plus what you give it."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>S. Russell and P. Norvig, <i>Artificial Intelligence: A Modern Approach</i>, 4th edition (Pearson, 2020): the standard definitions of AI and its subfields.</li>
+<li>T. M. Mitchell, <i>Machine Learning</i> (McGraw-Hill, 1997): the classic definition of learning from experience E on tasks T measured by P.</li>
+<li>I. Goodfellow, Y. Bengio and A. Courville, <a href="https://www.deeplearningbook.org/" target="_blank" rel="noopener"><i>Deep Learning</i></a> (MIT Press, 2016), chapter 1, including its nested diagram of AI, machine learning and deep learning.</li>
+<li>R. Bommasani et al., <a href="https://arxiv.org/abs/2108.07258" target="_blank" rel="noopener">"On the Opportunities and Risks of Foundation Models"</a>, Stanford CRFM (2021).</li>
+<li>Google, <a href="https://developers.google.com/machine-learning/crash-course" target="_blank" rel="noopener">Machine Learning Crash Course</a>: a free, plain introduction to models, training and inference.</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/about-claude/models/overview" target="_blank" rel="noopener">Claude models overview</a> (current model names).</li>
+</ol><p class="verified">Content type: established concepts · Model names verified 9 November 2026 against the Claude models overview · Last reviewed 9 November 2026</p></div>

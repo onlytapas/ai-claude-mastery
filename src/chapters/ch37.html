@@ -1,0 +1,180 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>Who founded Anthropic, when, and why a group of researchers left a successful lab to start another one</li>
+<li>What Anthropic's mission says, and how its legal structure (a Public Benefit Corporation with a Long-Term Benefit Trust) is meant to protect that mission</li>
+<li>Who sits on the Board and the Trust today, and how the Trust gains power over time</li>
+<li>Anthropic's big cloud and chip partners (Amazon, Google, Microsoft and NVIDIA) and why a model lab needs them</li>
+<li>The latest funding round (Series H, May 2026) and how to read funding headlines without being misled</li>
+<li>How to check company facts yourself, including facts that Claude itself may not know</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch26">Chapter 26</a> (how the AI industry fits together) gives the big picture of chips, clouds and labs. <a href="#ch27">Chapter 27</a> (OpenAI) helps, because Anthropic's founders came from there. No software is needed; the lab uses claude.ai in a browser.</div>
+
+<div class="bigidea"><p>Anthropic is the company that makes Claude. It was started in 2021 by a group of researchers, led by siblings Dario and Daniela Amodei, who believed powerful AI was coming and that safety research had to be done by people building the most capable models. To keep that aim in place as the company grew, they set it up as a <a class="gl" href="#g-public-benefit-corporation">Public Benefit Corporation</a> and added an independent <a class="gl" href="#g-long-term-benefit-trust">Long-Term Benefit Trust</a> that elects a growing share of the Board. Building frontier models costs a fortune in computing power, so Anthropic depends on huge cloud partnerships with Amazon, Google and Microsoft, and on investors: its latest round, in May 2026, valued it at $965 billion. Knowing this background helps you understand why Claude behaves as it does and why the company publishes so much about safety.</p></div>
+
+<h3 id="ch37-1"><span class="num">37.1</span>Why Anthropic exists</h3>
+<p>Every AI company tells a founding story. Anthropic's is unusual because its starting point was worry, not just opportunity. The founders believed three things at once:</p>
+<ol>
+<li><strong>AI would become very powerful, quite soon.</strong> Several founders had worked on the research showing that language models get steadily better as you make them bigger and train them on more data (the "scaling" idea you met in <a href="#ch7">Chapter 7</a>).</li>
+<li><strong>Powerful AI could cause serious harm</strong> if it was misused or behaved in ways nobody intended.</li>
+<li><strong>You can only study the safety of frontier AI if you build frontier AI.</strong> Safety research on small, old models may not tell you how the newest ones behave.</li>
+</ol>
+<p>Put those together and you get Anthropic's core bet: a safety-focused lab should be at the cutting edge, so it can do the research, set an example, and influence how the rest of the industry behaves. Critics point out the tension in this bet (a safety lab that also races to build more capable models), and Anthropic's leaders talk about that tension openly. Section 37.6 returns to it.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Imagine a group of structural engineers who think a new kind of very tall building is about to be built everywhere. They could write warnings from the sidelines. Instead they start their own construction firm, so they can test new safety methods on real towers, publish what they learn, and show that safe towers can also be good business. Whether that works depends on whether the firm stays true to safety when deadlines and money press on it. That is exactly the question people ask about Anthropic.</p></div>
+
+<h3 id="ch37-2"><span class="num">37.2</span>Founding and the founders</h3>
+<p>Anthropic was founded in early 2021. Most of its founders had previously worked at OpenAI, where several of them led research on GPT-2 and GPT-3, scaling laws and safety.</p>
+<div class="box warn"><span class="tag">Accuracy note</span><p>The founding year needs a small flag. Anthropic's own Series B announcement says the company was founded "at the beginning of 2021", but this book's research team saw that wording only in a search snippet; no current official company page states a founding year. Wikipedia gives January 2021. Treat "2021" as solid and the month as less certain.</p></div>
+<p>Anthropic's leadership page lists seven co-founders. This book uses that official list. Other accounts sometimes name additional early staff as founders, so you may see different counts elsewhere.</p>
+<div class="person"><span class="ini">DA</span><b>Dario Amodei</b><span>Co-founder and Chief Executive Officer. Previously a research leader at OpenAI.</span></div>
+<div class="person"><span class="ini">DA</span><b>Daniela Amodei</b><span>Co-founder and President. Dario's sister; previously held senior roles at OpenAI.</span></div>
+<div class="person"><span class="ini">TB</span><b>Tom Brown</b><span>Co-founder. First author of the 2020 GPT-3 paper, "Language Models are Few-Shot Learners".</span></div>
+<div class="person"><span class="ini">JC</span><b>Jack Clark</b><span>Co-founder. Known for AI policy work and a long-running AI newsletter.</span></div>
+<div class="person"><span class="ini">JK</span><b>Jared Kaplan</b><span>Co-founder. A physicist and lead author of the 2020 "scaling laws" paper on how model quality grows with size, data and compute.</span></div>
+<div class="person"><span class="ini">SM</span><b>Sam McCandlish</b><span>Co-founder. Co-author of the scaling-laws research.</span></div>
+<div class="person"><span class="ini">CO</span><b>Chris Olah</b><span>Co-founder. A pioneer of interpretability, the study of what happens inside neural networks (<a href="#ch38">Chapter 38</a>).</span></div>
+<p>Notice the mix. Scaling researchers (Kaplan, McCandlish, Brown) understood <em>how fast</em> models would improve. Interpretability and policy people (Olah, Clark) cared about <em>understanding</em> and <em>governing</em> them. The Amodeis brought research leadership and company building. That mix still shapes what Anthropic publishes.</p>
+<div class="box note"><span class="tag">Roles change</span><p>The CEO and President roles above are as listed on Anthropic's leadership page on 9 November 2026. Job titles of the other co-founders change over time, so this chapter does not list them. Check the leadership page for the current picture.</p></div>
+
+<h3 id="ch37-3"><span class="num">37.3</span>The mission and the Public Benefit Corporation</h3>
+<p>Most companies are legally expected to act in the interests of their shareholders. A <a class="gl" href="#g-public-benefit-corporation">Public Benefit Corporation</a> (PBC) is still a for-profit company, but its directors must also weigh a stated public purpose. Anthropic is a Delaware PBC. Its company page gives its purpose as:</p>
+<div class="box note"><span class="tag">Anthropic's stated purpose</span><p>"the responsible development and maintenance of advanced AI for the long-term benefit of humanity"</p></div>
+<p>In practice this gives the Board legal room to make choices that cost money in the short term, such as delaying a release for more safety testing, without being accused of ignoring shareholders. It does not force any particular decision, and it does not make the company a charity.</p>
+<div class="cols2">
+<div><h4>An ordinary company</h4><p>Directors focus on shareholder value. A safety delay that lowers profits can be hard to defend to investors.</p></div>
+<div><h4>A Public Benefit Corporation</h4><p>Directors must balance shareholder value with the stated public benefit. A safety delay can be justified by the company's purpose. Investors knew this when they invested.</p></div>
+</div>
+
+<h3 id="ch37-4"><span class="num">37.4</span>The Long-Term Benefit Trust and the Board</h3>
+<p>A PBC alone still leaves the Board chosen by shareholders. Anthropic added a second layer, announced on 19 September 2023: the <a class="gl" href="#g-long-term-benefit-trust">Long-Term Benefit Trust</a> (LTBT).</p>
+<ul>
+<li>The Trust is an <strong>independent body</strong> of trustees who have no financial stake in Anthropic.</li>
+<li>It can <strong>elect a growing share of the Board</strong>. When it was announced, Anthropic said the Trust was expected to elect a majority of the Board within four years.</li>
+<li>It does <strong>not</strong> take part in day-to-day decisions. It shapes who sits on the Board, and the Board oversees the company.</li>
+</ul>
+<div class="flow">
+<div><b>Shareholders</b>Investors and employees own shares and elect some directors</div>
+<div class="hl"><b>Long-Term Benefit Trust</b>Independent trustees elect a growing share of directors</div>
+<div><b>Board of Directors</b>Oversees the company and appoints leadership</div>
+<div><b>Leadership</b>Runs Anthropic day to day</div>
+</div>
+<p>Under the current Responsible Scaling Policy (<a href="#ch38">Chapter 38</a>), the Trust also has a formal safety role: it can request external review of Anthropic's risk reports, approve the external reviewers, and receives regular briefings.</p>
+<div class="tbl"><table>
+<tr><th>Body</th><th>Members listed on anthropic.com/company (9 Nov 2026)</th></tr>
+<tr><td>Board of Directors</td><td>Dario Amodei, Daniela Amodei, Yasmin Razavi, Reed Hastings, Chris Liddell, Vas Narasimhan</td></tr>
+<tr><td>Long-Term Benefit Trust</td><td>Ben Bernanke, Richard Fontaine, Neil Buddy Shah, Christopher Stubbs</td></tr>
+</table></div>
+<p>The two newest trustees are Ben Bernanke, the former chair of the US Federal Reserve, and Christopher Stubbs. Anthropic announced each appointment in a news post. Search summaries give their joining dates as 9 July 2026 (Bernanke) and 21 October 2026 (Stubbs); <strong>those exact dates are unverified</strong>, as the posts themselves were not checked line by line.</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a football club owned by investors, with an independent supporters' trust that has the right to appoint more and more of the club's board. The trust doesn't pick the team on Saturday, but over time it decides who makes the big decisions, so the club can't easily be turned into something its supporters never wanted.</p></div>
+<details class="deep"><summary>Under the hood: why the Trust's power grows gradually</summary><div class="body">
+<p>Giving an outside body control of the Board on day one would have made the company hard to fund: investors would be handing money to a company they could not influence. Phasing in the Trust's power let Anthropic raise money while committing, in advance, to a structure where independent trustees end up with a strong say.</p>
+<p>The 2023 announcement also described safeguards around changing the arrangement. The details are in the announcement post. This book does not summarise them line by line, because the exact mechanics are legal text best read at the source.</p>
+<p>Is it enough? People disagree. Supporters say it is one of the strongest governance commitments of any frontier lab. Sceptics note that trustees depend on information from the company, and that very large investors still have influence. Both views are opinions, not settled facts.</p>
+</div></details>
+
+<h3 id="ch37-5"><span class="num">37.5</span>Money, chips and clouds: Anthropic's partners</h3>
+<p>Training and running frontier models needs enormous amounts of <a class="gl" href="#g-compute">compute</a>: specialised chips in giant <a class="gl" href="#g-data-centre">data centres</a> (<a href="#ch25">Chapter 25</a>). No start-up can buy that alone, so Anthropic has deep ties to all three of the largest cloud companies, the <a class="gl" href="#g-hyperscaler">hyperscalers</a>.</p>
+<div class="tbl"><table>
+<tr><th>Partner</th><th>Announced</th><th>What was agreed</th></tr>
+<tr><td><b>Amazon / AWS</b></td><td>25 Sep 2023</td><td>Amazon invests "up to $4 billion" for a minority stake. AWS becomes Anthropic's primary cloud provider, including Amazon's own Trainium and Inferentia chips. Claude is sold through Amazon Bedrock.</td></tr>
+<tr><td><b>Google Cloud</b></td><td>23 Oct 2025</td><td>Anthropic expands its use of Google's <a class="gl" href="#g-tpu">TPUs</a>: "up to one million TPUs" and "well over a gigawatt" of capacity in 2026, "worth tens of billions of dollars".</td></tr>
+<tr><td><b>Microsoft and NVIDIA</b></td><td>18 Nov 2025</td><td>Anthropic commits $30 billion to Microsoft Azure compute (up to 1 gigawatt). NVIDIA will invest up to $10 billion and Microsoft up to $5 billion. Claude is offered in Microsoft Foundry.</td></tr>
+</table></div>
+<p>Reports in April 2026 described a further Amazon expansion, but the exact totals vary between reports, so this book does not quote a figure (see <a href="#ch29">Chapter 29</a>).</p>
+<div class="box example"><span class="tag">Real-world example: why this matters to your team</span><p>Your company may already have an AWS, Google Cloud or Azure contract. Because of these partnerships, you can usually reach Claude through the cloud you already use (Bedrock, Google Cloud's Vertex AI, or Microsoft Foundry) instead of signing a new supplier contract. For a QA team that wants to use Claude in CI, that can turn a three-month procurement process into a configuration change. <a href="#ch41">Chapter 41</a> compares these routes.</p></div>
+<p>This multi-cloud approach is unusual. Anthropic runs on three different kinds of AI chip: NVIDIA GPUs, Google TPUs and Amazon Trainium. Spreading work across them gives it more capacity and bargaining power, at the cost of engineering effort to make models run well on each.</p>
+
+<h4>Funding rounds</h4>
+<p>Anthropic has raised money in a series of lettered rounds. Each round sets a <a class="gl" href="#g-valuation">valuation</a>, the price investors agree the whole company is worth.</p>
+<div class="figure" role="img" aria-label="Bar chart of Anthropic post-money valuations: Series F 183 billion dollars, Series G 380 billion dollars, Series H 965 billion dollars"><div class="bars"><div class="bt">Post-money valuation by round (US$ billions)</div>
+<div class="bar-row"><span>Series F</span><span class="track"><span class="fill" style="width:19%">$183B</span></span></div>
+<div class="bar-row"><span>Series G</span><span class="track"><span class="fill" style="width:39%">$380B</span></span></div>
+<div class="bar-row"><span>Series H</span><span class="track"><span class="fill hl" style="width:100%">$965B</span></span></div></div>
+<div class="cap">Source: Anthropic news posts for Series F, G and H. Series H dated 28 May 2026; dates of Series F and G not verified for this book.</div></div>
+<div class="tbl"><table>
+<tr><th>Round</th><th>Raised</th><th>Post-money valuation</th><th>Date</th></tr>
+<tr><td>Series F</td><td>$13B</td><td>$183B</td><td>Unverified</td></tr>
+<tr><td>Series G</td><td>$30B</td><td>$380B</td><td>Unverified</td></tr>
+<tr><td><b>Series H</b></td><td><b>$65B</b></td><td><b>$965B</b></td><td><b>28 May 2026</b>, led by Altimeter, Dragoneer, Greenoaks and Sequoia</td></tr>
+</table></div>
+<details class="deep"><summary>Under the hood: reading a funding headline</summary><div class="body">
+<p><strong>Post-money valuation</strong> means the company's value including the new money. If investors put in $65B and the post-money value is $965B, the company was valued at $900B just before the round.</p>
+<p><strong>"Up to" figures</strong> (Amazon's "up to $4 billion", NVIDIA's "up to $10 billion") are ceilings, often paid in stages or tied to conditions. They are not cash in the bank on the day of the announcement.</p>
+<p><strong>Compute commitments</strong> (Anthropic's $30B to Azure) run the other way: they are money Anthropic agrees to <em>spend</em> with a partner, usually over several years. Headlines sometimes blur investment in and spending out. When you read about an AI deal, ask: who pays whom, how much is conditional, and over what period?</p>
+</div></details>
+<div class="box note"><span class="tag">Headquarters</span><p>Anthropic is headquartered in San Francisco, California. It also has offices in other countries; check the careers page for the current list rather than relying on a printed one.</p></div>
+
+<h3 id="ch37-6"><span class="num">37.6</span>A short timeline, and the debate around it</h3>
+<ol class="timeline">
+<li class="key"><span class="yr">2021</span><span class="ev"><b>Anthropic founded</b> by former OpenAI researchers led by Dario and Daniela Amodei.</span></li>
+<li><span class="yr">2022</span><span class="ev"><b>Constitutional AI paper</b> (15 December, arXiv), a new way of training models to be harmless using written principles (<a href="#ch38">Chapter 38</a>).</span></li>
+<li class="key"><span class="yr">2023</span><span class="ev"><b>Claude launches</b> (14 March). <b>Claude 2</b> and the public claude.ai chat follow on 11 July. Amazon partnership (25 September). Long-Term Benefit Trust and first Responsible Scaling Policy announced (both 19 September).</span></li>
+<li><span class="yr">2024</span><span class="ev"><b>Claude 3 family</b> (March). Interpretability breakthrough with features found inside Claude 3 Sonnet (May). <b>Model Context Protocol</b> released as an open standard (25 November).</span></li>
+<li class="key"><span class="yr">2025</span><span class="ev"><b>Claude Code</b> previewed (24 February) and generally available with Claude 4 (22 May). ASL-3 protections switched on. Developer products rebranded to the Claude name (16 September). Google TPU and Microsoft/NVIDIA deals (October, November). MCP donated to the Linux Foundation's Agentic AI Foundation (9 December).</span></li>
+<li class="key"><span class="yr">2026</span><span class="ev"><b>New constitution</b> for Claude (January). Project Glasswing (April). <b>Series H</b> at $965B (28 May). First <b>Fable</b> model (9 June). Opus, Sonnet and Haiku 5.5 (September to October).</span></li>
+</ol>
+<p>Model details belong to <a href="#ch39">Chapter 39</a>, and safety research to <a href="#ch38">Chapter 38</a>. Here, the point is the shape: a research lab that became, within five years, one of the most valuable private companies in the world, while keeping safety research and governance at the centre of its public identity.</p>
+<div class="box opinion"><span class="tag">Opinion · supporters and critics</span><p><b>Supporters</b>, including Anthropic's leadership in its public writing, argue that having a safety-focused lab at the frontier raises standards across the industry: competitors adopt similar scaling policies, publish system cards, and take interpretability seriously. <b>Critics</b>, including some AI-safety researchers and commentators, argue that any lab racing to build more capable models speeds up the very risks it warns about, and that commercial pressure will eventually win over caution. This book does not take a side. As a reader, judge the company by what it publishes and does over time, not by its slogans or its critics' slogans.</p></div>
+
+<h3 id="ch37-7"><span class="num">37.7</span>Why the company behind the model matters to you</h3>
+<p>You might wonder why a QA engineer needs company history. Three practical reasons:</p>
+<div class="tbl"><table>
+<tr><th>Company fact</th><th>What it means in your daily work</th></tr>
+<tr><td>Safety-first mission and published constitution</td><td>Claude is trained to refuse some requests, to be honest about uncertainty, and to push back when you are wrong. Understanding why helps you write prompts that work with this rather than fight it.</td></tr>
+<tr><td>Multi-cloud partnerships</td><td>You can often use Claude through your company's existing cloud account, which affects procurement, data residency and pricing.</td></tr>
+<tr><td>Fast growth and huge funding</td><td>Expect frequent model releases and retirements. Pin model versions in test pipelines and track deprecations (<a href="#ch39">Chapter 39</a>).</td></tr>
+<tr><td>Public Benefit Corporation and Trust</td><td>Useful context when your security or legal team asks "who controls this supplier?" during a vendor review.</td></tr>
+</table></div>
+<div class="box example"><span class="tag">Real-world example: the vendor questionnaire</span><p>A tester at a bank is asked to fill in part of a supplier-risk form before the team can use Claude. Questions include: legal entity type, headquarters, major shareholders, and governance. With this chapter she can answer the first three from official pages in ten minutes, with source links, and flag to her risk team that the governance answer involves a Long-Term Benefit Trust they may want to read about. Her manager is impressed less by the answers than by the source links.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Build a verified Anthropic fact card, and test Claude's knowledge of its maker</b><span>30 min · claude.ai (any plan) and a web browser</span></div><ol>
+<li>Open a blank document or spreadsheet with four columns: <em>Fact</em>, <em>Value</em>, <em>Official source URL</em>, <em>Date checked</em>.<span class="expect">an empty table ready to fill.</span></li>
+<li>Visit <code>https://www.anthropic.com/company</code>. Record the legal structure, the purpose statement, the Board members and the Long-Term Benefit Trust members.<span class="expect">a PBC purpose matching section 37.3, six directors and four trustees (as of 9 November 2026; it may have changed since, which is the point of checking).</span></li>
+<li>Visit <code>https://www.anthropic.com/company/leadership</code> and record the co-founders.<span class="expect">seven names, matching section 37.2 unless the page has been updated.</span></li>
+<li>Visit <code>https://www.anthropic.com/news/series-h</code> and record the amount, valuation, date and lead investors.<span class="expect">$65B at $965B post-money, 28 May 2026, led by Altimeter, Dragoneer, Greenoaks and Sequoia.</span></li>
+<li>In claude.ai, start a new chat with web search <strong>turned off</strong>. Ask: "Without searching, who are the current members of Anthropic's Long-Term Benefit Trust, and what was Anthropic's most recent funding round? Say how confident you are."<span class="expect">an answer limited by Claude's <a class="gl" href="#g-knowledge-cutoff">knowledge cutoff</a> (June 2026 for the 5.5 models). It may know the Series H round but is unlikely to know about Christopher Stubbs, whose appointment was announced in October 2026. A good answer flags its uncertainty.</span></li>
+<li>Turn web search <strong>on</strong> (a toggle in the chat input area; its location may change) and ask the same question, adding "Cite official anthropic.com pages."<span class="expect">a more current answer with links. Click every link and check the claim against the page.</span></li>
+<li>Add a fifth column to your table, <em>Claude without search / with search</em>, and mark each fact as matched, wrong or unknown.<span class="expect">a small evaluation showing where a model's built-in knowledge goes stale and how grounding with search fixes it (<a href="#ch22">Chapter 22</a>).</span></li>
+</ol>
+<p><b>Troubleshooting.</b> If web search is missing on a Team or Enterprise account, an owner may need to enable it; do steps 5 and 7 only. If a page has moved, search anthropic.com for its title. If Claude refuses to guess in step 5, that is good behaviour: record it as "unknown, flagged correctly".</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Anthropic is a non-profit."</dt><dd>It is a for-profit Public Benefit Corporation. It sells products and raises investment; its directors must also weigh its stated public purpose.</dd>
+<dt>"Amazon (or Google) owns Anthropic."</dt><dd>Amazon announced a minority stake; Google, Microsoft and NVIDIA are partners or investors too. None of them is described as owning the company.</dd>
+<dt>"The Long-Term Benefit Trust runs the company."</dt><dd>It elects a growing share of the Board and has some safety-review powers, but it does not make day-to-day decisions.</dd>
+<dt>"A $965B valuation means Anthropic has $965B."</dt><dd>Valuation is the price investors agreed the whole company is worth. The cash raised in Series H was $65B.</dd>
+<dt>"Claude always knows the latest facts about Anthropic."</dt><dd>Claude's built-in knowledge stops at its training cutoff. For anything recent, use web search or check the official pages.</dd>
+</dl></div>
+
+<h3 id="ch37-r"><span class="num">37.8</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Anthropic was founded in 2021 (month not confirmed on an official page) by former OpenAI researchers; the official co-founder list has seven names, led by Dario Amodei (CEO) and Daniela Amodei (President).</li>
+<li>Its core bet: safety research must happen at the frontier, so a safety-focused lab should build frontier models.</li>
+<li>It is a Delaware Public Benefit Corporation whose purpose is "the responsible development and maintenance of advanced AI for the long-term benefit of humanity".</li>
+<li>The Long-Term Benefit Trust (announced 19 September 2023) elects a growing share of the Board and now has a role in reviewing safety risk reports.</li>
+<li>Amazon (2023), Google Cloud (2025) and Microsoft with NVIDIA (2025) are its major compute partners; Claude is available through all three clouds.</li>
+<li>Series H (28 May 2026): $65B raised at a $965B post-money valuation. Earlier round dates are not verified here.</li>
+<li>Always check company facts against official pages, with a date. They change.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What kind of legal entity is Anthropic?</p><div class="opts"><button>A non-profit foundation</button><button data-ok>A for-profit Public Benefit Corporation</button><button>A subsidiary of Amazon</button></div><p class="why" hidden>A PBC is a for-profit company whose directors must also weigh a stated public benefit.</p></div>
+<div class="qz"><p class="q">What does the Long-Term Benefit Trust do?</p><div class="opts"><button>Approves every model release</button><button>Manages Anthropic's investments</button><button data-ok>Elects a growing share of the Board and has some oversight of safety risk reports</button></div><p class="why" hidden>It shapes who governs the company and can request external review of risk reports, but it stays out of day-to-day running.</p></div>
+<div class="qz"><p class="q">In Series H, Anthropic raised $65B at a $965B post-money valuation. What was the company valued at just before the money came in?</p><div class="opts"><button>$1,030B</button><button data-ok>$900B</button><button>$65B</button></div><p class="why" hidden>Post-money includes the new cash: $965B minus $65B is $900B.</p></div>
+<div class="qz"><p class="q">Which company became Anthropic's primary cloud provider in September 2023?</p><div class="opts"><button data-ok>Amazon Web Services</button><button>Microsoft Azure</button><button>Google Cloud</button></div><p class="why" hidden>The Amazon deal made AWS the primary cloud, using Trainium and Inferentia chips. Google and Microsoft deals came in 2025.</p></div>
+<div class="qz"><p class="q">You ask Claude, with web search off, who the newest LTBT trustee is, and it names someone who joined in 2024. What is the most likely explanation?</p><div class="opts"><button>Claude is deliberately hiding information</button><button data-ok>Claude's training data stops at its knowledge cutoff, so recent appointments are missing</button><button>The trustee list never changes</button></div><p class="why" hidden>Built-in knowledge goes stale. Turn on search or check the official page for anything recent.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Write a one-page "supplier profile" of Anthropic for your team's vendor-review folder: legal entity, headquarters, mission, governance (Board and Trust), major partners, latest funding, and how your company would access Claude (direct or through your cloud). Every line needs an official source link and the date you checked it. Mark anything you could not confirm as "unverified". Ask a colleague to spot-check three facts against the sources.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Anthropic makes Claude. It was started in 2021 by researchers who left OpenAI because they thought powerful AI was coming fast and safety work had to happen on the most capable models. They made it a Public Benefit Corporation, so the board must weigh a public purpose, not just profit, and they added an independent trust that elects more and more of the board over time. It runs on Amazon, Google and Microsoft clouds, which is why we can use Claude through our existing cloud account. Its last funding round, in May 2026, valued it at $965 billion. And if you want current facts about it, check anthropic.com, because Claude's own knowledge has a cutoff."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, "Company" (purpose, Board, Long-Term Benefit Trust): <a href="https://www.anthropic.com/company" target="_blank" rel="noopener">anthropic.com/company</a></li>
+<li>Anthropic, "Leadership" (co-founders): <a href="https://www.anthropic.com/company/leadership" target="_blank" rel="noopener">anthropic.com/company/leadership</a></li>
+<li>Anthropic, "The Long-Term Benefit Trust" (19 Sep 2023): <a href="https://www.anthropic.com/news/the-long-term-benefit-trust" target="_blank" rel="noopener">anthropic.com/news/the-long-term-benefit-trust</a></li>
+<li>Anthropic, "Anthropic raises Series B to build safe, reliable AI" (founding wording; seen via search snippet only): <a href="https://www.anthropic.com/news/anthropic-raises-series-b-to-build-safe-reliable-ai" target="_blank" rel="noopener">anthropic.com/news/anthropic-raises-series-b-to-build-safe-reliable-ai</a></li>
+<li>Anthropic, voluntary commitments (headquarters): <a href="https://www.anthropic.com/transparency/voluntary-commitments" target="_blank" rel="noopener">anthropic.com/transparency/voluntary-commitments</a></li>
+<li>Anthropic, "Expanding access to safer AI with Amazon" (25 Sep 2023): <a href="https://www.anthropic.com/news/anthropic-amazon" target="_blank" rel="noopener">anthropic.com/news/anthropic-amazon</a></li>
+<li>Anthropic, "Expanding our use of Google Cloud TPUs and services" (23 Oct 2025): <a href="https://www.anthropic.com/news/expanding-our-use-of-google-cloud-tpus-and-services" target="_blank" rel="noopener">anthropic.com/news/expanding-our-use-of-google-cloud-tpus-and-services</a></li>
+<li>Anthropic, "Microsoft, NVIDIA and Anthropic announce strategic partnerships" (18 Nov 2025): <a href="https://www.anthropic.com/news/microsoft-nvidia-anthropic-announce-strategic-partnerships" target="_blank" rel="noopener">anthropic.com/news/microsoft-nvidia-anthropic-announce-strategic-partnerships</a></li>
+<li>Anthropic, Series H (28 May 2026): <a href="https://www.anthropic.com/news/series-h" target="_blank" rel="noopener">anthropic.com/news/series-h</a>; Series G: <a href="https://www.anthropic.com/news/anthropic-raises-30-billion-series-g-funding-380-billion-post-money-valuation" target="_blank" rel="noopener">announcement</a>; Series F: <a href="https://www.anthropic.com/news/anthropic-raises-series-f-at-usd183b-post-money-valuation" target="_blank" rel="noopener">announcement</a></li>
+<li>Anthropic, trustee announcements: <a href="https://www.anthropic.com/news/ben-bernanke" target="_blank" rel="noopener">Ben Bernanke</a>; <a href="https://www.anthropic.com/news/christopher-stubbs-joins-long-term-benefit-trust" target="_blank" rel="noopener">Christopher Stubbs</a></li>
+<li>Wikipedia, "Anthropic" (secondary source for founding month): <a href="https://en.wikipedia.org/wiki/Anthropic" target="_blank" rel="noopener">en.wikipedia.org/wiki/Anthropic</a></li>
+<li>J. Kaplan et al., "Scaling Laws for Neural Language Models" (2020), arXiv:2001.08361; T. Brown et al., "Language Models are Few-Shot Learners" (2020), arXiv:2005.14165.</li>
+</ol>
+<p class="verified">Verified 9 November 2026 against anthropic.com company, leadership and news pages (via research/anthropic-claude-facts.md). Unverified: exact founding month, Series F and G dates, and trustee joining dates.</p></div>

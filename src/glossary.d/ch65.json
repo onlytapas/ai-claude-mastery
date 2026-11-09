@@ -1,0 +1,30 @@
+{
+ "Agentic harness": {
+  "d": "The software layer around an AI model that gives it tools, manages what it sees (its context) and enforces permissions. Claude Code is the agentic harness around Claude models.",
+  "see": "ch66"
+ },
+ "Workspace trust": {
+  "d": "The question Claude Code asks the first time you start it in a folder: whether you trust that folder's own settings, hooks and MCP servers, which can run commands.",
+  "see": "ch65"
+ },
+ "Working directory": {
+  "d": "The folder a program is working in. For Claude Code, the folder you start it in: it can read there freely and asks before going outside it.",
+  "see": "ch65"
+ },
+ "Checkpoint": {
+  "d": "A snapshot Claude Code saves before editing files, so you can rewind its changes later. It doesn't cover changes made by shell commands or to external systems.",
+  "see": "ch66"
+ },
+ "Compaction": {
+  "d": "Replacing a long conversation with a summary to free up space in the context window. Claude Code does it automatically near the limit, or when you run /compact.",
+  "see": "ch66"
+ },
+ "Auto mode classifier": {
+  "d": "In Claude Code's Auto permission mode, a second AI model that reviews actions not covered by your rules and blocks risky ones instead of asking you.",
+  "see": "ch66"
+ },
+ "Tool call": {
+  "d": "A request from an AI model to use one of its tools, such as reading a file or running a command, with the inputs filled in. The surrounding app runs it and returns the result.",
+  "see": "ch66"
+ }
+}

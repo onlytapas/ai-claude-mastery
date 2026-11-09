@@ -1,0 +1,254 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>What a model-serving stack does between "a model file" and "a reliable API"</li>
+<li>The metrics that matter: time to first token, time per output token, throughput and tail latency</li>
+<li>The main open-source serving engines (vLLM, SGLang, TensorRT-LLM, llama.cpp) and what each is for</li>
+<li>Continuous batching, KV cache paging and prefix caching, explained plainly then precisely</li>
+<li>Four ways to make serving cheaper or faster: quantisation, distillation, speculative decoding and smarter scheduling</li>
+<li>How to test an optimisation so you don't trade away quality without noticing</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch25">Chapter 25</a> is essential: it explains memory bandwidth, prefill versus decode, the KV cache, and the latency-versus-throughput trade-off. This chapter builds directly on it. <a href="#ch137">Chapter 137</a> (running models locally) and <a href="#ch138">Chapter 138</a> (training at scale) help but aren't required. This is an optional, expert-level chapter: each section starts in plain language.</div>
+
+<div class="bigidea"><p>Running a model for one person on a laptop is easy. Serving it to thousands of people at once, quickly and cheaply, is an engineering discipline. The core problem is that GPU memory and memory bandwidth are scarce, and every conversation's <a class="gl" href="#g-kv-cache">KV cache</a> competes for them. Modern serving engines such as <a class="gl" href="#g-vllm">vLLM</a> solve this with smarter scheduling (<a class="gl" href="#g-continuous-batching">continuous batching</a>), smarter memory (<a class="gl" href="#g-pagedattention">PagedAttention</a> and prefix caching) and smaller, faster models (<a class="gl" href="#g-quantisation">quantisation</a>, <a class="gl" href="#g-distillation">distillation</a> and <a class="gl" href="#g-speculative-decoding">speculative decoding</a>). Every optimisation is a trade-off between latency, cost and quality, and each one should be tested like any other change to production.</p></div>
+
+<h3 id="ch139-1"><span class="num">139.1</span>From model file to service</h3>
+<p>A model on its own is just a file of numbers. To turn it into something like the Claude API, you need software around it that accepts requests, decides which ones to run together, manages memory, runs the maths on the GPU and streams answers back. That software is the <strong>serving stack</strong>.</p>
+<div class="flow">
+<div><b>API server</b>Accepts HTTP requests (often in the OpenAI or Anthropic format), checks them and queues them</div>
+<div class="hl"><b>Scheduler</b>Decides, step by step, which requests run together on the GPU</div>
+<div><b>Memory manager</b>Gives each request space for its KV cache and reclaims it when done</div>
+<div><b>Engine</b>Runs prefill and decode on the GPU with optimised code ("kernels")</div>
+<div><b>Streamer</b>Sends each new token back to the right user as it's produced</div>
+</div>
+<h4>The numbers that matter</h4>
+<div class="tbl"><table>
+<tr><th>Metric</th><th>Plain meaning</th><th>What drives it</th></tr>
+<tr><td><a class="gl" href="#g-time-to-first-token">Time to first token</a> (TTFT)</td><td>How long before the answer starts appearing</td><td>Queueing, plus prefill of the prompt (long prompts take longer)</td></tr>
+<tr><td>Time per output token (TPOT), or inter-token latency</td><td>How fast the answer streams once started</td><td>Decode speed, which falls as more requests share each step</td></tr>
+<tr><td><a class="gl" href="#g-throughput">Throughput</a></td><td>Total tokens or requests per second across all users</td><td>Batch size, memory available for KV cache, kernel efficiency</td></tr>
+<tr><td>Tail latency (p95, p99)</td><td>How slow the slowest 5% or 1% of requests are</td><td>Bursts, long prompts and long answers blocking others</td></tr>
+<tr><td>Goodput</td><td>Throughput counting only requests that met their latency target</td><td>The balance of all the above</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of a busy coffee shop. TTFT is how long until the barista starts your order. TPOT is how fast they work once they've started. Throughput is cups per hour for the whole shop. Tail latency is the unlucky customer stuck behind someone ordering twelve complicated drinks. A shop tuned only for cups per hour can still leave that customer furious, which is why serving teams watch p95 and p99, not just averages (<a class="gl" href="#g-percentile">percentiles</a>).</p></div>
+
+<h3 id="ch139-2"><span class="num">139.2</span>The serving engines</h3>
+<p>You rarely build a serving stack from scratch. Several open-source engines do the hard parts. Facts below were checked on each project's official page on 9 November 2026.</p>
+<div class="tbl"><table>
+<tr><th>Engine</th><th>What it says it is</th><th>Typical use</th></tr>
+<tr><td><b>vLLM</b></td><td>A serving engine from the team behind the PagedAttention paper; OpenAI-compatible server; its docs list NVIDIA CUDA, AMD ROCm, Intel GPU, Google TPU and other hardware</td><td>The common default for self-hosting open models on data-centre GPUs</td></tr>
+<tr><td><b>SGLang</b></td><td>"An open-source inference framework for large language, vision-language, and diffusion models" (Apache 2.0)</td><td>High-throughput serving, especially agent-style and reinforcement-learning workloads</td></tr>
+<tr><td><b>TensorRT-LLM</b></td><td>NVIDIA's open-source library "for optimizing LLM and Visual Gen inference" on NVIDIA GPUs (Apache 2.0)</td><td>Squeezing maximum performance from NVIDIA hardware</td></tr>
+<tr><td><b>llama.cpp server</b></td><td>Lightweight C/C++ engine with OpenAI- and Anthropic-style endpoints (<a href="#ch137">Chapter 137</a>)</td><td>Laptops, workstations, CPUs, Apple Silicon, small internal services</td></tr>
+<tr><td><b>Ollama</b></td><td>Friendly model runner with a local API (<a href="#ch137">Chapter 137</a>)</td><td>Individual and small-team use rather than high-concurrency production</td></tr>
+</table></div>
+<p>Managed services (such as Amazon Bedrock, Google Cloud and Microsoft Foundry, <a href="#ch41">Chapter 41</a>) run their own stacks so you never see them. Everything in this chapter still happens; someone else does it.</p>
+<h4>What starting vLLM looks like</h4>
+<p>vLLM's quick start (Linux with a supported GPU, Python 3.11 or newer) installs it into a virtual environment and starts an OpenAI-compatible server:</p>
+<div class="code"><span class="cap">Terminal · from vLLM's quick start</span><pre>uv venv --python 3.12 --seed
+source .venv/bin/activate
+uv pip install vllm --torch-backend=auto
+vllm serve Qwen/Qwen2.5-1.5B-Instruct          <span class="c"># serves on http://localhost:8000 by default</span></pre></div>
+<div class="code"><span class="cap">Terminal · a test request</span><pre>curl http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model": "Qwen/Qwen2.5-1.5B-Instruct",
+       "messages": [{"role": "user", "content": "One edge case for a date-of-birth field?"}]}'</pre></div>
+<p>The project's docs also describe other install routes and additional steps for some platforms, so follow the current quick start rather than copying these lines from memory. You don't need to run vLLM for this chapter's lab.</p>
+
+<h3 id="ch139-3"><span class="num">139.3</span>Batching, done properly</h3>
+<p><a href="#ch25">Chapter 25</a> explained why batching helps: in decode, the GPU reads all the weights for every step, so serving many requests in the same step shares that cost. The question is <em>how</em> you batch.</p>
+<div class="cols2">
+<div><h4>Static batching</h4><p>Collect a group of requests, run them together until <em>all</em> have finished, then start the next group. A one-word answer sits waiting for a 2,000-word essay in the same batch. GPU slots go idle and new users wait in the queue.</p></div>
+<div><h4>Continuous batching</h4><p>Re-decide the batch at <em>every</em> decode step. As soon as one request finishes, its slot goes to a waiting request. The GPU stays full, and short answers leave immediately. This is the default in modern engines; llama.cpp's server, for example, lists it as enabled by default.</p></div>
+</div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Static batching is a lift that waits until every passenger has reached their floor before going back down for new people. Continuous batching is a paternoster or escalator: people step on and off at any moment, and it never runs empty while someone is waiting.</p></div>
+<details class="deep"><summary>Under the hood: chunked prefill and disaggregation</summary><div class="body">
+<p>Continuous batching creates a new problem. When a request with a very long prompt arrives, its prefill is a big burst of computation. If it runs in one go, every other user's next token is delayed: their streaming visibly stutters.</p>
+<p><strong>Chunked prefill</strong> (a documented vLLM feature) splits long prefills into pieces and mixes them with ongoing decode steps, smoothing out the stutter at a small cost to the new request's TTFT.</p>
+<p><strong>Prefill–decode disaggregation</strong> goes further: prefill and decode run on different groups of GPUs, each tuned for its phase (compute-heavy versus memory-bandwidth-heavy), and the KV cache is transferred between them. NVIDIA lists it as a key feature of TensorRT-LLM. It adds complexity and network traffic, so it pays off mainly at large scale.</p>
+</div></details>
+
+<h3 id="ch139-4"><span class="num">139.4</span>Memory: the KV cache is the real budget</h3>
+<p>Once the weights are loaded, the rest of the GPU's memory goes on KV caches, one per active request. The more requests whose caches fit, the bigger the batch and the higher the throughput. So much of serving optimisation is really KV cache optimisation.</p>
+<p>The size per token is simple to work out:</p>
+<div class="code"><span class="cap">The KV cache formula</span><pre>bytes per token = 2 (key and value) × layers × KV heads × head size × bytes per number</pre></div>
+<p>For an illustrative 70B-class model with 80 layers, 8 KV heads of size 128 and 16-bit numbers, that's about 0.33 MB per token. A 32,000-token conversation needs over 10 GB of cache on its own. The lab calculates this for you.</p>
+<h4>Three techniques that changed serving</h4>
+<div class="tbl"><table>
+<tr><th>Technique</th><th>The problem</th><th>The fix</th></tr>
+<tr><td><b>PagedAttention</b> (Kwon et al., 2023)</td><td>Older systems reserved one large, contiguous block per request, sized for the longest possible answer. Most of it sat unused, and gaps fragmented memory</td><td>Store the cache in small fixed-size pages allocated on demand, like an operating system's virtual memory. The paper reports "near-zero waste" and 2–4× higher throughput than the systems it compared at the same latency</td></tr>
+<tr><td><b><a class="gl" href="#g-prefix-caching">Prefix caching</a></b></td><td>Many requests start with the same text: a long system prompt, a shared document, the same few-shot examples. Prefilling it every time wastes compute and memory</td><td>Keep the KV cache for a shared prefix and reuse it across requests. vLLM calls this Automatic Prefix Caching. It's the same idea behind the API feature <a class="gl" href="#g-prompt-caching">prompt caching</a> (<a href="#ch89">Chapter 89</a>)</td></tr>
+<tr><td><b>KV cache quantisation</b></td><td>The cache itself is stored at 16 bits</td><td>Store it at 8 bits, roughly doubling how many tokens fit, with a small accuracy risk. vLLM documents "Quantized KV Cache" support</td></tr>
+</table></div>
+<p>Model design matters too. Many modern models use fewer KV heads than query heads (grouped-query attention), which shrinks the cache several times compared with giving every attention head its own keys and values. That's why "8 KV heads" appears in the example above.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>An internal test-generation service sends every request with the same 6,000-token system prompt describing the product, the house test style and the Jira conventions. Turning on prefix caching means that block is prefilled once and reused. TTFT drops noticeably for every user, and the GPU spends its time on the part of each request that's actually new. The same reasoning is why Anthropic's guidance puts stable content first and variable content last when you use prompt caching with Claude.</p></div>
+
+<h3 id="ch139-5"><span class="num">139.5</span>Making the model cheaper to run</h3>
+<h4>Quantisation for serving</h4>
+<p><a href="#ch137">Chapter 137</a> covered quantisation for laptops, where the goal is to fit at all. In data-centre serving, the goals are throughput and cost. Two broad families:</p>
+<div class="tbl"><table>
+<tr><th>Approach</th><th>What's reduced</th><th>Helps most with</th><th>Examples supported by vLLM</th></tr>
+<tr><td>Weight-only</td><td>Weights stored at 4 or 8 bits; maths done at 16 bits after unpacking</td><td>Memory-bound decode at small batch sizes; fitting larger models</td><td>AWQ, GPTQ, GGUF, bitsandbytes</td></tr>
+<tr><td>Weights and activations</td><td>Both stored and multiplied in 8-bit (or lower) formats on hardware that supports it</td><td>Compute-bound work: big batches and long prefills</td><td>FP8 and INT8 "W8A8" schemes through tools such as LLM Compressor</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Quantisation is a model change</span><p>A quantised model is a slightly different model. Treat switching to it like a release: run your evaluation suite before and after (<a href="#ch125">Chapter 125</a>), and look especially at the tasks you care about most, such as structured output, code and numbers.</p></div>
+<h4>Distillation</h4>
+<p>Distillation trains a small "student" model to imitate a large "teacher" model, using the teacher's outputs (or its full probability distributions over next tokens) as training targets. The idea was popularised by Hinton, Vinyals and Dean's 2015 paper "Distilling the Knowledge in a Neural Network". The student is much cheaper to serve and often keeps a surprising share of the teacher's ability on the tasks it was distilled for. Many small open models are partly distilled from larger siblings. Note that model licences and API terms often restrict using one company's outputs to train a competing model, so check before distilling from someone else's model.</p>
+<h4>Speculative decoding</h4>
+<p>Plain idea: decode is slow because the big model produces one token per step. So let a small, fast "draft" model guess the next few tokens, then have the big model check all those guesses in a single step. Every guess the big model agrees with is accepted for free; at the first disagreement, the big model's own choice is used and drafting starts again.</p>
+<div class="flow">
+<div><b>Draft</b>Small model proposes "the user is not logged in"</div>
+<div class="hl"><b>Verify</b>Big model checks all six tokens in one parallel pass</div>
+<div><b>Accept</b>First four match; the fifth is replaced by the big model's choice</div>
+<div><b>Repeat</b>Five tokens produced for roughly the cost of one big step plus drafting</div>
+</div>
+<p>Leviathan, Kalman and Matias (2022) showed this can be done "without any changes to the outputs": the final text follows exactly the distribution the big model alone would produce. They reported 2–3× speed-ups on T5-XXL. It works best when the text is predictable (code, boilerplate, structured output) and when the GPU has spare compute, which is typically at low batch sizes; under heavy load, the extra verification work competes with other requests. vLLM and TensorRT-LLM both list speculative decoding among their features.</p>
+<details class="deep"><summary>Under the hood: why verification is nearly free</summary><div class="body">
+<p>Remember from <a href="#ch25">Chapter 25</a> that decode is memory-bound: the GPU spends most of each step waiting for weights to arrive, while its calculators sit partly idle. Checking six draft tokens in one forward pass reads the weights once, just like producing one token, and uses some of that idle compute. That's why the big model can "check five tokens for the price of one". The acceptance rule from the paper (accept a draft token with a probability based on how the two models' probabilities compare, otherwise resample) guarantees the output distribution is unchanged, so speculative decoding is a pure speed optimisation, not a quality trade-off.</p>
+<p>Variants drop the separate draft model: some add extra prediction heads to the big model itself, others look up likely continuations from the prompt text. The principle (guess cheaply, verify in parallel) is the same.</p>
+</div></details>
+<h4>Smarter routing</h4>
+<p>The cheapest optimisation is often not to use the big model at all. <a class="gl" href="#g-model-routing">Model routing</a> sends easy requests to a small model and hard ones to a large one. With Claude this means choosing between Haiku, Sonnet and Opus per task (<a href="#ch40">Chapter 40</a>); in self-hosting it may mean running two models behind one API.</p>
+
+<h3 id="ch139-6"><span class="num">139.6</span>Trade-offs, and how to test an optimisation</h3>
+<p>Every lever moves at least one of three dials: latency, cost per token, and quality.</p>
+<div class="tbl"><table>
+<tr><th>Lever</th><th>Latency</th><th>Cost per token</th><th>Quality risk</th></tr>
+<tr><td>Bigger batches</td><td>Worse per user (slower streaming)</td><td>Better</td><td>None</td></tr>
+<tr><td>Continuous batching</td><td>Better, especially TTFT</td><td>Better</td><td>None</td></tr>
+<tr><td>Prefix caching</td><td>Better TTFT for shared prefixes</td><td>Better</td><td>None</td></tr>
+<tr><td>Weight quantisation</td><td>Usually better</td><td>Better (fewer or cheaper GPUs)</td><td>Small, task-dependent: measure</td></tr>
+<tr><td>KV cache quantisation</td><td>Neutral to better</td><td>Better (bigger batches)</td><td>Small: measure on long contexts</td></tr>
+<tr><td>Speculative decoding</td><td>Better at low load</td><td>Neutral to better</td><td>None by design</td></tr>
+<tr><td>Distillation or a smaller model</td><td>Better</td><td>Much better</td><td>Real: needs full evaluation</td></tr>
+<tr><td>Tensor parallelism across more GPUs</td><td>Better per user</td><td>Worse (more GPUs per request)</td><td>None</td></tr>
+</table></div>
+<p>Testing an optimisation is ordinary QA work with two halves:</p>
+<ol>
+<li><strong>Quality.</strong> Run the same evaluation set on the old and new configuration (<a href="#ch36">Chapter 36</a>, <a href="#ch125">Chapter 125</a>). Compare task scores, structured-output validity, and a sample of answers read by a person. For "lossless" changes like speculative decoding, a check that outputs match at temperature 0 is a good sanity test, though tiny numeric differences in GPU maths can still cause occasional divergence.</li>
+<li><strong>Performance.</strong> <a class="gl" href="#g-load-testing">Load test</a> with realistic traffic: the real mix of prompt lengths, answer lengths and arrival bursts. Report TTFT and TPOT at p50, p95 and p99, plus throughput, at several load levels. A change that helps average latency at low load can hurt p99 at peak.</li>
+</ol>
+<div class="box opinion"><span class="tag">Opinion · common among inference engineers</span><p>A view often expressed by people who run inference services is that most of the cost savings come from unglamorous choices (the right model size, high GPU utilisation, prefix caching, and not over-provisioning for rare peaks) rather than from the latest exotic technique. That's a practitioner judgement, not a measured law, but it's a useful order in which to look.</p></div>
+
+<div class="lab"><div class="lab-h"><b>Size a model server, then measure a real one</b><span>20 min · Python 3; optional Ollama from Chapter 137</span></div><ol>
+<li>Save <code>serve_calc.py</code> below and run <code>python3 serve_calc.py</code>.<span class="expect">The two tables shown under the script: KV cache capacity, then decode speed by batch size.</span></li>
+<li>Read the first table. With 40 GB left for the cache, 16-bit KV fits 59 conversations of 2K tokens but only 3 of 32K tokens.<span class="expect">Long contexts crush concurrency. Halving the KV precision to 8 bits roughly doubles both numbers.</span></li>
+<li>Read the second table. Going from batch 1 to batch 64 drops each user's speed from about 93 to 38 tokens per second, while total throughput rises from 93 to about 2,400.<span class="expect">This is the latency-throughput trade-off from Chapter 25, now with numbers (illustrative ones).</span></li>
+<li>Change <code>WEIGHTS_GB</code> to <code>70</code> (the same model at 8 bits) and run again.<span class="expect">Memory left for the KV cache becomes 5 GB, so only 7 conversations of 2K tokens fit at 16-bit, and each decode step is slower. This is why quantisation matters so much in serving.</span></li>
+<li>Optional, with Ollama and <code>qwen3.5:0.8b</code> from <a href="#ch137">Chapter 137</a>: save <code>ttft.py</code> and run <code>python3 ttft.py</code>.<span class="expect">Three lines. Run 1 has a much larger first-token time if the model had to load; runs 2 and 3 are faster and similar. Your numbers depend on your hardware.</span></li>
+</ol></div>
+<div class="code"><span class="cap">serve_calc.py</span><pre><span class="c"># serve_calc.py - how KV cache memory and batching shape a model server. ILLUSTRATIVE numbers.</span>
+GPU_GB = 80                 <span class="c"># one H100 SXM: 80 GB of memory</span>
+BANDWIDTH_GBS = 3350        <span class="c"># ...and 3.35 TB/s of memory bandwidth</span>
+WEIGHTS_GB = 35             <span class="c"># e.g. a 70B-parameter model at 4 bits</span>
+OVERHEAD_GB = 5             <span class="c"># runtime, activations, fragmentation (illustrative)</span>
+
+<span class="c"># Shape of an illustrative 70B-class model with grouped-query attention</span>
+LAYERS, KV_HEADS, HEAD_DIM = 80, 8, 128
+
+def kv_bytes_per_token(bytes_per_value):
+    return 2 * LAYERS * KV_HEADS * HEAD_DIM * bytes_per_value   <span class="c"># 2 = one key + one value</span>
+
+free_gb = GPU_GB - WEIGHTS_GB - OVERHEAD_GB
+print(f"Memory left for the KV cache: {free_gb} GB\n")
+print(f"{'KV precision':&lt;14}{'MB/token':&gt;9}{'2K ctx':&gt;9}{'32K ctx':&gt;9}   (requests that fit)")
+for label, b in [("16-bit", 2), ("8-bit", 1)]:
+    per_tok = kv_bytes_per_token(b)
+    fits = [int(free_gb * 1e9 // (per_tok * ctx)) for ctx in (2048, 32768)]
+    print(f"{label:&lt;14}{per_tok / 1e6:&gt;9.2f}{fits[0]:&gt;9}{fits[1]:&gt;9}")
+
+print("\nDecode speed vs batch size (memory-bound model of one decode step)")
+print(f"{'batch':&gt;5}{'ms/step':&gt;9}{'tok/s per user':&gt;16}{'tok/s total':&gt;13}")
+weights_ms = WEIGHTS_GB / BANDWIDTH_GBS * 1000      <span class="c"># read every weight once per step</span>
+for batch in (1, 8, 32, 64):
+    step_ms = weights_ms + 0.25 * batch              <span class="c"># + illustrative per-request cost</span>
+    per_user = 1000 / step_ms
+    print(f"{batch:&gt;5}{step_ms:&gt;9.1f}{per_user:&gt;16.0f}{per_user * batch:&gt;13.0f}")</pre></div>
+<div class="code"><span class="cap">Expected output (illustrative model and costs)</span><pre>Memory left for the KV cache: 40 GB
+
+KV precision   MB/token   2K ctx  32K ctx   (requests that fit)
+16-bit             0.33       59        3
+8-bit              0.16      119        7
+
+Decode speed vs batch size (memory-bound model of one decode step)
+batch  ms/step  tok/s per user  tok/s total
+    1     10.7              93           93
+    8     12.4              80          643
+   32     18.4              54         1735
+   64     26.4              38         2420</pre></div>
+<div class="code"><span class="cap">ttft.py (optional: needs Ollama running locally)</span><pre><span class="c"># ttft.py - measure time to first token and streaming speed from a local Ollama model.</span>
+import json
+import os
+import time
+import urllib.request
+
+HOST = os.environ.get("OLLAMA_HOST_URL", "http://localhost:11434")
+MODEL = os.environ.get("OLLAMA_MODEL", "qwen3.5:0.8b")
+PROMPT = "List five negative test cases for a login form, one line each."
+
+def run_once():
+    body = {"model": MODEL, "stream": True, "options": {"temperature": 0},
+            "messages": [{"role": "user", "content": PROMPT}]}
+    req = urllib.request.Request(HOST + "/api/chat", data=json.dumps(body).encode("utf-8"),
+                                 headers={"Content-Type": "application/json"})
+    start = time.perf_counter()
+    first = None
+    with urllib.request.urlopen(req, timeout=300) as resp:
+        for line in resp:                       <span class="c"># one JSON object per line</span>
+            chunk = json.loads(line)
+            if first is None and chunk.get("message", {}).get("content"):
+                first = time.perf_counter() - start
+            if chunk.get("done"):
+                total = time.perf_counter() - start
+                tokens = chunk["eval_count"]
+                return first, total, tokens
+
+for i in range(3):                              <span class="c"># run 1 includes loading the model</span>
+    first, total, tokens = run_once()
+    print(f"run {i + 1}: first token {first * 1000:7.0f} ms | total {total:5.1f} s | "
+          f"{tokens} tokens | {tokens / (total - first):5.1f} tok/s after first token")</pre></div>
+<div class="code"><span class="cap">Sample output from ttft.py (yours will differ)</span><pre>run 1: first token    2140 ms | total   4.9 s | 96 tokens |  34.8 tok/s after first token
+run 2: first token     118 ms | total   2.9 s | 96 tokens |  34.3 tok/s after first token
+run 3: first token     121 ms | total   2.9 s | 96 tokens |  34.6 tok/s after first token</pre></div>
+<div class="box note"><span class="tag">Troubleshooting</span><ul>
+<li><b><code>Connection refused</code> from ttft.py</b>: Ollama isn't running; start the app or <code>ollama serve</code>. The first script needs nothing running.</li>
+<li><b><code>TypeError</code> about <code>NoneType</code> in ttft.py</b>: no text arrived before the reply finished (for example, a model that only produced "thinking"). Try another prompt or model, or add <code>"think": false</code> to the request body.</li>
+<li><b>Run 1 isn't slower</b>: the model was already loaded from earlier use. Run <code>ollama stop qwen3.5:0.8b</code> first to see a cold start.</li>
+<li><b>All numbers seem slow</b>: check <code>ollama ps</code>; a model on CPU will be much slower than these samples.</li>
+</ul></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Faster serving always means lower quality."</dt><dd>Continuous batching, prefix caching and speculative decoding don't change the model's outputs by design. Quantisation and distillation do, and need evaluation.</dd>
+<dt>"Throughput and latency improve together."</dt><dd>Bigger batches raise throughput and slow each user's stream. You tune for a target, not for both at once.</dd>
+<dt>"The weights are the main memory cost of serving."</dt><dd>At scale, the KV caches of all active conversations often use as much memory as the weights or more, especially with long contexts.</dd>
+<dt>"Average latency tells you how the service feels."</dt><dd>Users notice the slow tail. Measure p95 and p99 under realistic load.</dd>
+<dt>"Speculative decoding helps in every situation."</dt><dd>It helps most when the GPU has spare compute and the text is predictable; under heavy load the gains shrink.</dd>
+</dl></div>
+
+<h3 id="ch139-r"><span class="num">139.7</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>A serving stack adds an API server, scheduler, memory manager, GPU engine and streamer around the model.</li>
+<li>Measure TTFT, time per output token, throughput and tail latency (p95/p99), not just averages.</li>
+<li>vLLM, SGLang and TensorRT-LLM are the main open-source data-centre engines; llama.cpp and Ollama suit smaller deployments.</li>
+<li>Continuous batching keeps the GPU full; PagedAttention, prefix caching and KV quantisation stretch scarce memory.</li>
+<li>Quantisation and distillation make models cheaper but change them; speculative decoding speeds decode without changing outputs.</li>
+<li>Treat every optimisation as a release: evaluate quality and load-test performance before and after.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">What does continuous batching change compared with static batching?</p><div class="opts"><button>It uses a bigger fixed batch size</button><button data-ok>It re-forms the batch at every decode step, so finished requests leave and waiting ones join immediately</button><button>It processes one request at a time to reduce latency</button></div><p class="why" hidden>Static batching waits for the slowest request in the group; continuous batching never leaves a slot idle while someone is waiting.</p></div>
+<div class="qz"><p class="q">What problem did PagedAttention address?</p><div class="opts"><button>Slow tokenisation of long prompts</button><button data-ok>Wasted and fragmented KV cache memory from reserving large contiguous blocks per request</button><button>Inaccurate answers from quantised models</button></div><p class="why" hidden>Allocating the cache in small pages on demand left near-zero waste, so more requests fit in each batch.</p></div>
+<div class="qz"><p class="q">Why can speculative decoding speed things up without changing the output?</p><div class="opts"><button>It skips the big model for easy tokens</button><button data-ok>The big model verifies the draft tokens in one parallel pass and its acceptance rule keeps the big model's output distribution</button><button>It lowers the temperature automatically</button></div><p class="why" hidden>Leviathan et al. (2022) showed exact equivalence; the gain comes from using idle compute in memory-bound decode.</p></div>
+<div class="qz"><p class="q">Your team plans to switch a production model to a 4-bit quantised version. What should QA insist on?</p><div class="opts"><button>Nothing: 4-bit is known to be lossless</button><button>Only a load test</button><button data-ok>An evaluation run before and after on the team's real tasks, plus a realistic load test</button></div><p class="why" hidden>Quantisation changes the model slightly, and the impact is task-specific. Performance and quality both need checking.</p></div>
+<div class="qz"><p class="q">Which metric best captures "the answer starts appearing quickly"?</p><div class="opts"><button data-ok>Time to first token</button><button>Total throughput</button><button>Time per output token</button></div><p class="why" hidden>TTFT covers queueing and prefill; time per output token covers how fast it streams afterwards.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Write a one-page "performance and quality test plan" for a team moving an internal AI test-generation service from a 16-bit model to an 8-bit quantised version with prefix caching turned on. Include: the evaluation set and pass criteria, the load profile (prompt and answer lengths, peak requests per minute), the metrics you'll report (TTFT, time per output token, throughput, p95 and p99), the rollback trigger, and who signs off. Use <code>serve_calc.py</code> to estimate how many concurrent requests the change should allow, and state that the estimate is illustrative.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Serving a model to many people is mostly a memory problem. Every conversation keeps a KV cache on the GPU, and the more caches fit, the more people you can serve at once. Engines like vLLM keep the GPU busy by letting requests join and leave the batch at every step, and store caches in small pages so nothing is wasted. To make serving cheaper you can quantise the model, distil it into a smaller one, or use speculative decoding, where a small model guesses and the big one checks. The first two change the model, so you test quality; the last doesn't. Always measure time to first token and the slowest requests, not just averages."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>W. Kwon et al., <a href="https://arxiv.org/abs/2309.06180" target="_blank" rel="noopener">"Efficient Memory Management for Large Language Model Serving with PagedAttention"</a>, SOSP 2023, arXiv:2309.06180.</li>
+<li>Y. Leviathan, M. Kalman and Y. Matias, <a href="https://arxiv.org/abs/2211.17192" target="_blank" rel="noopener">"Fast Inference from Transformers via Speculative Decoding"</a>, ICML 2023, arXiv:2211.17192.</li>
+<li>G. Hinton, O. Vinyals and J. Dean, <a href="https://arxiv.org/abs/1503.02531" target="_blank" rel="noopener">"Distilling the Knowledge in a Neural Network"</a>, arXiv:1503.02531 (2015).</li>
+<li>vLLM documentation: <a href="https://docs.vllm.ai/en/latest/getting_started/quickstart.html" target="_blank" rel="noopener">quick start</a>, <a href="https://docs.vllm.ai/en/latest/features/" target="_blank" rel="noopener">features</a> (automatic prefix caching, chunked prefill, speculative decoding) and <a href="https://docs.vllm.ai/en/latest/features/quantization/index.html" target="_blank" rel="noopener">quantisation</a>.</li>
+<li><a href="https://github.com/sgl-project/sglang" target="_blank" rel="noopener">SGLang on GitHub</a> and <a href="https://github.com/NVIDIA/TensorRT-LLM" target="_blank" rel="noopener">TensorRT-LLM on GitHub</a>.</li>
+<li>ggml-org, <a href="https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md" target="_blank" rel="noopener">llama.cpp server documentation</a> (continuous batching default, endpoints).</li>
+<li>Ollama, <a href="https://docs.ollama.com/api/chat" target="_blank" rel="noopener">Chat API</a> (streaming responses and timing fields).</li>
+<li>NVIDIA, <a href="https://www.nvidia.com/en-us/data-center/h100/" target="_blank" rel="noopener">H100 specifications</a> (memory and bandwidth used in the lab).</li>
+</ol>
+<p class="verified">Verified 9 November 2026 against the papers and project documentation listed above. Engine features and install steps change frequently; check the official docs before deploying.</p></div>

@@ -1,0 +1,66 @@
+{
+ "Cache breakpoint": {
+  "d": "A marker (cache_control) in a Claude API request that says 'cache everything up to here'. The next request with an identical beginning reads that part from the cache instead of processing it again.",
+  "see": "ch90"
+ },
+ "Cache hit rate": {
+  "d": "The share of input tokens (or requests) served from a prompt cache rather than processed fresh. Higher is cheaper and faster.",
+  "see": "ch90"
+ },
+ "Jitter": {
+  "d": "A small random amount added to (or used as) a retry wait, so that many clients that failed at the same moment don't all retry at the same moment.",
+  "see": "ch90"
+ },
+ "Token bucket": {
+  "d": "A rate-limiting method: a bucket of allowance refills steadily up to a maximum, and each request spends from it. Short bursts are allowed until the bucket is empty.",
+  "see": "ch90"
+ },
+ "Message Batches API": {
+  "d": "Anthropic's asynchronous API for sending many Messages requests at once. Results arrive later (most within an hour, at most 24 hours) at half the normal price.",
+  "see": "ch90"
+ },
+ "Spend limit": {
+  "d": "A ceiling on how much an API organisation or workspace may spend in a month. Anthropic sets one per usage tier; you can set your own lower one.",
+  "see": "ch90"
+ },
+ "Responses API": {
+  "d": "OpenAI's recommended API for generating text (POST /v1/responses). It replaced Chat Completions as the default for new projects, though Chat Completions is still supported.",
+  "see": "ch91"
+ },
+ "Interactions API": {
+  "d": "Google's recommended interface for new Gemini API projects (POST /v1beta/interactions). The older generateContent method is still supported.",
+  "see": "ch91"
+ },
+ "Compatibility layer": {
+  "d": "An endpoint that accepts another vendor's request format, such as Claude or Gemini accepting OpenAI SDK calls. Handy for quick comparisons, but usually missing features of the native API.",
+  "see": "ch91"
+ },
+ "Vendor lock-in": {
+  "d": "Being tied to one supplier because switching would be costly: your code, prompts, data formats or contracts only fit that supplier.",
+  "see": "ch91"
+ },
+ "Ingestion": {
+  "d": "The first stage of a RAG pipeline: collecting documents from their sources (wikis, PDFs, tickets), extracting clean text and metadata, and passing them on for chunking and indexing.",
+  "see": "ch92"
+ },
+ "Reciprocal rank fusion": {
+  "d": "A simple way to merge several ranked result lists: each item scores 1/(k + its rank) in every list, and the scores are added. Used to combine keyword and vector search.",
+  "see": "ch92"
+ },
+ "Contextual retrieval": {
+  "d": "A RAG technique published by Anthropic in 2024: before indexing, a model writes a short note saying where each chunk sits in its document, and that note is added to the chunk for both embedding and keyword search.",
+  "see": "ch92"
+ },
+ "Recall@k": {
+  "d": "A retrieval metric: the share of test questions for which the right chunk appears in the top k results.",
+  "see": "ch92"
+ },
+ "Faithfulness": {
+  "d": "Whether every claim in a generated answer is supported by the retrieved sources. An unfaithful answer adds facts the sources do not contain.",
+  "see": "ch92"
+ },
+ "Metadata filter": {
+  "d": "A rule applied to stored chunk properties (owner, product, date, permission group) to include or exclude chunks before or during search.",
+  "see": "ch92"
+ }
+}

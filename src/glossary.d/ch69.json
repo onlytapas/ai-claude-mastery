@@ -1,0 +1,30 @@
+{
+ "Git worktree": {
+  "d": "An extra working folder linked to the same git repository, with its own files and its own branch but a shared history. Lets several tasks be worked on at once without their edits colliding.",
+  "see": "ch69"
+ },
+ "Background session": {
+  "d": "A Claude Code session that keeps working on your machine without a terminal window open, started with claude --bg or from agent view.",
+  "see": "ch69"
+ },
+ "Agent view": {
+  "d": "The Claude Code screen, opened with claude agents, that lists all background sessions and their state so you can dispatch, peek at, attach to or stop them. A research preview in version 2.1.319.",
+  "see": "ch69"
+ },
+ "Cloud session": {
+  "d": "A Claude Code session that runs on Anthropic-managed (or self-hosted) cloud machines, on a fresh clone of your GitHub repository, rather than on your computer.",
+  "see": "ch69"
+ },
+ "Remote Control": {
+  "d": "A Claude Code feature that lets you continue and steer a session running on your own computer from claude.ai/code or the Claude mobile app. Commands still run on your machine.",
+  "see": "ch69"
+ },
+ "Branch": {
+  "d": "In git, a separate line of work. Changes on a branch stay apart from the main version until they are merged.",
+  "see": "ch61"
+ },
+ "IDE": {
+  "d": "Integrated development environment: an editor with built-in tools for writing, running and debugging code, such as VS Code or IntelliJ IDEA.",
+  "see": "ch70"
+ }
+}

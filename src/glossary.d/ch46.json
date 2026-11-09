@@ -1,0 +1,22 @@
+{
+ "CSV": {
+  "d": "Comma-separated values: a plain-text table with one row per line and columns separated by commas. Test tools often export results this way.",
+  "see": "ch46"
+ },
+ "Code execution": {
+  "d": "A Claude capability that lets it write and run code (usually Python) in a private sandbox, to analyse files and create documents such as Excel or Word files.",
+  "see": "ch46"
+ },
+ "Project knowledge": {
+  "d": "The documents, text and code added to a Claude project, available to every chat in that project.",
+  "see": "ch47"
+ },
+ "Project instructions": {
+  "d": "Standing guidance attached to a Claude project that shapes every chat in it, much like a system prompt.",
+  "see": "ch47"
+ },
+ "Persistent storage": {
+  "d": "The ability of an artifact to save data (text only) between visits, either privately per user or shared with everyone who uses it.",
+  "see": "ch48"
+ }
+}

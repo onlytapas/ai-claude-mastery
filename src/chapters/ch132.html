@@ -1,0 +1,234 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>Where your data actually travels when you use an AI tool, and who can see it at each stop</li>
+<li>The difference between Anthropic's consumer and commercial terms on training and retention</li>
+<li>A simple data-classification scheme that tells a tester what may go into which tool</li>
+<li>How to handle personal data (PII): minimise, mask, pseudonymise, or replace with synthetic data</li>
+<li>Keeping secrets out of prompts, and what data loss prevention (DLP) can and can't do</li>
+<li>What data residency means, and what Anthropic's geographic controls offer</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> <a href="#ch42">Chapter 42</a> (Claude for organisations, including its data-handling table), <a href="#ch98">Chapter 98</a> (keys, tokens and secrets) and <a href="#ch122">Chapter 122</a> (synthetic test data). The lab needs Python 3.</div>
+
+<div class="bigidea"><p>Every prompt is a small data transfer. Whatever you paste, attach or let an agent read leaves your machine, reaches a provider, may be logged, and may be kept for a period that depends on your plan and settings. Privacy in practice comes down to four habits: know which route your data takes, put only the data the task needs on that route, mask what's personal or secret before it leaves, and use the commercial controls your organisation has paid for. The law (<a href="#ch133">Chapter 133</a>) tells you why; this chapter tells you how.</p></div>
+
+<h3 id="ch132-1"><span class="num">132.1</span>What data goes where</h3>
+<p>When a tester pastes a failing API response into an AI chat, it feels like a private conversation. Technically, it's a journey with several stops:</p>
+<div class="flow"><div><b>Your device</b>clipboard, files, terminal history, local logs</div><div><b>The app</b>Claude.ai, Claude Code, an IDE plug-in, or your company's tool</div><div class="hl"><b>The provider</b>Anthropic, or a cloud platform such as Amazon Bedrock</div><div><b>Storage</b>chat history, logs, safety review, feedback</div><div><b>Onward</b>connected tools: MCP servers, Jira, Slack, web fetches</div></div>
+<p>At each stop, ask three questions: <em>who can see it, how long is it kept, and what else may it be used for?</em> The answers differ by product and plan, so "Is Claude safe for our data?" has no single answer. The right question is "Is <em>this route</em>, on <em>this plan</em>, with <em>these settings</em>, appropriate for <em>this data</em>?"</p>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Sending data to an AI service is like sending a parcel. A personal courier and a corporate logistics contract may use the same vans, but the contract sets who may open the parcel, how long the depot keeps a copy, and what happens if it's lost. You'd check what's in the box, and which contract you're using, before you hand it over.</p></div>
+<div class="box warn"><span class="tag">Agents widen the journey</span><p>A chat sends what you paste. An agent sends what it <em>reads</em>. When Claude Code opens a file, runs a command or calls an MCP tool, the result enters the conversation and travels to the model. An agent working in a repository with a production database dump in it can send rows from that dump without you ever pasting them. Scope what agents can read (<a href="#ch131">Chapter 131</a> and <a href="#ch134">Chapter 134</a>).</p></div>
+
+<h3 id="ch132-2"><span class="num">132.2</span>Consumer versus commercial terms</h3>
+<p>Anthropic offers Claude under two families of terms. <b>Consumer terms</b> cover individual plans (Free, Pro, Max and other personal plans) and Claude Code used from those accounts. <b>Commercial terms</b> cover Team and Enterprise, the Claude API (including through Amazon Bedrock, Google Cloud and Microsoft Foundry), and government and education offerings. The difference matters more than any feature.</p>
+<ol class="timeline">
+<li class="key"><span class="yr">28 Aug 2025</span><span class="ev"><b>Consumer terms updated.</b> Anthropic asked Free, Pro and Max users to choose whether their chats and coding sessions may be used to improve Claude. Choosing yes extends retention of that data to five years; choosing no keeps the existing 30-day period. The update did not apply to services under the Commercial Terms.</span></li>
+<li><span class="yr">8 Oct 2025</span><span class="ev"><b>Deadline for existing users</b> to make a choice to keep using Claude. New users choose at sign-up.</span></li>
+</ol>
+<p>Here is how the privacy centre describes things today (read 9 November 2026). <a href="#ch42">Chapter 42</a> has a fuller table with exact quotes; the essentials:</p>
+<div class="tbl"><table>
+<tr><th></th><th>Consumer (individual plans)</th><th>Commercial (Team, Enterprise, API)</th></tr>
+<tr><td><b>Used for training?</b></td><td>Only if the user turns on the model-improvement setting ("Help improve Claude", <a href="#ch43">Chapter 43</a>), or the chat is flagged for safety review, or the user explicitly opts in another way. <a class="gl" href="#g-incognito-chat">Incognito chats</a> are never used, even with the setting on.</td><td>"By default, we will not use your inputs or outputs from our commercial products" to train models, unless the customer chooses to allow it.</td></tr>
+<tr><td><b>Retention</b></td><td>Deleted chats leave back-end storage within 30 days. With model improvement on, de-identified data may be kept up to 5 years in training pipelines.</td><td>API inputs and outputs are deleted within 30 days by default. Chats in apps such as Team are kept so you can return to them. Other terms, such as <a class="gl" href="#g-zero-data-retention">zero data retention</a>, can be agreed.</td></tr>
+<tr><td><b>Feedback (thumbs up/down)</b></td><td>The whole related conversation is kept up to 5 years, de-linked from your user ID, and may be used for training.</td><td>Same: up to 5 years, de-linked. Team and Enterprise owners can turn feedback off with the "Rate chats" setting.</td></tr>
+<tr><td><b>Safety-flagged content</b></td><td colspan="2">Inputs and outputs may be kept up to 2 years; trust and safety classification scores up to 7 years.</td></tr>
+</table></div>
+<div class="box note"><span class="tag">Turning training off isn't time travel</span><p>The consumer retention page notes that switching model improvement off stops <em>future</em> training use of your chats, but data already used in training runs, or in models already trained, stays there. Decide before you paste, not after.</p></div>
+<div class="box example"><span class="tag">Real-world example</span><p>A tester uses a personal Pro account at home to "quickly" ask Claude why a customer's payment failed, pasting the request log with the customer's name, email and card prefix. Even with training off, that personal data now sits in a consumer account outside the company's contract, audit logs and deletion controls. The same question asked through the company's Team workspace, with the log first passed through a redactor (lab below), is a very different risk.</p></div>
+<details class="deep"><summary>Under the hood: why commercial terms usually satisfy security teams</summary><div class="body">
+<p>Commercial agreements change three things a security review cares about. <b>Contract:</b> a business agreement and usually a data processing addendum set out the provider's duties as a processor of your data. <b>Control:</b> admins, not individuals, decide settings; Enterprise adds audit logs, SCIM, role-based access, a Compliance API and custom data retention. <b>Visibility:</b> usage is tied to company identities through single sign-on, so access can be removed when someone leaves. None of this stops a person pasting the wrong thing, which is why the remaining sections focus on habits and tooling.</p>
+</div></details>
+
+<h3 id="ch132-3"><span class="num">132.3</span>Classify before you paste</h3>
+<p>Most companies already have an information-classification policy. Map it onto AI routes so nobody has to guess. The example below is <b>illustrative</b>: use your organisation's real classes and rules.</p>
+<div class="tbl"><table>
+<tr><th>Class</th><th>QA examples</th><th>Consumer AI account</th><th>Company commercial workspace</th><th>Local model only</th></tr>
+<tr><td><b>Public</b></td><td>Published docs, open-source code, public bug reports</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+<tr><td><b>Internal</b></td><td>Test plans, non-sensitive stories, test code, synthetic data</td><td>No</td><td>Yes</td><td>Yes</td></tr>
+<tr><td><b>Confidential</b></td><td>Unreleased features, architecture, security findings, logs from test environments</td><td>No</td><td>Yes, if policy allows, with minimisation</td><td>Yes</td></tr>
+<tr><td><b>Restricted</b></td><td>Real customer personal data, production database extracts, credentials, payment data, health data</td><td>No</td><td>No, unless explicitly approved (masked first)</td><td>Only with approval</td></tr>
+</table></div>
+<p>Running models on your own computer (<a href="#ch137">Chapter 137</a>) keeps data on the machine, which helps. It doesn't make careless handling safe: local files, logs and backups still need protecting.</p>
+
+<h3 id="ch132-4"><span class="num">132.4</span>Handling personal data (PII)</h3>
+<p><a class="gl" href="#g-pii">Personally identifiable information</a> (PII) is any information that identifies a person directly (name, email, phone, PAN, Aadhaar number) or indirectly when combined (date of birth plus PIN code plus employer). Laws use slightly different terms: "personal data" in the EU's GDPR and in India's DPDP Act. QA teams meet PII constantly: in production bug reports, logs, screenshots, test data copied from live systems and support tickets.</p>
+<p>Work down this ladder, stopping at the first step that still lets you do the job:</p>
+<div class="flow"><div class="hl"><b>1. Don't include it</b>Most debugging needs the shape of the data, not the person</div><div><b>2. Synthetic data</b>Generate realistic fake records (<a href="#ch122">Chapter 122</a>)</div><div><b>3. Mask</b>Replace values with placeholders such as [EMAIL]</div><div><b>4. Pseudonymise</b>Replace with consistent tokens (user_17) and keep the key elsewhere</div><div><b>5. Approved route</b>If real data is unavoidable: commercial workspace, minimum fields, documented reason</div></div>
+<div class="cols2"><div><h4>Masking</h4><p><a class="gl" href="#g-data-masking">Data masking</a> replaces sensitive values with placeholders. "priya@example.com" becomes "[EMAIL]". Simple and safe, but you lose the ability to tell two customers apart.</p></div><div><h4>Pseudonymisation</h4><p><a class="gl" href="#g-pseudonymisation">Pseudonymisation</a> replaces values with consistent stand-ins ("customer_A" everywhere), so patterns survive. Under GDPR, pseudonymised data is <em>still personal data</em> because someone holds the key to reverse it.</p></div></div>
+<div class="box warn"><span class="tag">Anonymisation is harder than it looks</span><p>Truly anonymous data can't be linked back to a person by any reasonable means. Removing names isn't enough: a rare combination of age, town and job title can identify someone. Treat "we anonymised it" claims sceptically, and prefer synthetic data for testing.</p></div>
+<div class="box note"><span class="tag">Screenshots and images</span><p>Images carry PII too: names in a page header, an email in the corner of a screenshot, a customer's address in a PDF. Crop or blur before attaching, and check the browser's tab bar and bookmarks bar.</p></div>
+
+<h3 id="ch132-5"><span class="num">132.5</span>Secrets never belong in prompts</h3>
+<p>A <a class="gl" href="#g-secret">secret</a> is anything that grants access: <a class="gl" href="#g-api-key">API keys</a>, passwords, <a class="gl" href="#g-access-token">access tokens</a>, private keys, connection strings, session cookies. Secrets leak into AI conversations in predictable ways: a pasted <code>curl</code> command with an <code>Authorization</code> header, a stack trace that prints environment variables, an agent reading <code>.env</code>, or a HAR file exported from browser developer tools, which contains cookies.</p>
+<p>In Claude Code, block the obvious paths with deny rules (they win over every allow rule, <a href="#ch78">Chapter 78</a>):</p>
+<div class="code"><span class="cap">.claude/settings.json (project) or managed settings</span><pre>{
+  "permissions": {
+    "deny": ["Read(./.env)", "Read(./.env.*)", "Read(./secrets/**)"]
+  }
+}</pre></div>
+<p>Deny rules govern Claude's file tools. Shell commands are a separate path, so pair them with the <a class="gl" href="#g-sandbox">sandbox</a> and its read restrictions for stronger protection (<a href="#ch134">Chapter 134</a>). If a secret does get into a conversation, treat it as leaked: revoke and rotate it straight away, following <a href="#ch98">Chapter 98</a>. Deleting the chat doesn't un-send it.</p>
+
+<h3 id="ch132-6"><span class="num">132.6</span>Data loss prevention (DLP)</h3>
+<p><a class="gl" href="#g-data-loss-prevention">Data loss prevention</a> (DLP) means tools and rules that spot sensitive data and stop it leaving approved places. Security teams apply DLP at several points; each sees different things.</p>
+<div class="tbl"><table>
+<tr><th>Where DLP sits</th><th>What it can do for AI use</th><th>Blind spots</th></tr>
+<tr><td><b>Endpoint</b> (agent on the laptop)</td><td>Warn or block when sensitive data is copied, uploaded or pasted into unapproved apps</td><td>Personal devices; command-line tools</td></tr>
+<tr><td><b>Browser / secure web gateway</b></td><td>Allow the company AI workspace, block consumer AI sites, inspect uploads</td><td>Desktop apps and APIs that bypass the browser</td></tr>
+<tr><td><b>API gateway / proxy</b></td><td>Scan or redact prompts your own applications send to a model API</td><td>Only covers traffic routed through it</td></tr>
+<tr><td><b>Provider admin controls</b></td><td>Restrict connectors, turn off feedback, audit usage, export logs for review (Enterprise)</td><td>Can't see what users do in other tools</td></tr>
+<tr><td><b>Before you paste</b> (you)</td><td>A redaction script or checklist, as in the lab</td><td>Depends on people using it</td></tr>
+</table></div>
+<p>DLP pattern matching is good at structured data (card numbers, PAN, Aadhaar numbers, keys) and poor at meaning (a paragraph describing a customer's medical condition). Expect both misses and false alarms, and keep the human habit even where the tooling exists.</p>
+<div class="box opinion"><span class="tag">Opinion · common among security practitioners</span><p>Many security leaders argue that blocking all AI tools backfires: people move to personal accounts the company can't see ("shadow AI"). Their usual preference is to provide one approved, well-configured route, make it easy, and block or warn on the rest. This is practitioner judgement rather than a published standard.</p></div>
+
+<h3 id="ch132-7"><span class="num">132.7</span>Data residency</h3>
+<p><a class="gl" href="#g-data-residency">Data residency</a> means controlling which country or region your data is processed and stored in. Organisations care because of law (some data may not leave a jurisdiction), contracts (customers may require it) and risk appetite.</p>
+<p>Anthropic's API offers two independent controls (verified 9 November 2026):</p>
+<div class="tbl"><table>
+<tr><th>Control</th><th>What it governs</th><th>Options today</th></tr>
+<tr><td><b>Inference geo</b> (<code>inference_geo</code> per request, or a workspace default)</td><td>Where the model runs</td><td><code>"global"</code> (default, any available region) or <code>"us"</code> (US-only, priced at 1.1x on Claude 4.6 and later models)</td></tr>
+<tr><td><b>Workspace geo</b> (set when a workspace is created; can't be changed)</td><td>Where data is stored at rest and where some processing (for example code execution) happens</td><td><code>"us"</code> only</td></tr>
+</table></div>
+<p>Administrators can restrict a workspace with <code>allowed_inference_geos</code> and set <code>default_inference_geo</code>. On Amazon Bedrock and Google Cloud's Google-managed offering, the region comes from the endpoint you choose instead; your cloud team configures it.</p>
+<div class="box note"><span class="tag">For readers in India</span><p>At the time of writing, Anthropic's own controls don't offer an India region. If your organisation needs processing in a specific region, check what each cloud platform offers for Claude in that region at the time you decide, and get the answer in writing. India's DPDP Act (<a href="#ch133">Chapter 133</a>) does not ban sending personal data abroad in general: the government may restrict transfers to countries it notifies, and some sector regulators (banking, for example) have their own stricter localisation rules. Your compliance team will know which apply.</p></div>
+
+<h3 id="ch132-8"><span class="num">132.8</span>A compliance checklist for an AI tool</h3>
+<p>Before a team adopts an AI tool for work data, someone should be able to answer these questions. They line up with what auditors and the laws in <a href="#ch133">Chapter 133</a> ask for.</p>
+<div class="tbl"><table>
+<tr><th>Question</th><th>Where to find the answer</th></tr>
+<tr><td>Which plan and terms are we on: consumer or commercial?</td><td>Admin console; contract</td></tr>
+<tr><td>Is our data used for training? Can that change?</td><td>Provider privacy centre; contract</td></tr>
+<tr><td>How long are inputs, outputs, feedback and flagged content kept?</td><td>Provider retention pages; any ZDR or custom retention agreement</td></tr>
+<tr><td>Is there a data processing addendum, and who are the sub-processors?</td><td>Provider trust or legal pages</td></tr>
+<tr><td>Where is data processed and stored?</td><td>Data residency docs; cloud region settings</td></tr>
+<tr><td>Which connectors, MCP servers and plug-ins can reach company data?</td><td>Admin settings; <a href="#ch105">Chapter 105</a></td></tr>
+<tr><td>Who can see usage, and can we export audit logs?</td><td>Admin console (Enterprise audit logs, Compliance API)</td></tr>
+<tr><td>What may staff paste, and what must be masked first?</td><td>Your classification table (131.3) and AI use policy (<a href="#ch135">Chapter 135</a>)</td></tr>
+<tr><td>What do we do if personal data or a secret is pasted by mistake?</td><td>Incident process: rotate secrets; assess whether it counts as a personal data breach</td></tr>
+</table></div>
+
+<div class="lab"><div class="lab-h"><b>Build a "redact before you paste" tool</b><span>30 min · Python 3 · plus your Claude settings</span></div><ol>
+<li>Make a folder: <code>mkdir privacy-lab &amp;&amp; cd privacy-lab</code>. Save the script below as <code>redact.py</code>. It masks secrets first (so later rules don't split them), then emails, PAN and Aadhaar-style numbers, card numbers (checked with the Luhn checksum to reduce false alarms), Indian mobile numbers and IP addresses.<span class="expect">one file, about 60 lines.</span></li>
+</ol>
+<div class="code"><span class="cap">redact.py</span><pre>"""redact.py - mask common personal data and secrets before text goes to an AI tool.
+Usage: python3 redact.py bug_report.txt &gt; bug_report.redacted.txt
+A safety net, not a guarantee: always read the output before you paste it.
+"""
+import re
+import sys
+
+
+def luhn_ok(number):
+    digits = [int(d) for d in re.sub(r"\D", "", number)][::-1]
+    total = 0
+    for i, d in enumerate(digits):
+        if i % 2 == 1:
+            d *= 2
+            if d &gt; 9:
+                d -= 9
+        total += d
+    return total % 10 == 0
+
+
+RULES = [
+    # secrets first, so later rules don't split them
+    ("ANTHROPIC_KEY", re.compile(r"sk-ant-[A-Za-z0-9_\-]{10,}")),
+    ("JWT", re.compile(r"eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+")),
+    ("BEARER", re.compile(r"(?i)(authorization:\s*bearer\s+)[A-Za-z0-9._\-]+")),
+    ("PASSWORD", re.compile(r"(?i)(password\s*[=:]\s*)\S+")),
+    ("EMAIL", re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")),
+    ("PAN", re.compile(r"\b[A-Z]{5}[0-9]{4}[A-Z]\b")),
+    ("CARD", re.compile(r"\b(?:\d[ -]?){12,18}\d\b")),
+    ("AADHAAR", re.compile(r"\b[2-9][0-9]{3}\s?[0-9]{4}\s?[0-9]{4}\b")),
+    ("PHONE_IN", re.compile(r"(?&lt;!\d)(?:\+91[\s-]?|0)?[6-9]\d{4}\s?\d{5}(?!\d)")),
+    ("IPV4", re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")),
+]
+
+
+def redact(text):
+    counts = {}
+    for label, pattern in RULES:
+        def replace(match, label=label):
+            if label == "CARD" and not luhn_ok(match.group(0)):
+                return match.group(0)            # not a real card number shape
+            counts[label] = counts.get(label, 0) + 1
+            if label in ("BEARER", "PASSWORD"):
+                return match.group(1) + f"[{label}]"
+            return f"[{label}]"
+        text = pattern.sub(replace, text)
+    return text, counts
+
+
+if __name__ == "__main__":
+    source = open(sys.argv[1], encoding="utf-8").read() if len(sys.argv) &gt; 1 else sys.stdin.read()
+    cleaned, counts = redact(source)
+    print(cleaned)
+    summary = ", ".join(f"{k}={v}" for k, v in sorted(counts.items())) or "nothing found"
+    print(f"Redacted: {summary}", file=sys.stderr)</pre></div>
+<ol start="2">
+<li>Save this fake bug report as <code>bug_report.txt</code>. Every value in it is invented for the exercise; the card number is a widely used test number.<span class="expect">a realistic-looking report full of personal data and secrets.</span></li>
+</ol>
+<div class="code"><span class="cap">bug_report.txt</span><pre>Bug QA-482: checkout fails for some customers
+Reporter: priya.sharma@example.com, phone +91 98765 43210
+Customer: Ravi Kumar, PAN ABCDE1234F, Aadhaar 2345 6789 0123
+Card used: 4111 1111 1111 1111 (test card), order total 12499
+Request log from 10.20.30.40:
+  Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.abc123def456
+  password=Winter2026!
+  x-api-key: sk-ant-FAKE-KEY-FOR-THIS-LAB-0000
+Expected: order confirmed. Actual: HTTP 500 after 3.2 s.</pre></div>
+<ol start="3">
+<li>Run <code>python3 redact.py bug_report.txt</code>.<span class="expect">this output (the "Redacted:" summary goes to standard error, so in some terminals it prints first):</span></li>
+</ol>
+<div class="code"><span class="cap">Expected output</span><pre>Bug QA-482: checkout fails for some customers
+Reporter: [EMAIL], phone [PHONE_IN]
+Customer: Ravi Kumar, PAN [PAN], Aadhaar [AADHAAR]
+Card used: [CARD] (test card), order total 12499
+Request log from [IPV4]:
+  Authorization: Bearer [JWT]
+  password=[PASSWORD]
+  x-api-key: [ANTHROPIC_KEY]
+Expected: order confirmed. Actual: HTTP 500 after 3.2 s.
+
+Redacted: AADHAAR=1, ANTHROPIC_KEY=1, CARD=1, EMAIL=1, IPV4=1, JWT=1, PAN=1, PASSWORD=1, PHONE_IN=1</pre></div>
+<ol start="4">
+<li>Look closely at what was <em>not</em> removed. The customer's name, "Ravi Kumar", is still there: names don't follow a pattern, so regex can't find them reliably. Replace it by hand with "Customer A".<span class="expect">you understand why the docstring says "a safety net, not a guarantee".</span></li>
+<li>Save the clean version: <code>python3 redact.py bug_report.txt &gt; clean.txt</code>, fix the name, then ask Claude (in your company workspace) "Suggest likely causes of this checkout failure and the first three checks to run" with <code>clean.txt</code> attached.<span class="expect">useful debugging suggestions; nothing in the answer needed the real personal data.</span></li>
+<li>Check your account settings. On a personal account, open Settings &gt; Privacy and note whether model improvement is on. On a work account, ask your admin which plan you're on and whether feedback ("Rate chats") is enabled.<span class="expect">you can state which terms cover your chats and whether they may be used for training.</span></li>
+<li>If you use Claude Code, add the deny rules from 131.5 to a test project's <code>.claude/settings.json</code>, create a dummy <code>.env</code>, and ask Claude to read it.<span class="expect">Claude reports it isn't allowed to read the file.</span></li>
+</ol>
+<p><b>Troubleshooting:</b> nothing redacted → check you passed the file name; a phone number missed → it may have a format the pattern doesn't cover, such as brackets or dashes in different places, so extend the pattern and add a test line; ordinary numbers masked as [CARD] or [AADHAAR] → that's a false positive, so make the pattern stricter; <code>UnicodeDecodeError</code> → save the input file as UTF-8.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"If I turn training off, my data is never kept."</dt><dd>Training and retention are different. Data is still stored for the retention period, longer if flagged or sent as feedback.</dd>
+<dt>"My personal Pro account is fine for work if training is off."</dt><dd>Consumer terms sit outside your company's contract, admin controls and audit trail. Use the approved commercial route for work data.</dd>
+<dt>"Pseudonymised data isn't personal data."</dt><dd>Under GDPR it still is, because it can be re-linked. Only truly anonymous data falls outside, and that's hard to achieve.</dd>
+<dt>"The DLP tool will catch it."</dt><dd>DLP catches patterns, not meaning, and only on the routes it watches. Keep the habit of checking before you paste.</dd>
+<dt>"Deleting the chat fixes a leaked key."</dt><dd>Once sent, assume it's exposed. Revoke and rotate the key.</dd>
+</dl></div>
+
+<h3 id="ch132-r"><span class="num">132.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>Every prompt, file and agent read is a data transfer: know the route, the plan and the settings.</li>
+<li>Anthropic's consumer plans train only if the user opts in; commercial products don't train on your data by default. Feedback and flagged content have longer retention.</li>
+<li>Classify data and map each class to allowed AI routes.</li>
+<li>For PII: leave it out, use synthetic data, mask or pseudonymise, and only then consider an approved route for real data.</li>
+<li>Secrets never go in prompts; deny agent access to secret files; rotate anything that leaks.</li>
+<li>DLP and residency controls help, but they complement careful habits rather than replacing them.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">Under Anthropic's terms as of November 2026, are a company's Claude API inputs used for model training by default?</p><div class="opts"><button>Yes, always</button><button data-ok>No, not by default; exceptions include feedback the customer submits or an explicit choice to allow it</button><button>Only if the API key is older than 30 days</button></div><p class="why" hidden>The commercial privacy page says inputs and outputs from commercial products aren't used for training by default. Feedback such as thumbs up/down is the main exception.</p></div>
+<div class="qz"><p class="q">A consumer user turned on model improvement. How long may Anthropic keep de-identified data from new chats in training pipelines?</p><div class="opts"><button>30 days</button><button>2 years</button><button data-ok>Up to 5 years</button></div><p class="why" hidden>The consumer retention page says up to 5 years with the setting on. With it off, deleted chats leave back-end storage within 30 days.</p></div>
+<div class="qz"><p class="q">You replace each customer email with a consistent label like "customer_17" and keep a lookup table. Under GDPR this is:</p><div class="opts"><button>Anonymisation, so GDPR no longer applies</button><button data-ok>Pseudonymisation; it's still personal data</button><button>Encryption</button></div><p class="why" hidden>Because the lookup table can re-identify people, the data remains personal data. It's a good safeguard, not an exemption.</p></div>
+<div class="qz"><p class="q">Which control stops Claude Code's file tools from reading <code>.env</code> even if a broad allow rule exists?</p><div class="opts"><button>Asking Claude politely in CLAUDE.md</button><button data-ok>A deny rule such as <code>Read(./.env)</code></button><button>Turning off model improvement</button></div><p class="why" hidden>Deny rules are checked first and can't be overridden by allow rules. Instructions in CLAUDE.md are guidance, not enforcement.</p></div>
+<div class="qz"><p class="q">With Anthropic's API, what does setting <code>inference_geo</code> to <code>"us"</code> control?</p><div class="opts"><button data-ok>Where the model runs for that request</button><button>Where data is stored at rest</button><button>Whether the data is used for training</button></div><p class="why" hidden>Inference geo governs where inference runs. Storage location is the separate workspace geo, and training is governed by the terms and settings.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Write a one-page "AI data handling card" for your QA team. Include: (1) which AI routes are approved, and under which terms; (2) a four-class table like 131.3 using your company's real classes; (3) three before-and-after examples of a bug report made safe; (4) the Claude Code deny rules every project should carry; (5) what to do in the first hour if someone pastes a secret or customer data by mistake. Have your security or privacy team review it, and record what they changed.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"When you paste something into an AI tool, you're sending it to a company's servers, where it's kept for a while. Whether it can be used for training depends on whether you're on a personal plan or our company plan, so work data goes only through the company route. Before you paste, ask: does the AI need the real customer's details to answer? Usually not. Run the redactor, swap names for 'Customer A', and never include passwords or keys. If you slip up with a key, tell us so we can rotate it, because deleting the chat doesn't undo it."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic Privacy Center, <a href="https://privacy.claude.com/en/articles/10023580-is-my-data-used-for-model-training" target="_blank" rel="noopener">Is my data used for model training? (consumer)</a> (updated 16 March 2026) and <a href="https://privacy.claude.com/en/articles/10023548-how-long-do-you-store-my-data" target="_blank" rel="noopener">How long do you store my data? (consumer)</a> (updated 1 July 2026).</li>
+<li>Anthropic Privacy Center, <a href="https://privacy.claude.com/en/articles/7996868-is-my-data-used-for-model-training" target="_blank" rel="noopener">Is my data used for model training? (commercial)</a> (updated 18 August 2026) and <a href="https://privacy.claude.com/en/articles/7996866-how-long-do-you-store-my-organization-s-data" target="_blank" rel="noopener">How long do you store my organization's data?</a> (updated 1 July 2026).</li>
+<li>Anthropic, <a href="https://www.anthropic.com/news/updates-to-our-consumer-terms" target="_blank" rel="noopener">Updates to Consumer Terms and Privacy Policy</a> (28 August 2025).</li>
+<li>Claude Platform docs, <a href="https://platform.claude.com/docs/en/manage-claude/data-residency" target="_blank" rel="noopener">Data residency</a>: inference geo, workspace geo, pricing and platform notes.</li>
+<li>Claude Code docs, <a href="https://code.claude.com/docs/en/permissions" target="_blank" rel="noopener">Permissions</a> and <a href="https://code.claude.com/docs/en/sandboxing" target="_blank" rel="noopener">Sandboxing</a>.</li>
+<li>Government of India, <a href="https://www.meity.gov.in/static/uploads/2024/06/2bf1f0e9f04e6fb4f8fef35e82c42aa5.pdf" target="_blank" rel="noopener">Digital Personal Data Protection Act, 2023</a> (section 16 on transfers outside India).</li>
+<li>European Data Protection Board, <a href="https://www.edpb.europa.eu/our-work-tools/our-documents/opinion-board-art-64/opinion-282024-certain-data-protection-aspects_en" target="_blank" rel="noopener">Opinion 28/2024 on data protection aspects of AI models</a>.</li>
+</ol><p class="verified">Verified 9 November 2026 against the Anthropic privacy centre pages and platform documentation listed above. The lab code was run with Python 3.</p></div>

@@ -1,0 +1,42 @@
+{
+ "API key": {
+  "d": "A long secret string a service gives you, sent with every request to prove the request comes from your account. Anyone who has it can use the service as you, so it must be kept secret.",
+  "see": "ch98"
+ },
+ "Access token": {
+  "d": "A secret string, usually short-lived, that a program sends with each request to prove it has been allowed in. OAuth sign-ins produce access tokens.",
+  "see": "ch98"
+ },
+ "OAuth": {
+  "d": "A standard way to give an app limited access to your account without sharing your password: you sign in on the real service, approve what the app may do, and the app receives a token.",
+  "see": "ch98"
+ },
+ "Personal access token": {
+  "d": "A token you create in a tool's settings (for example GitHub or Atlassian) that lets a program act as your account, ideally limited to specific permissions and with an expiry date.",
+  "see": "ch98"
+ },
+ "Environment variable": {
+  "d": "A named value stored in your terminal session or system, such as GITHUB_TOKEN, that programs can read. A common safe place to keep secrets out of code.",
+  "see": "ch56"
+ },
+ "Secret": {
+  "d": "Any value that grants access, such as a password, API key or token. Secrets must never be put in code, tickets, screenshots or AI chats.",
+  "see": "ch98"
+ },
+ "Bearer token": {
+  "d": "A token sent in the Authorization header of a web request. Whoever holds (bears) it gets access, so it must be kept secret and sent only over HTTPS.",
+  "see": "ch98"
+ },
+ "Scope": {
+  "d": "A specific permission attached to a token, such as 'read issues' or 'write comments'. Narrow scopes limit the damage if a token leaks.",
+  "see": "ch98"
+ },
+ "MCP server": {
+  "d": "A program that wraps one tool or data source (Jira, a browser, a database) and offers its abilities to AI apps using the Model Context Protocol.",
+  "see": "ch97"
+ },
+ "MCP host": {
+  "d": "The AI application you use, such as Claude Code or the Claude desktop app, which connects to MCP servers through MCP clients.",
+  "see": "ch97"
+ }
+}

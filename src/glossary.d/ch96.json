@@ -1,0 +1,42 @@
+{
+ "Container": {
+  "d": "A running, isolated copy of an application together with the exact libraries and settings it needs, started from a container image. Throwing a container away doesn't change the image it came from.",
+  "see": "ch96"
+ },
+ "Container image": {
+  "d": "A read-only package of an application and everything it needs to run, built from a Dockerfile. The same image is tested, stored in a registry and run in production.",
+  "see": "ch96"
+ },
+ "Docker Compose": {
+  "d": "A Docker tool that describes how to run one or more containers together, with their settings, secrets, ports and volumes, in a single YAML file such as compose.yaml.",
+  "see": "ch96"
+ },
+ "Container registry": {
+  "d": "A server that stores container images so that pipelines and servers can push and pull them, for example GitHub's ghcr.io or Docker Hub.",
+  "see": "ch96"
+ },
+ "Reverse proxy": {
+  "d": "A server that sits in front of an application, receives requests from users (often over HTTPS) and forwards them to the application. Caddy and nginx are common examples.",
+  "see": "ch96"
+ },
+ "Health check": {
+  "d": "A small, cheap request that tells a machine whether an application is working, used to restart broken containers or decide whether a new version can take traffic.",
+  "see": "ch96"
+ },
+ "Readiness check": {
+  "d": "A health check that asks whether an application can serve real requests right now (for example, whether its database and settings are in place), as opposed to merely being alive.",
+  "see": "ch96"
+ },
+ "Rollback": {
+  "d": "Returning a system to the previous known-good version after a bad release. It restores code, not data, so back up before every release.",
+  "see": "ch96"
+ },
+ "Continuous deployment": {
+  "d": "Automatically building and releasing every change that passes the tests, through a pipeline rather than by hand, often with an approval step before production.",
+  "see": "ch96"
+ },
+ "Role-based access control": {
+  "d": "A way of managing permissions where each permission belongs to a role (such as viewer, tester or admin) and each user is given a role. Often shortened to RBAC.",
+  "see": "ch96"
+ }
+}

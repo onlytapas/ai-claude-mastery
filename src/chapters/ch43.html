@@ -1,0 +1,183 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>How to create a Claude account and log in on the web, desktop and mobile apps</li>
+<li>What each part of the claude.ai screen is for: the sidebar, the message box, the "+" menu and the model menu</li>
+<li>How to start, continue, rename, find and delete conversations</li>
+<li>How to choose a model, an effort level and the thinking setting, and when each choice matters</li>
+<li>Which settings to check on day one, including privacy and incognito chats</li>
+<li>How usage limits work, and simple habits that make your allowance last</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> nothing technical. It helps to have read <a href="#ch40">Chapter 40</a> (the current Claude models) and <a href="#ch41">Chapter 41</a> (how the model, the apps and Claude Code fit together). Plan details are in <a href="#ch42">Chapter 42</a>. You need an email address or a Google account, and you must be 18 or over to use the consumer product.</div>
+
+<div class="bigidea"><p>Claude's apps look like a simple chat window, but there are a few controls worth learning on day one. A conversation is a single thread of messages; Claude remembers everything inside it, but by default nothing from one conversation carries into another unless you switch on features such as memory or projects. Next to the send button is a model menu where you pick which Claude model answers and how hard it thinks. Higher settings give more thorough answers but take longer and use more of your allowance. Learn those controls, check your privacy settings once, and you are ready to work.</p></div>
+
+<div class="box warn"><span class="tag">Screens change often</span><p>Every button name and menu location in this chapter was checked against Anthropic's help centre (support.claude.com) and claude.com on 9 November 2026. Anthropic changes the interface frequently, and it is currently rolling out a "new Claude experience" in stages, so your screen may not match exactly. If a control has moved, search the help centre for its name, or ask Claude itself: "Where is the setting for X in this app?"</p></div>
+
+<h3 id="ch43-1"><span class="num">43.1</span>Getting an account</h3>
+<p>You can use Claude in a web browser at <b>claude.ai</b>, in the desktop app (macOS and Windows; Linux is in beta) or in the mobile app (iOS and Android). All of them use the same account and show the same conversation history, so you can start a chat on your laptop and carry on from your phone.</p>
+<div class="flow"><div><b>1. Go to claude.ai</b>or open the app</div><div><b>2. Choose a sign-in method</b>"Continue with email" or "Continue with Google"</div><div class="hl"><b>3. Confirm your email</b>open the secure login link (or enter the code it gives you)</div><div><b>4. Confirm you are 18+</b>and accept the terms</div><div><b>5. Start chatting</b>on the Free plan, or upgrade later</div></div>
+<p>A few practical details, from Anthropic's login help article:</p>
+<ul>
+<li><b>Email login has no password.</b> You get an email titled "Secure link to log in to Claude.ai". Open the link on the same device and you are logged in. Open it on a different device and it shows a verification code to type on the first one.</li>
+<li><b>Use the same method every time.</b> If you signed up with Google, log in with Google. Mixing methods is the most common reason people "lose" their chat history.</li>
+<li><b>Email not arriving?</b> Check your spam or junk folder for mail from <code>@mail.anthropic.com</code>.</li>
+<li><b>Some people are asked to verify a phone number</b> the first time they sign up or log in. If you see that message, follow the on-screen steps.</li>
+<li><b>Work accounts are different.</b> If your company has a Team or Enterprise plan, you are usually invited by an administrator and may log in through your company's single sign-on (SSO). Use that account for work data, not a personal one (<a href="#ch42">Chapter 42</a>).</li>
+</ul>
+<div class="box note"><span class="tag">Which plan do you need?</span><p>The Free plan is enough to learn everything in this chapter. As of 9 November 2026, Free gives "limited usage" with the Sonnet and Haiku models; paid plans (Pro, Max, Ultra, Team, Enterprise) add more usage, the Opus models and extra features such as Research and Claude Code. Prices and plan boundaries change, so check <a href="https://claude.com/pricing" target="_blank" rel="noopener">claude.com/pricing</a> before you buy. <a href="#ch42">Chapter 42</a> compares the plans in detail.</p></div>
+
+<h3 id="ch43-2"><span class="num">43.2</span>A tour of the screen</h3>
+<p>The layout is similar on the web and in the desktop app. The mobile apps squeeze the same parts into a smaller screen, with the sidebar hidden behind a menu button.</p>
+<div class="tbl"><table>
+<tr><th>Area</th><th>Where (web, November 2026)</th><th>What it does</th></tr>
+<tr><td><b>Sidebar</b></td><td>Left edge</td><td>Start a new chat, see recent conversations, open your projects and artifacts, and reach your account menu (bottom left)</td></tr>
+<tr><td><b>Message box</b></td><td>Bottom centre</td><td>Where you type. You can paste text, drop files and add screenshots here</td></tr>
+<tr><td><b>"+" menu</b></td><td>Inside the message box</td><td>Add files, turn web search on or off, start Research, use connectors and skills. In the desktop app it can also add a folder for Claude to read from and save into</td></tr>
+<tr><td><b>Model menu</b></td><td>Next to the send button</td><td>Choose the model, the effort level and the thinking setting (43.4)</td></tr>
+<tr><td><b>Conversation</b></td><td>Main area</td><td>Your messages and Claude's replies. Longer pieces of work such as documents, slides or small apps may open beside the chat as <a class="gl" href="#g-artifact">artifacts</a> (<a href="#ch48">Chapter 48</a>)</td></tr>
+<tr><td><b>Settings</b></td><td>Account menu, bottom left of the sidebar</td><td>Profile, privacy, memory, usage and more (43.5)</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of each conversation as a separate notebook. Inside one notebook, Claude can read every page you have written so far. When you open a fresh notebook, it starts blank. Projects (<a href="#ch47">Chapter 47</a>) are like a ring binder that holds several notebooks plus a shared folder of reference papers. Memory (<a href="#ch50">Chapter 50</a>) is like a sticky note on the cover that Claude reads every time.</p></div>
+<p>A good habit from Anthropic's own getting-started tutorial: if you don't recognise something on screen, take a screenshot, drop it into the chat and ask Claude what it is.</p>
+
+<h3 id="ch43-3"><span class="num">43.3</span>Starting and managing conversations</h3>
+<p>Type your request in plain language and press Enter to send. Claude replies in the same thread. Everything you and Claude have said in that thread is sent to the model again with each new message, which is how it "remembers" the conversation. That shared text is the <a class="gl" href="#g-context-window">context window</a> you met in <a href="#ch20">Chapter 20</a>.</p>
+<h4>When to start a new chat</h4>
+<p>One topic per conversation is a good rule. A new chat gives Claude a clean slate: no leftover assumptions from an earlier task, and fewer tokens to reread each time, which also saves usage. Stay in the same chat when the next request builds on what is already there, for example "now write the negative test cases for the same story".</p>
+<div class="cols2"><div><h4>Keep going in the same chat when…</h4><p>you are refining one piece of work: improving a draft, asking follow-up questions about the same log file, or adjusting test cases you have just generated.</p></div><div><h4>Start a new chat when…</h4><p>the task changes, the conversation has become very long, Claude keeps repeating an earlier mistake, or you want an answer that isn't influenced by what came before.</p></div></div>
+<h4>Fixing a reply you don't like</h4>
+<ul>
+<li><b>Just say so.</b> "That's too long. Give me five bullet points" works well. Anthropic's tutorial puts it simply: if a response is off, tell Claude and it will adjust.</li>
+<li><b>Edit your own message.</b> You can edit an earlier message and resend it, which creates a new branch of the conversation from that point. It is the cleanest way to fix a badly worded prompt without the bad answer staying in the context.</li>
+<li><b>Retry.</b> A retry control under Claude's reply asks for a fresh answer to the same message. Because language models are <a class="gl" href="#g-non-deterministic">non-deterministic</a>, the second answer will be worded differently and may be better.</li>
+<li><b>Stop.</b> While Claude is writing, the send button turns into a stop button. Use it the moment you can see the answer is heading in the wrong direction.</li>
+</ul>
+<h4>Finding, renaming and deleting chats</h4>
+<p>Claude names each new conversation automatically from its first messages. According to Anthropic's help article on deleting and renaming conversations, on the web each chat in the sidebar's chat history ("Chats and tasks" in the current layout) has a "⋮" menu with options such as rename and delete, and there is a "Select" option for deleting several at once. On iOS you press and hold a chat in the list; on Android you use the "⋮" menu at the top right of an open conversation. Many people also star important chats so they stay at the top of the sidebar.</p>
+<div class="box example"><span class="tag">Real-world example</span><p>Priya, a tester, keeps one long-running chat called "Sprint 42 test design". It works for two days, then answers start mixing up stories from earlier in the sprint. She asks Claude for a short summary of the decisions made so far, copies it into a new chat called "Sprint 42 test design (part 2)", and carries on. The new chat is faster, uses less of her allowance and stops confusing the stories.</p></div>
+
+<h3 id="ch43-4"><span class="num">43.4</span>Choosing a model, effort and thinking</h3>
+<p>The model menu next to the send button controls three separate things. You can change any of them in the middle of a conversation; according to Anthropic's help article, "Changes apply starting with Claude's next response."</p>
+<div class="tbl"><table>
+<tr><th>Control</th><th>What it changes</th><th>Plain advice</th></tr>
+<tr><td><b>Model</b></td><td>Which Claude model answers. The menu shows the main current models, with older ones under "More models"</td><td>Use the recommended current model for most work. Pick a faster, lighter model for quick, simple jobs. Fable is the most capable and the slowest (<a href="#ch40">Chapter 40</a>)</td></tr>
+<tr><td><b>Effort</b></td><td>How thorough each response is: Low, Medium, High, Extra high, Max</td><td>Each model marks one level as "Default". Lower for routine tasks; higher for hard analysis</td></tr>
+<tr><td><b>Thinking</b></td><td>Whether Claude reasons first in an expandable section before answering</td><td>On the current 5.5 models and Fable 5.1, thinking is always on, so there is no toggle; lower the effort if you want less thinking</td></tr>
+</table></div>
+<p>The help centre describes the effort levels like this: Low and Medium are for routine tasks and make your usage go further; High is "the best overall balance of quality and speed"; Extra high is for long-running coding and agentic tasks (Opus 4.7 and newer); Max is the most thorough. It also warns: "Higher effort means more thorough responses, but they take longer and use more tokens."</p>
+<div class="figure" role="img" aria-label="Effort levels from Low to Max, with thoroughness, time and usage all increasing">
+<div class="flow"><div><b>Low</b>quick lookups, rewording</div><div><b>Medium</b>routine drafting</div><div class="hl"><b>High</b>balanced, everyday analysis</div><div><b>Extra high</b>long coding and agent tasks</div><div><b>Max</b>hardest problems</div></div>
+<div class="cap">Moving right: more thorough, slower, more usage. Descriptions summarised from Anthropic's help article "Change the model, effort, and thinking settings" (checked 9 November 2026).</div></div>
+<div class="tbl"><table>
+<tr><th>QA task</th><th>A sensible starting point</th></tr>
+<tr><td>Rewrite a bug title so it's clearer</td><td>Any model, Low or Medium effort</td></tr>
+<tr><td>Draft test cases from a short Jira story</td><td>Recommended model, default effort</td></tr>
+<tr><td>Work out why a flaky test fails from a long CI log</td><td>Recommended model, High or above</td></tr>
+<tr><td>Review a whole test strategy for gaps and risks</td><td>Strongest model you have, High or Max</td></tr>
+</table></div>
+<p>The menu you see depends on your plan and, at work, on your administrator: an Enterprise admin can switch models off for some roles or set the default model and effort for new chats.</p>
+<details class="deep"><summary>Under the hood: what "thinking" and "effort" actually do</summary><div class="body"><p>When thinking is on, the model first writes reasoning tokens (its "scratchpad") before writing the answer you read. More tokens spent reasoning means more computation on your question, which tends to help with multi-step problems. That is the <a class="gl" href="#g-test-time-compute">test-time compute</a> idea from <a href="#ch19">Chapter 19</a>.</p><p>Current Claude models use <a class="gl" href="#g-adaptive-thinking">adaptive thinking</a>: the model decides for each message whether to think and how much. The <a class="gl" href="#g-effort-level">effort level</a> is the dial that nudges that decision. On easy questions the model may answer straight away even at high effort. That's why effort, not an on/off switch, is the main control on the newest models. Thinking tokens count towards your usage, which is why higher effort uses up your allowance faster.</p></div></details>
+
+<h3 id="ch43-5"><span class="num">43.5</span>Settings to check on day one</h3>
+<p>Open Settings from the account menu at the bottom left of the sidebar. You don't need to change much, but check these:</p>
+<div class="tbl"><table>
+<tr><th>Setting</th><th>Why it matters</th><th>Where (November 2026)</th></tr>
+<tr><td><b>Instructions for Claude</b></td><td>Short standing preferences applied to every conversation, such as "I'm a QA engineer; use British spelling; be concise"</td><td>Settings, profile</td></tr>
+<tr><td><b>Memory</b></td><td>Lets Claude carry useful context between chats. On by default for consumer plans. You can view and edit what it remembers (<a href="#ch50">Chapter 50</a>)</td><td>Settings</td></tr>
+<tr><td><b>Help improve Claude</b></td><td>Controls whether your new chats and coding sessions may be used to train future models on consumer plans (Free, Pro, Max)</td><td>Settings &gt; Privacy</td></tr>
+<tr><td><b>Export data</b></td><td>Download your conversations (web and desktop only)</td><td>Settings &gt; Privacy</td></tr>
+<tr><td><b>Usage</b></td><td>Shows how much of your current session and weekly limit you've used, and when they reset (43.7)</td><td>Settings &gt; Usage</td></tr>
+</table></div>
+<div class="box warn"><span class="tag">Make a deliberate privacy choice</span><p>Before you paste anything about work into a personal account, decide whether you are comfortable with the "Help improve Claude" setting as it stands, and check your company's AI policy. Business plans (Team, Enterprise) are governed by your organisation's agreement and admin settings rather than this personal toggle. Never paste passwords, API keys, customer personal data or unreleased confidential material into a personal account.</p></div>
+
+<h3 id="ch43-6"><span class="num">43.6</span>Incognito chats</h3>
+<p>An <a class="gl" href="#g-incognito-chat">incognito chat</a> is a conversation that is not saved to your chat history or to Claude's memory. According to Anthropic's help article (checked 9 November 2026):</p>
+<ul>
+<li><b>How to start one:</b> open a new chat outside a project and click the ghost icon at the top right. The chat gets a black border and an "Incognito chat" label. Click the "x" at the top right to end it.</li>
+<li><b>What it doesn't do:</b> it doesn't appear in your history, isn't added to memory, doesn't use your existing memory, isn't used for model training, and can't be reopened once closed.</li>
+<li><b>What it still does:</b> Claude can still see your profile preferences. Anthropic still keeps incognito chats for 30 days by default (longer on some Enterprise plans), and on Team and Enterprise plans they are included in data exports for account Owners.</li>
+<li><b>Limits:</b> not available inside projects. Under the new Claude experience, incognito chats open in the previous chat experience, so Claude can't create files or run code in them.</li>
+</ul>
+<div class="box mistakes"><span class="tag">Incognito is not invisible</span><dl><dt>"Incognito means nobody can ever see it."</dt><dd>It means it isn't saved to <em>your</em> history or memory. Anthropic retains it for a period, and on business plans your organisation's owners may be able to export it. It is a tidiness and privacy tool, not a secrecy tool.</dd></dl></div>
+
+<h3 id="ch43-7"><span class="num">43.7</span>Usage limits and making them last</h3>
+<p>Every plan has a <a class="gl" href="#g-usage-limit">usage limit</a>: an allowance of work Claude will do for you before you have to wait. Anthropic's help centre describes two kinds: a <b>five-hour session limit</b> and <b>weekly limits</b> that apply across all models. Settings &gt; Usage shows a "Current session" bar and when each limit resets. (Verified Ultra accounts don't have the five-hour limit; usage-based Enterprise plans are billed by consumption instead.) On paid plans you can switch on usage credits to keep going past your plan's limit.</p>
+<p>The limit isn't counted in messages. It depends on how much work each message causes. Anthropic lists these as the things that use it up:</p>
+<div class="figure" role="img" aria-label="Things that consume usage">
+<div class="tbl"><table>
+<tr><th>What uses more</th><th>Why</th></tr>
+<tr><td>Long messages and big attachments</td><td>More tokens for the model to read</td></tr>
+<tr><td>Long conversations</td><td>The whole thread is reread with each new message</td></tr>
+<tr><td>Tools such as web search and Research</td><td>Each search brings more text into the conversation</td></tr>
+<tr><td>Stronger models and higher effort</td><td>More computation and more thinking tokens per answer</td></tr>
+<tr><td>Artifacts, running code, creating files, browsing</td><td>Multi-step work behind the scenes</td></tr>
+</table></div>
+<div class="cap">Source: Anthropic help centre, "Usage limit best practices" (checked 9 November 2026).</div></div>
+<h4>Habits that stretch your allowance</h4>
+<ul>
+<li><b>Put everything in one well-structured message.</b> The story, the acceptance criteria and the format you want, all at once, rather than drip-feeding them over five messages. (<a href="#ch44">Chapter 44</a> shows how.)</li>
+<li><b>Start fresh chats</b> for new topics instead of continuing a huge thread.</li>
+<li><b>Match model and effort to the task.</b> Don't use Max to fix a typo.</li>
+<li><b>Store reference documents in a project.</b> Project content reused while it is still cached "counts less against your limits", in Anthropic's words; the cache expires after a period of inactivity.</li>
+<li><b>Switch off web search</b> when the answer should come only from your own documents.</li>
+</ul>
+
+<h3 id="ch43-8"><span class="num">43.8</span>Keyboard and speed tips</h3>
+<p>Most people only need a handful of habits:</p>
+<ul>
+<li><b>Enter</b> sends; <b>Shift+Enter</b> adds a new line without sending, which is useful for multi-line prompts.</li>
+<li><b>Paste screenshots directly</b> into the message box instead of saving them first.</li>
+<li><b>Drag files</b> onto the chat window to attach them (<a href="#ch46">Chapter 46</a> covers file types and limits).</li>
+<li><b>The desktop app</b> has a quick-entry shortcut you can customise in its settings, so you can call Claude up from anywhere on your computer (<a href="#ch51">Chapter 51</a>).</li>
+</ul>
+<div class="box note"><span class="tag">Shortcut lists change</span><p>Anthropic does not publish a stable shortcut list for the claude.ai web app in its help centre, and third-party lists disagree. The interface itself is the most reliable guide: look in the account menu for a keyboard shortcuts option. Don't confuse these with Claude Code's shortcuts, which are documented separately (<a href="#ch68">Chapter 68</a>).</p></div>
+
+<div class="lab"><div class="lab-h"><b>Lab: set up and explore Claude</b><span>20 min · claude.ai (Free plan is fine)</span></div><ol>
+<li>Go to claude.ai and sign up or log in with "Continue with email" or "Continue with Google".<span class="expect">You land on a new chat screen with a message box in the middle and a sidebar on the left.</span></li>
+<li>Open Settings from the account menu at the bottom left. Find the privacy section and read the "Help improve Claude" setting. Decide whether you want it on or off.<span class="expect">You know your current training setting and where to change it.</span></li>
+<li>In your profile settings, add a short instruction: "I work in software testing. Use British spelling. Keep answers concise unless I ask for detail."<span class="expect">The text is saved. It will apply to new conversations.</span></li>
+<li>Start a new chat and send: "Explain the difference between a smoke test and a regression test in three sentences."<span class="expect">A short answer in British spelling. The chat gets an automatic title in the sidebar.</span></li>
+<li>Open the model menu next to the send button. Note which models and effort levels you can choose. Change the effort level (or the model, if effort isn't shown), then send: "Now give me one example of each from an online banking app."<span class="expect">The menu shows your plan's models, with one effort level marked "Default". The new answer comes from your new setting.</span></li>
+<li>Edit your first message so it asks for "five sentences" instead of three, and resend it.<span class="expect">Claude answers the edited message. The conversation now continues from that new branch.</span></li>
+<li>Rename the chat to "Lab 43 test types" using the chat's menu in the sidebar or chat history.<span class="expect">The new name appears in the sidebar.</span></li>
+<li>Start an incognito chat (ghost icon, top right of a new chat). Ask anything, then close it with the "x".<span class="expect">The chat has a black border while open and does not appear in your history afterwards.</span></li>
+<li>Open Settings &gt; Usage.<span class="expect">You see a "Current session" bar and weekly usage with reset times (layout varies by plan).</span></li>
+</ol>
+<p><b>Troubleshooting:</b> no login email: check spam for <code>@mail.anthropic.com</code>. No effort options: your chosen model or plan may not offer them; try another model. Can't find the ghost icon: you may be inside a project. Start a chat from the main screen instead. A control is missing or named differently: the interface has changed since 9 November 2026; search support.claude.com for the feature name.</p></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"Claude remembers everything I've ever told it."</dt><dd>Inside one conversation, yes. Across conversations, only through features like memory or projects, and only what those features store.</dd>
+<dt>"Always pick the biggest model and Max effort to get the best answer."</dt><dd>For simple tasks it's slower, uses up your allowance faster and often isn't better. Match the setting to the task.</dd>
+<dt>"The usage limit is a fixed number of messages."</dt><dd>It depends on model, effort, conversation length, attachments and tools. One huge message with Research can use more than twenty short ones.</dd>
+<dt>"Deleting a chat or using incognito erases all trace of it instantly."</dt><dd>Retention rules still apply. Read the privacy settings and your organisation's policy.</dd>
+<dt>"Changing the model mid-chat restarts the conversation."</dt><dd>The new setting applies from the next reply, and the conversation so far is kept.</dd>
+</dl></div>
+
+<h3 id="ch43-r"><span class="num">43.9</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>The same account works on web, desktop and mobile. Log in with the same method every time.</li>
+<li>One conversation is one context: Claude sees everything in the thread, nothing from other threads unless memory or projects bring it in.</li>
+<li>Start new chats for new topics; edit, retry or simply give feedback to fix a poor answer.</li>
+<li>The model menu next to the send button controls model, effort and thinking; changes apply from the next reply.</li>
+<li>Check privacy settings on day one, and use incognito for chats you don't want in history or memory, remembering it is not secret.</li>
+<li>Usage depends on how much work each message causes; one well-structured message beats many fragments.</li>
+<li>Screens change: verify UI locations against support.claude.com.</li>
+</ul></div>
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">You switch from Medium to High effort halfway through a conversation. What happens?</p><div class="opts"><button>The conversation is cleared and starts again</button><button data-ok>The next reply uses High effort, and the conversation so far is kept</button><button>All earlier replies are regenerated at High effort</button></div><p class="why" hidden>Anthropic's help article says changes apply starting with Claude's next response.</p></div>
+<div class="qz"><p class="q">Which of these uses up your allowance fastest?</p><div class="opts"><button>Five short questions in a new chat at Low effort</button><button data-ok>A very long conversation with large attachments, Research and Max effort</button><button>Renaming several chats</button></div><p class="why" hidden>Usage depends on tokens and work: long threads, big files, tools and higher effort all add up.</p></div>
+<div class="qz"><p class="q">What is true of an incognito chat?</p><div class="opts"><button>Anthropic never stores it at all</button><button>It can be reopened later from your history</button><button data-ok>It isn't saved to your history or memory, but is still retained for a period</button></div><p class="why" hidden>Incognito chats are kept for 30 days by default, and on business plans may appear in owner exports.</p></div>
+<div class="qz"><p class="q">Claude keeps repeating the same wrong assumption in a long chat. What's the best first move?</p><div class="opts"><button>Switch to Max effort and keep going</button><button data-ok>Summarise the useful decisions and continue in a new chat</button><button>Delete your account and start again</button></div><p class="why" hidden>A fresh context removes the influence of earlier mistakes and saves usage.</p></div>
+<div class="qz"><p class="q">On the newest models you can't find a thinking toggle. Why?</p><div class="opts"><button>Thinking isn't supported on new models</button><button data-ok>Thinking is always on for them; you control it through the effort level</button><button>It's only available in Claude Code</button></div><p class="why" hidden>The help centre says the toggle doesn't appear for models where thinking is always on; lower effort to reduce it.</p></div>
+</div>
+<div class="box assignment"><span class="tag">Assignment</span><p>Write a one-page "Claude starter guide" for your team. Include: which account type to use for work, the privacy settings to check, when to start a new chat, a table of three common QA tasks with a suggested model and effort level, and two habits for saving usage. Date it, and add a line saying the screens may have changed. Test it by asking one colleague to follow it without help.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"Each Claude conversation is its own notebook: it remembers everything in that chat, but nothing from other chats unless you turn on memory or use a project. Next to the send button is the model menu, where you choose the model and how much effort it puts in. Higher effort is more thorough but slower and uses more of your allowance. Start a new chat for each new task, check your privacy settings once, and use incognito when you don't want a chat kept in your history."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic Help Center, <a href="https://support.claude.com/en/articles/13189465-log-in-to-your-claude-account" target="_blank" rel="noopener">Log in to your Claude account</a> and <a href="https://support.claude.com/en/articles/13117299-minimum-age-requirement-access-restriction" target="_blank" rel="noopener">Minimum age requirement</a>.</li>
+<li>Anthropic Help Center, <a href="https://support.claude.com/en/articles/8664678-change-the-model-effort-and-extended-thinking-settings" target="_blank" rel="noopener">Change the model, effort, and thinking settings</a>.</li>
+<li>Anthropic Help Center, <a href="https://support.claude.com/en/articles/8230524-how-can-i-delete-or-rename-a-conversation" target="_blank" rel="noopener">Delete or rename a conversation</a>.</li>
+<li>Anthropic Help Center, <a href="https://support.claude.com/en/articles/12260368-use-incognito-chats" target="_blank" rel="noopener">Use incognito chats</a>.</li>
+<li>Anthropic Help Center, <a href="https://support.claude.com/en/articles/9797557-usage-limit-best-practices" target="_blank" rel="noopener">Usage limit best practices</a>.</li>
+<li>Anthropic Privacy Center, <a href="https://privacy.claude.com/en/articles/12109829-how-do-i-change-my-model-improvement-privacy-settings" target="_blank" rel="noopener">Change your model improvement privacy setting</a>; Help Center, <a href="https://support.claude.com/en/articles/9450526-export-your-claude-data" target="_blank" rel="noopener">Export your Claude data</a>.</li>
+<li>Anthropic Help Center, <a href="https://support.claude.com/en/articles/16761823-claude-cowork-and-chat-are-one-claude" target="_blank" rel="noopener">Claude Cowork and chat are one Claude</a> (the new Claude experience).</li>
+<li>Claude Academy, <a href="https://academy.claude.com/tutorials/getting-started-with-claude-ai" target="_blank" rel="noopener">Getting started with Claude.ai</a>; <a href="https://claude.com/download" target="_blank" rel="noopener">Download Claude</a>; <a href="https://claude.com/pricing" target="_blank" rel="noopener">Pricing</a>.</li>
+</ol><p class="verified">Verified 9 November 2026 against the Anthropic Help Center, Privacy Center and claude.com. UI locations are liable to change. The claude.ai web keyboard shortcuts could not be verified against an official source and are limited here to Enter and Shift+Enter.</p></div>

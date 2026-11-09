@@ -1,0 +1,272 @@
+<div class="objectives"><span class="tag">What you'll learn</span><ul>
+<li>The four places MCP shows up for Claude users, and which one to use when</li>
+<li>How to add, scope, share, inspect and remove MCP servers in Claude Code, with exact commands</li>
+<li>How connectors work in claude.ai and the desktop app, including custom connectors and plan differences</li>
+<li>How desktop extensions and the desktop config file work, and how to move servers into Claude Code</li>
+<li>How developers attach MCP servers directly to API requests with the MCP connector</li>
+<li>Which controls organisations use to decide what's allowed</li>
+</ul></div>
+<div class="prereq"><b>Before you start:</b> Chapter 97 (what MCP is) and Chapter 99 (how it works inside). Chapter 98 explains API keys, tokens and OAuth. Chapter 54 covers the terminal basics used here.</div>
+
+<div class="bigidea"><p>The same MCP server can be reached from several places: Claude Code in your terminal or editor, claude.ai in the browser, the Claude desktop app, and the Claude API. Each has its own way of adding servers. In claude.ai and the desktop app, servers are called <strong>connectors</strong> and you add them through menus. In Claude Code you add them with <code>claude mcp</code> commands or a <code>.mcp.json</code> file your team shares. Knowing where each lives, and who controls it, is what lets you set up a whole QA team consistently.</p></div>
+
+<h3 id="ch100-1"><span class="num">100.1</span>Four places MCP shows up</h3>
+<div class="tbl"><table>
+<tr><th>Surface</th><th>What MCP is called there</th><th>Kinds of server</th><th>Who sets it up</th><th>How</th></tr>
+<tr><td><b>Claude Code</b> (terminal, VS Code, JetBrains)</td><td>MCP servers</td><td>Local (stdio) and remote (HTTP); also your claude.ai connectors</td><td>You, or your team through a shared file; IT can restrict</td><td><code>claude mcp add</code>, <code>.mcp.json</code>, <code>/mcp</code></td></tr>
+<tr><td><b>claude.ai</b> (web and mobile)</td><td>Connectors</td><td>Remote only</td><td>You on Free, Pro, Max and Ultra plans; an Owner on Team and Enterprise</td><td><b>Customize › Connectors</b></td></tr>
+<tr><td><b>Claude desktop app</b></td><td>Connectors and desktop extensions</td><td>Remote connectors, plus local servers packaged as extensions</td><td>You, within what your organisation allows</td><td><b>Customize › Connectors</b>; <b>Settings › Extensions</b></td></tr>
+<tr><td><b>Claude API</b></td><td>MCP connector (beta)</td><td>Remote only, tools only</td><td>Developers, in code</td><td><code>mcp_servers</code> in each request</td></tr>
+</table></div>
+<div class="box analogy"><span class="tag">In everyday life</span><p>Think of streaming-service apps. You can watch the same service on your phone, your laptop and your TV, but you sign in separately on each, and the TV at work might be locked down by IT. MCP servers are like that: one service, several "screens", each with its own sign-in and its own rules.</p></div>
+
+<h3 id="ch100-2"><span class="num">100.2</span>Claude Code: adding a server</h3>
+<p>All commands below are run in a normal terminal, not inside a Claude session. They were checked against Claude Code 2.1.319's own help output.</p>
+<h4>A remote server (Streamable HTTP)</h4>
+<div class="code"><pre><span class="c"># the pattern</span>
+claude mcp add --transport http &lt;name&gt; &lt;url&gt;
+
+<span class="c"># a real example from Anthropic's documentation</span>
+claude mcp add --transport http notion https://mcp.notion.com/mcp
+
+<span class="c"># a server that takes a fixed API key in a header instead of OAuth</span>
+claude mcp add --transport http secure-api https://api.example.com/mcp \
+  --header "Authorization: Bearer your-token"</pre></div>
+<h4>A local server (stdio)</h4>
+<div class="code"><pre><span class="c"># the pattern: options BEFORE the name, the server's own command AFTER --</span>
+claude mcp add [options] &lt;name&gt; -- &lt;command&gt; [args...]
+
+<span class="c"># a file-system server limited to one folder</span>
+claude mcp add files -- npx -y @modelcontextprotocol/server-filesystem ~/claude-lab
+
+<span class="c"># a server that needs an API key in an environment variable</span>
+claude mcp add --env AIRTABLE_API_KEY=YOUR_KEY --transport stdio airtable -- npx -y airtable-mcp-server</pre></div>
+<p>The <code>--</code> matters. Everything after it is handed to the server program unchanged; everything before it is for Claude Code. Putting <code>--env</code> after the <code>--</code> is a common mistake.</p>
+<h4>The main options</h4>
+<div class="tbl"><table>
+<tr><th>Option</th><th>Meaning</th></tr>
+<tr><td><code>-t, --transport</code></td><td><code>stdio</code> (the default), <code>http</code> or <code>sse</code> (deprecated)</td></tr>
+<tr><td><code>-s, --scope</code></td><td><code>local</code> (the default), <code>project</code> or <code>user</code>. See 93.3.</td></tr>
+<tr><td><code>-e, --env KEY=value</code></td><td>An environment variable for a stdio server, typically a token</td></tr>
+<tr><td><code>-H, --header "Name: value"</code></td><td>A header sent to an HTTP or SSE server, such as an API key</td></tr>
+<tr><td><code>--client-id</code>, <code>--client-secret</code>, <code>--callback-port</code></td><td>For servers that need a pre-registered OAuth app (Chapter 98)</td></tr>
+</table></div>
+<p>Other ways to add servers: <code>claude mcp add-json &lt;name&gt; '&lt;json&gt;'</code> takes a JSON definition (and is the only way to add WebSocket servers), and <code>claude mcp add-from-claude-desktop</code> imports servers from the desktop app (93.7). Server names added through <code>claude mcp</code> may contain only letters, numbers, hyphens and underscores.</p>
+
+<h3 id="ch100-3"><span class="num">100.3</span>Scopes: just me, my team, or everywhere</h3>
+<p>Every server you add lives in a <strong>scope</strong> that decides who gets it and where it's stored:</p>
+<div class="tbl"><table>
+<tr><th>Scope</th><th>Who gets it</th><th>Stored in</th><th>Use it for</th></tr>
+<tr><td><code>local</code> (default)</td><td>Only you, only in this project</td><td><code>~/.claude.json</code>, under this project's path</td><td>Trying a server; servers with your personal credentials</td></tr>
+<tr><td><code>project</code></td><td>Everyone who works in this repository</td><td><code>.mcp.json</code> at the project root, committed to git</td><td>The team's standard servers, such as Playwright for the test repo</td></tr>
+<tr><td><code>user</code></td><td>Only you, in every project</td><td><code>~/.claude.json</code></td><td>Tools you use everywhere, such as your issue tracker</td></tr>
+</table></div>
+<p>If two servers have the same name, Claude Code uses the closest one: local beats project, project beats user, and those beat plugin servers and claude.ai connectors.</p>
+<h4>The shared team file: <code>.mcp.json</code></h4>
+<div class="code"><span class="cap">.mcp.json, committed in the test repository</span><pre>{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
+    },
+    "test-api": {
+      "type": "http",
+      "url": "${API_BASE_URL:-https://staging.example.com}/mcp",
+      "headers": { "Authorization": "Bearer ${TEST_API_TOKEN}" }
+    }
+  }
+}</pre></div>
+<ul>
+<li><code>${TEST_API_TOKEN}</code> is filled in from each person's own environment when Claude Code starts. <strong>The secret never goes in the file</strong>, so the file is safe to commit (Chapter 98 covers storing the secret itself).</li>
+<li><code>${API_BASE_URL:-https://…}</code> means "use API_BASE_URL if it's set, otherwise this default", handy for switching between staging and test environments.</li>
+<li>An entry with no <code>type</code> is treated as stdio. An entry with a <code>url</code> but no <code>type</code> is an error.</li>
+</ul>
+<div class="box warn"><span class="tag">Project servers need your approval</span><p>A <code>.mcp.json</code> server can start programs on your computer, so Claude Code won't connect to one until you approve it in an interactive session. Until then, <code>claude mcp list</code> shows it as <em>⏸ Pending approval</em>. A freshly cloned repository can't approve its own servers: approval settings committed in the project are ignored until you've trusted the folder. To clear your earlier approve-or-reject choices for a project, run <code>claude mcp reset-project-choices</code>.</p></div>
+
+<h3 id="ch100-4"><span class="num">100.4</span>Checking, signing in, using and removing</h3>
+<div class="code"><pre>claude mcp list                  <span class="c"># every configured server, with a health status</span>
+claude mcp get playwright        <span class="c"># details for one server, including any connection problem</span>
+claude mcp remove playwright     <span class="c"># delete it (add -s to choose the scope)</span>
+claude mcp login jira            <span class="c"># OAuth sign-in from the shell (--no-browser over SSH)</span>
+claude mcp logout jira           <span class="c"># forget the stored sign-in</span></pre></div>
+<p>Statuses you'll see in <code>claude mcp list</code>:</p>
+<div class="tbl"><table>
+<tr><th>Status</th><th>Meaning</th><th>What to do</th></tr>
+<tr><td><code>✔ Connected</code></td><td>Working</td><td>Nothing</td></tr>
+<tr><td><code>! Needs authentication</code></td><td>The server wants you to sign in</td><td>Open <code>/mcp</code> in a session, or run <code>claude mcp login &lt;name&gt;</code></td></tr>
+<tr><td><code>✘ Failed to connect</code></td><td>Claude Code couldn't reach or start it; details follow</td><td>Run <code>claude mcp get &lt;name&gt;</code> and read the <code>Issue:</code> line (Chapter 105)</td></tr>
+<tr><td><code>⏸ Pending approval</code></td><td>A project server you haven't approved</td><td>Start <code>claude</code> in the project and approve it</td></tr>
+<tr><td><code>⊘ Disabled for this project</code></td><td>You switched it off in <code>/mcp</code></td><td>Turn it back on in <code>/mcp</code></td></tr>
+</table></div>
+<h4>Inside a session: <code>/mcp</code></h4>
+<p>Typing <code>/mcp</code> opens a panel listing every server (your own, the team's, plugins' and claude.ai connectors) with its status and tools. From a server's menu you can sign in, reconnect, clear its sign-in, or disable it for this project without deleting its configuration.</p>
+<h4>Using what servers offer</h4>
+<ul>
+<li><strong>Tools</strong>: just ask. "Open the staging login page and screenshot it" uses Playwright's tools. Claude Code asks permission the first time unless a rule allows it.</li>
+<li><strong>Resources</strong>: type <code>@</code> to see them, e.g. <code>@github:issue://123</code>.</li>
+<li><strong>Prompts</strong>: appear as commands, e.g. <code>/mcp__github__pr_review 456</code>.</li>
+</ul>
+<details class="deep"><summary>Time limits and big results</summary><div class="body">
+<ul>
+<li><b>Tool-call time limit:</b> set a <code>timeout</code> in milliseconds on one server's entry, or <code>MCP_TOOL_TIMEOUT</code> for all. A call that goes quiet (no reply, no progress) for the idle window (5 minutes for remote servers, 30 for stdio by default) is stopped with an error; <code>CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT</code> changes that window.</li>
+<li><b>Long calls:</b> a call in the main conversation that runs longer than two minutes moves to a background task, so the session isn't blocked.</li>
+<li><b>Big results:</b> output over 10,000 tokens triggers a warning; the default cap is 25,000 tokens (<code>MAX_MCP_OUTPUT_TOKENS</code>). Larger results are saved to a file Claude can read in parts.</li>
+</ul>
+</div></details>
+
+<h3 id="ch100-5"><span class="num">100.5</span>claude.ai: connectors</h3>
+<p>In claude.ai and the desktop app, remote MCP servers are called <a class="gl" href="#g-connector">connectors</a>. They live under <a href="https://claude.ai/customize/connectors" target="_blank" rel="noopener"><b>Customize › Connectors</b></a>.</p>
+<h4>From the Connectors directory</h4>
+<ol>
+<li>Go to <b>Customize › Connectors</b> and select <b>Discover</b>.</li>
+<li>Search for the service, such as Jira or Google Drive, and open its page.</li>
+<li>Select <b>Connect to Claude</b>, sign in to the service, and approve the access it asks for.</li>
+<li>Back on the Connectors page it shows as <b>Connected</b>.</li>
+</ol>
+<p>Each directory listing carries a label:</p>
+<div class="tbl"><table>
+<tr><th>Label</th><th>Meaning</th></tr>
+<tr><td><b>Verified</b> (checkmark)</td><td>Anthropic tested its tools for quality and compatibility. Not a security audit, and the developer can change tools after review.</td></tr>
+<tr><td><b>Community</b></td><td>Built by a third party and screened, but not reviewed in depth</td></tr>
+<tr><td><b>Custom</b></td><td>Added by you or your organisation by URL; not reviewed by Anthropic</td></tr>
+</table></div>
+<h4>A custom connector (by URL)</h4>
+<p>Any remote MCP server can be added by its URL, even if it isn't in the directory:</p>
+<ul>
+<li><b>Free, Pro, Max and Ultra plans:</b> Customize › Connectors › <b>Add custom connector</b>, then enter the URL. The Free plan allows one custom connector.</li>
+<li><b>Team and Enterprise plans:</b> an Owner adds it under <b>Organization settings › Connectors</b> (Add › Custom › Web). Members then connect with their own account from Customize › Connectors. Members can't add custom connectors themselves.</li>
+<li><b>Sign-in choices</b> include signing each user in through OAuth, or "No sign-in" with an API key sent as a request header. The request-headers option is in beta for a limited set of organisations. Sign-in settings can't be edited later; remove and re-add the connector to change them.</li>
+</ul>
+<h4>Using connectors in a chat</h4>
+<p>Click <b>+</b> in the message box, choose <b>Connectors</b>, and switch each one on or off for that conversation. Under Customize › Connectors you can set individual tools to <b>Blocked</b>, for example a "delete" tool you never want used.</p>
+<div class="box example"><span class="tag">Real-world example: a QA view</span><p>A test lead connects Jira and Confluence in claude.ai and asks: "Compare the acceptance criteria in SHOP-812 with the test plan page in Confluence. List any criteria without a test." No terminal needed. Claude reads both through connectors and returns a gap list. The same lead uses Claude Code with Playwright for the part that needs a browser.</p></div>
+<div class="box note"><span class="tag">Availability varies</span><p>Which connectors you see, and whether you can add your own, depends on your plan and your organisation's settings. Owners decide which connectors a Team or Enterprise organisation offers.</p></div>
+
+<h3 id="ch100-6"><span class="num">100.6</span>Your connectors inside Claude Code</h3>
+<p>If you sign in to Claude Code with a claude.ai account, the connectors you've added in claude.ai <strong>appear in Claude Code automatically</strong>. <code>/mcp</code> lists them in a claude.ai section. Their tools are named <code>mcp__claude_ai_&lt;server&gt;__&lt;tool&gt;</code> in permission rules.</p>
+<ul>
+<li>They're <em>not</em> loaded when Claude Code is using a different sign-in method, such as an <code>ANTHROPIC_API_KEY</code>, a cloud provider like Amazon Bedrock, or a token from <code>claude setup-token</code>. If a connector is missing, run <code>/status</code> to check which method is active.</li>
+<li>A server you added yourself with the same URL takes precedence, and the connector is listed as hidden.</li>
+<li>To stop Claude Code loading connectors, set <code>"disableClaudeAiConnectors": true</code> in a settings file, or start with <code>ENABLE_CLAUDEAI_MCP_SERVERS=false claude</code>.</li>
+<li>Organisation tool controls apply here too. A tool set to <em>ask</em> prompts on every call, even in auto mode. A tool set to <em>blocked</em> is removed before Claude sees it.</li>
+</ul>
+
+<h3 id="ch100-7"><span class="num">100.7</span>The Claude desktop app</h3>
+<p>The desktop app (macOS and Windows) uses the same connectors as claude.ai, and adds two ways to run servers <em>locally</em> on your computer:</p>
+<h4>Desktop extensions (.mcpb)</h4>
+<p>A desktop extension is a local MCP server packaged as a single <code>.mcpb</code> file (an "MCP Bundle"): a zip containing the server and a <code>manifest.json</code>. It installs in one click, much like a browser extension, and runs on your machine over stdio, so it can reach local files and systems behind your firewall.</p>
+<ol>
+<li>In the desktop app, open <b>Settings › Extensions</b>.</li>
+<li>Drag the <code>.mcpb</code> file onto the page and review the preview.</li>
+<li>Select <b>Install</b> and confirm.</li>
+</ol>
+<p>Organisations can turn extensions off or restrict which ones can be installed. If <b>Extensions</b> doesn't appear in Settings, they're turned off for you.</p>
+<h4>The developer configuration file</h4>
+<p>Local servers can also be added by hand in <b>Settings › Developer › Edit Config</b>, which opens <code>claude_desktop_config.json</code>:</p>
+<div class="tbl"><table>
+<tr><th>System</th><th>Location</th></tr>
+<tr><td>macOS</td><td><code>~/Library/Application Support/Claude/claude_desktop_config.json</code></td></tr>
+<tr><td>Windows</td><td><code>%APPDATA%\Claude\claude_desktop_config.json</code></td></tr>
+</table></div>
+<p>It uses the same <code>mcpServers</code> shape as <code>.mcp.json</code>. Restart the app after editing it.</p>
+<h4>Moving between the desktop app and Claude Code</h4>
+<div class="code"><pre><span class="c"># copy servers from the desktop config into Claude Code (macOS and WSL only)</span>
+claude mcp add-from-claude-desktop
+claude mcp add-from-claude-desktop --scope user     <span class="c"># make them available in every project</span>
+
+<span class="c"># the other direction: run Claude Code itself as a stdio MCP server</span>
+claude mcp serve</pre></div>
+<p>The import shows a list to choose from, skips servers whose names contain spaces or other unsupported characters, and adds a numeric suffix (such as <code>server_1</code>) if a name already exists. <code>claude mcp serve</code> prints nothing when it starts: it's waiting for a client. To use it from the desktop app, add an entry with <code>"command": "claude"</code> and <code>"args": ["mcp", "serve"]</code> (use the full path from <code>which claude</code> if needed). The connecting app is then responsible for asking you before each tool call.</p>
+
+<h3 id="ch100-8"><span class="num">100.8</span>The Claude API: the MCP connector</h3>
+<p>Developers building their own apps on the Claude API (Part XI) can attach remote MCP servers to a request directly, without writing an MCP client. The feature is in <strong>beta</strong> and needs a beta header.</p>
+<div class="code"><span class="cap">Shape of a request (from Anthropic's documentation)</span><pre>curl https://api.anthropic.com/v1/messages \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2026-10-21" \
+  -H "anthropic-beta: mcp-client-2025-11-20" \
+  -d '{
+    "model": "claude-opus-5-5",
+    "max_tokens": 1000,
+    "messages": [{"role": "user", "content": "What tools do you have available?"}],
+    "mcp_servers": [
+      { "type": "url", "url": "https://example-server.modelcontextprotocol.io/sse",
+        "name": "example-mcp", "authorization_token": "YOUR_TOKEN" }
+    ],
+    "tools": [ { "type": "mcp_toolset", "mcp_server_name": "example-mcp" } ]
+  }'</pre></div>
+<ul>
+<li><code>mcp_servers</code> says where each server is and how to authenticate; a matching <code>mcp_toolset</code> in <code>tools</code> says which of its tools to enable (all, an allowlist, or a denylist).</li>
+<li>Only <strong>tools</strong> are supported (not resources or prompts), and the server must be reachable over the internet. Local stdio servers can't be used.</li>
+<li>A newer beta header, <code>mcp-client-2026-09-15</code>, adds the ability to pin a server's tool list during a conversation.</li>
+<li>Your code must obtain the OAuth token itself; the API doesn't run a browser sign-in. Chapter 98 explains how.</li>
+</ul>
+
+<h3 id="ch100-9"><span class="num">100.9</span>Organisation controls</h3>
+<p>For a QA team inside a company, these controls decide what you can connect:</p>
+<div class="tbl"><table>
+<tr><th>Where</th><th>Control</th><th>Effect</th></tr>
+<tr><td>claude.ai (Team/Enterprise)</td><td>Owners choose connectors in Organization settings</td><td>Members see only what's been added, and request others</td></tr>
+<tr><td>claude.ai and Claude Code</td><td>Per-tool controls on connectors: <em>ask</em> or <em>blocked</em></td><td>Approval on every call, or the tool removed entirely</td></tr>
+<tr><td>Claude Code (managed settings)</td><td><code>managed-mcp.json</code>, <code>managedMcpServers</code>, <code>allowedMcpServers</code>, <code>deniedMcpServers</code></td><td>IT deploys a fixed server set, or allow- and deny-lists servers by name or URL</td></tr>
+<tr><td>Desktop app</td><td>Extension policies</td><td>Extensions turned off or limited to an approved list</td></tr>
+</table></div>
+<p>A server blocked by policy shows as <em>✘ Blocked by enterprise managed policy</em>, or is hidden entirely. If something you expected is missing, ask your administrator before trying to work around it.</p>
+
+<h3 id="ch100-10"><span class="num">100.10</span>Which one should I use?</h3>
+<div class="tbl"><table>
+<tr><th>You want to…</th><th>Use</th></tr>
+<tr><td>Ask questions across Jira, Confluence and Drive in a chat</td><td>claude.ai connectors</td></tr>
+<tr><td>Drive a browser, run tests, work with files in a repository</td><td>Claude Code with a local server (e.g. Playwright)</td></tr>
+<tr><td>Give the whole team the same servers for a test repo</td><td>Claude Code, <code>project</code> scope, committed <code>.mcp.json</code></td></tr>
+<tr><td>Use a local tool from the desktop app without a terminal</td><td>A desktop extension (.mcpb)</td></tr>
+<tr><td>Build an internal app that uses a remote MCP server</td><td>The API's MCP connector</td></tr>
+</table></div>
+
+<div class="lab"><div class="lab-h"><b>Set up MCP in three places</b><span>40 min · terminal and claude.ai</span></div><ol>
+<li>Add a local file server limited to your practice folder: <code>claude mcp add files -- npx -y @modelcontextprotocol/server-filesystem ~/claude-lab</code><span class="expect">an "Added …" confirmation. Run <code>claude mcp list</code> and it shows <code>files</code> with a status.</span></li>
+<li>Add a remote server for a service you have an account with, using the URL from that service's own MCP documentation, for example <code>claude mcp add --transport http notion https://mcp.notion.com/mcp</code>.<span class="expect">the server listed, probably as <em>! Needs authentication</em>.</span></li>
+<li>Start <code>claude</code> in <code>~/claude-lab</code>, type <code>/mcp</code>, sign in to the remote server, and open each server to see its tools.<span class="expect">both servers connected, with their tool lists and <code>mcp__…</code> names.</span></li>
+<li>Ask: "Using the files server, list the files in this folder." Approve the tool call when asked.<span class="expect">a permission prompt naming the MCP tool, then the file list.</span></li>
+<li>In claude.ai, open Customize › Connectors and connect one directory connector (or ask your Owner which ones are available).<span class="expect">the connector listed as Connected. Back in Claude Code, <code>/mcp</code> shows it in the claude.ai section, if you're signed in with your claude.ai account.</span></li>
+<li>Tidy up: <code>claude mcp remove files</code>.<span class="expect">"Removed …", and the server gone from <code>claude mcp list</code>.</span></li>
+</ol></div>
+
+<div class="box mistakes"><span class="tag">Common misunderstandings</span><dl>
+<dt>"I added it in claude.ai, so it's in Claude Code too."</dt><dd>Only if Claude Code is signed in with that same claude.ai account. With an API key or cloud provider, connectors aren't loaded.</dd>
+<dt>"Putting the token in .mcp.json is fine; it's a private repo."</dt><dd>Never commit secrets. Use <code>${VARIABLE}</code> references and keep the value in each person's environment or a secrets manager.</dd>
+<dt>"The server is in .mcp.json, so why isn't it connecting?"</dt><dd>Project servers need approval in an interactive session first. Look for <em>⏸ Pending approval</em>.</dd>
+<dt>"Verified means safe."</dt><dd>Verified means Anthropic tested quality and compatibility. It isn't a security audit. Review scopes and block tools you don't need.</dd>
+<dt>"The API connector can use my local Playwright server."</dt><dd>The API connector reaches only public remote servers, and only their tools.</dd>
+</dl></div>
+
+<h3 id="ch100-r"><span class="num">100.11</span>Review</h3>
+<div class="box takeaways"><span class="tag">Key takeaways</span><ul>
+<li>MCP appears in Claude Code (servers), claude.ai and the desktop app (connectors and extensions), and the API (the MCP connector, beta).</li>
+<li>Claude Code: <code>claude mcp add</code> with <code>--transport http</code> for remote or <code>-- command</code> for local; options go before the name.</li>
+<li>Scopes: <code>local</code> (you, this project), <code>project</code> (team, in <code>.mcp.json</code>), <code>user</code> (you, everywhere). Project servers need approval.</li>
+<li>Check with <code>claude mcp list</code>/<code>get</code>, manage in <code>/mcp</code>, sign in with <code>/mcp</code> or <code>claude mcp login</code>.</li>
+<li>claude.ai connectors come from the directory (Verified/Community) or by URL (Custom); on Team/Enterprise, Owners add them.</li>
+<li>Desktop extensions (.mcpb) install local servers in one click; <code>add-from-claude-desktop</code> and <code>mcp serve</code> bridge the desktop app and Claude Code.</li>
+<li>Organisations control connectors, individual tools, managed server lists and extensions.</li>
+</ul></div>
+
+<div class="quiz"><div class="quiz-h">Check yourself</div>
+<div class="qz"><p class="q">You want everyone who clones the test repository to get the Playwright server. Which scope?</p><div class="opts"><button>local</button><button data-ok>project, which writes .mcp.json</button><button>user</button></div><p class="why" hidden>Project scope is stored in .mcp.json at the repository root, which you commit.</p></div>
+<div class="qz"><p class="q">What's wrong with <code>claude mcp add airtable -- npx -y airtable-mcp-server --env KEY=abc</code>?</p><div class="opts"><button>Nothing</button><button data-ok>--env is after the --, so it goes to the server program instead of Claude Code</button><button>stdio servers can't take environment variables</button></div><p class="why" hidden>Claude Code's options must come before the name; everything after -- belongs to the server.</p></div>
+<div class="qz"><p class="q">You're on a Team plan and want a custom connector by URL in claude.ai. Who adds it?</p><div class="opts"><button>Any member</button><button data-ok>An organisation Owner; members then connect with their own accounts</button><button>Anthropic support</button></div><p class="why" hidden>On Team and Enterprise, Owners add connectors for the organisation.</p></div>
+<div class="qz"><p class="q">Your claude.ai connectors don't appear in Claude Code. What should you check first?</p><div class="opts"><button data-ok>/status, to see whether Claude Code is signed in with your claude.ai account rather than an API key</button><button>Reinstall the connector</button><button>Switch to plan mode</button></div><p class="why" hidden>Connectors load only when the active sign-in is a claude.ai subscription login.</p></div>
+<div class="qz"><p class="q">Which statement about the API's MCP connector is true?</p><div class="opts"><button>It supports local stdio servers</button><button data-ok>It supports remote servers' tools only, and needs a beta header</button><button>It runs the OAuth browser sign-in for you</button></div><p class="why" hidden>Remote servers only, tools only, beta; your code supplies the token.</p></div>
+</div>
+
+<div class="box assignment"><span class="tag">Assignment</span><p>Design your QA team's MCP setup on one page. List each tool your team uses (Jira, Confluence, GitHub, a test database, Playwright and so on), choose the surface for each (claude.ai connector, Claude Code project server, personal server, or desktop extension), and say who adds it and where its credentials live. Then write the <code>.mcp.json</code> for your test repository with <code>${VARIABLE}</code> placeholders and no secrets, and have a colleague review it.</p></div>
+<div class="box teach"><span class="tag">Teach it</span><p>"MCP servers can be used from four places. In claude.ai and the desktop app they're called connectors: you pick them from a directory or add a URL, and on company plans an Owner adds them. In Claude Code you use <code>claude mcp add</code>: HTTP for remote services, a command for local ones. Choose a scope: local for you, project to share with the team through <code>.mcp.json</code>, user for everywhere. Check with <code>claude mcp list</code> and <code>/mcp</code>. Developers can attach remote servers to API calls too. And never put a token in a shared file."</p></div>
+<div class="sources"><h4>Sources and further reading</h4><ol>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/mcp" target="_blank" rel="noopener">Connect Claude Code to tools via MCP</a>: adding servers, scopes, <code>.mcp.json</code>, approvals, statuses, claude.ai connectors in Claude Code, importing from Claude Desktop, <code>claude mcp serve</code>, limits.</li>
+<li>Claude Code 2.1.319, <code>claude mcp --help</code>, <code>claude mcp add --help</code>, <code>claude mcp get --help</code>, <code>claude mcp serve --help</code> (captured 9 November 2026).</li>
+<li>Anthropic, <a href="https://claude.com/docs/connectors/getting-started" target="_blank" rel="noopener">Get started with connectors</a>, <a href="https://claude.com/docs/connectors/custom/add-unlisted" target="_blank" rel="noopener">Add a connector that isn't in the directory</a> and <a href="https://claude.com/docs/connectors/verification" target="_blank" rel="noopener">Connector verification</a>.</li>
+<li>Anthropic, <a href="https://claude.com/docs/connectors/building/mcpb" target="_blank" rel="noopener">Build a desktop extension with MCPB</a>; <a href="https://github.com/modelcontextprotocol/mcpb" target="_blank" rel="noopener">MCPB repository</a>.</li>
+<li>Model Context Protocol, <a href="https://modelcontextprotocol.io/docs/2026-07-28/develop/connect-local-servers" target="_blank" rel="noopener">Connect to local MCP servers</a> (Claude Desktop configuration file).</li>
+<li>Anthropic, <a href="https://platform.claude.com/docs/en/agents-and-tools/mcp-connector" target="_blank" rel="noopener">MCP connector</a> (Claude API, beta).</li>
+<li>Anthropic, <a href="https://code.claude.com/docs/en/managed-mcp" target="_blank" rel="noopener">Managed MCP configuration</a>.</li>
+</ol><p class="verified">Verified 9 November 2026 against Anthropic documentation and Claude Code 2.1.319. Menu names in claude.ai and the desktop app can change; plan and organisation settings affect availability.</p></div>
