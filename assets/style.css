@@ -380,3 +380,14 @@ main pre:not(.code pre):not(.term pre){white-space:pre-wrap;overflow-wrap:anywhe
   :root:not([data-theme="light"]) .theme-toggle .sun{display:block}
   :root:not([data-theme="light"]) .theme-toggle .moon{display:none}
 }
+
+/* ---------- phones: keep memory low
+   The whole book is one long page. Chapters far from the reader are not laid out or painted until
+   they come near the screen (content-visibility), which keeps phone browsers within their memory
+   limit. The see-through blurred header is also costly on phones, so it is solid there. */
+@media screen{
+  article.chapter,#glossary{content-visibility:auto;contain-intrinsic-size:auto 9000px}
+}
+@media (hover:none),(max-width:900px){
+  .runhead{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--leaf)}
+}

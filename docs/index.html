@@ -399,6 +399,17 @@ main pre:not(.code pre):not(.term pre){white-space:pre-wrap;overflow-wrap:anywhe
   :root:not([data-theme="light"]) .theme-toggle .moon{display:none}
 }
 
+/* ---------- phones: keep memory low
+   The whole book is one long page. Chapters far from the reader are not laid out or painted until
+   they come near the screen (content-visibility), which keeps phone browsers within their memory
+   limit. The see-through blurred header is also costly on phones, so it is solid there. */
+@media screen{
+  article.chapter,#glossary{content-visibility:auto;contain-intrinsic-size:auto 9000px}
+}
+@media (hover:none),(max-width:900px){
+  .runhead{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--leaf)}
+}
+
 </style>
 </head>
 <body>
@@ -44958,11 +44969,35 @@ var current = null, openChap = null, activeEls = [];
 function measure(){
   var sy = window.scrollY;
   spyTargets.forEach(function(t){ t.top = t.el.getBoundingClientRect().top + sy; });
+  // A chapter that is far off screen is not laid out yet, so the headings inside it have no real
+  // position. Place those at their chapter's start so the list stays in order for findCurrent.
+  var chapTop = 0, nextTop = Infinity;
+  for (var i = spyTargets.length - 1; i >= 0; i--){
+    var t = spyTargets[i];
+    if (!t.sub){ nextTop = t.top; continue; }
+    t._next = nextTop;
+  }
+  spyTargets.forEach(function(t){
+    if (!t.sub){ chapTop = t.top; return; }
+    if (!(t.top >= chapTop && t.top <= t._next)) t.top = chapTop;
+  });
 }
 function findCurrent(){
   var y = window.scrollY + 130, lo = 0, hi = spyTargets.length - 1, ans = -1;
   while (lo <= hi){ var mid = (lo + hi) >> 1; if (spyTargets[mid].top <= y){ ans = mid; lo = mid + 1; } else hi = mid - 1; }
   return ans < 0 ? null : spyTargets[ans];
+}
+// Saved positions go stale when far-away chapters are laid out (see style.css). Check the answer
+// against the live page: the current item must start above the line and the next chapter-level
+// item below it. If not, measure again. This costs two position reads per frame.
+function stillRight(cur){
+  var line = 130, i = cur ? spyTargets.indexOf(cur) : -1;
+  if (cur && cur.el.getBoundingClientRect().top > line + 1) return false;
+  for (var j = i + 1; j < spyTargets.length; j++){
+    if (spyTargets[j].sub) continue;
+    return spyTargets[j].el.getBoundingClientRect().top > line - 1;
+  }
+  return true;
 }
 function keepInRail(el){
   var r = el.getBoundingClientRect(), rr = rail.getBoundingClientRect();
@@ -44992,6 +45027,7 @@ function setActive(cur){
 }
 function spy(){
   var cur = findCurrent();
+  if (!stillRight(cur)){ measure(); cur = findCurrent(); }
   if (cur !== current){ current = cur; setActive(cur); }
   var h = document.documentElement.scrollHeight - window.innerHeight;
   bar.style.width = (h > 0 ? Math.min(100, window.scrollY / h * 100) : 0) + '%';
@@ -45005,6 +45041,28 @@ var resizeTimer;
 window.addEventListener('resize', function(){ clearTimeout(resizeTimer); resizeTimer = setTimeout(function(){ measure(); spy(); }, 150); });
 // Content above can change height (opening an "Under the hood" section, fonts loading), so re-measure then.
 document.addEventListener('toggle', function(){ measure(); }, true);
+// Chapters are laid out only when they come near the screen (see style.css), so their heights change
+// as the reader scrolls. Measure again whenever a chapter's size changes.
+// After a jump to a link, the chapters around the target are laid out and change height, which would
+// push the target off screen; keep it pinned in place until things settle or the reader scrolls.
+var pin = null, pinUntil = 0;
+function pinTo(id){ pin = id && document.getElementById(id); pinUntil = Date.now() + 3000; }
+function unpin(){ pin = null; }
+['wheel', 'touchstart', 'keydown', 'mousedown'].forEach(function(ev){ window.addEventListener(ev, unpin, { passive: true }); });
+window.addEventListener('hashchange', function(){ pinTo(decodeURIComponent(location.hash.slice(1))); });
+if (location.hash) pinTo(decodeURIComponent(location.hash.slice(1)));
+if (window.ResizeObserver){
+  var remeasure;
+  var ro = new ResizeObserver(function(){
+    if (pin && Date.now() < pinUntil) pin.scrollIntoView();
+    clearTimeout(remeasure);
+    remeasure = setTimeout(function(){
+      if (pin && Date.now() < pinUntil) pin.scrollIntoView();
+      measure(); spy();
+    }, 100);
+  });
+  $$('article.chapter, #glossary').forEach(function(el){ ro.observe(el); });
+}
 window.addEventListener('load', function(){ measure(); spy(); });
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ measure(); spy(); });
 measure(); spy();
